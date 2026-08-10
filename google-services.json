@@ -1,0 +1,98 @@
+{
+  "project_info": {
+    "project_number": "209723097611",
+    "project_id": "community-event-8b639",
+    "storage_bucket": "community-event-8b639.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:209723097611:android:ee98267b10c30837223d0e",
+        "android_client_info": {
+          "package_name": "info.siza.communityevents"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "209723097611-hrkoph3b59ag0etfc34dubb2c5lkjc2s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "info.siza.communityevents",
+            "certificate_hash": "f7860b3ecfb9545bd8812eee7fbad704e00b561a"
+          }
+        },
+        {
+          "client_id": "209723097611-55ugqo7vm42em5m1qitileljvmhofg27.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBsNVdDaPLLSUeLosaS9F-FNUvCWYUMgjA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "209723097611-55ugqo7vm42em5m1qitileljvmhofg27.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "209723097611-71i1fkbpeqiate6nmbbqquplfnd0fpit.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "info.siza.communityevents"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:209723097611:android:80b8c0e5a1ca7522223d0e",
+        "android_client_info": {
+          "package_name": "info.siza.communityevents.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "209723097611-omjrul0emberfrsnsfh4rn5kn2uo4ido.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "info.siza.communityevents.app",
+            "certificate_hash": "f7860b3ecfb9545bd8812eee7fbad704e00b561a"
+          }
+        },
+        {
+          "client_id": "209723097611-55ugqo7vm42em5m1qitileljvmhofg27.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBsNVdDaPLLSUeLosaS9F-FNUvCWYUMgjA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "209723097611-55ugqo7vm42em5m1qitileljvmhofg27.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "209723097611-71i1fkbpeqiate6nmbbqquplfnd0fpit.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "info.siza.communityevents"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
