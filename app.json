@@ -2,24 +2,29 @@
   "expo": {
     "name": "Community Events Australia",
     "slug": "community-events-australia-native",
-    "version": "0.1.0",
+    "version": "0.3.0",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/logo.png",
+      "image": "./assets/splash-native.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#f8faf9"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "bundleIdentifier": "info.siza.communityevents",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "info.siza.communityevents.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#ffffff"
@@ -31,7 +36,26 @@
     "plugins": [
       "expo-build-properties",
       "@react-native-firebase/app",
-      "@react-native-firebase/auth"
+      "@react-native-firebase/auth",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Allow Community Events Australia to add community events to your calendar."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Community Events Australia to verify event addresses and calculate prayer times."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Community Events Australia to select an event poster from your photos.",
+          "microphonePermission": false
+        }
+      ]
     ]
   }
 }

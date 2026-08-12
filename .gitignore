@@ -1,9 +1,11 @@
 ﻿node_modules/
 .expo/
+.expo-export-check-*/
 dist/
 build/
 coverage/
 *.log
+*.apk
 .DS_Store
 .env
 .env.local

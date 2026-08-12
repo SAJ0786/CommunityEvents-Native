@@ -1,39 +1,16 @@
-﻿import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getApp } from '@react-native-firebase/app';
 import {
   getAuth,
-  getReactNativePersistence,
-  initializeAuth,
   signInAnonymously,
-} from 'firebase/auth';
-import { getFunctions } from 'firebase/functions';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+  signInWithPhoneNumber,
+  updateProfile,
+} from '@react-native-firebase/auth';
+import { getFirestore } from '@react-native-firebase/firestore';
+import { getFunctions } from '@react-native-firebase/functions';
+import { getStorage } from '@react-native-firebase/storage';
 
-export const firebaseConfig = {
-  apiKey: 'AIzaSyCEBUl1pMkQ__slfHjNMSTg6RSycRhPwmk',
-  authDomain: 'community-event-8b639.firebaseapp.com',
-  projectId: 'community-event-8b639',
-  storageBucket: 'community-event-8b639.firebasestorage.app',
-  messagingSenderId: '209723097611',
-  appId: '1:209723097611:web:b91b3970bc3ec1a4223d0e',
-  measurementId: 'G-54XSP1B3WV',
-};
-
-export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-
-function getNativeAuth() {
-  try {
-    return initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage),
-    });
-  } catch (error) {
-    if (error?.code === 'auth/already-initialized') return getAuth(app);
-    throw error;
-  }
-}
-
-export const auth = getNativeAuth();
+export const app = getApp();
+export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app, 'australia-southeast1');
 export const storage = getStorage(app);
@@ -41,9 +18,7 @@ export const storage = getStorage(app);
 let sessionPromise = null;
 
 export async function ensureFirebaseSession() {
-  if (typeof auth.authStateReady === 'function') await auth.authStateReady();
   if (auth.currentUser) return auth.currentUser;
-
   if (!sessionPromise) {
     sessionPromise = signInAnonymously(auth)
       .then(credential => credential.user)
@@ -51,6 +26,35 @@ export async function ensureFirebaseSession() {
         sessionPromise = null;
       });
   }
-
   return sessionPromise;
+}
+
+export function formatAustralianMobile(raw) {
+  let value = String(raw || '').replace(/[\s\-().]/g, '');
+  if (value.startsWith('0')) value = `+61${value.slice(1)}`;
+  if (value.startsWith('61') && !value.startsWith('+')) value = `+${value}`;
+  return value;
+}
+
+export function isValidAustralianMobile(raw) {
+  return /^\+614\d{8}$/.test(formatAustralianMobile(raw));
+}
+
+export async function sendPhoneVerification(phoneNumber) {
+  const formatted = formatAustralianMobile(phoneNumber);
+  if (!isValidAustralianMobile(formatted)) {
+    throw new Error('Please enter a valid Australian mobile (04XX XXX XXX).');
+  }
+  return signInWithPhoneNumber(auth, formatted);
+}
+
+export async function confirmPhoneVerification(confirmation, code) {
+  if (!confirmation) throw new Error('Verification session expired. Please request a new code.');
+  const result = await confirmation.confirm(String(code || '').trim());
+  return result.user;
+}
+
+export async function setNativeDisplayName(user, displayName) {
+  if (!user) return;
+  await updateProfile(user, { displayName: String(displayName || '').trim() });
 }

@@ -5,13 +5,24 @@
   },
   "build": {
     "development": {
+      "environment": "development",
       "developmentClient": true,
       "distribution": "internal"
     },
+    "apk": {
+      "environment": "preview",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
+      "distribution": "internal"
+    },
     "preview": {
+      "environment": "preview",
       "distribution": "internal"
     },
     "production": {
+      "environment": "production",
       "autoIncrement": true
     }
   },
