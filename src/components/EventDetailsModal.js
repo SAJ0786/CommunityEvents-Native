@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  Easing,
   Image,
   Linking,
   Modal,
@@ -27,11 +28,13 @@ import { openEventInDeviceCalendar } from '../services/calendar';
 import { getImmediatePosterSource, resolvePosterSource } from '../services/images';
 import { getEventHostUid, sendHostMessage } from '../services/messaging';
 
-function DetailRow({ label, value }) {
+function DetailRow({ label, icon, value }) {
   if (!value) return null;
   return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
+    <View accessibilityLabel={`${label}: ${value}`} style={styles.detailRow}>
+      <View style={styles.detailIconCircle}>
+        <Text style={styles.detailIcon}>{icon}</Text>
+      </View>
       <Text style={styles.detailValue}>{String(value)}</Text>
     </View>
   );
@@ -44,24 +47,20 @@ function ActionButton({ label, icon, variant = 'subtle', onPress, disabled = fal
       onPress={onPress}
       style={({ pressed }) => [
         styles.actionButton,
-        variant === 'share' && styles.actionButtonShare,
-        variant === 'primary' && styles.actionButtonPrimary,
-        variant === 'danger' && styles.actionButtonDanger,
         disabled && styles.disabled,
         pressed && styles.pressed,
       ]}
     >
-      <Text style={[
-        styles.actionIcon,
-        variant === 'primary' && styles.actionIconPrimary,
-        variant === 'danger' && styles.actionIconDanger,
-      ]}
-      >
-        {icon}
-      </Text>
+      <View style={[
+        styles.actionIconBubble,
+        variant === 'share' && styles.actionIconBubbleShare,
+        variant === 'primary' && styles.actionIconBubblePrimary,
+        variant === 'danger' && styles.actionIconBubbleDanger,
+      ]}>
+        <Text style={styles.actionIcon}>{icon}</Text>
+      </View>
       <Text style={[
         styles.actionLabel,
-        variant === 'primary' && styles.actionLabelPrimary,
         variant === 'danger' && styles.actionLabelDanger,
       ]}
       >
@@ -127,7 +126,7 @@ export default function EventDetailsModal({
 }) {
   const translateY = useRef(new Animated.Value(0)).current;
   const closeRef = useRef(onClose);
-  const scrollOffsetRef = useRef(0);
+  const closingRef = useRef(false);
   const [posterUri, setPosterUri] = useState('');
   const [posterOpen, setPosterOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -143,7 +142,14 @@ export default function EventDetailsModal({
 
   useEffect(() => {
     if (!visible) return;
-    translateY.setValue(0);
+    closingRef.current = false;
+    translateY.setValue(640);
+    Animated.timing(translateY, {
+      toValue: 0,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
   }, [translateY, visible]);
 
   useEffect(() => {
@@ -171,10 +177,24 @@ export default function EventDetailsModal({
     };
   }, [event]);
 
+  const animateClose = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    Animated.timing(translateY, {
+      toValue: 900,
+      duration: 280,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      translateY.setValue(0);
+      closeRef.current?.();
+    });
+  };
+
   const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
     onMoveShouldSetPanResponderCapture: (_, gesture) => (
-      scrollOffsetRef.current <= 0
-      && gesture.dy > 12
+      gesture.dy > 8
       && Math.abs(gesture.dy) > Math.abs(gesture.dx)
     ),
     onPanResponderMove: (_, gesture) => {
@@ -184,7 +204,8 @@ export default function EventDetailsModal({
       if (gesture.dy > 110 || gesture.vy > 1) {
         Animated.timing(translateY, {
           toValue: 900,
-          duration: 180,
+          duration: 260,
+          easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }).start(() => {
           translateY.setValue(0);
@@ -194,8 +215,8 @@ export default function EventDetailsModal({
       }
       Animated.spring(translateY, {
         toValue: 0,
-        damping: 20,
-        stiffness: 220,
+        damping: 24,
+        stiffness: 180,
         useNativeDriver: true,
       }).start();
     },
@@ -303,19 +324,19 @@ export default function EventDetailsModal({
 
   return (
     <>
-      <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+      <Modal transparent visible={visible} animationType="fade" onRequestClose={animateClose}>
         <SafeAreaView style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={onClose} />
-          <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
-            <View style={styles.sheetHeader}>
+          <Pressable style={styles.backdrop} onPress={animateClose} />
+          <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+            <View style={styles.sheetHeader} {...panResponder.panHandlers}>
               <View style={styles.dragHandle} />
               <View style={styles.headerRow}>
                 <View style={styles.headerCopy}>
                   <Text style={styles.headerTitle}>Event details</Text>
                   <Text style={styles.headerHint}>Swipe down to close</Text>
                 </View>
-                <Pressable onPress={onClose} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
-                  <Text style={styles.closeText}>Close</Text>
+                <Pressable accessibilityLabel="Close event details" onPress={animateClose} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
+                  <Text style={styles.closeText}>{'\u00D7'}</Text>
                 </Pressable>
               </View>
             </View>
@@ -323,11 +344,11 @@ export default function EventDetailsModal({
             <ScrollView
               contentContainerStyle={styles.content}
               keyboardShouldPersistTaps="handled"
-              onScroll={event => { scrollOffsetRef.current = event.nativeEvent.contentOffset.y; }}
-              scrollEventThrottle={16}
             >
               <View style={styles.card}>
-                <Text style={styles.title}>{getEventTitle(event)}</Text>
+                <View style={styles.titlePanel}>
+                  <Text style={styles.title}>{getEventTitle(event).toUpperCase()}</Text>
+                </View>
 
                 <View style={styles.actionGrid}>
                   <ActionButton icon="📤" label="Share" variant="share" onPress={() => setShareOpen(true)} />
@@ -352,18 +373,20 @@ export default function EventDetailsModal({
                   </Pressable>
                 ) : null}
 
-                <DetailRow label="Event" value={displayType} />
-                <DetailRow label="Host" value={host} />
-                <DetailRow label="Time" value={`${event.prayerLabel ? `${event.prayerLabel} ` : ''}${formatEventTime(event.startTime, event.endTime)}`} />
-                <DetailRow label={isGuest ? 'Suburb' : 'Location'} value={location || 'Location TBC'} />
-                <DetailRow label="Audience" value={audience} />
-                <DetailRow label="Hijri date" value={hijriDate} />
-                <DetailRow label="Speaker" value={event.speakerName} />
-                <DetailRow label="Reciters" value={formatReciters(event.reciters)} />
+                <View style={styles.detailsPanel}>
+                  <DetailRow icon={'\uD83C\uDFAB'} label="Event" value={displayType} />
+                  <DetailRow icon={'\u2302'} label="Host" value={host} />
+                  <DetailRow icon={'\u23F0'} label="Time" value={`${event.prayerLabel ? `${event.prayerLabel} ` : ''}${formatEventTime(event.startTime, event.endTime)}`} />
+                  <DetailRow icon={'\uD83D\uDCCD'} label={isGuest ? 'Suburb' : 'Location'} value={location || 'Location TBC'} />
+                  <DetailRow icon={'\uD83D\uDC65'} label="Audience" value={audience} />
+                  <DetailRow icon={'\u263E'} label="Hijri date" value={hijriDate} />
+                  <DetailRow icon={'\uD83C\uDFA4'} label="Speaker" value={event.speakerName} />
+                  <DetailRow icon={'\uD83C\uDF99'} label="Reciters" value={formatReciters(event.reciters)} />
+                </View>
 
                 {event.notes?.trim() ? (
                   <View style={styles.notesBox}>
-                    <Text style={styles.detailLabel}>Notes</Text>
+                    <Text style={styles.notesLabel}>{'\uD83D\uDCDD'} Notes</Text>
                     <Text style={styles.notes}>{event.notes.trim()}</Text>
                   </View>
                 ) : null}
@@ -451,7 +474,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   sheet: {
-    maxHeight: '88%',
+    maxHeight: '84%',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     backgroundColor: colors.background,
@@ -492,14 +515,17 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   closeButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
     backgroundColor: colors.tealSoft,
   },
   closeText: {
     color: colors.tealDark,
-    fontSize: 14,
+    fontSize: 28,
+    lineHeight: 30,
     fontWeight: '900',
   },
   content: {
@@ -538,14 +564,23 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
-    padding: spacing.lg,
+    padding: spacing.md,
     ...shadow,
+  },
+  titlePanel: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.teal,
+    borderRadius: radius.md,
+    backgroundColor: '#edf8f6',
   },
   title: {
     color: colors.navy,
-    fontSize: 23,
-    lineHeight: 28,
+    fontSize: 16,
+    lineHeight: 21,
     fontWeight: '900',
+    letterSpacing: 0.35,
   },
   date: {
     color: colors.teal,
@@ -556,73 +591,57 @@ const styles = StyleSheet.create({
   actionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
+    gap: 6,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
   },
   actionButton: {
-    minWidth: 134,
-    minHeight: 48,
-    flexDirection: 'row',
+    width: 64,
+    minHeight: 70,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
-    paddingHorizontal: spacing.md,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#f8fafc',
+    gap: 5,
   },
-  actionButtonShare: {
-    backgroundColor: '#dcfce7',
-    borderColor: '#86efac',
-  },
-  actionButtonPrimary: {
-    backgroundColor: '#2563eb',
-    borderColor: '#2563eb',
-  },
-  actionButtonDanger: {
-    backgroundColor: '#fef2f2',
-    borderColor: '#fecaca',
-  },
-  actionIcon: {
-    fontSize: 15,
-  },
-  actionIconPrimary: {
-    color: colors.surface,
-  },
-  actionIconDanger: {
-    color: colors.danger,
-  },
+  actionIconBubble: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: '#eef2f7' },
+  actionIconBubbleShare: { backgroundColor: '#dcfce7' },
+  actionIconBubblePrimary: { backgroundColor: '#dbeafe' },
+  actionIconBubbleDanger: { backgroundColor: '#fee2e2' },
+  actionIcon: { fontSize: 20 },
   actionLabel: {
-    color: colors.tealDark,
-    fontSize: 13,
+    color: colors.text,
+    fontSize: 10,
+    lineHeight: 12,
     fontWeight: '900',
-  },
-  actionLabelPrimary: {
-    color: colors.surface,
+    textAlign: 'center',
   },
   actionLabelDanger: {
     color: colors.danger,
   },
-  detailRow: {
-    paddingVertical: spacing.sm,
+  detailsPanel: {
+    marginTop: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  detailLabel: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
+  detailRow: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 7,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
+  detailIconCircle: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: colors.tealSoft },
+  detailIcon: { fontSize: 16 },
   detailValue: {
+    flex: 1,
+    minWidth: 0,
     color: colors.text,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '700',
-    marginTop: spacing.xs,
   },
+  notesLabel: { color: colors.tealDark, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
   notesBox: {
     marginTop: spacing.md,
     padding: spacing.md,

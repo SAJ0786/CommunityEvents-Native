@@ -39,7 +39,13 @@ export function isGooglePlacesConfigured() {
 }
 
 export function createPlacesSessionToken() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+  // Places API (New) accepts session tokens up to 36 characters. A UUID keeps
+  // autocomplete and place-details requests in one billable session.
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, character => {
+    const random = Math.floor(Math.random() * 16);
+    const value = character === 'x' ? random : ((random & 0x3) | 0x8);
+    return value.toString(16);
+  });
 }
 
 export async function autocompleteAustralianAddresses(input, sessionToken) {

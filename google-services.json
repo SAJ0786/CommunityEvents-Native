@@ -66,6 +66,14 @@
           }
         },
         {
+          "client_id": "209723097611-u9440dq954hvpsn8f5evneavgnrtmmvl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "info.siza.communityevents.app",
+            "certificate_hash": "bd5cf4e7fb8e03ad94bc186fb3049d40132fd041"
+          }
+        },
+        {
           "client_id": "209723097611-55ugqo7vm42em5m1qitileljvmhofg27.apps.googleusercontent.com",
           "client_type": 3
         }

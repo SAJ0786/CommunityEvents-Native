@@ -77,7 +77,16 @@ export default function CitySelector({ selectedCity, onChange, allowCurrentLocat
                 onPress={detectCurrentCity}
                 style={({ pressed }) => [styles.locationButton, pressed && styles.pressed, locating && styles.disabled]}
               >
-                {locating ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.locationButtonText}>Use Current Location</Text>}
+                <View style={styles.locationIconCircle}>
+                  {locating
+                    ? <ActivityIndicator color={colors.surface} size="small" />
+                    : <Text style={styles.locationIcon}>{'\u25CE'}</Text>}
+                </View>
+                <View style={styles.locationCopy}>
+                  <Text style={styles.locationButtonText}>{locating ? 'Finding your city...' : 'Use my current location'}</Text>
+                  <Text style={styles.locationButtonHint}>Detect the nearest supported city</Text>
+                </View>
+                <Text style={styles.locationArrow}>{'\u203A'}</Text>
               </Pressable>
             ) : null}
             {locationError ? <Text style={styles.locationError}>{locationError}</Text> : null}
@@ -195,18 +204,34 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   locationButton: {
-    minHeight: 46,
+    minHeight: 68,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-    backgroundColor: colors.teal,
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: '#73c9c0',
+    borderRadius: radius.lg,
+    backgroundColor: '#e4f7f4',
     marginBottom: spacing.md,
   },
+  locationIconCircle: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 21,
+    backgroundColor: colors.teal,
+  },
+  locationIcon: { color: colors.surface, fontSize: 25, lineHeight: 27, fontWeight: '900' },
+  locationCopy: { flex: 1, minWidth: 0 },
   locationButtonText: {
-    color: colors.surface,
+    color: colors.tealDark,
     fontSize: 14,
     fontWeight: '900',
   },
+  locationButtonHint: { color: '#46706c', fontSize: 11, fontWeight: '700', marginTop: 2 },
+  locationArrow: { color: colors.tealDark, fontSize: 28, lineHeight: 28, fontWeight: '700' },
   locationError: {
     color: colors.danger,
     fontSize: 12,

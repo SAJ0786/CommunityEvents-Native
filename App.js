@@ -775,7 +775,9 @@ export default function App() {
           onClear={() => setHomeFilters({ ...EMPTY_HOME_FILTERS })}
         /> : null}
       <View style={styles.titleRow}>
-        <View>
+        <View style={styles.titleAccent} />
+        <View style={styles.titleCopy}>
+          <Text style={styles.sectionEyebrow}>DISCOVER WHAT'S ON</Text>
           <Text style={styles.sectionTitle}>Upcoming Events</Text>
           <Text style={styles.sectionSubtitle}>
             {displayedEvents.length} event{displayedEvents.length === 1 ? '' : 's'} in {cityLabel(selectedCity)}
@@ -1065,13 +1067,17 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    marginTop: spacing.sm,
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
+  titleAccent: { width: 5, height: 48, borderRadius: 3, backgroundColor: colors.teal },
+  titleCopy: { flex: 1, minWidth: 0 },
+  sectionEyebrow: { color: colors.tealDark, fontSize: 10, fontWeight: '900', letterSpacing: 1.25 },
   sectionTitle: {
     color: colors.navy,
-    fontSize: 28,
+    fontSize: 24,
+    lineHeight: 29,
     fontWeight: '900',
   },
   sectionSubtitle: {

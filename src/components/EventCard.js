@@ -97,7 +97,9 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
       </Pressable>
 
       <View style={styles.content}>
-        <Text style={[styles.title, compact && styles.titleCompact]} numberOfLines={2}>{title}</Text>
+        <View style={styles.titlePanel}>
+          <Text style={[styles.title, compact && styles.titleCompact]} numberOfLines={2}>{title.toUpperCase()}</Text>
+        </View>
         <Text style={[styles.meta, compact && styles.metaCompact]}>{'\u23F0'} {displayTime || 'Time TBC'}</Text>
         <Text style={[styles.meta, compact && styles.metaCompact]} numberOfLines={1}>{'\uD83D\uDCCD'} {suburb || 'Location TBC'}</Text>
 
@@ -160,8 +162,9 @@ const styles = StyleSheet.create({
   liveBadge: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingVertical: 2, color: colors.surface, backgroundColor: colors.teal, fontSize: 9, fontWeight: '900', textAlign: 'center' },
   zoomHint: { position: 'absolute', right: 5, bottom: 5, width: 22, height: 22, borderRadius: 11, color: colors.surface, backgroundColor: 'rgba(0,0,0,0.58)', fontSize: 15, lineHeight: 22, fontWeight: '900', textAlign: 'center' },
   content: { flex: 1, minWidth: 0, justifyContent: 'center' },
-  title: { color: colors.navy, fontSize: 15, lineHeight: 20, fontWeight: '900', marginBottom: 4 },
-  titleCompact: { fontSize: 14, lineHeight: 19 },
+  titlePanel: { alignSelf: 'stretch', paddingHorizontal: 9, paddingVertical: 7, marginBottom: 5, borderLeftWidth: 3, borderLeftColor: colors.teal, borderRadius: 9, backgroundColor: '#edf8f6' },
+  title: { color: colors.navy, fontSize: 13, lineHeight: 17, fontWeight: '900', letterSpacing: 0.25 },
+  titleCompact: { fontSize: 12, lineHeight: 16 },
   meta: { color: colors.muted, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   metaCompact: { fontSize: 11 },
   footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 6 },
