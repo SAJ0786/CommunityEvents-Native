@@ -8,9 +8,11 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "check": "node scripts/verify-source.js"
+    "check": "node scripts/verify-source.js",
+    "postinstall": "patch-package"
   },
   "dependencies": {
+    "@api.video/react-native-livestream": "^2.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-firebase/app": "^26.1.0",
     "@react-native-firebase/auth": "^26.1.0",
@@ -31,6 +33,7 @@
     "expo-notifications": "~0.32.17",
     "expo-status-bar": "~3.0.9",
     "firebase": "^12.0.0",
+    "patch-package": "^8.0.1",
     "promise": "^8.3.0",
     "react": "19.1.0",
     "react-native": "0.81.5",

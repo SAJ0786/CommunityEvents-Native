@@ -3,7 +3,6 @@
     "name": "Community Events Australia",
     "slug": "community-events-australia-native",
     "version": "0.3.0",
-    "newArchEnabled": false,
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
