@@ -19,7 +19,9 @@
       "supportsTablet": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Allow Community Events Australia to use your camera when you choose to live stream an event.",
+        "NSMicrophoneUsageDescription": "Allow Community Events Australia to use your microphone when you choose to live stream an event."
       }
     },
     "android": {
@@ -28,13 +30,19 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "extra": {
       "firebaseProjectId": "community-event-8b639"
     },
     "plugins": [
       "expo-build-properties",
+      "expo-notifications",
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
       [
@@ -53,7 +61,7 @@
         "expo-image-picker",
         {
           "photosPermission": "Allow Community Events Australia to select an event poster from your photos.",
-          "microphonePermission": false
+          "microphonePermission": "Allow Community Events Australia to use your microphone when you choose to live stream an event."
         }
       ]
     ]

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -109,10 +110,12 @@ export default function StreamedVideosScreen({ isGuest = false, onBack }) {
         return (
           <View key={video.id} style={styles.videoCard}>
             {!isGuest && video.videoId ? (
-              <View style={styles.thumbnail}>
-                <Text style={styles.thumbnailLabel}>YouTube thumbnail ready</Text>
-                <Text style={styles.thumbnailSubtext}>{video.videoId}</Text>
-              </View>
+              <Image
+                accessibilityLabel={`${title} YouTube thumbnail`}
+                source={{ uri: `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg` }}
+                style={styles.thumbnail}
+                resizeMode="cover"
+              />
             ) : (
               <View style={styles.placeholderThumb}>
                 <Text style={styles.placeholderIcon}>{'\u25B6'}</Text>
@@ -207,15 +210,12 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   thumbnail: {
+    width: '100%',
     minHeight: 180,
+    aspectRatio: 16 / 9,
     borderRadius: radius.md,
     backgroundColor: '#e5e7eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.lg,
   },
-  thumbnailLabel: { color: colors.navy, fontSize: 16, fontWeight: '900' },
-  thumbnailSubtext: { color: colors.muted, fontSize: 12, marginTop: 6 },
   placeholderThumb: {
     minHeight: 180,
     borderRadius: radius.md,

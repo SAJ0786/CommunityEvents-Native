@@ -33,6 +33,7 @@ import HijriCalendarScreen from './src/components/HijriCalendarScreen';
 import InboxScreen from './src/components/InboxScreen';
 import EventMapView from './src/components/EventMapView';
 import MyEventsScreen from './src/components/MyEventsScreen';
+import NativeLiveStreamModal from './src/components/NativeLiveStreamModal';
 import ProfileScreen from './src/components/ProfileScreen';
 import RecurringEventForm from './src/components/RecurringEventForm';
 import StreamedVideosScreen from './src/components/StreamedVideosScreen';
@@ -159,6 +160,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [streamEvent, setStreamEvent] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
   const [currentUser, setCurrentUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -285,6 +287,17 @@ export default function App() {
       eventError => setError(friendlyError(eventError, 'Could not update events automatically.'))
     );
   }, [currentUser?.isAnonymous, currentUser?.uid]);
+
+  useEffect(() => {
+    setSelectedEvent(current => {
+      if (!current?.id) return current;
+      return events.find(item => item.id === current.id) || current;
+    });
+    setStreamEvent(current => {
+      if (!current?.id) return current;
+      return events.find(item => item.id === current.id) || current;
+    });
+  }, [events]);
 
   useEffect(() => {
     const refreshSilently = () => {
@@ -1021,6 +1034,21 @@ export default function App() {
           setSelectedEvent(null);
           handleDeleteSeries(event);
         } : undefined}
+        canManageStream={!isGuest && (selectedEventOwned || profile?.role === 'admin' || profile?.role === 'superAdmin')}
+        onManageStream={event => {
+          setSelectedEvent(null);
+          setStreamEvent(event);
+        }}
+        />
+        <NativeLiveStreamModal
+          event={streamEvent}
+          visible={Boolean(streamEvent)}
+          onClose={() => setStreamEvent(null)}
+          onStreamChanged={updatedEvent => {
+            setStreamEvent(updatedEvent);
+            setEvents(current => current.map(item => item.id === updatedEvent.id ? { ...item, ...updatedEvent } : item));
+            setMyEvents(current => current.map(item => item.id === updatedEvent.id ? { ...item, ...updatedEvent } : item));
+          }}
         />
         <BottomNavigation
           activeTab={activeTab === 'bulk_share' || activeTab === 'admin' ? 'profile' : activeTab === 'calendar' || activeTab === 'hijri-calendar' || activeTab === 'streams' || activeTab === 'feedback' || activeTab === 'inbox' ? 'home' : activeTab}

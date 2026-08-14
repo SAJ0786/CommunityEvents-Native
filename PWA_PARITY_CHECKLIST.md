@@ -29,6 +29,15 @@ Additional PWA parity completed in this pass:
 
 - One-line Google Australian address autocomplete with structured address and GPS coordinates for both Single and Recurring events.
 - Signed-in Home data now follows the PWA full-data path; guests continue to use the privacy-safe callable function.
-- Connect to Host is wired from the expanded event drawer into Inbox conversations.
+- Contact Host is wired from the expanded event drawer into Inbox conversations.
 - Calendar month/week views, Hijri overlay, one-event device calendar action, and personal live calendar feed sync are implemented.
 - AI Search remains intentionally deferred until the final phase as requested.
+
+Additional gaps raised after the checklist review:
+
+| Requirement | Implementation status | Device test |
+|---|---|---|
+| Event live streaming | Host Go Live/Manage Live controls now support this phone's camera over RTMPS and the PWA's external YouTube Live link flow; signed-in viewers receive Watch Live | Pending next APK |
+| Contact Host terminology | Event action and message sheet renamed from Connect to Host to Contact Host | Pending next APK |
+| Streamed video thumbnails | Real YouTube `hqdefault` thumbnails now render from each video ID | Pending next APK |
+| Per-event reminders | Event drawer now schedules, changes, and removes local device reminders at five lead times | Pending next APK |

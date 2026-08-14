@@ -27,6 +27,20 @@ import { getEventSuburb, getEventTitle } from '../services/events';
 import { openEventInDeviceCalendar } from '../services/calendar';
 import { getImmediatePosterSource, resolvePosterSource } from '../services/images';
 import { getEventHostUid, sendHostMessage } from '../services/messaging';
+import {
+  cancelEventReminder,
+  formatReminderLeadTime,
+  getEventReminder,
+  scheduleEventReminder,
+} from '../services/reminders';
+
+const REMINDER_OPTIONS = [
+  { value: 15, label: '15 minutes before' },
+  { value: 30, label: '30 minutes before' },
+  { value: 60, label: '1 hour before' },
+  { value: 180, label: '3 hours before' },
+  { value: 1440, label: '1 day before' },
+];
 
 function DetailRow({ label, icon, value }) {
   if (!value) return null;
@@ -123,6 +137,8 @@ export default function EventDetailsModal({
   onCopy,
   onEditSeries,
   onDeleteSeries,
+  canManageStream = false,
+  onManageStream,
 }) {
   const translateY = useRef(new Animated.Value(0)).current;
   const closeRef = useRef(onClose);
@@ -135,6 +151,10 @@ export default function EventDetailsModal({
   const [hostMessageText, setHostMessageText] = useState('');
   const [hostMessageStatus, setHostMessageStatus] = useState('');
   const [hostMessageSending, setHostMessageSending] = useState(false);
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminder, setReminder] = useState(null);
+  const [reminderBusy, setReminderBusy] = useState(false);
+  const [reminderError, setReminderError] = useState('');
 
   useEffect(() => {
     closeRef.current = onClose;
@@ -161,6 +181,9 @@ export default function EventDetailsModal({
       setHostMessageOpen(false);
       setHostMessageText('');
       setHostMessageStatus('');
+      setReminderOpen(false);
+      setReminder(null);
+      setReminderError('');
       return () => { alive = false; };
     }
 
@@ -169,6 +192,12 @@ export default function EventDetailsModal({
     resolvePosterSource(event)
       .then(value => {
         if (alive && value) setPosterUri(value);
+      })
+      .catch(() => {});
+
+    getEventReminder(event.id)
+      .then(value => {
+        if (alive) setReminder(value);
       })
       .catch(() => {});
 
@@ -322,6 +351,47 @@ export default function EventDetailsModal({
     }
   };
 
+  const openLiveVideo = async () => {
+    if (!event.liveWatchUrl) return;
+    try {
+      await Linking.openURL(event.liveWatchUrl);
+    } catch {
+      Alert.alert('Watch Live', 'Could not open YouTube on this device.');
+    }
+  };
+
+  const setEventReminder = async minutesBefore => {
+    if (isGuest || reminderBusy) return;
+    setReminderBusy(true);
+    setReminderError('');
+    try {
+      const value = await scheduleEventReminder(event, minutesBefore);
+      setReminder(value);
+      setReminderOpen(false);
+      Alert.alert('Reminder set', `We’ll remind you ${formatReminderLeadTime(minutesBefore)}.`);
+    } catch (error) {
+      setReminderError(error?.message || 'Could not set this reminder.');
+    } finally {
+      setReminderBusy(false);
+    }
+  };
+
+  const removeEventReminder = async () => {
+    if (!event.id || reminderBusy) return;
+    setReminderBusy(true);
+    setReminderError('');
+    try {
+      await cancelEventReminder(event.id);
+      setReminder(null);
+      setReminderOpen(false);
+      Alert.alert('Reminder removed', 'This event reminder has been cancelled.');
+    } catch (error) {
+      setReminderError(error?.message || 'Could not remove this reminder.');
+    } finally {
+      setReminderBusy(false);
+    }
+  };
+
   return (
     <>
       <Modal transparent visible={visible} animationType="fade" onRequestClose={animateClose}>
@@ -353,7 +423,10 @@ export default function EventDetailsModal({
                 <View style={styles.actionGrid}>
                   <ActionButton icon="📤" label="Share" variant="share" onPress={() => setShareOpen(true)} />
                   <ActionButton icon="🗺️" label="Directions" variant="primary" onPress={openDirections} disabled={isGuest || !fullAddress} />
-                  {canConnectHost ? <ActionButton icon="✉️" label="Connect" onPress={() => { setHostMessageStatus(''); setHostMessageOpen(true); }} /> : null}
+                  {canConnectHost ? <ActionButton icon="✉️" label="Contact Host" onPress={() => { setHostMessageStatus(''); setHostMessageOpen(true); }} /> : null}
+                  {!isGuest && event.isLive && event.liveWatchUrl && event.liveAppVisibility !== 'private' ? <ActionButton icon="🔴" label="Watch Live" variant="danger" onPress={openLiveVideo} /> : null}
+                  {canManageStream && onManageStream ? <ActionButton icon="📹" label={event.isLive ? 'Manage Live' : 'Go Live'} variant={event.isLive ? 'danger' : 'primary'} onPress={() => onManageStream(event)} /> : null}
+                  <ActionButton icon={reminder ? "🔔" : "⏰"} label={reminder ? 'Reminder Set' : 'Reminder'} onPress={() => { setReminderError(''); setReminderOpen(true); }} disabled={isGuest} />
                   <ActionButton icon="📅" label="Calendar" onPress={addToCalendar} disabled={isGuest} />
                   {onEdit ? <ActionButton icon="✏️" label="Edit" onPress={() => onEdit(event)} /> : null}
                   {onEditSeries ? <ActionButton icon="🗂️" label="Edit Series" onPress={() => onEditSeries(event)} /> : null}
@@ -422,7 +495,7 @@ export default function EventDetailsModal({
         <View style={styles.overlayRoot}>
           <Pressable style={styles.overlayBackdrop} onPress={() => setHostMessageOpen(false)} />
           <View style={styles.overlayCard}>
-            <Text style={styles.overlayTitle}>Connect to Host</Text>
+            <Text style={styles.overlayTitle}>Contact Host</Text>
             <Text style={styles.overlaySubtitle}>Message about {getEventTitle(event)}</Text>
             <TextInput
               multiline
@@ -447,6 +520,42 @@ export default function EventDetailsModal({
             </Pressable>
             <Pressable onPress={() => setHostMessageOpen(false)} style={({ pressed }) => [styles.overlayClose, pressed && styles.pressed]}>
               <Text style={styles.overlayCloseText}>{hostMessageStatus.startsWith('Message sent') ? 'Done' : 'Cancel'}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal transparent visible={reminderOpen} animationType="fade" onRequestClose={() => setReminderOpen(false)}>
+        <View style={styles.overlayRoot}>
+          <Pressable style={styles.overlayBackdrop} onPress={() => setReminderOpen(false)} />
+          <View style={styles.overlayCard}>
+            <Text style={styles.overlayTitle}>Event Reminder</Text>
+            <Text style={styles.overlaySubtitle}>Choose when this phone should remind you about {getEventTitle(event)}.</Text>
+            <View style={styles.reminderOptions}>
+              {REMINDER_OPTIONS.map(option => (
+                <Pressable
+                  disabled={reminderBusy}
+                  key={option.value}
+                  onPress={() => setEventReminder(option.value)}
+                  style={({ pressed }) => [
+                    styles.reminderOption,
+                    reminder?.minutesBefore === option.value && styles.reminderOptionActive,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.reminderOptionIcon}>{reminder?.minutesBefore === option.value ? '🔔' : '○'}</Text>
+                  <Text style={[styles.reminderOptionText, reminder?.minutesBefore === option.value && styles.reminderOptionTextActive]}>{option.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            {reminderError ? <Text style={styles.reminderError}>{reminderError}</Text> : null}
+            {reminder ? (
+              <Pressable disabled={reminderBusy} onPress={removeEventReminder} style={styles.removeReminderButton}>
+                <Text style={styles.removeReminderText}>{reminderBusy ? 'Please wait…' : 'Remove Reminder'}</Text>
+              </Pressable>
+            ) : null}
+            <Pressable disabled={reminderBusy} onPress={() => setReminderOpen(false)} style={({ pressed }) => [styles.overlayClose, pressed && styles.pressed]}>
+              <Text style={styles.overlayCloseText}>Cancel</Text>
             </Pressable>
           </View>
         </View>
@@ -741,6 +850,59 @@ const styles = StyleSheet.create({
   },
   messageSendText: {
     color: colors.surface,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  reminderOptions: {
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  reminderOption: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  reminderOptionActive: {
+    borderColor: colors.teal,
+    backgroundColor: colors.tealSoft,
+  },
+  reminderOptionIcon: {
+    width: 26,
+    fontSize: 17,
+    textAlign: 'center',
+  },
+  reminderOptionText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  reminderOptionTextActive: {
+    color: colors.tealDark,
+  },
+  reminderError: {
+    color: colors.danger,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '800',
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  removeReminderButton: {
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: '#fee2e2',
+  },
+  removeReminderText: {
+    color: colors.danger,
     fontSize: 14,
     fontWeight: '900',
   },
