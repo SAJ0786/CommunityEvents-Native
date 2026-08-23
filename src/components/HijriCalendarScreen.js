@@ -29,6 +29,7 @@ import { calculatePrayerTimes, PRAYER_OPTIONS } from '../services/prayerTimes';
 import { getPrayerReminderSettings, initializeDefaultPrayerReminders, setPrayerReminder } from '../services/reminders';
 import { DEFAULT_CITY, cityLabel, normalizeCity } from '../utils/cities';
 import { getPrayerLocation } from '../utils/prayerLocations';
+import CompactSelect from './CompactSelect';
 import NativeDateTimeField from './NativeDateTimeField';
 
 const CATEGORIES = ['Wiladat', 'Shahadat', 'Wafat', 'Eid', 'Ayyam-e-Aza', 'Amaal', 'Season', 'Event'];
@@ -203,10 +204,16 @@ export default function HijriCalendarScreen({ profile, selectedCity }) {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.hero}>
-        <Text style={styles.title}>Hijri Calendar</Text>
-        <Text style={styles.subtitle}>
-          Today&apos;s Hijri date, key Islamic events, prayer times, and quick conversion tools.
-        </Text>
+        <View style={styles.heroGlowLarge} />
+        <View style={styles.heroGlowSmall} />
+        <View style={styles.heroIcon}>
+          <MaterialCommunityIcons name="moon-waning-crescent" color={colors.surface} size={25} />
+        </View>
+        <View style={styles.heroCopy}>
+          <Text style={styles.heroEyebrow}>ISLAMIC CALENDAR</Text>
+          <Text style={styles.title}>Hijri Calendar</Text>
+          <Text numberOfLines={2} style={styles.subtitle}>Dates, prayer times and quick conversion</Text>
+        </View>
       </View>
 
       {loading ? (
@@ -216,68 +223,82 @@ export default function HijriCalendarScreen({ profile, selectedCity }) {
         </View>
       ) : (
         <>
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Today</Text>
-            <Text style={styles.primaryDate}>{formatDate(todayIso, { weekday: 'long' })}</Text>
-            <Text style={styles.secondaryDate}>{todayHijri || 'Hijri date unavailable'}</Text>
+          <View style={[styles.card, styles.todayCard]}>
+            <View style={styles.todayTopRow}>
+              <View style={styles.todayIcon}>
+                <MaterialCommunityIcons name="calendar-today" color={colors.tealDark} size={23} />
+              </View>
+              <View style={styles.todayCopy}>
+                <Text style={styles.todayLabel}>TODAY</Text>
+                <Text style={styles.secondaryDate}>{todayHijri || 'Hijri date unavailable'}</Text>
+                <Text style={styles.primaryDate}>{formatDate(todayIso, { weekday: 'long' })}</Text>
+              </View>
+            </View>
 
             {nextObservance ? (
               <View style={[styles.highlightBox, toneStyles[observanceTone(nextObservance.category)]]}>
-                <Text style={styles.highlightLabel}>Next Observance</Text>
-                <Text style={styles.highlightTitle}>{nextObservance.name}</Text>
-                <Text style={styles.highlightText}>
-                  {hijriDisplayFromParts(nextObservance.day, nextObservance.month, nextObservance.hYear)}
-                </Text>
-                <Text style={styles.highlightText}>{formatDate(nextObservance.gDate, { weekday: 'long' })}</Text>
-              </View>
-            ) : null}
-
-            {todayPrayerTimes ? (
-              <View style={styles.sectionBlock}>
-                <View style={styles.sectionRow}>
-                  <Text style={styles.sectionTitle}>Prayer Times</Text>
-                  <Text style={styles.sectionMeta}>{cityLabel(prayerCity)}</Text>
+                <View style={styles.observanceIcon}>
+                  <MaterialCommunityIcons name="star-crescent" color={colors.tealDark} size={18} />
                 </View>
-                <Text style={styles.prayerHelp}>Tap any prayer time to schedule or remove its phone reminder.</Text>
-                <View style={styles.prayerJourney}>
-                  <View pointerEvents="none" style={styles.sunArc}>
-                    <View style={styles.sunArcLine} />
-                    <View accessibilityLabel="Current daylight position" style={[styles.sunArcDot, sunPosition]} />
-                  </View>
-                  <View style={styles.sunEndpointRow}>
-                    {SUN_ENDPOINTS.map(key => {
-                      const option = PRAYER_OPTIONS.find(item => item.key === key);
-                      const visual = PRAYER_VISUALS[key];
-                      const reminderEnabled = prayerReminderKeys.includes(key);
-                      return (
-                        <Pressable accessibilityRole="button" accessibilityState={{ selected: reminderEnabled }} disabled={Boolean(prayerReminderBusy)} key={key} onPress={() => togglePrayerReminder(key)} style={({ pressed }) => [styles.sunEndpoint, reminderEnabled && styles.prayerStageActive, pressed && styles.pressed]}>
-                          {prayerReminderBusy === key ? <ActivityIndicator color={visual.color} size="small" /> : <MaterialCommunityIcons name={visual.icon} color={visual.color} size={34} />}
-                          <Text style={styles.sunEndpointLabel}>{option?.label}</Text>
-                          <Text style={styles.sunEndpointTime}>{todayPrayerTimes[key]}</Text>
-                          <MaterialCommunityIcons name={reminderEnabled ? 'bell' : 'bell-outline'} color={reminderEnabled ? colors.tealDark : colors.textMuted} size={15} style={styles.prayerReminderIcon} />
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                  <View style={styles.prayerStageRow}>
-                    {PRAYER_STAGES.map(key => {
-                      const option = PRAYER_OPTIONS.find(item => item.key === key);
-                      const visual = PRAYER_VISUALS[key];
-                      const reminderEnabled = prayerReminderKeys.includes(key);
-                      return (
-                        <Pressable accessibilityRole="button" accessibilityState={{ selected: reminderEnabled }} disabled={Boolean(prayerReminderBusy)} key={key} onPress={() => togglePrayerReminder(key)} style={({ pressed }) => [styles.prayerStage, reminderEnabled && styles.prayerStageActive, pressed && styles.pressed]}>
-                          {prayerReminderBusy === key ? <ActivityIndicator color={visual.color} size="small" /> : <MaterialCommunityIcons name={visual.icon} color={visual.color} size={28} />}
-                          <Text style={styles.prayerStageLabel}>{option?.label === 'Maghrebain' ? 'Maghreb' : option?.label}</Text>
-                          <Text style={styles.prayerStageTime}>{todayPrayerTimes[key]}</Text>
-                          <MaterialCommunityIcons name={reminderEnabled ? 'bell' : 'bell-outline'} color={reminderEnabled ? colors.tealDark : colors.textMuted} size={14} style={styles.prayerReminderIcon} />
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                <View style={styles.observanceCopy}>
+                  <Text style={styles.highlightLabel}>NEXT OBSERVANCE</Text>
+                  <Text numberOfLines={1} style={styles.highlightTitle}>{nextObservance.name}</Text>
+                  <Text numberOfLines={1} style={styles.highlightText}>
+                    {hijriDisplayFromParts(nextObservance.day, nextObservance.month, nextObservance.hYear)} · {formatDate(nextObservance.gDate)}
+                  </Text>
                 </View>
               </View>
             ) : null}
           </View>
+
+          {todayPrayerTimes ? (
+            <View style={styles.card}>
+              <View style={styles.sectionRow}>
+                <Text style={styles.cardTitle}>Prayer Times</Text>
+                <View style={styles.cityPill}>
+                  <MaterialCommunityIcons name="map-marker" color={colors.tealDark} size={14} />
+                  <Text style={styles.cityPillText}>{cityLabel(prayerCity)}</Text>
+                </View>
+              </View>
+              <Text style={styles.prayerHelp}>Tap a prayer time to add or remove its phone reminder.</Text>
+              <View style={styles.prayerJourney}>
+                <View pointerEvents="none" style={styles.sunArc}>
+                  <View style={styles.sunArcLine} />
+                  <View accessibilityLabel="Current daylight position" style={[styles.sunArcDot, sunPosition]} />
+                </View>
+                <View style={styles.sunEndpointRow}>
+                  {SUN_ENDPOINTS.map(key => {
+                    const option = PRAYER_OPTIONS.find(item => item.key === key);
+                    const visual = PRAYER_VISUALS[key];
+                    const reminderEnabled = prayerReminderKeys.includes(key);
+                    return (
+                      <Pressable accessibilityRole="button" accessibilityState={{ selected: reminderEnabled }} disabled={Boolean(prayerReminderBusy)} key={key} onPress={() => togglePrayerReminder(key)} style={({ pressed }) => [styles.sunEndpoint, reminderEnabled && styles.prayerStageActive, pressed && styles.pressed]}>
+                        {prayerReminderBusy === key ? <ActivityIndicator color={visual.color} size="small" /> : <MaterialCommunityIcons name={visual.icon} color={visual.color} size={30} />}
+                        <Text style={styles.sunEndpointLabel}>{option?.label}</Text>
+                        <Text style={styles.sunEndpointTime}>{todayPrayerTimes[key]}</Text>
+                        <MaterialCommunityIcons name={reminderEnabled ? 'bell' : 'bell-outline'} color={reminderEnabled ? colors.tealDark : colors.muted} size={14} style={styles.prayerReminderIcon} />
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <View style={styles.prayerStageRow}>
+                  {PRAYER_STAGES.map(key => {
+                    const option = PRAYER_OPTIONS.find(item => item.key === key);
+                    const visual = PRAYER_VISUALS[key];
+                    const reminderEnabled = prayerReminderKeys.includes(key);
+                    return (
+                      <Pressable accessibilityRole="button" accessibilityState={{ selected: reminderEnabled }} disabled={Boolean(prayerReminderBusy)} key={key} onPress={() => togglePrayerReminder(key)} style={({ pressed }) => [styles.prayerStage, reminderEnabled && styles.prayerStageActive, pressed && styles.pressed]}>
+                        {prayerReminderBusy === key ? <ActivityIndicator color={visual.color} size="small" /> : <MaterialCommunityIcons name={visual.icon} color={visual.color} size={25} />}
+                        <Text style={styles.prayerStageLabel}>{option?.label === 'Maghrebain' ? 'Maghreb' : option?.label}</Text>
+                        <Text style={styles.prayerStageTime}>{todayPrayerTimes[key]}</Text>
+                        <MaterialCommunityIcons name={reminderEnabled ? 'bell' : 'bell-outline'} color={reminderEnabled ? colors.tealDark : colors.muted} size={13} style={styles.prayerReminderIcon} />
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          ) : null}
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Quick Convert</Text>
@@ -316,17 +337,14 @@ export default function HijriCalendarScreen({ profile, selectedCity }) {
                     style={styles.input}
                   />
                 </View>
-                <View style={[styles.fieldStack, styles.flexField]}>
+                <View style={[styles.fieldStack, styles.flexField, styles.monthField]}>
                   <Text style={styles.fieldLabel}>Month</Text>
-                  <TextInput
-                    value={HIJRI_MONTHS.find(item => String(item.value) === String(hMonth))?.name || ''}
-                    onChangeText={value => {
-                      const matched = HIJRI_MONTHS.find(item => item.name.toLowerCase() === value.trim().toLowerCase());
-                      if (matched) setHMonth(String(matched.value));
-                    }}
+                  <CompactSelect
+                    value={String(hMonth)}
+                    onChange={value => setHMonth(String(value))}
+                    options={HIJRI_MONTHS.map(month => ({ value: String(month.value), label: month.name }))}
                     placeholder="Muharram"
-                    autoCapitalize="words"
-                    style={styles.input}
+                    title="Choose Hijri month"
                   />
                 </View>
                 <View style={[styles.fieldStack, styles.flexField]}>
@@ -340,23 +358,6 @@ export default function HijriCalendarScreen({ profile, selectedCity }) {
                 </View>
               </View>
             )}
-
-            {!useGregorianInput ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.monthChips}>
-                {HIJRI_MONTHS.map(month => {
-                  const active = String(month.value) === String(hMonth);
-                  return (
-                    <Pressable
-                      key={month.value}
-                      onPress={() => setHMonth(String(month.value))}
-                      style={[styles.monthChip, active && styles.monthChipActive]}
-                    >
-                      <Text style={[styles.monthChipText, active && styles.monthChipTextActive]}>{month.name}</Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            ) : null}
 
             <View style={styles.resultBox}>
               <Text style={styles.resultLabel}>{useGregorianInput ? 'Hijri date' : 'Gregorian date'}</Text>
@@ -380,7 +381,7 @@ export default function HijriCalendarScreen({ profile, selectedCity }) {
               value={search}
               onChangeText={setSearch}
               placeholder="Search key Islamic events..."
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.muted}
               style={styles.input}
             />
 
@@ -455,28 +456,43 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: spacing.lg,
-    gap: spacing.lg,
-    paddingBottom: spacing.xxl,
+    padding: spacing.md,
+    gap: spacing.md,
+    paddingBottom: spacing.xl,
   },
   hero: {
-    gap: spacing.sm,
+    position: 'relative',
+    minHeight: 98,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.teal,
+    ...shadow,
   },
+  heroGlowLarge: { position: 'absolute', width: 130, height: 130, borderRadius: 65, right: -35, top: -70, backgroundColor: 'rgba(255,255,255,0.12)' },
+  heroGlowSmall: { position: 'absolute', width: 72, height: 72, borderRadius: 36, right: 58, bottom: -54, backgroundColor: 'rgba(255,255,255,0.09)' },
+  heroIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', backgroundColor: 'rgba(255,255,255,0.16)' },
+  heroCopy: { flex: 1, gap: 2 },
+  heroEyebrow: { color: 'rgba(255,255,255,0.78)', fontSize: 9, fontWeight: '900', letterSpacing: 1.1 },
   title: {
-    color: colors.navy,
-    fontSize: 34,
-    lineHeight: 38,
+    color: colors.surface,
+    fontSize: 24,
+    lineHeight: 29,
     fontWeight: '900',
   },
   subtitle: {
-    color: colors.textMuted,
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '600',
+    color: 'rgba(255,255,255,0.86)',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '700',
   },
   loadingCard: {
     backgroundColor: colors.surface,
-    borderRadius: radius.xl,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.xl,
@@ -485,55 +501,67 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   loadingText: {
-    color: colors.textMuted,
+    color: colors.muted,
     fontSize: 15,
     fontWeight: '700',
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.xl,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.lg,
-    gap: spacing.md,
+    padding: spacing.md,
+    gap: spacing.sm,
     ...shadow,
   },
+  todayCard: { overflow: 'hidden', borderColor: '#b9dfd9', backgroundColor: '#fbfefd' },
+  todayTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  todayIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tealSoft, borderWidth: 1, borderColor: '#c7e7e1' },
+  todayCopy: { flex: 1, gap: 1 },
+  todayLabel: { color: colors.tealDark, fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   cardTitle: {
     color: colors.navy,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '900',
   },
   primaryDate: {
-    color: colors.navy,
-    fontSize: 20,
-    fontWeight: '900',
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '700',
   },
   secondaryDate: {
-    color: colors.tealDark,
-    fontSize: 16,
-    fontWeight: '800',
+    color: colors.navy,
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: '900',
   },
   highlightBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    gap: spacing.xs,
+    borderRadius: radius.md,
+    paddingVertical: 9,
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
   },
+  observanceIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.76)' },
+  observanceCopy: { flex: 1, gap: 1 },
   highlightLabel: {
-    color: colors.textMuted,
-    fontSize: 11,
+    color: colors.muted,
+    fontSize: 8,
     fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   highlightTitle: {
     color: colors.navy,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '900',
   },
   highlightText: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '700',
   },
   sectionBlock: {
@@ -551,23 +579,25 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   sectionMeta: {
-    color: colors.textMuted,
+    color: colors.muted,
     fontSize: 13,
     fontWeight: '700',
   },
-  prayerHelp: { color: colors.textMuted, fontSize: 11, lineHeight: 16, fontWeight: '700' },
-  prayerJourney: { position: 'relative', overflow: 'hidden', padding: spacing.md, borderWidth: 1, borderColor: '#9fd8d1', borderRadius: radius.lg, backgroundColor: colors.tealSoft, gap: spacing.sm },
-  sunArc: { height: 42, marginHorizontal: spacing.md, marginBottom: -16 },
+  cityPill: { maxWidth: '58%', minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, borderRadius: 999, backgroundColor: colors.tealSoft },
+  cityPillText: { flexShrink: 1, color: colors.tealDark, fontSize: 10, fontWeight: '900' },
+  prayerHelp: { color: colors.muted, fontSize: 11, lineHeight: 16, fontWeight: '700' },
+  prayerJourney: { position: 'relative', overflow: 'hidden', padding: spacing.sm, borderWidth: 1, borderColor: '#9fd8d1', borderRadius: radius.md, backgroundColor: colors.tealSoft, gap: 6 },
+  sunArc: { height: 36, marginHorizontal: spacing.md, marginBottom: -14 },
   sunArcLine: { position: 'absolute', top: 14, left: 0, right: 0, height: 54, borderTopWidth: 1.5, borderColor: colors.teal, borderTopLeftRadius: 180, borderTopRightRadius: 180, opacity: 0.75 },
   sunArcDot: { position: 'absolute', width: 13, height: 13, marginLeft: -6, borderRadius: 7, backgroundColor: '#e99718', shadowColor: '#e99718', shadowOpacity: 0.45, shadowRadius: 5, elevation: 3 },
   sunEndpointRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
-  sunEndpoint: { position: 'relative', flex: 1, minHeight: 112, alignItems: 'center', justifyContent: 'center', padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
-  sunEndpointLabel: { marginTop: 3, color: colors.textMuted, fontSize: 12, fontWeight: '800' },
-  sunEndpointTime: { marginTop: 2, color: colors.navy, fontSize: 22, lineHeight: 27, fontWeight: '900' },
-  prayerStageRow: { flexDirection: 'row', gap: spacing.sm },
-  prayerStage: { position: 'relative', flex: 1, minHeight: 105, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.sm, paddingHorizontal: 5, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  sunEndpoint: { position: 'relative', flex: 1, minHeight: 90, alignItems: 'center', justifyContent: 'center', padding: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  sunEndpointLabel: { marginTop: 3, color: colors.muted, fontSize: 12, fontWeight: '800' },
+  sunEndpointTime: { marginTop: 1, color: colors.navy, fontSize: 18, lineHeight: 22, fontWeight: '900' },
+  prayerStageRow: { flexDirection: 'row', gap: 6 },
+  prayerStage: { position: 'relative', flex: 1, minHeight: 82, alignItems: 'center', justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 4, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   prayerStageActive: { borderColor: colors.teal, backgroundColor: '#f4fbfa' },
-  prayerStageLabel: { marginTop: 3, color: colors.textMuted, fontSize: 11, fontWeight: '800', textAlign: 'center' },
+  prayerStageLabel: { marginTop: 3, color: colors.muted, fontSize: 11, fontWeight: '800', textAlign: 'center' },
   prayerStageTime: { marginTop: 2, color: colors.navy, fontSize: 16, lineHeight: 21, fontWeight: '900' },
   prayerReminderIcon: { position: 'absolute', top: 7, right: 7 },
   toggleRow: {
@@ -602,7 +632,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   fieldLabel: {
-    color: colors.textMuted,
+    color: colors.muted,
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
@@ -626,32 +656,9 @@ const styles = StyleSheet.create({
   },
   flexField: {
     flex: 1,
-    minWidth: 92,
+    minWidth: 76,
   },
-  monthChips: {
-    gap: spacing.sm,
-    paddingRight: spacing.sm,
-  },
-  monthChip: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-  },
-  monthChipActive: {
-    backgroundColor: colors.tealSoft,
-    borderColor: colors.teal,
-  },
-  monthChipText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  monthChipTextActive: {
-    color: colors.tealDark,
-  },
+  monthField: { flex: 1.45, minWidth: 130 },
   resultBox: {
     padding: spacing.md,
     borderRadius: radius.lg,
@@ -659,7 +666,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   resultLabel: {
-    color: colors.textMuted,
+    color: colors.muted,
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
@@ -683,7 +690,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.background,
   },
-  categorySelectLabel: { color: colors.textMuted, fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
+  categorySelectLabel: { color: colors.muted, fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
   categorySelectValue: { maxWidth: 240, marginTop: 3, color: colors.navy, fontSize: 12, fontWeight: '800' },
   categorySelectChevron: { color: colors.tealDark, fontSize: 12, fontWeight: '900' },
   categoryMenu: { marginTop: -spacing.xs, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, ...shadow },
@@ -737,7 +744,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   listNotes: {
-    color: colors.textMuted,
+    color: colors.muted,
     fontSize: 13,
     lineHeight: 19,
     fontStyle: 'italic',
@@ -757,7 +764,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   emptyText: {
-    color: colors.textMuted,
+    color: colors.muted,
     fontSize: 14,
     fontWeight: '700',
   },

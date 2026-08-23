@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -97,7 +97,7 @@ const ADMIN_ACTION_GROUPS = [
   {
     key: 'operations',
     title: 'Operations',
-    actions: ['settings', 'messaging', 'troubleshooting', 'tools'],
+    actions: ['settings', 'messaging', 'import', 'troubleshooting', 'tools'],
   },
 ];
 
@@ -146,6 +146,9 @@ const LIVE_ACTIONS = [
   },
   {
     key: 'troubleshooting', title: 'Troubleshooting Management', description: 'Diagnostics, crash monitoring and support tools.', local: true,
+  },
+  {
+    key: 'import', title: 'Event Import & Export', description: 'Import PWA event spreadsheets and export upcoming-event reports.', local: true,
   },
   {
     key: 'tools', title: 'Tools', description: 'YouTube Live Connection, event import/export and future utilities.', local: true,
@@ -359,6 +362,7 @@ export default function AdminDashboardScreen({
   onCopyEvent,
   onEditSeries,
 }) {
+  const adminScrollRef = useRef(null);
   const [panel, setPanel] = useState('overview');
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
@@ -384,7 +388,8 @@ export default function AdminDashboardScreen({
   const [editingHijriObsId, setEditingHijriObsId] = useState(null);
   const [hijriObsSelection, setHijriObsSelection] = useState('');
   const [hijriObsForm, setHijriObsForm] = useState(blankHijriObservanceForm);
-  const [adminEventsLoading, setAdminEventsLoading] = useState(false);
+  const [adminEventLoadingViews, setAdminEventLoadingViews] = useState({ active: false, archived: false });
+  const [adminEventLoadedViews, setAdminEventLoadedViews] = useState({ active: false, archived: false });
   const [adminEventsError, setAdminEventsError] = useState('');
   const [adminEvents, setAdminEvents] = useState([]);
   const [archivedAdminEvents, setArchivedAdminEvents] = useState([]);
@@ -460,6 +465,14 @@ export default function AdminDashboardScreen({
     : cityLabel(getAdminCity(profile)).replace(', Australia', '');
   const canAccess = profile?.role === 'admin' || profile?.role === 'superAdmin';
   const canManageHijriSettings = profile?.role === 'superAdmin';
+  const adminEventsLoading = Boolean(adminEventLoadingViews[adminEventView]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      adminScrollRef.current?.scrollTo?.({ y: 0, animated: false });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [panel]);
 
   useEffect(() => {
     if (profile?.role !== 'superAdmin') setExportCity(getAdminCity(profile));
@@ -746,7 +759,7 @@ export default function AdminDashboardScreen({
   };
 
   const loadAdminEvents = async (view = adminEventView) => {
-    setAdminEventsLoading(true);
+    setAdminEventLoadingViews(current => ({ ...current, [view]: true }));
     setAdminEventsError('');
     try {
       const sourceQuery = view === 'archived'
@@ -763,7 +776,8 @@ export default function AdminDashboardScreen({
     } catch (error) {
       setAdminEventsError(error.message || 'Could not load admin events.');
     } finally {
-      setAdminEventsLoading(false);
+      setAdminEventLoadedViews(current => ({ ...current, [view]: true }));
+      setAdminEventLoadingViews(current => ({ ...current, [view]: false }));
     }
   };
 
@@ -789,20 +803,19 @@ export default function AdminDashboardScreen({
 
   useEffect(() => {
     if (panel !== 'events') return;
-    if (adminEventView === 'active' && adminEvents.length === 0 && !adminEventsLoading) {
+    if (!adminEventLoadedViews.active && !adminEventLoadingViews.active) {
       loadAdminEvents('active');
-      return;
     }
-    if (adminEventView === 'archived' && archivedAdminEvents.length === 0 && !adminEventsLoading) {
+    if (!adminEventLoadedViews.archived && !adminEventLoadingViews.archived) {
       loadAdminEvents('archived');
     }
-  }, [adminEventView, adminEvents.length, adminEventsLoading, archivedAdminEvents.length, panel]);
+  }, [adminEventLoadedViews.active, adminEventLoadedViews.archived, adminEventLoadingViews.active, adminEventLoadingViews.archived, panel]);
 
   useEffect(() => {
-    if (panel === 'users' && adminEvents.length === 0 && !adminEventsLoading) {
+    if (panel === 'users' && !adminEventLoadedViews.active && !adminEventLoadingViews.active) {
       loadAdminEvents('active');
     }
-  }, [adminEvents.length, adminEventsLoading, panel]);
+  }, [adminEventLoadedViews.active, adminEventLoadingViews.active, panel]);
 
   const handleToggleAdminVisibility = async event => {
     setAdminVisibilityBusyId(event.id);
@@ -1637,10 +1650,11 @@ export default function AdminDashboardScreen({
 
   return (
     <ScrollView
+      ref={adminScrollRef}
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
-      removeClippedSubviews={panel === 'events' || panel === 'users'}
+      removeClippedSubviews={false}
       scrollEventThrottle={16}
     >
       {panel === 'overview' ? (
@@ -2921,6 +2935,21 @@ export default function AdminDashboardScreen({
                 </Text>
               </View>
             ) : null}
+          </View> : null}
+
+          {panel === 'tools' ? <View style={styles.actionCard}>
+            <View style={styles.cardTop}>
+              <View style={styles.listTextWrap}>
+                <Text style={styles.cardTitle}>Event Import & Export</Text>
+                <Text style={styles.cardDescription}>Upload the PWA Excel template or export upcoming events by date and location.</Text>
+              </View>
+              <View style={[styles.dashboardActionIcon, { backgroundColor: ADMIN_ACTION_META.import.tone }]}>
+                <Text style={styles.dashboardActionIconText}>{ADMIN_ACTION_META.import.icon}</Text>
+              </View>
+            </View>
+            <Pressable onPress={() => setPanel('import')} style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>Open Event Import & Export</Text>
+            </Pressable>
           </View> : null}
 
           {panel === 'tools' ? <View style={styles.actionCard}>
