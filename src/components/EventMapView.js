@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { compareEventsByDateTime, getEventTitle } from '../services/events';
@@ -95,12 +95,6 @@ function eventTimeLabel(event) {
   return event.prayerLabel ? `${event.prayerLabel} ${base}` : base;
 }
 
-function fullAddress(event = {}) {
-  const address = event.address || {};
-  if (typeof address === 'string') return address;
-  return address.fullAddress || [address.street, address.suburb, address.state, address.postcode].filter(Boolean).join(', ');
-}
-
 function distanceKm(from, to) {
   if (!from || !to) return null;
   const radians = value => Number(value) * Math.PI / 180;
@@ -120,6 +114,7 @@ function distanceLabel(from, to) {
 
 export default function EventMapView({ events = [], onSelectEvent }) {
   const mapRef = useRef(null);
+  const markerRefs = useRef({});
   const [timeFilter, setTimeFilter] = useState('today');
   const [userLocation, setUserLocation] = useState(null);
   const [locationEnabled, setLocationEnabled] = useState(false);
@@ -129,7 +124,6 @@ export default function EventMapView({ events = [], onSelectEvent }) {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapLoadSlow, setMapLoadSlow] = useState(false);
   const [mapAttempt, setMapAttempt] = useState(0);
-  const [selectedMarker, setSelectedMarker] = useState(null);
 
   useEffect(() => {
     if (!mapReady || mapLoaded) {
@@ -171,23 +165,6 @@ export default function EventMapView({ events = [], onSelectEvent }) {
     setMapLoaded(false);
     setMapLoadSlow(false);
     setMapAttempt(current => current + 1);
-  };
-
-  const openDirections = async event => {
-    const address = fullAddress(event);
-    if (!address) {
-      setLocationError('This event does not have a full address for directions.');
-      return;
-    }
-    const destination = encodeURIComponent(address);
-    const url = Platform.OS === 'ios'
-      ? `https://maps.apple.com/?daddr=${destination}&dirflg=d`
-      : `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
-    try {
-      await Linking.openURL(url);
-    } catch {
-      setLocationError('Could not open directions on this device.');
-    }
   };
 
   useEffect(() => {
@@ -274,16 +251,19 @@ export default function EventMapView({ events = [], onSelectEvent }) {
         >
           {mapEvents.map(({ event, coords }) => {
             const key = audienceKey(event.audienceType || event.audience);
+            const markerKey = String(event.id || `${coords.latitude}-${coords.longitude}`);
             return (
               <Marker
-                key={event.id}
+                key={markerKey}
+                ref={ref => {
+                  if (ref) markerRefs.current[markerKey] = ref;
+                  else delete markerRefs.current[markerKey];
+                }}
                 coordinate={coords}
                 pinColor={AUDIENCE_COLORS[key]}
-                title={getEventTitle(event)}
-                description={`${eventDateLabel(event)} - ${eventTimeLabel(event)} - ${event.address?.suburb || event.suburb || ''}`}
-                onPress={() => setSelectedMarker({ event, coords })}
+                onPress={() => requestAnimationFrame(() => markerRefs.current[markerKey]?.showCallout?.())}
               >
-                <Callout onPress={() => onSelectEvent?.(event)}>
+                <Callout tooltip onPress={() => onSelectEvent?.(event)}>
                   <View style={styles.callout}>
                     <Text style={styles.calloutTitle}>{getEventTitle(event)}</Text>
                     <Text style={styles.calloutMeta}>
@@ -293,7 +273,10 @@ export default function EventMapView({ events = [], onSelectEvent }) {
                       {audienceLabel(event.audienceType || event.audience)}
                     </Text>
                     {userLocation ? <Text style={styles.calloutDistance}>{distanceLabel(userLocation, coords)}</Text> : null}
-                    <Text style={styles.viewLink}>Open event details</Text>
+                    <View style={styles.calloutAction}>
+                      <Text style={styles.viewLink}>View event details</Text>
+                      <Text style={styles.calloutChevron}>{'›'}</Text>
+                    </View>
                   </View>
                 </Callout>
               </Marker>
@@ -316,24 +299,6 @@ export default function EventMapView({ events = [], onSelectEvent }) {
           </View>
         ) : null}
       </View>
-
-      {selectedMarker ? (
-        <View style={styles.selectedCard}>
-          <View style={styles.selectedCopy}>
-            <Text style={styles.selectedTitle}>{getEventTitle(selectedMarker.event)}</Text>
-            <Text style={styles.selectedMeta}>{eventDateLabel(selectedMarker.event)} · {eventTimeLabel(selectedMarker.event)}</Text>
-            {userLocation ? <Text style={styles.selectedDistance}>{distanceLabel(userLocation, selectedMarker.coords)}</Text> : null}
-          </View>
-          <View style={styles.selectedActions}>
-            <Pressable onPress={() => onSelectEvent?.(selectedMarker.event)} style={({ pressed }) => [styles.selectedViewButton, pressed && styles.pressed]}>
-              <Text style={styles.selectedViewText}>View</Text>
-            </Pressable>
-            <Pressable onPress={() => openDirections(selectedMarker.event)} style={({ pressed }) => [styles.selectedDirectionsButton, pressed && styles.pressed]}>
-              <Text style={styles.selectedDirectionsText}>Directions</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
 
       <View style={styles.locationActions}>
         <Pressable
@@ -466,22 +431,14 @@ const styles = StyleSheet.create({
   mapProblemText: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: spacing.sm },
   retryButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.teal, marginTop: spacing.md },
   retryButtonText: { color: colors.surface, fontSize: 13, fontWeight: '900' },
-  selectedCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, marginTop: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, ...shadow },
-  selectedCopy: { flex: 1, minWidth: 0 },
-  selectedTitle: { color: colors.navy, fontSize: 14, fontWeight: '900' },
-  selectedMeta: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 3 },
-  selectedDistance: { color: colors.tealDark, fontSize: 11, fontWeight: '900', marginTop: 3 },
-  selectedActions: { gap: 6 },
-  selectedViewButton: { minHeight: 38, minWidth: 88, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.tealSoft },
-  selectedViewText: { color: colors.tealDark, fontSize: 12, fontWeight: '900' },
-  selectedDirectionsButton: { minHeight: 38, minWidth: 88, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: '#2563eb' },
-  selectedDirectionsText: { color: colors.surface, fontSize: 12, fontWeight: '900' },
-  callout: { width: 235, padding: 4 },
+  callout: { width: 250, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   calloutTitle: { color: colors.navy, fontSize: 14, fontWeight: '900', marginBottom: 4 },
   calloutMeta: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   calloutAudience: { fontSize: 12, fontWeight: '900', marginTop: 4 },
   calloutDistance: { color: colors.navy, fontSize: 12, fontWeight: '900', marginTop: 4 },
-  viewLink: { color: colors.tealDark, fontSize: 13, fontWeight: '900', marginTop: 8 },
+  calloutAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: 9, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  viewLink: { color: colors.tealDark, fontSize: 13, fontWeight: '900' },
+  calloutChevron: { color: colors.tealDark, fontSize: 22, lineHeight: 22, fontWeight: '900' },
   empty: {
     alignItems: 'center',
     padding: spacing.xl,

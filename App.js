@@ -587,7 +587,9 @@ function MainApp() {
       }
       const nextProfile = await updateUserPreferences(currentUser.uid, changes);
       setProfile(nextProfile);
-      setProfileMessage('Profile settings saved.');
+      setProfileMessage(nextProfile?.roleDemoted
+        ? 'Default city updated. Admin access was removed because admin access is city-specific.'
+        : 'Profile settings saved.');
       if (changes.defaultCity) handleCityChange(changes.defaultCity);
       if (changes.defaultModule) handlePreferredModuleChange(changes.defaultModule);
       return true;

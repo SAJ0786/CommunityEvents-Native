@@ -43,6 +43,13 @@ import AddressAutocomplete from './AddressAutocomplete';
 import CompactSelect from './CompactSelect';
 import { getDynamicEventOptions } from '../services/eventOptionsAdmin';
 
+const FIELD_LIMITS = {
+  hostName: 40,
+  customEventType: 20,
+  eventSubject: 35,
+  notes: 500,
+};
+
 function Field({ label, optional = false, error, children }) {
   return (
     <View style={styles.field}>
@@ -314,6 +321,7 @@ export default function CreateEventForm({
   const validation = useMemo(() => {
     const errors = {};
     if (!form.hostName.trim()) errors.hostName = 'Enter the host name.';
+    if (form.hostName.trim().length > FIELD_LIMITS.hostName) errors.hostName = `Host name must be ${FIELD_LIMITS.hostName} characters or less.`;
     if (!isIsoDate(form.eventDate)) errors.eventDate = 'Use a valid date in YYYY-MM-DD format.';
     if (form.timeMode === 'prayer' && !form.prayerName) {
       errors.startTime = 'Select the prayer time for this event.';
@@ -326,6 +334,12 @@ export default function CreateEventForm({
     }
     if (form.eventType === 'Custom' && !form.customEventType.trim()) {
       errors.customEventType = 'Enter the custom event type.';
+    }
+    if (form.eventType === 'Custom' && form.customEventType.trim().length > FIELD_LIMITS.customEventType) {
+      errors.customEventType = `Custom event type must be ${FIELD_LIMITS.customEventType} characters or less.`;
+    }
+    if (form.eventSubject.trim().length > FIELD_LIMITS.eventSubject) {
+      errors.eventSubject = `Subject must be ${FIELD_LIMITS.eventSubject} characters or less. Use Notes for extra detail.`;
     }
     if (
       !form.fullAddress.trim()
@@ -764,6 +778,7 @@ export default function CreateEventForm({
 
         <Field label="Host Name" error={attempted ? validation.hostName : ''}>
           <TextInput
+            maxLength={FIELD_LIMITS.hostName}
             value={form.hostName}
             onChangeText={value => update('hostName', value)}
             placeholder={form.isOnBehalfOf ? "Enter the host's name" : 'Your name or organisation'}
@@ -771,6 +786,7 @@ export default function CreateEventForm({
             editable={!lockedHostName}
             style={[styles.input, attempted && validation.hostName && styles.inputInvalid]}
           />
+          <Text style={styles.counter}>{form.hostName.length}/{FIELD_LIMITS.hostName}</Text>
         </Field>
 
         <Field label="Host Phone Number" optional>
@@ -965,23 +981,27 @@ export default function CreateEventForm({
         {form.eventType === 'Custom' ? (
           <Field label="Custom Event Type" error={attempted ? validation.customEventType : ''}>
             <TextInput
+              maxLength={FIELD_LIMITS.customEventType}
               value={form.customEventType}
               onChangeText={value => update('customEventType', value)}
               placeholder="e.g. Aqeeqa, Nikah, Commemoration"
               placeholderTextColor={colors.muted}
               style={[styles.input, attempted && validation.customEventType && styles.inputInvalid]}
             />
+            <Text style={styles.counter}>{form.customEventType.length}/{FIELD_LIMITS.customEventType}</Text>
           </Field>
         ) : null}
 
-        <Field label="Subject" optional>
+        <Field label="Subject" optional error={attempted ? validation.eventSubject : ''}>
           <TextInput
+            maxLength={FIELD_LIMITS.eventSubject}
             value={form.eventSubject}
             onChangeText={value => update('eventSubject', value)}
             placeholder="e.g. Shahadat of Imam Hussain (A.S.)"
             placeholderTextColor={colors.muted}
-            style={styles.input}
+            style={[styles.input, attempted && validation.eventSubject && styles.inputInvalid]}
           />
+          <Text style={styles.counter}>{form.eventSubject.length}/{FIELD_LIMITS.eventSubject}</Text>
         </Field>
 
         <Field label="Audience Type">
@@ -1061,7 +1081,7 @@ export default function CreateEventForm({
         <Field label="Notes" optional>
           <TextInput
             multiline
-            maxLength={500}
+            maxLength={FIELD_LIMITS.notes}
             numberOfLines={4}
             textAlignVertical="top"
             value={form.notes}
@@ -1070,7 +1090,7 @@ export default function CreateEventForm({
             placeholderTextColor={colors.muted}
             style={[styles.input, styles.textArea]}
           />
-          <Text style={styles.counter}>{form.notes.length}/500</Text>
+          <Text style={styles.counter}>{form.notes.length}/{FIELD_LIMITS.notes}</Text>
         </Field>
 
         {nativePicker ? (

@@ -1,4 +1,4 @@
-import { arrayRemove, arrayUnion, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from '@react-native-firebase/firestore';
+import { arrayRemove, arrayUnion, collection, deleteField, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from '@react-native-firebase/firestore';
 import { httpsCallable } from '@react-native-firebase/functions';
 import { deleteUser } from '@react-native-firebase/auth';
 import { db, functions } from '../firebase/firebase';
@@ -90,8 +90,20 @@ export async function updateUserPreferences(uid, changes = {}) {
     payload.emailLower = payload.email;
   }
   if (!Object.keys(payload).length) return getUserProfile(uid);
+  let roleDemoted = false;
+  if (Object.prototype.hasOwnProperty.call(payload, 'defaultCity')) {
+    const current = await getUserProfile(uid);
+    const currentCity = String(current?.defaultCity || '').trim();
+    const requestedCity = String(payload.defaultCity || '').trim();
+    if (current?.role === ROLES.ADMIN && currentCity && requestedCity && currentCity !== requestedCity) {
+      payload.role = ROLES.USER;
+      payload.adminCity = deleteField();
+      roleDemoted = true;
+    }
+  }
   await updateDoc(doc(db, 'users', uid), { ...payload, updatedAt: serverTimestamp() });
-  return getUserProfile(uid);
+  const updated = await getUserProfile(uid);
+  return roleDemoted ? { ...updated, roleDemoted: true } : updated;
 }
 
 function hasPhone(user = {}) {

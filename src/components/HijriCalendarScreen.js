@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, radius, shadow, spacing } from '../theme';
 import {
   getCurrentHijriYear,
@@ -31,6 +32,15 @@ import { getPrayerLocation } from '../utils/prayerLocations';
 import NativeDateTimeField from './NativeDateTimeField';
 
 const CATEGORIES = ['Wiladat', 'Shahadat', 'Wafat', 'Eid', 'Ayyam-e-Aza', 'Amaal', 'Season', 'Event'];
+const PRAYER_VISUALS = {
+  fajr: { icon: 'weather-night-partly-cloudy', color: '#0f766e' },
+  sunrise: { icon: 'weather-sunset-up', color: '#e99718' },
+  zohrain: { icon: 'white-balance-sunny', color: '#e99718' },
+  sunset: { icon: 'weather-sunset-down', color: '#e17726' },
+  maghreb: { icon: 'weather-night', color: '#17213f' },
+};
+const SUN_ENDPOINTS = ['sunrise', 'sunset'];
+const PRAYER_STAGES = ['fajr', 'zohrain', 'maghreb'];
 
 function toIsoDate(date) {
   const value = new Date(date);
@@ -41,6 +51,11 @@ function toIsoDate(date) {
 function parseIsoDate(input) {
   const [year, month, day] = String(input || '').split('-').map(Number);
   return new Date(year || 2000, (month || 1) - 1, day || 1);
+}
+
+function timeMinutes(value) {
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})/);
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
 }
 
 function formatDate(value, options = {}) {
@@ -136,6 +151,18 @@ export default function HijriCalendarScreen({ profile, selectedCity }) {
     () => calculatePrayerTimes(todayIso, getPrayerLocation(prayerCity)),
     [prayerCity, todayIso]
   );
+  const sunPosition = useMemo(() => {
+    const sunrise = timeMinutes(todayPrayerTimes?.sunrise);
+    const sunset = timeMinutes(todayPrayerTimes?.sunset);
+    if (!Number.isFinite(sunrise) || !Number.isFinite(sunset) || sunset <= sunrise) return { left: '50%', top: 8 };
+    const now = new Date();
+    const current = now.getHours() * 60 + now.getMinutes();
+    const progress = Math.max(0, Math.min(1, (current - sunrise) / (sunset - sunrise)));
+    return {
+      left: `${4 + progress * 92}%`,
+      top: 28 - Math.sin(Math.PI * progress) * 20,
+    };
+  }, [todayPrayerTimes]);
   const currentHijriYear = getCurrentHijriYear(overrides) || Number(hYear) || 1448;
   const visibleObservances = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -211,20 +238,42 @@ export default function HijriCalendarScreen({ profile, selectedCity }) {
                   <Text style={styles.sectionTitle}>Prayer Times</Text>
                   <Text style={styles.sectionMeta}>{cityLabel(prayerCity)}</Text>
                 </View>
-                <Text style={styles.prayerHelp}>Tap the bell on any prayer time to schedule or remove a phone reminder.</Text>
-                <View style={styles.prayerGrid}>
-                  {PRAYER_OPTIONS.map(option => {
-                    const reminderEnabled = prayerReminderKeys.includes(option.key);
-                    return (
-                    <Pressable accessibilityState={{ selected: reminderEnabled }} disabled={Boolean(prayerReminderBusy)} key={option.key} onPress={() => togglePrayerReminder(option.key)} style={({ pressed }) => [styles.prayerCard, reminderEnabled && styles.prayerCardActive, pressed && styles.pressed]}>
-                      <View style={styles.prayerLabelRow}>
-                        <Text style={styles.prayerLabel}>{option.label}</Text>
-                        {prayerReminderBusy === option.key ? <ActivityIndicator color={colors.tealDark} size="small" /> : <Text style={[styles.prayerBell, reminderEnabled && styles.prayerBellActive]}>{reminderEnabled ? '\u{1F514}' : '\u{1F515}'}</Text>}
-                      </View>
-                      <Text style={styles.prayerTime}>{todayPrayerTimes[option.key]}</Text>
-                    </Pressable>
-                    );
-                  })}
+                <Text style={styles.prayerHelp}>Tap any prayer time to schedule or remove its phone reminder.</Text>
+                <View style={styles.prayerJourney}>
+                  <View pointerEvents="none" style={styles.sunArc}>
+                    <View style={styles.sunArcLine} />
+                    <View accessibilityLabel="Current daylight position" style={[styles.sunArcDot, sunPosition]} />
+                  </View>
+                  <View style={styles.sunEndpointRow}>
+                    {SUN_ENDPOINTS.map(key => {
+                      const option = PRAYER_OPTIONS.find(item => item.key === key);
+                      const visual = PRAYER_VISUALS[key];
+                      const reminderEnabled = prayerReminderKeys.includes(key);
+                      return (
+                        <Pressable accessibilityRole="button" accessibilityState={{ selected: reminderEnabled }} disabled={Boolean(prayerReminderBusy)} key={key} onPress={() => togglePrayerReminder(key)} style={({ pressed }) => [styles.sunEndpoint, reminderEnabled && styles.prayerStageActive, pressed && styles.pressed]}>
+                          {prayerReminderBusy === key ? <ActivityIndicator color={visual.color} size="small" /> : <MaterialCommunityIcons name={visual.icon} color={visual.color} size={34} />}
+                          <Text style={styles.sunEndpointLabel}>{option?.label}</Text>
+                          <Text style={styles.sunEndpointTime}>{todayPrayerTimes[key]}</Text>
+                          <MaterialCommunityIcons name={reminderEnabled ? 'bell' : 'bell-outline'} color={reminderEnabled ? colors.tealDark : colors.textMuted} size={15} style={styles.prayerReminderIcon} />
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <View style={styles.prayerStageRow}>
+                    {PRAYER_STAGES.map(key => {
+                      const option = PRAYER_OPTIONS.find(item => item.key === key);
+                      const visual = PRAYER_VISUALS[key];
+                      const reminderEnabled = prayerReminderKeys.includes(key);
+                      return (
+                        <Pressable accessibilityRole="button" accessibilityState={{ selected: reminderEnabled }} disabled={Boolean(prayerReminderBusy)} key={key} onPress={() => togglePrayerReminder(key)} style={({ pressed }) => [styles.prayerStage, reminderEnabled && styles.prayerStageActive, pressed && styles.pressed]}>
+                          {prayerReminderBusy === key ? <ActivityIndicator color={visual.color} size="small" /> : <MaterialCommunityIcons name={visual.icon} color={visual.color} size={28} />}
+                          <Text style={styles.prayerStageLabel}>{option?.label === 'Maghrebain' ? 'Maghreb' : option?.label}</Text>
+                          <Text style={styles.prayerStageTime}>{todayPrayerTimes[key]}</Text>
+                          <MaterialCommunityIcons name={reminderEnabled ? 'bell' : 'bell-outline'} color={reminderEnabled ? colors.tealDark : colors.textMuted} size={14} style={styles.prayerReminderIcon} />
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                 </View>
               </View>
             ) : null}
@@ -506,37 +555,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  prayerGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  prayerCard: {
-    minWidth: '30%',
-    flexGrow: 1,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-    gap: spacing.xs,
-  },
-  prayerCardActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
   prayerHelp: { color: colors.textMuted, fontSize: 11, lineHeight: 16, fontWeight: '700' },
-  prayerLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs },
-  prayerBell: { color: colors.textMuted, fontSize: 16 },
-  prayerBellActive: { color: colors.tealDark },
-  prayerLabel: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  prayerTime: {
-    color: colors.navy,
-    fontSize: 16,
-    fontWeight: '900',
-  },
+  prayerJourney: { position: 'relative', overflow: 'hidden', padding: spacing.md, borderWidth: 1, borderColor: '#9fd8d1', borderRadius: radius.lg, backgroundColor: colors.tealSoft, gap: spacing.sm },
+  sunArc: { height: 42, marginHorizontal: spacing.md, marginBottom: -16 },
+  sunArcLine: { position: 'absolute', top: 14, left: 0, right: 0, height: 54, borderTopWidth: 1.5, borderColor: colors.teal, borderTopLeftRadius: 180, borderTopRightRadius: 180, opacity: 0.75 },
+  sunArcDot: { position: 'absolute', width: 13, height: 13, marginLeft: -6, borderRadius: 7, backgroundColor: '#e99718', shadowColor: '#e99718', shadowOpacity: 0.45, shadowRadius: 5, elevation: 3 },
+  sunEndpointRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
+  sunEndpoint: { position: 'relative', flex: 1, minHeight: 112, alignItems: 'center', justifyContent: 'center', padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  sunEndpointLabel: { marginTop: 3, color: colors.textMuted, fontSize: 12, fontWeight: '800' },
+  sunEndpointTime: { marginTop: 2, color: colors.navy, fontSize: 22, lineHeight: 27, fontWeight: '900' },
+  prayerStageRow: { flexDirection: 'row', gap: spacing.sm },
+  prayerStage: { position: 'relative', flex: 1, minHeight: 105, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.sm, paddingHorizontal: 5, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  prayerStageActive: { borderColor: colors.teal, backgroundColor: '#f4fbfa' },
+  prayerStageLabel: { marginTop: 3, color: colors.textMuted, fontSize: 11, fontWeight: '800', textAlign: 'center' },
+  prayerStageTime: { marginTop: 2, color: colors.navy, fontSize: 16, lineHeight: 21, fontWeight: '900' },
+  prayerReminderIcon: { position: 'absolute', top: 7, right: 7 },
   toggleRow: {
     flexDirection: 'row',
     gap: spacing.sm,

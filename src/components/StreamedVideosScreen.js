@@ -106,6 +106,8 @@ export default function StreamedVideosScreen({ isGuest = false, onBack }) {
 
       {!loading && !error && videos.map(video => {
         const isLive = video.status === 'live' || video.status === 'active';
+        const isScheduled = video.status === 'scheduled';
+        const statusLabel = isLive ? 'LIVE' : isScheduled ? 'Scheduled' : 'Completed';
         const title = video.eventTitle || 'Community Event Stream';
         return (
           <View key={video.id} style={styles.videoCard}>
@@ -125,15 +127,15 @@ export default function StreamedVideosScreen({ isGuest = false, onBack }) {
             <View style={styles.videoBody}>
               <View style={styles.videoTopRow}>
                 <Text style={styles.videoTitle}>{title}</Text>
-                <View style={[styles.statusPill, isLive ? styles.livePill : styles.completedPill]}>
-                  <Text style={[styles.statusPillText, isLive ? styles.livePillText : styles.completedPillText]}>
-                    {isLive ? 'LIVE' : 'Completed'}
+                <View style={[styles.statusPill, isLive ? styles.livePill : isScheduled ? styles.scheduledPill : styles.completedPill]}>
+                  <Text style={[styles.statusPillText, isLive ? styles.livePillText : isScheduled ? styles.scheduledPillText : styles.completedPillText]}>
+                    {statusLabel}
                   </Text>
                 </View>
               </View>
               {video.hostName ? <Text style={styles.videoHost}>{video.hostName}</Text> : null}
               <Text style={styles.videoMeta}>
-                {[formatDate(video.eventDate || video.startedAt), video.privacyStatus === 'unlisted' ? 'Private' : 'Public']
+                {[formatDate(video.eventDate || video.scheduledStartAt || video.startedAt), video.privacyStatus === 'unlisted' ? 'Private' : 'Public']
                   .filter(Boolean)
                   .join(' • ')}
               </Text>
@@ -229,9 +231,11 @@ const styles = StyleSheet.create({
   videoTitle: { flex: 1, color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: '900' },
   statusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   livePill: { backgroundColor: '#fee2e2' },
+  scheduledPill: { backgroundColor: '#fef3c7' },
   completedPill: { backgroundColor: '#f1f5f9' },
   statusPillText: { fontSize: 11, fontWeight: '900' },
   livePillText: { color: '#991b1b' },
+  scheduledPillText: { color: '#92400e' },
   completedPillText: { color: '#475569' },
   videoHost: { color: colors.text, fontSize: 13, fontWeight: '700' },
   videoMeta: { color: colors.muted, fontSize: 12, lineHeight: 18 },

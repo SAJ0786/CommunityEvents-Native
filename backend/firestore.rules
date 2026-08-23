@@ -24,12 +24,20 @@ service cloud.firestore {
     function isCityAdminForEvent(data) {
       return isRegistered() && role() == 'admin' && eventCity(data) == adminCity();
     }
+    function canUpdateOwnProfile(userId) {
+      return request.auth.uid == userId
+        && (
+          role() != 'admin'
+          || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['defaultCity'])
+          || request.resource.data.role == 'user'
+        );
+    }
 
     // ── Users ──────────────────────────────────────────────────────────────────
     match /users/{userId} {
       allow read:   if isRegistered() && (request.auth.uid == userId || isAdmin());
       allow create: if isRegistered() && request.auth.uid == userId;
-      allow update: if isRegistered() && (request.auth.uid == userId || isSuperAdmin());
+      allow update: if isRegistered() && (canUpdateOwnProfile(userId) || isSuperAdmin());
       allow delete: if isRegistered() && (request.auth.uid == userId || isSuperAdmin());
     }
 

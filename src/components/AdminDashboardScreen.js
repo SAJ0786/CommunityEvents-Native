@@ -17,6 +17,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as XLSX from 'xlsx';
+import RNShare from 'react-native-share';
 import { collection, getDocs, orderBy, query, where } from '@react-native-firebase/firestore';
 import { colors, radius, shadow, spacing } from '../theme';
 import NativeDateTimeField from './NativeDateTimeField';
@@ -147,7 +148,7 @@ const LIVE_ACTIONS = [
     key: 'troubleshooting', title: 'Troubleshooting Management', description: 'Diagnostics, crash monitoring and support tools.', local: true,
   },
   {
-    key: 'tools', title: 'Tools', description: 'YouTube Live Connection, bulk import and future utilities.', local: true,
+    key: 'tools', title: 'Tools', description: 'YouTube Live Connection, event import/export and future utilities.', local: true,
   },
 ];
 
@@ -166,6 +167,19 @@ function todayIso() {
   const value = new Date();
   value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
   return value.toISOString().slice(0, 10);
+}
+
+function dateAfterIso(days = 0) {
+  const value = new Date();
+  value.setHours(12, 0, 0, 0);
+  value.setDate(value.getDate() + days);
+  value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
+  return value.toISOString().slice(0, 10);
+}
+
+function exportDateLabel(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : String(value || '');
 }
 
 function formatSubmissionDate(value) {
@@ -428,6 +442,11 @@ export default function AdminDashboardScreen({
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [importError, setImportError] = useState('');
+  const [exportCity, setExportCity] = useState(profile?.role === 'superAdmin' ? 'all' : getAdminCity(profile));
+  const [exportFrom, setExportFrom] = useState(todayIso());
+  const [exportTo, setExportTo] = useState(dateAfterIso(30));
+  const [exporting, setExporting] = useState(false);
+  const [exportResult, setExportResult] = useState({ message: '', error: false });
   const [feedbackThreads, setFeedbackThreads] = useState([]);
   const [newEventType, setNewEventType] = useState('');
   const [newReciterType, setNewReciterType] = useState('');
@@ -441,6 +460,10 @@ export default function AdminDashboardScreen({
     : cityLabel(getAdminCity(profile)).replace(', Australia', '');
   const canAccess = profile?.role === 'admin' || profile?.role === 'superAdmin';
   const canManageHijriSettings = profile?.role === 'superAdmin';
+
+  useEffect(() => {
+    if (profile?.role !== 'superAdmin') setExportCity(getAdminCity(profile));
+  }, [profile?.adminCity, profile?.defaultCity, profile?.role]);
 
   const stats = useMemo(() => {
     const totalEvents = events.length;
@@ -1149,23 +1172,42 @@ export default function AdminDashboardScreen({
         encoding: FileSystem.EncodingType.Base64,
       });
       const workbook = XLSX.read(base64, { type: 'base64' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
-      const dataRows = rows.slice(2).filter(row => Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== ''));
+      const requiredHeaders = ['hostName', 'startTime', 'eventType', 'audienceType', 'street', 'suburb', 'state', 'postcode'];
+      const sheets = workbook.SheetNames.map(name => {
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: '' });
+        const headers = (rows[0] || []).map(value => String(value || '').trim());
+        return {
+          name,
+          rows,
+          headers,
+          hasEventHeaders: requiredHeaders.every(header => headers.includes(header)),
+        };
+      });
+      const selectedSheet = sheets.find(sheet => sheet.name.toLowerCase() === 'events' && sheet.hasEventHeaders)
+        || sheets.find(sheet => sheet.hasEventHeaders);
+      if (!selectedSheet) {
+        setImportError('No Events worksheet with valid event-import headers was found. Please use the current PWA template.');
+        return;
+      }
+      const rows = selectedSheet.rows;
+      const dataRows = rows.slice(2)
+        .map((row, index) => ({ row, rowNumber: index + 3 }))
+        .filter(item => Array.isArray(item.row) && item.row.some(cell => String(cell ?? '').trim() !== ''));
 
       if (!dataRows.length) {
         setImportError('No data rows were found. Start your event data from Row 3 like the PWA template.');
         return;
       }
 
-      const headers = rows[0].map(value => String(value || '').trim());
+      const headers = selectedSheet.headers;
       const indexOfHeader = name => headers.findIndex(header => header === name);
       const readCell = (row, name, fallback = '') => {
         const idx = indexOfHeader(name);
         return idx >= 0 ? row[idx] : fallback;
       };
 
-      const rawEvents = dataRows.map(row => ({
+      const rawEvents = dataRows.map(({ row, rowNumber }) => ({
+        _rowNumber: rowNumber,
         hostName: String(readCell(row, 'hostName')).trim(),
         hostPhone: String(readCell(row, 'hostPhone')).trim(),
         hostContact: String(readCell(row, 'hostContact')).trim(),
@@ -1206,6 +1248,75 @@ export default function AdminDashboardScreen({
       setImportError(error?.message || 'Import failed.');
     } finally {
       setImporting(false);
+    }
+  };
+
+  const handleExportUpcomingEvents = async () => {
+    const today = todayIso();
+    const from = exportFrom < today ? today : exportFrom;
+    const to = exportTo < today ? today : exportTo;
+    if (from > to) {
+      setExportResult({ message: 'The start date cannot be after the end date.', error: true });
+      return;
+    }
+
+    setExporting(true);
+    setExportResult({ message: '', error: false });
+    try {
+      const snapshot = await getDocs(collection(db, 'events'));
+      const selectedCity = profile?.role === 'superAdmin' ? exportCity : getAdminCity(profile);
+      const selectedEvents = snapshot.docs
+        .map(item => ({ id: item.id, ...item.data() }))
+        .filter(event => event.status === 'active' && event.hidden !== true)
+        .filter(event => canAdminAccessEvent(profile, event))
+        .filter(event => {
+          const date = String(event.eventDate || '');
+          if (!date || date < today || date < from || date > to) return false;
+          return selectedCity === 'all' || getEventMetroArea(event) === selectedCity;
+        })
+        .sort(compareEventsByDateTime);
+
+      if (!selectedEvents.length) {
+        setExportResult({ message: 'No active upcoming events match this date range and location.', error: true });
+        return;
+      }
+
+      const rows = selectedEvents.map(event => ({
+        'Gregorian Date': exportDateLabel(event.eventDate),
+        'Hijri Date': event.hijriDate || '',
+        'Host Name': event.hostName || '',
+        'Start Time': event.startTime || '',
+        'End Time': event.endTime || '',
+        'Event Type': event.eventTypeDisplay || event.customEventType || event.eventType || '',
+        Subject: event.eventSubject || '',
+        'Speaker Name': event.speakerName || '',
+        'Audience Type': event.audienceType || '',
+        Suburb: event.address?.suburb || event.suburb || '',
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      worksheet['!cols'] = [
+        { wch: 15 }, { wch: 22 }, { wch: 28 }, { wch: 12 }, { wch: 12 },
+        { wch: 18 }, { wch: 36 }, { wch: 24 }, { wch: 18 }, { wch: 20 },
+      ];
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Upcoming Events');
+      const locationName = selectedCity === 'all' ? 'All_Cities' : cityCode(selectedCity);
+      const fileName = `Community_Events_Upcoming_${locationName}_${from}_to_${to}.xlsx`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+      const fileBase64 = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
+      await FileSystem.writeAsStringAsync(fileUri, fileBase64, { encoding: FileSystem.EncodingType.Base64 });
+      await RNShare.open({
+        title: 'Export upcoming events',
+        url: fileUri,
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        filename: fileName,
+        failOnCancel: false,
+      });
+      setExportResult({ message: `Prepared ${selectedEvents.length} upcoming event${selectedEvents.length === 1 ? '' : 's'} for export.`, error: false });
+    } catch (error) {
+      setExportResult({ message: error?.message || 'Could not export upcoming events.', error: true });
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -1932,12 +2043,58 @@ export default function AdminDashboardScreen({
         <View style={styles.section}>
           <View style={styles.sectionHead}>
             <View>
-              <Text style={styles.sectionTitle}>Bulk Event Import</Text>
-              <Text style={styles.sectionMeta}>Spreadsheet import for large event batches</Text>
+              <Text style={styles.sectionTitle}>Import & Export</Text>
+              <Text style={styles.sectionMeta}>Bulk event spreadsheets and upcoming-event reports</Text>
             </View>
             <Pressable onPress={() => setPanel('overview')} style={styles.secondaryButton}>
               <Text style={styles.secondaryButtonText}>{'\u00AB'} Back</Text>
             </Pressable>
+          </View>
+
+          <View style={styles.actionCard}>
+            <Text style={styles.cardTitle}>Export Upcoming Events</Text>
+            <Text style={styles.cardDescription}>Create an Excel report of active upcoming events for a date range and location. Archived, inactive and hidden events are excluded.</Text>
+            <View style={styles.exportFields}>
+              <View style={styles.exportField}>
+                <Text style={styles.inputLabel}>From date</Text>
+                <NativeDateTimeField value={exportFrom} minimumDate={new Date()} onChange={value => {
+                  setExportFrom(value);
+                  if (exportTo < value) setExportTo(value);
+                  setExportResult({ message: '', error: false });
+                }} compact />
+              </View>
+              <View style={styles.exportField}>
+                <Text style={styles.inputLabel}>To date</Text>
+                <NativeDateTimeField value={exportTo} minimumDate={new Date(`${exportFrom}T12:00:00`)} onChange={value => {
+                  setExportTo(value);
+                  setExportResult({ message: '', error: false });
+                }} compact />
+              </View>
+            </View>
+            <View style={styles.exportField}>
+              <Text style={styles.inputLabel}>Location</Text>
+              {profile?.role === 'superAdmin' ? (
+                <CompactSelect
+                  title="Choose export location"
+                  value={exportCity}
+                  onChange={value => {
+                    setExportCity(value);
+                    setExportResult({ message: '', error: false });
+                  }}
+                  options={[{ value: 'all', label: 'All cities' }, ...CITY_OPTIONS]}
+                />
+              ) : (
+                <View style={styles.readOnlyField}><Text style={styles.readOnlyFieldText}>{cityLabel(getAdminCity(profile))}</Text></View>
+              )}
+            </View>
+            <Pressable disabled={exporting} onPress={handleExportUpcomingEvents} style={[styles.primaryButton, exporting && styles.disabledButton]}>
+              {exporting ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.primaryButtonText}>Export Upcoming Events (.xlsx)</Text>}
+            </Pressable>
+            {exportResult.message ? (
+              <View style={[styles.noticeBox, exportResult.error ? styles.noticeError : styles.noticeSuccess]}>
+                <Text style={[styles.noticeText, exportResult.error && styles.noticeTextError]}>{exportResult.message}</Text>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.actionCard}>
@@ -3570,6 +3727,30 @@ const styles = StyleSheet.create({
   importStepBody: {
     flex: 1,
     gap: spacing.sm,
+  },
+  exportFields: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  exportField: {
+    flex: 1,
+    minWidth: 150,
+    gap: spacing.xs,
+  },
+  readOnlyField: {
+    minHeight: 50,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.background,
+  },
+  readOnlyFieldText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '800',
   },
   logoPickerBox: {
     minHeight: 96,

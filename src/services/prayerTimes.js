@@ -3,7 +3,7 @@ export const PRAYER_OPTIONS = [
   { key: 'sunrise', label: 'Sunrise' },
   { key: 'zohrain', label: 'Zohrain' },
   { key: 'sunset', label: 'Sunset' },
-  { key: 'maghreb', label: 'Maghrebain' },
+  { key: 'maghreb', label: 'Maghreb' },
 ];
 
 const DEG_TO_RAD = Math.PI / 180;
