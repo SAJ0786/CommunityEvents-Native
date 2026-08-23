@@ -20,7 +20,9 @@ export default ({ config }) => ({
       config: {
         ...(config.android?.config || {}),
         googleMaps: {
-          apiKey: mapsApiKey,
+          // Keep generated native source free of plaintext credentials. Gradle
+          // substitutes this placeholder from GOOGLE_MAPS_API_KEY at build time.
+          apiKey: '${GOOGLE_MAPS_API_KEY}',
         },
       },
     } : {}),
