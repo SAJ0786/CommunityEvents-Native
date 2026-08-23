@@ -1,4 +1,4 @@
-import { getDownloadURL, putFile, ref } from '@react-native-firebase/storage';
+import { deleteObject, getDownloadURL, putFile, ref } from '@react-native-firebase/storage';
 import { storage } from '../firebase/firebase';
 
 export async function uploadEventPoster(localUri, userId, eventId, contentType = 'image/jpeg') {
@@ -13,6 +13,27 @@ export async function uploadEventPoster(localUri, userId, eventId, contentType =
   await putFile(imageRef, localUri, { contentType: safeType });
   const imageUrl = await getDownloadURL(imageRef);
   return { imagePath, imageUrl };
+}
+
+export async function uploadBusinessImage(localUri, userId, businessId, kind = 'cover', contentType = 'image/jpeg') {
+  if (!localUri || !userId) throw new Error('A selected image and signed-in user are required.');
+  const safeKind = ['logo', 'cover', 'promotion'].includes(kind) ? kind : 'cover';
+  const safeType = String(contentType || 'image/jpeg').startsWith('image/')
+    ? String(contentType || 'image/jpeg')
+    : 'image/jpeg';
+  const extension = safeType.includes('png') ? 'png' : safeType.includes('webp') ? 'webp' : 'jpg';
+  const fileName = `${safeKind}-${businessId || Date.now()}-${Date.now()}.${extension}`;
+  const imagePath = `business-images/${userId}/${fileName}`;
+  const imageRef = ref(storage, imagePath);
+  await putFile(imageRef, localUri, { contentType: safeType });
+  const imageUrl = await getDownloadURL(imageRef);
+  return { imagePath, imageUrl };
+}
+
+export async function deleteBusinessImage(imagePath) {
+  const safePath = String(imagePath || '').trim();
+  if (!safePath || !safePath.startsWith('business-images/')) return;
+  await deleteObject(ref(storage, safePath));
 }
 
 const posterUrlCache = new Map();

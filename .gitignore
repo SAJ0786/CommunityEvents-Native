@@ -1,6 +1,10 @@
 ﻿node_modules/
 .expo/
 .expo-export-check-*/
+.idea/
+.jdk17-build/
+.local-jdk17/
+.tools/
 dist/
 build/
 coverage/

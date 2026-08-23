@@ -1,9 +1,9 @@
 export const PRAYER_OPTIONS = [
   { key: 'fajr', label: 'Fajr' },
+  { key: 'sunrise', label: 'Sunrise' },
   { key: 'zohrain', label: 'Zohrain' },
-  { key: 'asr', label: 'Asr' },
-  { key: 'maghreb', label: 'Maghreb' },
-  { key: 'isha', label: 'Isha' },
+  { key: 'sunset', label: 'Sunset' },
+  { key: 'maghreb', label: 'Maghrebain' },
 ];
 
 const DEG_TO_RAD = Math.PI / 180;
@@ -127,6 +127,7 @@ export function calculatePrayerTimes(dateStr, address = {}) {
     sunrise: decimalToTime(sunrise),
     zohrain: decimalToTime(noon),
     asr: decimalToTime(asr),
+    sunset: decimalToTime(sunset),
     maghreb: decimalToTime(Math.max(maghreb, sunset + 7 / 60)),
     isha: decimalToTime(isha),
   };

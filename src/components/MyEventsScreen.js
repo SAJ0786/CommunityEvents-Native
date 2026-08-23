@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import EventCard from './EventCard';
 import { colors, radius, shadow, spacing } from '../theme';
 
@@ -29,132 +29,117 @@ export default function MyEventsScreen({
   onDeleteSeries,
   deletingSeriesId = '',
 }) {
-  return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.title}>My Events</Text>
-      <Text style={styles.subtitle}>Events you created. Toggle visibility to show or hide from the home screen.</Text>
-
-      {loading ? (
-        <View style={styles.loadingCard}>
-          <ActivityIndicator color={colors.teal} size="large" />
-          <Text style={styles.loadingText}>Loading your events...</Text>
+  const renderEvent = ({ item: event }) => (
+    <View style={styles.itemWrap}>
+      {event.isRecurring || event.seriesId || event.recurringSeriesId ? (
+        <View style={styles.seriesBanner}>
+          <Text style={styles.seriesBannerText}>
+            Recurring Series
+            {(seriesCounts[event.seriesId || event.recurringSeriesId] || event.recurrenceTotal) ? ` - ${seriesCounts[event.seriesId || event.recurringSeriesId] || event.recurrenceTotal} events` : ''}
+          </Text>
         </View>
       ) : null}
-
-      {!loading && events.length === 0 ? (
-        <EmptyState
-          title="No events yet"
-          text="You haven't added any events yet."
-        />
-      ) : null}
-
-      {!loading && events.length === 0 ? (
-        <Pressable onPress={onAddEvent} style={({ pressed }) => [styles.addEventButton, pressed && styles.pressed]}>
-          <Text style={styles.addEventText}>+ Add Your First Event</Text>
+      <View style={styles.visibilityRow}>
+        <Text style={[styles.visibilityText, event.hidden ? styles.hiddenText : styles.visibleText]}>
+          {event.hidden ? 'Hidden from home screen' : 'Visible on home screen'}
+        </Text>
+        <Pressable
+          disabled={visibilityBusyId === event.id}
+          onPress={() => onToggleVisibility?.(event)}
+          style={({ pressed }) => [
+            styles.visibilityButton,
+            event.hidden && styles.makeVisibleButton,
+            pressed && styles.pressed,
+            visibilityBusyId === event.id && styles.disabled,
+          ]}
+        >
+          {visibilityBusyId === event.id ? (
+            <ActivityIndicator color={colors.tealDark} size="small" />
+          ) : (
+            <Text style={styles.visibilityButtonText}>{event.hidden ? 'Make Visible' : 'Hide Event'}</Text>
+          )}
         </Pressable>
-      ) : null}
-
-      {!loading ? (
-        <View style={styles.list}>
-          {events.map(event => (
-            <View key={event.id} style={styles.itemWrap}>
-              {event.isRecurring || event.seriesId || event.recurringSeriesId ? (
-                <View style={styles.seriesBanner}>
-                  <Text style={styles.seriesBannerText}>
-                    Recurring Series
-                    {(seriesCounts[event.seriesId || event.recurringSeriesId] || event.recurrenceTotal) ? ` - ${seriesCounts[event.seriesId || event.recurringSeriesId] || event.recurrenceTotal} events` : ''}
-                  </Text>
-                </View>
-              ) : null}
-              <View style={styles.visibilityRow}>
-                <Text style={[styles.visibilityText, event.hidden ? styles.hiddenText : styles.visibleText]}>
-                  {event.hidden ? 'Hidden from home screen' : 'Visible on home screen'}
-                </Text>
-                <Pressable
-                  disabled={visibilityBusyId === event.id}
-                  onPress={() => onToggleVisibility?.(event)}
-                  style={({ pressed }) => [
-                    styles.visibilityButton,
-                    event.hidden && styles.makeVisibleButton,
-                    pressed && styles.pressed,
-                    visibilityBusyId === event.id && styles.disabled,
-                  ]}
-                >
-                  {visibilityBusyId === event.id ? (
-                    <ActivityIndicator color={colors.tealDark} size="small" />
-                  ) : (
-                    <Text style={styles.visibilityButtonText}>{event.hidden ? 'Make Visible' : 'Hide Event'}</Text>
-                  )}
-                </Pressable>
-              </View>
-              <View style={event.hidden ? styles.hiddenCard : undefined}>
-                <EventCard event={event} onPress={() => onPressEvent?.(event)} />
-              </View>
-              <View style={styles.metaRow}>
-                <View style={styles.actionRow}>
-                  <Pressable
-                    onPress={() => onEdit?.(event)}
-                    style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
-                  >
-                    <Text style={styles.editText}>Edit</Text>
-                  </Pressable>
-                  {onEditSeries && (event.seriesId || event.recurringSeriesId) ? (
-                    <Pressable
-                      onPress={() => onEditSeries(event)}
-                      style={({ pressed }) => [styles.seriesButton, pressed && styles.pressed]}
-                    >
-                      <Text style={styles.seriesText}>Edit Entire Series</Text>
-                    </Pressable>
-                  ) : null}
-                  {onCopy ? (
-                    <Pressable
-                      onPress={() => onCopy(event)}
-                      style={({ pressed }) => [styles.copyButton, pressed && styles.pressed]}
-                    >
-                      <Text style={styles.copyText}>Copy</Text>
-                    </Pressable>
-                  ) : null}
-                  {onDeleteSeries && (event.seriesId || event.recurringSeriesId) ? (
-                    <Pressable
-                      onPress={() => onDeleteSeries(event)}
-                      disabled={deletingSeriesId === (event.seriesId || event.recurringSeriesId)}
-                      style={({ pressed }) => [
-                        styles.deleteSeriesButton,
-                        pressed && styles.pressed,
-                        deletingSeriesId === (event.seriesId || event.recurringSeriesId) && styles.disabled,
-                      ]}
-                    >
-                      {deletingSeriesId === (event.seriesId || event.recurringSeriesId) ? (
-                        <ActivityIndicator color={colors.danger} size="small" />
-                      ) : (
-                        <Text style={styles.deleteSeriesText}>Delete Entire Series</Text>
-                      )}
-                    </Pressable>
-                  ) : null}
-                  <Pressable
-                    onPress={() => onDelete?.(event)}
-                    disabled={deletingId === event.id}
-                    style={({ pressed }) => [
-                      styles.deleteButton,
-                      pressed && styles.pressed,
-                      deletingId === event.id && styles.disabled,
-                    ]}
-                  >
-                    {deletingId === event.id ? (
-                      <ActivityIndicator color={colors.danger} size="small" />
-                    ) : (
-                      <Text style={styles.deleteText}>Delete</Text>
-                    )}
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          ))}
+      </View>
+      <View style={event.hidden ? styles.hiddenCard : undefined}>
+        <EventCard event={event} onPress={() => onPressEvent?.(event)} />
+      </View>
+      <View style={styles.metaRow}>
+        <View style={styles.actionRow}>
+          <Pressable onPress={() => onEdit?.(event)} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}>
+            <Text style={styles.editText}>Edit</Text>
+          </Pressable>
+          {onEditSeries && (event.seriesId || event.recurringSeriesId) ? (
+            <Pressable onPress={() => onEditSeries(event)} style={({ pressed }) => [styles.seriesButton, pressed && styles.pressed]}>
+              <Text style={styles.seriesText}>Edit Entire Series</Text>
+            </Pressable>
+          ) : null}
+          {onCopy ? (
+            <Pressable onPress={() => onCopy(event)} style={({ pressed }) => [styles.copyButton, pressed && styles.pressed]}>
+              <Text style={styles.copyText}>Copy</Text>
+            </Pressable>
+          ) : null}
+          {onDeleteSeries && (event.seriesId || event.recurringSeriesId) ? (
+            <Pressable
+              onPress={() => onDeleteSeries(event)}
+              disabled={deletingSeriesId === (event.seriesId || event.recurringSeriesId)}
+              style={({ pressed }) => [styles.deleteSeriesButton, pressed && styles.pressed, deletingSeriesId === (event.seriesId || event.recurringSeriesId) && styles.disabled]}
+            >
+              {deletingSeriesId === (event.seriesId || event.recurringSeriesId) ? (
+                <ActivityIndicator color={colors.danger} size="small" />
+              ) : (
+                <Text style={styles.deleteSeriesText}>Delete Entire Series</Text>
+              )}
+            </Pressable>
+          ) : null}
+          <Pressable
+            onPress={() => onDelete?.(event)}
+            disabled={deletingId === event.id}
+            style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed, deletingId === event.id && styles.disabled]}
+          >
+            {deletingId === event.id ? (
+              <ActivityIndicator color={colors.danger} size="small" />
+            ) : (
+              <Text style={styles.deleteText}>Delete</Text>
+            )}
+          </Pressable>
         </View>
-      ) : null}
+      </View>
+    </View>
+  );
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-    </ScrollView>
+  return (
+    <FlatList
+      data={loading ? [] : events}
+      keyExtractor={event => event.id}
+      renderItem={renderEvent}
+      contentContainerStyle={styles.content}
+      ItemSeparatorComponent={() => <View style={styles.separator} />}
+      ListHeaderComponent={(
+        <View style={styles.headerContent}>
+          <Text style={styles.title}>My Events</Text>
+          <Text style={styles.subtitle}>Events you created. Toggle visibility to show or hide from the home screen.</Text>
+          {loading ? (
+            <View style={styles.loadingCard}>
+              <ActivityIndicator color={colors.teal} size="large" />
+              <Text style={styles.loadingText}>Loading your events...</Text>
+            </View>
+          ) : null}
+          {!loading && events.length === 0 ? <EmptyState title="No events yet" text="You haven't added any events yet." /> : null}
+          {!loading && events.length === 0 ? (
+            <Pressable onPress={onAddEvent} style={({ pressed }) => [styles.addEventButton, pressed && styles.pressed]}>
+              <Text style={styles.addEventText}>+ Add Your First Event</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      )}
+      ListFooterComponent={error ? <Text style={styles.error}>{error}</Text> : null}
+      initialNumToRender={4}
+      maxToRenderPerBatch={4}
+      updateCellsBatchingPeriod={40}
+      windowSize={5}
+      removeClippedSubviews
+      showsVerticalScrollIndicator={false}
+    />
   );
 }
 
@@ -211,9 +196,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: spacing.sm,
   },
-  list: {
-    gap: spacing.md,
-  },
+  headerContent: { marginBottom: spacing.md },
+  separator: { height: spacing.md },
   itemWrap: {
     gap: spacing.sm,
   },

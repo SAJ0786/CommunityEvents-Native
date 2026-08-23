@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "Community Events Australia",
+    "name": "Community Connect Australia",
     "slug": "community-events-australia-native",
     "version": "0.3.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash-native.png",
+      "image": "./assets/splash-community-connect.png",
       "resizeMode": "contain",
       "backgroundColor": "#f8faf9"
     },
@@ -20,12 +20,13 @@
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Allow Community Events Australia to use your camera when you choose to live stream an event.",
-        "NSMicrophoneUsageDescription": "Allow Community Events Australia to use your microphone when you choose to live stream an event."
+        "NSCameraUsageDescription": "Allow Community Connect Australia to use your camera when you choose to live stream an event.",
+        "NSMicrophoneUsageDescription": "Allow Community Connect Australia to use your microphone when you choose to live stream an event."
       }
     },
     "android": {
       "package": "info.siza.communityevents.app",
+      "versionCode": 32,
       "googleServicesFile": "./google-services.json",
       "allowBackup": false,
       "adaptiveIcon": {
@@ -39,30 +40,40 @@
       ]
     },
     "extra": {
-      "firebaseProjectId": "community-event-8b639"
+      "firebaseProjectId": "community-event-8b639",
+      "androidCertificateSha1": "5E8F16062EA3CD2C4A0D547876BAA6F38CABF625",
+      "testBuild": true
     },
     "plugins": [
       "expo-build-properties",
+      "expo-font",
       "expo-notifications",
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "PORTRAIT_UP"
+        }
+      ],
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
+      "@react-native-firebase/crashlytics",
       [
         "expo-calendar",
         {
-          "calendarPermission": "Allow Community Events Australia to add community events to your calendar."
+          "calendarPermission": "Allow Community Connect Australia to add community events to your calendar."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow Community Events Australia to verify event addresses and calculate prayer times."
+          "locationWhenInUsePermission": "Allow Community Connect Australia to show nearby events and community businesses."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Community Events Australia to select an event poster from your photos.",
-          "microphonePermission": "Allow Community Events Australia to use your microphone when you choose to live stream an event."
+          "photosPermission": "Allow Community Connect Australia to select event posters and business images from your photos.",
+          "microphonePermission": "Allow Community Connect Australia to use your microphone when you choose to live stream an event."
         }
       ]
     ]

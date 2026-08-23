@@ -102,7 +102,6 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
         </View>
         <Text style={[styles.meta, compact && styles.metaCompact]}>{'\u23F0'} {displayTime || 'Time TBC'}</Text>
         <Text style={[styles.meta, compact && styles.metaCompact]} numberOfLines={1}>{'\uD83D\uDCCD'} {suburb || 'Location TBC'}</Text>
-
         <View style={styles.footerRow}>
           <View style={styles.badgeRow}>
             <View style={[styles.badge, audience === 'Family Event' ? styles.familyBadge : styles.audienceBadge]}>
@@ -130,7 +129,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
                 <ActivityIndicator color={colors.tealDark} size="small" />
               ) : (
                 <Text style={[styles.saveText, isSaved && styles.saveTextActive]}>
-                  {isSaved ? '\u2605' : '\u2606'}
+                  {isSaved ? '\u2665' : '\u2661'}
                 </Text>
               )}
             </Pressable>
@@ -178,7 +177,7 @@ const styles = StyleSheet.create({
   saveButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   saveButtonPressed: { opacity: 0.65 },
   saveText: { color: '#cbd5d3', fontSize: 24, lineHeight: 28 },
-  saveTextActive: { color: colors.teal },
+  saveTextActive: { color: '#d43867' },
   posterModal: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(0,0,0,0.94)' },
   posterFullscreen: { width: '100%', height: '88%' },
   posterCloseHint: { position: 'absolute', bottom: 34, color: colors.surface, fontSize: 13, fontWeight: '800' },

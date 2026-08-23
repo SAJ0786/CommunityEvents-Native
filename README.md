@@ -13,3 +13,7 @@ npm run start
 ```
 
 Use Expo Go for the first read-only test. Later native features such as push notifications and livestreaming will require an Expo development build.
+
+## Diagnostics
+
+Production native builds use Firebase Crashlytics through a privacy-safe central diagnostics service. Support can correlate reports using the Diagnostic Session ID shown under Profile > Help & Policies. See [docs/CRASH_MONITORING.md](docs/CRASH_MONITORING.md).

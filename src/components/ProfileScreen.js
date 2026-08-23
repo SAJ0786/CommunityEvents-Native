@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -15,6 +16,12 @@ import { colors, radius, shadow, spacing } from '../theme';
 import { cityLabel, DEFAULT_CITY, normalizeCity } from '../utils/cities';
 import CitySelector from './CitySelector';
 import { STORE_SHARE_LINES } from '../utils/storeLinks';
+import * as Clipboard from 'expo-clipboard';
+import { getDiagnosticSessionId } from '../services/diagnostics';
+import { setPrayerRemindersEnabled } from '../services/reminders';
+import { getPrayerLocation } from '../utils/prayerLocations';
+
+const sizaLogo = require('../../assets/siza-apps.jpg');
 
 function ProfileRow({ label, value, subtle = false }) {
   if (value === undefined || value === null || value === '') return null;
@@ -49,6 +56,9 @@ export default function ProfileScreen({
   onSaveProfile,
   onDeleteAccount,
   appVersion = '',
+  appBuild = '',
+  preferredModule = 'events',
+  onPreferredModuleChange,
 }) {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -63,6 +73,12 @@ export default function ProfileScreen({
   const [editingProfile, setEditingProfile] = useState(false);
   const [deleteStep, setDeleteStep] = useState(null);
   const [archiveEventsNow, setArchiveEventsNow] = useState(null);
+  const [pushEnabled, setPushEnabled] = useState(profile?.pushNotificationsEnabled !== false);
+  const [smsEnabled, setSmsEnabled] = useState(profile?.smsNotificationsEnabled === true);
+  const [emailEnabled, setEmailEnabled] = useState(profile?.emailNotificationsEnabled !== false);
+  const [eventNotifications, setEventNotifications] = useState(profile?.eventNotificationsEnabled !== false);
+  const [businessNotifications, setBusinessNotifications] = useState(profile?.businessNotificationsEnabled !== false);
+  const [prayerReminders, setPrayerReminders] = useState(profile?.prayerRemindersEnabled !== false);
   const isGuest = !user || user.isAnonymous;
 
   useEffect(() => {
@@ -72,6 +88,15 @@ export default function ProfileScreen({
     setProfileValidation('');
     setEditingProfile(false);
   }, [profile?.defaultCity, profile?.email, profile?.fullName]);
+
+  useEffect(() => {
+    setPushEnabled(profile?.pushNotificationsEnabled !== false);
+    setSmsEnabled(profile?.smsNotificationsEnabled === true);
+    setEmailEnabled(profile?.emailNotificationsEnabled !== false);
+    setEventNotifications(profile?.eventNotificationsEnabled !== false);
+    setBusinessNotifications(profile?.businessNotificationsEnabled !== false);
+    setPrayerReminders(profile?.prayerRemindersEnabled !== false);
+  }, [profile?.businessNotificationsEnabled, profile?.emailNotificationsEnabled, profile?.eventNotificationsEnabled, profile?.prayerRemindersEnabled, profile?.pushNotificationsEnabled, profile?.smsNotificationsEnabled]);
 
   const profileDirty = useMemo(() => (
     fullName.trim() !== String(profile?.fullName || '').trim()
@@ -127,8 +152,8 @@ export default function ProfileScreen({
 
   const shareApp = async () => {
     const message = [
-      '🌙 *Community Events Australia*',
-      '_Your free community events app_',
+      '🌙 *Community Connect Australia*',
+      '_Community events and local businesses in one app_',
       '*Features:*',
       '📅 Browse upcoming Majalis, Milads & community events',
       '🔔 Get push notifications before events',
@@ -143,7 +168,7 @@ export default function ProfileScreen({
       '',
       ...STORE_SHARE_LINES,
       '',
-      '_Download Community Events App to keep connected with community_',
+      '_Download Community Connect Australia to stay connected with your community_',
     ].join('\n');
     try {
       await Share.share({ title: 'Share the App', message });
@@ -157,6 +182,28 @@ export default function ProfileScreen({
     if (!deleted) return;
     setDeleteStep(null);
     setArchiveEventsNow(null);
+  };
+
+  const saveNotifications = async () => {
+    setProfileValidation('');
+    try {
+      await setPrayerRemindersEnabled(prayerReminders, getPrayerLocation(defaultCity));
+      await onSaveProfile?.({
+        pushNotificationsEnabled: pushEnabled,
+        smsNotificationsEnabled: smsEnabled,
+        emailNotificationsEnabled: emailEnabled,
+        eventNotificationsEnabled: eventNotifications,
+        businessNotificationsEnabled: businessNotifications,
+        prayerRemindersEnabled: prayerReminders,
+      });
+    } catch (nextError) {
+      setProfileValidation(nextError?.message || 'Could not save notification settings.');
+    }
+  };
+
+  const choosePreferredModule = module => {
+    onPreferredModuleChange?.(module);
+    if (!isGuest) onSaveProfile?.({ defaultModule: module });
   };
 
   return (
@@ -174,6 +221,14 @@ export default function ProfileScreen({
       {!loading && isGuest ? (
         <View style={styles.card}>
           <View style={styles.statusPill}><Text style={styles.statusText}>GUEST MODE</Text></View>
+          <Text style={styles.inputLabel}>OPEN AFTER SIGN IN</Text>
+          <View style={styles.moduleChoice}>
+            {[['events', 'Events'], ['directory', 'Business Directory']].map(([value, label]) => (
+              <Pressable key={value} onPress={() => choosePreferredModule(value)} style={[styles.moduleChoiceButton, preferredModule === value && styles.moduleChoiceButtonActive]}>
+                <Text style={[styles.moduleChoiceText, preferredModule === value && styles.moduleChoiceTextActive]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
           <Text style={styles.cardTitle}>{authStep === 'otp' ? 'Enter Verification Code' : 'Mobile Sign In'}</Text>
           <Text style={styles.body}>
             {authStep === 'otp'
@@ -274,6 +329,7 @@ export default function ProfileScreen({
               </>
             ) : null}
           </View>
+
         </View>
       ) : null}
 
@@ -425,8 +481,30 @@ export default function ProfileScreen({
           </View>
 
           <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Notifications</Text>
+            <Text style={styles.sectionHint}>Control how Events and Business Directory updates reach you.</Text>
+            {[
+              ['Push notifications', pushEnabled, setPushEnabled],
+              ['SMS notifications', smsEnabled, setSmsEnabled],
+              ['Email notifications', emailEnabled, setEmailEnabled],
+              ['Community Events updates', eventNotifications, setEventNotifications],
+              ['Prayer-time reminders', prayerReminders, setPrayerReminders],
+              ['Business Directory updates', businessNotifications, setBusinessNotifications],
+            ].map(([label, value, setter]) => (
+              <View key={label} style={styles.preferenceRow}><Text style={styles.preferenceLabel}>{label}</Text><Switch value={value} onValueChange={setter} trackColor={{ false: colors.border, true: colors.teal }} /></View>
+            ))}
+            <Text style={styles.inputLabel}>DEFAULT HOME MODULE</Text>
+            <View style={styles.moduleChoice}>
+              {[['events', 'Events'], ['directory', 'Business Directory']].map(([value, label]) => (
+                <Pressable key={value} onPress={() => choosePreferredModule(value)} style={[styles.moduleChoiceButton, preferredModule === value && styles.moduleChoiceButtonActive]}><Text style={[styles.moduleChoiceText, preferredModule === value && styles.moduleChoiceTextActive]}>{label}</Text></Pressable>
+              ))}
+            </View>
+            <Pressable disabled={profileBusy} onPress={saveNotifications} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Save Notification Settings</Text></Pressable>
+          </View>
+
+          <View style={styles.card}>
             <Text style={styles.sectionTitle}>Share App</Text>
-            <Text style={styles.bodySmall}>Invite your community to join Community Events Australia.</Text>
+            <Text style={styles.bodySmall}>Invite your community to join Community Connect Australia.</Text>
             <Pressable onPress={shareApp} style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}>
               <Text style={styles.primaryButtonText}>Share the App</Text>
             </Pressable>
@@ -434,6 +512,10 @@ export default function ProfileScreen({
 
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Help &amp; Policies</Text>
+            <View style={styles.diagnosticCard}>
+              <View style={styles.diagnosticCopy}><Text style={styles.diagnosticLabel}>DIAGNOSTIC SESSION ID</Text><Text selectable style={styles.diagnosticValue}>{getDiagnosticSessionId()}</Text></View>
+              <Pressable onPress={() => Clipboard.setStringAsync(getDiagnosticSessionId())} style={styles.copyButton}><Text style={styles.copyButtonText}>Copy</Text></Pressable>
+            </View>
             {[
               ['Shia Majlis and Muharram programs across Australia', 'https://communityevents.siza.info/shia-events-australia.html'],
               ['User Guide', 'https://communityevents.siza.info/docs/user-guide.html'],
@@ -454,11 +536,12 @@ export default function ProfileScreen({
 
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>About</Text>
+            <Image source={sizaLogo} resizeMode="contain" style={styles.sizaLogo} />
             <Text style={styles.aboutBrand}>SIZA</Text>
             <Text style={styles.aboutTagline}>{'CREATE \u2022 SHARE \u2022 CONNECT'}</Text>
-            <Text style={styles.aboutTitle}>Community Events Australia</Text>
+            <Text style={styles.aboutTitle}>Community Connect Australia</Text>
             <Text style={styles.aboutBody}>{'An initiative by SIZA Apps, offered as a service to the community \u2014 helping build stronger, more connected communities.'}</Text>
-            {appVersion ? <Text style={styles.buildText}>Version {appVersion}</Text> : null}
+            {appVersion ? <Text style={styles.buildText}>Version {appVersion}{appBuild ? ` \u00B7 Build ${appBuild}` : ''}</Text> : null}
           </View>
         </>
       ) : null}
@@ -503,6 +586,13 @@ const styles = StyleSheet.create({
   loadingText: { color: colors.muted, fontSize: 14, fontWeight: '700', marginTop: spacing.md, textAlign: 'center' },
   inputGroup: { marginTop: spacing.md },
   inputLabel: { color: colors.navy, fontSize: 12, fontWeight: '900', marginBottom: 6, textTransform: 'uppercase' },
+  moduleChoice: { flexDirection: 'row', padding: 3, marginBottom: spacing.md, borderRadius: radius.md, backgroundColor: '#edf2f1' },
+  moduleChoiceButton: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 7, borderRadius: 11 },
+  moduleChoiceButtonActive: { backgroundColor: colors.surface, ...shadow },
+  moduleChoiceText: { color: colors.muted, fontSize: 11, fontWeight: '800', textAlign: 'center' },
+  moduleChoiceTextActive: { color: colors.tealDark, fontWeight: '900' },
+  preferenceRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
+  preferenceLabel: { flex: 1, color: colors.text, fontSize: 13, fontWeight: '800' },
   input: {
     minHeight: 48,
     borderWidth: 1,
@@ -574,6 +664,12 @@ const styles = StyleSheet.create({
   rowValueSubtle: { color: colors.muted },
   policyLink: { minHeight: 44, justifyContent: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   policyText: { color: colors.tealDark, fontSize: 14, fontWeight: '800', textDecorationLine: 'underline' },
+  diagnosticCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md, marginBottom: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
+  diagnosticCopy: { flex: 1 },
+  diagnosticLabel: { color: colors.muted, fontSize: 9, fontWeight: '900' },
+  diagnosticValue: { marginTop: 3, color: colors.tealDark, fontSize: 12, fontWeight: '900' },
+  copyButton: { minHeight: 38, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: 10, backgroundColor: colors.surface },
+  copyButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '900' },
   deleteWrap: {
     marginTop: spacing.lg,
     paddingTop: spacing.lg,
@@ -592,6 +688,7 @@ const styles = StyleSheet.create({
   deleteTitle: { color: colors.navy, fontSize: 15, fontWeight: '900' },
   deleteBody: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: spacing.xs },
   aboutBrand: { color: colors.tealDark, fontSize: 13, fontWeight: '900', marginTop: spacing.sm },
+  sizaLogo: { width: '100%', height: 110, marginTop: spacing.md, borderRadius: radius.md },
   aboutTagline: { color: colors.muted, fontSize: 12, fontWeight: '900', marginTop: 4 },
   aboutTitle: { color: colors.navy, fontSize: 22, fontWeight: '900', marginTop: spacing.md },
   aboutBody: { color: colors.text, fontSize: 14, lineHeight: 21, marginTop: spacing.sm },

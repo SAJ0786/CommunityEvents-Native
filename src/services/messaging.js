@@ -128,6 +128,54 @@ export async function sendHostReply({ thread, user, profile, text }) {
   });
 }
 
+export async function sendBusinessMessage({ business, user, profile, text }) {
+  const messageText = clean(text);
+  if (!user?.uid || user.isAnonymous) throw new Error('Please sign in to contact this business.');
+  if (!business?.id) throw new Error('This business does not have an in-app contact inbox yet.');
+  const routeSnapshot = await getDoc(doc(db, 'businessContactRoutes', business.id));
+  const ownerUid = clean(routeSnapshot.data()?.ownerUid);
+  if (!routeSnapshot.exists() || routeSnapshot.data()?.active !== true || !ownerUid) {
+    throw new Error('This business does not have an in-app contact inbox yet.');
+  }
+  if (ownerUid === user.uid) throw new Error('This business listing is already managed by you.');
+  if (!messageText) throw new Error('Please write a message first.');
+  if (messageText.length > 2000) throw new Error('Please keep the message under 2000 characters.');
+  const senderUid = user.uid;
+  const threadId = `${business.id}_${senderUid}_${ownerUid}`;
+  const threadRef = doc(db, 'businessMessageThreads', threadId);
+  const senderName = getSenderName(user, profile);
+  await setDoc(threadRef, {
+    type: 'business', businessId: business.id, businessName: clean(business.name), ownerUid,
+    senderUid, senderName, participantUids: compact([senderUid, ownerUid]), createdAt: serverTimestamp(),
+  }, { merge: true });
+  await addDoc(collection(threadRef, 'messages'), { senderUid, senderName, text: messageText, kind: 'text', createdAt: serverTimestamp() });
+  await updateDoc(threadRef, {
+    updatedAt: serverTimestamp(), lastMessage: messageText, lastSenderUid: senderUid,
+    [`unreadBy.${ownerUid}`]: increment(1), [`unreadBy.${senderUid}`]: 0,
+  });
+}
+
+export function listenBusinessThreads(uid, callback) {
+  if (!uid) return () => callback([]);
+  const q = query(collection(db, 'businessMessageThreads'), where('participantUids', 'array-contains', uid));
+  return onSnapshot(q, snap => callback(sortByUpdatedDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })))), () => callback([]));
+}
+
+export async function sendBusinessReply({ thread, user, profile, text }) {
+  const messageText = clean(text);
+  if (!user?.uid || !thread?.participantUids?.includes(user.uid)) throw new Error('You cannot reply to this business conversation.');
+  if (!messageText) throw new Error('Please write a reply first.');
+  const recipientUid = thread.participantUids.find(uid => uid !== user.uid);
+  const threadRef = doc(db, 'businessMessageThreads', thread.id);
+  const senderName = getSenderName(user, profile);
+  await addDoc(collection(threadRef, 'messages'), { senderUid: user.uid, senderName, text: messageText, kind: 'text', createdAt: serverTimestamp() });
+  await updateDoc(threadRef, { updatedAt: serverTimestamp(), lastMessage: messageText, lastSenderUid: user.uid, [`unreadBy.${user.uid}`]: 0, ...(recipientUid ? { [`unreadBy.${recipientUid}`]: increment(1) } : {}) });
+}
+
+export async function markBusinessThreadRead(threadId, uid) {
+  if (threadId && uid) await updateDoc(doc(db, 'businessMessageThreads', threadId), { [`unreadBy.${uid}`]: 0 });
+}
+
 export function listenHostThreads(uid, callback) {
   if (!uid) return () => callback([]);
   const q = query(collection(db, 'hostMessageThreads'), where('participantUids', 'array-contains', uid));
@@ -156,25 +204,46 @@ async function guestId() {
   }
 }
 
-export async function sendFeedbackMessage({ user, profile, text, city = DEFAULT_CITY, target = 'cityAdmins' }) {
+export async function sendFeedbackMessage({
+  user,
+  profile,
+  text,
+  city = DEFAULT_CITY,
+  target = 'cityAdmins',
+  module = 'events',
+  category = 'feedback',
+  subject = '',
+  businessId = '',
+  businessName = '',
+}) {
   const messageText = clean(text);
   if (!messageText) throw new Error('Please write your message first.');
   if (messageText.length > 2500) throw new Error('Please keep the message under 2500 characters.');
 
   const safeTarget = target === 'superAdmins' ? 'superAdmins' : 'cityAdmins';
   const safeCity = normalizeCity(city || profile?.defaultCity || DEFAULT_CITY);
+  const safeModule = module === 'business' ? 'business' : 'events';
+  const safeCategory = clean(category) || 'feedback';
   const senderUid = user?.uid && !user?.isAnonymous ? user.uid : null;
   const senderGuestId = senderUid ? null : await guestId();
   const senderName = senderUid ? getSenderName(user, profile) : 'Guest user';
+  const routePrefix = safeModule === 'events' && safeCategory === 'feedback'
+    ? `${safeTarget}_${safeCity}`
+    : `${safeModule}_${safeCategory.replace(/[^a-z0-9_-]/gi, '-').toLowerCase()}_${safeTarget}_${safeCity}`;
   const threadId = senderUid
-    ? `${safeTarget}_${safeCity}_${senderUid}`
-    : `${safeTarget}_${safeCity}_${senderGuestId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    ? `${routePrefix}_${senderUid}`
+    : `${routePrefix}_${senderGuestId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const threadRef = doc(db, 'adminFeedbackThreads', threadId);
   const unreadField = safeTarget === 'superAdmins' ? 'unreadForSuperAdmins' : 'unreadForCityAdmins';
   const existing = senderUid ? await getDoc(threadRef) : null;
 
   await setDoc(threadRef, {
     type: 'feedback',
+    module: safeModule,
+    category: safeCategory,
+    subject: clean(subject),
+    businessId: clean(businessId),
+    businessName: clean(businessName),
     target: safeTarget,
     city: safeCity,
     cityLabel: cityLabel(safeCity),
@@ -203,9 +272,14 @@ export async function sendFeedbackMessage({ user, profile, text, city = DEFAULT_
 export async function sendFeedbackReply({ thread, user, profile, text }) {
   const messageText = clean(text);
   if (!user?.uid) throw new Error('Please sign in to reply.');
-  if (!isAdminRole(profile?.role)) throw new Error('Admin access required.');
   if (!thread?.id) throw new Error('Feedback thread not found.');
   if (!messageText) throw new Error('Please write a reply first.');
+  const senderIsReplying = thread.senderUid === user.uid;
+  const adminIsReplying = isAdminRole(profile?.role) && (
+    isSuperAdminRole(profile?.role)
+    || (thread.target === 'cityAdmins' && thread.city === getAdminCity(profile))
+  );
+  if (!senderIsReplying && !adminIsReplying) throw new Error('You cannot reply to this conversation.');
 
   const threadRef = doc(db, 'adminFeedbackThreads', thread.id);
   const senderName = getSenderName(user, profile);
@@ -222,9 +296,8 @@ export async function sendFeedbackReply({ thread, user, profile, text }) {
     updatedAt: serverTimestamp(),
     lastMessage: messageText,
     lastSenderUid: user.uid,
-    unreadForSuperAdmins: isSuperAdminRole(profile?.role) ? 0 : (thread.unreadForSuperAdmins || 0),
-    unreadForCityAdmins: profile?.role === 'admin' ? 0 : (thread.unreadForCityAdmins || 0),
-    ...(thread.senderUid ? { [`unreadBy.${thread.senderUid}`]: increment(1) } : {}),
+    [thread.target === 'superAdmins' ? 'unreadForSuperAdmins' : 'unreadForCityAdmins']: senderIsReplying ? increment(1) : 0,
+    ...(thread.senderUid ? { [`unreadBy.${thread.senderUid}`]: senderIsReplying ? 0 : increment(1) } : {}),
   });
 }
 
@@ -294,7 +367,7 @@ export function listenAdminFeedbackThreads(profile, callback) {
   const q = isSuperAdminRole(profile?.role)
     ? query(base)
     : query(base, where('target', '==', 'cityAdmins'), where('city', '==', getAdminCity(profile)));
-  return onSnapshot(q, snap => callback(sortByUpdatedDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })))), error => {
+  return onSnapshot(q, snap => callback(sortByUpdatedDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => !isBusinessSupportThread(item)))), error => {
     console.error('[listenAdminFeedbackThreads]', error);
     callback([]);
   });
@@ -303,8 +376,31 @@ export function listenAdminFeedbackThreads(profile, callback) {
 export function listenOwnFeedbackThreads(uid, callback) {
   if (!uid) return () => callback([]);
   const q = query(collection(db, 'adminFeedbackThreads'), where('senderUid', '==', uid));
-  return onSnapshot(q, snap => callback(sortByUpdatedDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })))), error => {
+  return onSnapshot(q, snap => callback(sortByUpdatedDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => !isBusinessSupportThread(item)))), error => {
     console.error('[listenOwnFeedbackThreads]', error);
+    callback([]);
+  });
+}
+
+export function isBusinessSupportThread(thread = {}) {
+  const message = clean(thread.lastMessage).toUpperCase();
+  return thread.module === 'business'
+    || message.startsWith('BUSINESS REPORT')
+    || message.startsWith('BUSINESS DIRECTORY CONTACT');
+}
+
+export function listenBusinessSupportThreads(user, profile, callback) {
+  if (!user?.uid || user.isAnonymous) return () => callback([]);
+  const base = collection(db, 'adminFeedbackThreads');
+  const q = isSuperAdminRole(profile?.role)
+    ? query(base)
+    : profile?.role === 'admin'
+      ? query(base, where('target', '==', 'cityAdmins'), where('city', '==', getAdminCity(profile)))
+      : query(base, where('senderUid', '==', user.uid));
+  return onSnapshot(q, snap => callback(sortByUpdatedDesc(
+    snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(isBusinessSupportThread)
+  )), error => {
+    console.error('[listenBusinessSupportThreads]', error);
     callback([]);
   });
 }

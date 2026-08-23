@@ -13,7 +13,7 @@ import * as Location from 'expo-location';
 import { CITY_OPTIONS, cityCode, cityLabel, classifyMetroArea } from '../utils/cities';
 import { colors, radius, shadow, spacing } from '../theme';
 
-export default function CitySelector({ selectedCity, onChange, allowCurrentLocation = false }) {
+export default function CitySelector({ selectedCity, onChange, onLocationResolved, allowCurrentLocation = false, compact = false }) {
   const [open, setOpen] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState('');
@@ -39,6 +39,10 @@ export default function CitySelector({ selectedCity, onChange, allowCurrentLocat
         fullAddress: [first.name, first.city, first.region, first.postalCode].filter(Boolean).join(', '),
       });
       onChange?.(resolved);
+      onLocationResolved?.({
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
+      });
       setOpen(false);
     } catch (error) {
       setLocationError(error?.message || 'Could not determine your current city.');
@@ -49,14 +53,15 @@ export default function CitySelector({ selectedCity, onChange, allowCurrentLocat
 
   return (
     <>
-      <Pressable onPress={() => setOpen(true)} style={({ pressed }) => [styles.trigger, pressed && styles.pressed]}>
-        <View style={styles.triggerCode}>
+      <Pressable onPress={() => setOpen(true)} style={({ pressed }) => [styles.trigger, compact && styles.triggerCompact, pressed && styles.pressed]}>
+        <View style={[styles.triggerCode, compact && styles.triggerCodeCompact]}>
+          <Text style={styles.triggerMarker}>{'\u{1F4CD}'}</Text>
           <Text style={styles.triggerCodeText}>{cityCode(selectedCity)}</Text>
         </View>
-        <View style={styles.triggerCopy}>
+        {!compact ? <View style={styles.triggerCopy}>
           <Text style={styles.triggerLabel}>City</Text>
           <Text style={styles.triggerValue}>{selectedLabel}</Text>
-        </View>
+        </View> : null}
         <Text style={styles.chevron}>▾</Text>
       </Pressable>
 
@@ -138,6 +143,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tealSoft,
     alignItems: 'center',
   },
+  triggerCompact: { width: 92, minHeight: 45, gap: 5, paddingHorizontal: 6 },
+  triggerCodeCompact: { minWidth: 58, flexDirection: 'row', gap: 2, paddingHorizontal: 5, paddingVertical: 6 },
+  triggerMarker: { fontSize: 15 },
   triggerCodeText: {
     color: colors.tealDark,
     fontSize: 12,

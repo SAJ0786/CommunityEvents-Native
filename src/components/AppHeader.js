@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Image,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   SafeAreaView,
@@ -13,35 +15,50 @@ import {
 } from 'react-native';
 import { colors, radius, shadow, spacing } from '../theme';
 
-const AUTH_ITEMS = [
+const EVENT_AUTH_ITEMS = [
   { key: 'home', label: 'Home', icon: '\u{1F3E0}' },
   { key: 'calendar', label: 'Calendar', icon: '\u{1F4C5}', group: 'Calendar' },
-  { key: 'hijri-calendar', label: 'Hijri Calendar', icon: '\u{1F319}', group: 'Calendar' },
+  { key: 'hijri-calendar', label: 'Hijri Calendar', icon: '\u263E', group: 'Calendar' },
   { key: 'inbox', label: 'Inbox', icon: '\u{1F4E5}', group: 'Messages' },
   { key: 'feedback', label: 'Feedback', icon: '\u{1F4AC}', group: 'Messages' },
-  { key: 'admin', label: 'Admin Dashboard', icon: '\u{1F6E0}', group: 'Account', adminOnly: true },
-  { key: 'profile', label: 'Profile & Settings', icon: '\u{1F464}', group: 'Account' },
+  { key: 'admin', label: 'Events Admin', icon: '\u{1F6E0}', group: 'Administration', adminOnly: true },
   { key: 'bulk_share', label: 'Bulk Share Events', icon: '\u{1F4E4}', group: 'Tools', adminOnly: true },
   { key: 'search', label: 'AI Search', icon: '\u{1F916}', group: 'Tools', disabled: true },
   { key: 'streams', label: 'Streamed Videos', icon: '\u25B6', group: 'Streams' },
 ];
 
-const GUEST_ITEMS = [
+const EVENT_GUEST_ITEMS = [
   { key: 'home', label: 'Home', icon: '\u{1F3E0}' },
   { key: 'calendar', label: 'Calendar', icon: '\u{1F4C5}', group: 'Calendar' },
-  { key: 'hijri-calendar', label: 'Hijri Calendar', icon: '\u{1F319}', group: 'Calendar' },
+  { key: 'hijri-calendar', label: 'Hijri Calendar', icon: '\u263E', group: 'Calendar' },
   { key: 'feedback', label: 'Feedback', icon: '\u{1F4AC}', group: 'Messages' },
-  { key: 'admin', label: 'Admin Dashboard', icon: '\u{1F6E0}', group: 'Account', disabled: true },
-  { key: 'profile', label: 'Profile & Settings', icon: '\u{1F464}', group: 'Account', disabled: true },
-  { key: 'bulk_share', label: 'Bulk Share Events', icon: '\u{1F4E4}', group: 'Tools', disabled: true },
   { key: 'search', label: 'AI Search', icon: '\u{1F916}', group: 'Tools', disabled: true },
   { key: 'streams', label: 'Streamed Videos', icon: '\u25B6', group: 'Streams' },
 ];
 
+const BUSINESS_AUTH_ITEMS = [
+  { key: 'business-home', label: 'Business Directory Home', icon: '\u{1F3EA}' },
+  { key: 'business-admin', label: 'Business Settings', icon: '\u2699\uFE0F', group: 'Business Management', adminOnly: true },
+  { key: 'business-inbox', label: 'Business Inbox', icon: '\u{1F4E5}', group: 'Messages' },
+  { key: 'business-feedback', label: 'Business Feedback', icon: '\u{1F4CB}', group: 'Messages' },
+  { key: 'business-report', label: 'Report a Business', icon: '\u{1F6A9}', group: 'Support' },
+  { key: 'business-contact', label: 'Contact Us', icon: '\u{1F4AC}', group: 'Support' },
+];
+
+const BUSINESS_GUEST_ITEMS = [
+  { key: 'business-home', label: 'Business Directory Home', icon: '\u{1F3EA}' },
+  { key: 'business-feedback', label: 'Business Feedback', icon: '\u{1F4CB}', group: 'Messages' },
+  { key: 'business-report', label: 'Report a Business', icon: '\u{1F6A9}', group: 'Support' },
+  { key: 'business-contact', label: 'Contact Us', icon: '\u{1F4AC}', group: 'Support' },
+];
+
 const GROUP_LABELS = {
+  Community: 'Explore Community',
   Calendar: 'Calendar',
   Messages: 'Inbox & Feedback',
-  Account: 'Admin & Profile',
+  Administration: 'Administration',
+  'Business Management': 'Business Management',
+  Support: 'Help & Support',
   Tools: 'Share & Search',
   Streams: 'Streamed Videos',
 };
@@ -52,15 +69,19 @@ const HEADER_TOP_PADDING = Platform.OS === 'android'
 
 export default function AppHeader({
   activeTab,
+  activeModule = 'events',
   isGuest = false,
   user,
   profile,
   logoSource,
   onNavigate,
+  onModuleChange,
   onSignOut,
   authBusy = false,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [switcherWidth, setSwitcherWidth] = useState(0);
+  const sliderPosition = useRef(new Animated.Value(activeModule === 'directory' ? 1 : 0)).current;
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superAdmin';
   const displayName = profile?.fullName || user?.displayName || user?.email || '';
   const roleLabel = profile?.role === 'superAdmin'
@@ -70,9 +91,11 @@ export default function AppHeader({
       : 'User';
 
   const items = useMemo(() => {
-    const source = isGuest ? GUEST_ITEMS : AUTH_ITEMS;
+    const source = activeModule === 'directory'
+      ? (isGuest ? BUSINESS_GUEST_ITEMS : BUSINESS_AUTH_ITEMS)
+      : (isGuest ? EVENT_GUEST_ITEMS : EVENT_AUTH_ITEMS);
     return source.filter(item => !item.adminOnly || isAdmin);
-  }, [isAdmin, isGuest]);
+  }, [activeModule, isAdmin, isGuest]);
 
   const rows = useMemo(() => items.flatMap((item, index) => {
     const result = [];
@@ -88,7 +111,62 @@ export default function AppHeader({
     onNavigate?.(key);
   };
 
-  const activeKey = activeTab === 'bulk_share' ? 'bulk_share' : activeTab;
+  const activeKey = activeModule === 'directory'
+    ? `business-${activeTab === 'home' ? 'home' : activeTab}`
+    : activeTab === 'bulk_share' ? 'bulk_share' : activeTab;
+
+  useEffect(() => {
+    Animated.spring(sliderPosition, {
+      toValue: activeModule === 'directory' ? 1 : 0,
+      useNativeDriver: true,
+      damping: 20,
+      stiffness: 220,
+      mass: 0.7,
+    }).start();
+  }, [activeModule, sliderPosition]);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, gesture) => (
+      Math.abs(gesture.dx) > 6 && Math.abs(gesture.dx) > Math.abs(gesture.dy)
+    ),
+    onPanResponderMove: (_, gesture) => {
+      if (!switcherWidth) return;
+      const halfWidth = Math.max(1, (switcherWidth - 6) / 2);
+      const origin = activeModule === 'directory' ? 1 : 0;
+      sliderPosition.setValue(Math.max(0, Math.min(1, origin + gesture.dx / halfWidth)));
+    },
+    onPanResponderRelease: (_, gesture) => {
+      const nextModule = gesture.dx > 22
+        ? 'directory'
+        : gesture.dx < -22
+          ? 'events'
+          : activeModule;
+      onModuleChange?.(nextModule);
+      Animated.spring(sliderPosition, {
+        toValue: nextModule === 'directory' ? 1 : 0,
+        useNativeDriver: true,
+        damping: 20,
+        stiffness: 220,
+        mass: 0.7,
+      }).start();
+    },
+    onPanResponderTerminate: () => {
+      Animated.spring(sliderPosition, {
+        toValue: activeModule === 'directory' ? 1 : 0,
+        useNativeDriver: true,
+        damping: 20,
+        stiffness: 220,
+        mass: 0.7,
+      }).start();
+    },
+  }), [activeModule, onModuleChange, sliderPosition, switcherWidth]);
+
+  const sliderTranslate = sliderPosition.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, Math.max(0, (switcherWidth - 6) / 2)],
+  });
+  const brandProduct = activeModule === 'directory' ? 'Businesses Australia' : 'Events Australia';
 
   return (
     <>
@@ -103,13 +181,53 @@ export default function AppHeader({
 
         <View style={styles.brandWrap}>
           <Image source={logoSource} style={styles.logo} resizeMode="contain" />
-          <View>
-            <Text style={styles.brand}>Community</Text>
-            <Text style={styles.brand}>Events Australia</Text>
+          <View style={styles.brandTextWrap}>
+            <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={[styles.brand, activeModule === 'directory' && styles.brandCompact]}>Community</Text>
+            <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={[styles.brand, activeModule === 'directory' && styles.brandCompact]}>{brandProduct}</Text>
           </View>
         </View>
 
         <View style={styles.rightSpacer} />
+      </View>
+
+      <View style={styles.moduleSwitcherWrap}>
+        <View
+          onLayout={event => setSwitcherWidth(event.nativeEvent.layout.width)}
+          style={styles.moduleSwitcher}
+          {...panResponder.panHandlers}
+        >
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.moduleSlider,
+              { width: Math.max(0, (switcherWidth - 6) / 2), transform: [{ translateX: sliderTranslate }] },
+            ]}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: activeModule === 'events' }}
+            onPress={() => onModuleChange?.('events')}
+            style={({ pressed }) => [
+              styles.moduleButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.moduleIcon}>{'\u{1F4C5}'}</Text>
+            <Text style={[styles.moduleLabel, activeModule === 'events' && styles.moduleLabelActive]}>Events</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: activeModule === 'directory' }}
+            onPress={() => onModuleChange?.('directory')}
+            style={({ pressed }) => [
+              styles.moduleButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.moduleIcon}>{'\u{1F3EA}'}</Text>
+            <Text style={[styles.moduleLabel, activeModule === 'directory' && styles.moduleLabelActive]}>Business Directory</Text>
+          </Pressable>
+        </View>
       </View>
 
       <Modal animationType="fade" transparent visible={menuOpen} onRequestClose={() => setMenuOpen(false)}>
@@ -132,6 +250,10 @@ export default function AppHeader({
                     <View style={styles.rolePill}>
                       <Text style={styles.rolePillText}>{roleLabel}</Text>
                     </View>
+                    <Pressable disabled={authBusy} onPress={() => { setMenuOpen(false); onSignOut?.(); }} style={({ pressed }) => [styles.identityLogout, pressed && styles.pressed, authBusy && styles.menuItemDisabled]}>
+                      <Text style={styles.logoutIcon}>{authBusy ? '\u2026' : '\u238B'}</Text>
+                      <Text style={styles.logoutText}>{authBusy ? 'Signing out…' : 'Log out'}</Text>
+                    </Pressable>
                   </>
                 )}
               </View>
@@ -157,8 +279,13 @@ export default function AppHeader({
                       ]}
                     >
                       <View style={styles.menuItemContent}>
-                        <View style={[styles.menuIconWrap, active && styles.menuIconWrapActive]}>
-                          <Text style={styles.menuIcon}>{item.icon}</Text>
+                        <View style={[
+                          styles.menuIconWrap,
+                          item.key === 'streams' && styles.youtubeMenuIcon,
+                          item.key === 'hijri-calendar' && styles.hijriMenuIcon,
+                          active && styles.menuIconWrapActive,
+                        ]}>
+                          <Text style={[styles.menuIcon, item.key === 'streams' && styles.specialMenuIcon, item.key === 'hijri-calendar' && styles.hijriMenuIconText]}>{item.icon}</Text>
                         </View>
                         <Text style={[
                           styles.menuItemText,
@@ -176,23 +303,12 @@ export default function AppHeader({
 
               {isGuest ? (
                 <Pressable
-                  onPress={() => handleNavigate('profile')}
+                  onPress={() => handleNavigate('login')}
                   style={({ pressed }) => [styles.footerButton, styles.loginButton, pressed && styles.pressed]}
                 >
                   <Text style={styles.loginButtonText}>Login / Create Account</Text>
                 </Pressable>
-              ) : (
-                <Pressable
-                  disabled={authBusy}
-                  onPress={() => {
-                    setMenuOpen(false);
-                    onSignOut?.();
-                  }}
-                  style={({ pressed }) => [styles.footerButton, pressed && styles.pressed, authBusy && styles.menuItemDisabled]}
-                >
-                  <Text style={styles.footerButtonText}>{authBusy ? 'Signing out...' : 'Logout'}</Text>
-                </Pressable>
-              )}
+              ) : null}
             </View>
           </View>
         </SafeAreaView>
@@ -211,9 +327,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     paddingHorizontal: spacing.lg,
     backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    ...shadow,
+    borderBottomWidth: 0,
   },
   iconButton: {
     width: 42,
@@ -236,23 +350,76 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
     flex: 1,
     minWidth: 0,
   },
   logo: {
-    width: 50,
-    height: 50,
+    width: 46,
+    height: 46,
   },
+  brandTextWrap: { minWidth: 0 },
   brand: {
     color: colors.navy,
     fontSize: 22,
     fontWeight: '900',
     lineHeight: 24,
   },
+  brandCompact: { fontSize: 18, lineHeight: 21 },
   rightSpacer: {
     width: 42,
     height: 42,
+  },
+  youtubeMenuIcon: { backgroundColor: '#ff0000', borderColor: '#ff0000' },
+  hijriMenuIcon: { backgroundColor: '#5b3fb5', borderColor: '#5b3fb5' },
+  specialMenuIcon: { color: '#ffffff' },
+  hijriMenuIconText: { color: '#ffd66b' },
+  moduleSwitcherWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    ...shadow,
+  },
+  moduleSwitcher: {
+    position: 'relative',
+    minHeight: 42,
+    flexDirection: 'row',
+    padding: 3,
+    borderRadius: 14,
+    backgroundColor: '#eef4f3',
+  },
+  moduleSlider: {
+    position: 'absolute',
+    left: 3,
+    top: 3,
+    bottom: 3,
+    borderRadius: 11,
+    backgroundColor: colors.surface,
+    ...shadow,
+  },
+  moduleButton: {
+    flex: 1,
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 11,
+  },
+  moduleIcon: {
+    fontSize: 15,
+  },
+  moduleLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  moduleLabelActive: {
+    color: colors.tealDark,
+    fontWeight: '900',
   },
   modalRoot: {
     flex: 1,
@@ -385,11 +552,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
   },
-  footerButtonText: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '800',
-  },
+  logoutButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: '#fff1f0' },
+  identityLogout: { position: 'absolute', top: spacing.sm, right: spacing.sm, minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, borderRadius: 10, backgroundColor: '#fff1f0' },
+  logoutIcon: { color: '#c8372d', fontSize: 20, fontWeight: '900' },
+  logoutText: { color: '#b52c24', fontSize: 14, fontWeight: '900' },
   pressed: {
     opacity: 0.78,
   },

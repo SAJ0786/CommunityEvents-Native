@@ -1,14 +1,14 @@
 ﻿export const DEFAULT_CITY = 'sydney';
 
 export const CITY_OPTIONS = [
-  { value: 'sydney', label: 'Sydney, Australia' },
-  { value: 'melbourne', label: 'Melbourne, Australia' },
-  { value: 'canberra', label: 'Canberra, Australia' },
-  { value: 'brisbane', label: 'Brisbane, Australia' },
   { value: 'adelaide', label: 'Adelaide, Australia' },
+  { value: 'brisbane', label: 'Brisbane, Australia' },
+  { value: 'canberra', label: 'Canberra, Australia' },
   { value: 'hobart', label: 'Hobart, Australia' },
+  { value: 'melbourne', label: 'Melbourne, Australia' },
   { value: 'perth', label: 'Perth, Australia' },
   { value: 'rest-of-australia', label: 'Rest of Australia' },
+  { value: 'sydney', label: 'Sydney, Australia' },
 ];
 
 export const CITY_CODES = {
@@ -84,7 +84,9 @@ export function getEventMetroArea(event = {}) {
 }
 
 export function cityLabel(value) {
-  return CITY_OPTIONS.find(city => city.value === value)?.label || CITY_OPTIONS[0].label;
+  return CITY_OPTIONS.find(city => city.value === value)?.label
+    || CITY_OPTIONS.find(city => city.value === DEFAULT_CITY)?.label
+    || 'Sydney, Australia';
 }
 
 export function cityCode(value) {

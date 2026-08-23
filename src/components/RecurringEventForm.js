@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import CreateEventForm from './CreateEventForm';
 import CompactSelect from './CompactSelect';
 import { getHijriParts, HIJRI_MONTHS } from '../services/hijri';
@@ -121,6 +122,15 @@ export default function RecurringEventForm({
   const [settingsReady, setSettingsReady] = useState(false);
   const [hijriStart, setHijriStart] = useState({ day: '', month: '', year: '' });
   const [hijriEnd, setHijriEnd] = useState({ day: '', month: '', year: '' });
+  const [datePicker, setDatePicker] = useState('');
+
+  const handleDatePicker = (event, value) => {
+    const kind = datePicker;
+    setDatePicker('');
+    if (event?.type === 'dismissed' || !value) return;
+    if (kind === 'start') setStartDate(formatLocalDate(value));
+    if (kind === 'end') setEndDate(formatLocalDate(value));
+  };
 
   useEffect(() => {
     getHijriSettings().then(settings => {
@@ -227,25 +237,11 @@ export default function RecurringEventForm({
         {!settingsReady ? <ActivityIndicator color={colors.teal} style={styles.loader} /> : calendarType === 'gregorian' ? (
           <>
             <Field label="First event date">
-              <TextInput
-                autoCapitalize="none"
-                onChangeText={setStartDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.muted}
-                style={styles.input}
-                value={startDate}
-              />
+              <Pressable onPress={() => setDatePicker('start')} style={styles.datePickerButton}><Text style={styles.datePickerIcon}>{'\u{1F4C5}'}</Text><Text style={styles.datePickerText}>{startDate}</Text><Text style={styles.datePickerArrow}>{'\u203A'}</Text></Pressable>
             </Field>
             {endMode === 'date' ? (
               <Field label="End date">
-                <TextInput
-                  autoCapitalize="none"
-                  onChangeText={setEndDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.muted}
-                  style={styles.input}
-                  value={endDate}
-                />
+                <Pressable onPress={() => setDatePicker('end')} style={styles.datePickerButton}><Text style={styles.datePickerIcon}>{'\u{1F4C5}'}</Text><Text style={styles.datePickerText}>{endDate}</Text><Text style={styles.datePickerArrow}>{'\u203A'}</Text></Pressable>
               </Field>
             ) : null}
           </>
@@ -255,6 +251,8 @@ export default function RecurringEventForm({
             {endMode === 'date' ? <HijriInputs label="End Hijri date" value={hijriEnd} onChange={setHijriEnd} /> : null}
           </>
         )}
+
+        {datePicker ? <DateTimePicker value={parseLocalDate(datePicker === 'start' ? startDate : endDate) || new Date()} mode="date" minimumDate={new Date()} onChange={handleDatePicker} /> : null}
 
         <Text style={styles.sectionLabel}>Frequency *</Text>
         <ToggleRow options={FREQUENCIES} value={frequency} onChange={setFrequency} />
@@ -335,6 +333,8 @@ const styles = StyleSheet.create({
   label: { color: colors.text, fontSize: 13, fontWeight: '900', marginBottom: 7, textTransform: 'uppercase' },
   sectionLabel: { color: colors.text, fontSize: 13, fontWeight: '900', marginBottom: 7, textTransform: 'uppercase' },
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 13, color: colors.text, backgroundColor: colors.surface, fontSize: 16 },
+  datePickerButton: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface },
+  datePickerIcon: { fontSize: 18 }, datePickerText: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '800' }, datePickerArrow: { color: colors.tealDark, fontSize: 22, fontWeight: '900' },
   hijriNumbers: { flexDirection: 'row', gap: spacing.sm },
   dayInput: { flex: 1 },
   yearInput: { flex: 1.5 },

@@ -3,15 +3,21 @@ const path = require('path');
 const parser = require('@babel/parser');
 
 const projectRoot = path.resolve(__dirname, '..');
-const sourceRoots = ['src/components', 'src/firebase', 'src/services', 'src/utils'];
 const files = ['App.js'];
 
-for (const sourceRoot of sourceRoots) {
-  const absoluteRoot = path.join(projectRoot, sourceRoot);
-  for (const name of fs.readdirSync(absoluteRoot)) {
-    if (name.endsWith('.js')) files.push(path.join(sourceRoot, name));
+function collectJavaScriptFiles(relativeDirectory) {
+  const absoluteDirectory = path.join(projectRoot, relativeDirectory);
+  for (const entry of fs.readdirSync(absoluteDirectory, { withFileTypes: true })) {
+    const relativePath = path.join(relativeDirectory, entry.name);
+    if (entry.isDirectory()) {
+      collectJavaScriptFiles(relativePath);
+    } else if (entry.name.endsWith('.js')) {
+      files.push(relativePath);
+    }
   }
 }
+
+collectJavaScriptFiles('src');
 
 for (const file of files) {
   const source = fs.readFileSync(path.join(projectRoot, file), 'utf8');

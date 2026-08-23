@@ -43,6 +43,11 @@ const shortText = (value, max = 90) => {
   return text.length > max ? `${text.slice(0, max - 1)}...` : text;
 };
 
+const isLegacyBusinessMessage = message => {
+  const text = String(message?.text || '').trim().toUpperCase();
+  return text.startsWith('BUSINESS REPORT') || text.startsWith('BUSINESS DIRECTORY CONTACT');
+};
+
 function SelectPills({ options, value, onChange }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillRow}>
@@ -273,7 +278,7 @@ export default function FeedbackScreen({ user, profile, selectedCity, onBack }) 
               </Text>
 
               <View style={styles.messageList}>
-                {messages.map(message => {
+                {messages.filter(message => !isLegacyBusinessMessage(message)).map(message => {
                   const mine = message.senderUid && message.senderUid === user?.uid;
                   const canReact = selectedHasRegisteredSender && isRegisteredUser && !mine && message.kind !== 'reaction';
                   return (

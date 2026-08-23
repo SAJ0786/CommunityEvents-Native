@@ -3,11 +3,15 @@ import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } fr
 import { colors, radius, shadow, spacing } from '../theme';
 
 function normaliseOption(option) {
-  if (typeof option === 'string') return { value: option, label: option };
-  return { value: option?.value ?? '', label: option?.label ?? String(option?.value ?? '') };
+  if (typeof option === 'string') return { value: option, label: option, group: '' };
+  return {
+    value: option?.value ?? '',
+    label: option?.label ?? String(option?.value ?? ''),
+    group: String(option?.group || ''),
+  };
 }
 
-export default function CompactSelect({ options = [], value, onChange, placeholder = 'Choose an option' }) {
+export default function CompactSelect({ options = [], value, onChange, placeholder = 'Choose an option', title = 'Choose an option' }) {
   const [open, setOpen] = useState(false);
   const rows = useMemo(() => options.map(normaliseOption), [options]);
   const selected = rows.find(option => option.value === value);
@@ -31,28 +35,32 @@ export default function CompactSelect({ options = [], value, onChange, placehold
           <Pressable style={styles.backdrop} onPress={() => setOpen(false)} />
           <View style={styles.sheet}>
             <View style={styles.header}>
-              <Text style={styles.title}>Choose an option</Text>
+              <Text style={styles.title}>{title}</Text>
               <Pressable onPress={() => setOpen(false)} style={({ pressed }) => [styles.close, pressed && styles.pressed]}>
                 <Text style={styles.closeText}>Close</Text>
               </Pressable>
             </View>
             <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
-              {rows.map(option => {
+              {rows.map((option, index) => {
                 const active = option.value === value;
                 return (
-                  <Pressable
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: active }}
-                    key={String(option.value)}
-                    onPress={() => {
-                      onChange?.(option.value);
-                      setOpen(false);
-                    }}
-                    style={({ pressed }) => [styles.option, active && styles.optionActive, pressed && styles.pressed]}
-                  >
-                    <Text style={[styles.optionText, active && styles.optionTextActive]}>{option.label}</Text>
-                    {active ? <Text style={styles.check}>{'\u2713'}</Text> : null}
-                  </Pressable>
+                  <React.Fragment key={String(option.value)}>
+                    {option.group && option.group !== rows[index - 1]?.group ? (
+                      <Text style={styles.groupTitle}>{option.group}</Text>
+                    ) : null}
+                    <Pressable
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: active }}
+                      onPress={() => {
+                        onChange?.(option.value);
+                        setOpen(false);
+                      }}
+                      style={({ pressed }) => [styles.option, active && styles.optionActive, pressed && styles.pressed]}
+                    >
+                      <Text style={[styles.optionText, active && styles.optionTextActive]}>{option.label}</Text>
+                      {active ? <Text style={styles.check}>{'\u2713'}</Text> : null}
+                    </Pressable>
+                  </React.Fragment>
                 );
               })}
             </ScrollView>
@@ -76,6 +84,7 @@ const styles = StyleSheet.create({
   close: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   closeText: { color: colors.tealDark, fontSize: 13, fontWeight: '900' },
   list: { gap: spacing.sm, paddingBottom: spacing.lg },
+  groupTitle: { color: colors.tealDark, fontSize: 11, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: spacing.sm, paddingHorizontal: 2 },
   option: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   optionActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
   optionText: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '700' },

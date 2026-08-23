@@ -179,7 +179,7 @@ function buildMessage(selectedEvents, profile, uid, messageTitle, messageMode = 
   return lines.join('\n');
 }
 
-export default function BulkShareScreen({ events = [], profile, user, onBack }) {
+export default function BulkShareScreen({ events = [], profile, user }) {
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
@@ -243,9 +243,6 @@ export default function BulkShareScreen({ events = [], profile, user, onBack }) 
               {!isNationalBulkShare ? ` Your bulk share list is limited to ${cityLabel(bulkShareCity)}.` : ''}
             </Text>
           </View>
-          <Pressable onPress={onBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-            <Text style={styles.backButtonText}>Back</Text>
-          </Pressable>
         </View>
 
         <Text style={styles.label}>Message title</Text>

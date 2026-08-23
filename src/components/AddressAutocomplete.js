@@ -8,7 +8,12 @@ import {
   isGooglePlacesConfigured,
 } from '../services/googlePlaces';
 
-export default function AddressAutocomplete({ value = {}, onChange, invalid = false }) {
+export default function AddressAutocomplete({
+  value = {},
+  onChange,
+  invalid = false,
+  placeholder = 'Start typing the full event address…',
+}) {
   const [query, setQuery] = useState(value?.fullAddress || '');
   const [suggestions, setSuggestions] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -56,7 +61,7 @@ export default function AddressAutocomplete({ value = {}, onChange, invalid = fa
   const changeText = text => {
     selectedTextRef.current = '';
     setQuery(text);
-    setError('');
+    setError(isGooglePlacesConfigured() ? '' : 'Google address search is unavailable in this build. Please install the latest test APK.');
     onChange?.({
       ...value,
       placeId: '',
@@ -78,7 +83,7 @@ export default function AddressAutocomplete({ value = {}, onChange, invalid = fa
       selectedTextRef.current = address.fullAddress;
       setQuery(address.fullAddress);
       setSuggestions([]);
-      onChange?.(address);
+      onChange?.({ ...value, ...address });
       sessionRef.current = createPlacesSessionToken();
     } catch (selectionError) {
       setError(selectionError?.message || 'Could not load this address.');
@@ -97,9 +102,12 @@ export default function AddressAutocomplete({ value = {}, onChange, invalid = fa
         <TextInput
           autoCapitalize="words"
           autoCorrect={false}
-          editable={configured && !selecting}
+          editable={!selecting}
           onChangeText={changeText}
-          placeholder={configured ? 'Start typing the full event address…' : 'Google address search is not configured'}
+          onFocus={() => {
+            if (!configured) setError('Google address search is unavailable in this build. Please install the latest test APK.');
+          }}
+          placeholder={placeholder}
           placeholderTextColor={colors.muted}
           style={styles.input}
           value={query}
@@ -127,6 +135,8 @@ export default function AddressAutocomplete({ value = {}, onChange, invalid = fa
 
       {verified ? (
         <Text style={styles.verified}>✓ {value.suburb}, {value.state} {value.postcode} · GPS saved</Text>
+      ) : !configured ? (
+        <Text style={styles.helper}>Address search requires the latest configured test build.</Text>
       ) : (
         <Text style={styles.helper}>Select an Australian address from the Google suggestions.</Text>
       )}

@@ -6,7 +6,7 @@ import {
   Linking,
   Pressable,
   ScrollView,
-  Switch,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -19,6 +19,7 @@ import * as Location from 'expo-location';
 import * as XLSX from 'xlsx';
 import { collection, getDocs, orderBy, query, where } from '@react-native-firebase/firestore';
 import { colors, radius, shadow, spacing } from '../theme';
+import NativeDateTimeField from './NativeDateTimeField';
 import {
   getHijriDisplay,
   getHijriParts,
@@ -52,6 +53,7 @@ import {
   deleteEventSubmission,
   recalculateHijriEventMetadata,
   setEventVisibility,
+  transferEventOwnership,
   updateEventSubmission,
 } from '../services/events';
 import {
@@ -70,7 +72,10 @@ import {
 } from '../services/organisations';
 import EventCard from './EventCard';
 import EventDetailsModal from './EventDetailsModal';
+import CompactSelect from './CompactSelect';
 import { CITY_OPTIONS, DEFAULT_CITY, cityCode, cityLabel, getEventMetroArea, normalizeCity } from '../utils/cities';
+import { listenAdminFeedbackThreads } from '../services/messaging';
+import { addDynamicEventOption } from '../services/eventOptionsAdmin';
 
 const HIJRI_OBSERVANCE_CATEGORIES = ['Wiladat', 'Shahadat', 'Wafat', 'Eid', 'Ayyam-e-Aza', 'Amaal', 'Season', 'Event'];
 const BULK_IMPORT_TEMPLATE_URL = 'https://communityevents.siza.info/Community_Events_Import_Template.xlsx';
@@ -82,35 +87,48 @@ const ROLE_OPTIONS = [
 
 const PWA_MODULES = [];
 
+const ADMIN_ACTION_GROUPS = [
+  {
+    key: 'people-events',
+    title: 'People & Events',
+    actions: ['users', 'events', 'orgs'],
+  },
+  {
+    key: 'operations',
+    title: 'Operations',
+    actions: ['settings', 'messaging', 'troubleshooting', 'tools'],
+  },
+];
+
+const ADMIN_ACTION_META = {
+  businesses: { icon: '\u{1F3EA}', tone: '#e4f7f2' },
+  users: { icon: '👥', tone: '#e8f4ff' },
+  orgs: { icon: '🏢', tone: '#eef0ff' },
+  feedback: { icon: '✦', tone: '#fff1ea' },
+  inbox: { icon: '✉', tone: '#f0ecff' },
+  events: { icon: '🗓', tone: '#e4f7f2' },
+  import: { icon: '⇧', tone: '#e8f4ff' },
+  bulk_share: { icon: '↗', tone: '#fff1ea' },
+  streams: { icon: '▶', tone: '#ffebef' },
+  settings: { icon: '⚙', tone: '#edf0f4' },
+  repair: { icon: '⚒', tone: '#fff6df' },
+  'hijri-calendar': { icon: '☾', tone: '#eeeaff' },
+  messaging: { icon: '\u{1F4E8}', tone: '#fff1ea' },
+  troubleshooting: { icon: '\u{1F6E0}', tone: '#edf0f4' },
+  tools: { icon: '\u{1F9F0}', tone: '#fff6df' },
+};
+
 const LIVE_ACTIONS = [
   {
     key: 'users',
-    title: 'Users',
+    title: 'User Management',
     description: 'User management, search, city scoping, and contact detail updates.',
     local: true,
   },
   {
-    key: 'import',
-    title: 'Bulk Event Import',
-    description: 'Download the spreadsheet template, fill it in, then import large event batches.',
-    local: true,
-  },
-  {
-    key: 'settings',
-    title: 'Settings',
-    description: 'Hijri calendar settings, reminder emails, and announcement tools.',
-    local: true,
-  },
-  {
     key: 'events',
-    title: 'Events',
+    title: 'Event Management',
     description: 'Admin event list, active and archived views, filtering, and visibility control.',
-    local: true,
-  },
-  {
-    key: 'repair',
-    title: 'Hijri Repair Tool',
-    description: 'Review Hijri-entered events and manually repair Gregorian/Hijri alignment when needed.',
     local: true,
   },
   {
@@ -120,29 +138,16 @@ const LIVE_ACTIONS = [
     local: true,
   },
   {
-    key: 'bulk_share',
-    title: 'Bulk Share Events',
-    description: 'Share city or filtered event batches across channels.',
+    key: 'settings', title: 'Calendar Settings', description: 'Manage Hijri calendar adjustment only.', local: true,
   },
   {
-    key: 'streams',
-    title: 'Streamed Videos',
-    description: 'Review the streamed video archive already available in native.',
+    key: 'messaging', title: 'Community Messaging', description: 'Community Update and Email Reminders.', local: true,
   },
   {
-    key: 'feedback',
-    title: 'Feedback',
-    description: 'Read and reply to feedback threads from users and guests.',
+    key: 'troubleshooting', title: 'Troubleshooting Management', description: 'Diagnostics, crash monitoring and support tools.', local: true,
   },
   {
-    key: 'inbox',
-    title: 'Inbox',
-    description: 'Handle event-host message threads inside the app.',
-  },
-  {
-    key: 'hijri-calendar',
-    title: 'Hijri Calendar',
-    description: 'Review user-facing Hijri dates, observances, and prayer times.',
+    key: 'tools', title: 'Tools', description: 'YouTube Live Connection, bulk import and future utilities.', local: true,
   },
 ];
 
@@ -161,6 +166,19 @@ function todayIso() {
   const value = new Date();
   value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
   return value.toISOString().slice(0, 10);
+}
+
+function formatSubmissionDate(value) {
+  if (!value) return '';
+  const date = typeof value?.toDate === 'function'
+    ? value.toDate()
+    : typeof value?.seconds === 'number'
+      ? new Date(value.seconds * 1000)
+      : value instanceof Date
+        ? value
+        : new Date(value);
+  if (!date || Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function slugHijriObservance(value) {
@@ -182,6 +200,12 @@ function sortOverrides(overrides = []) {
 
 function getAdminCity(profile) {
   return normalizeCity(profile?.adminCity || profile?.defaultCity || DEFAULT_CITY);
+}
+
+function getInitials(value) {
+  const parts = String(value || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'AD';
+  return parts.slice(0, 2).map(part => part.charAt(0).toUpperCase()).join('');
 }
 
 function canAdminAccessEvent(profile, event) {
@@ -317,6 +341,9 @@ export default function AdminDashboardScreen({
   profile,
   events = [],
   onNavigate,
+  onEditEvent,
+  onCopyEvent,
+  onEditSeries,
 }) {
   const [panel, setPanel] = useState('overview');
   const [settingsLoading, setSettingsLoading] = useState(true);
@@ -351,9 +378,16 @@ export default function AdminDashboardScreen({
   const [adminEventQuery, setAdminEventQuery] = useState('');
   const [adminEventType, setAdminEventType] = useState('all');
   const [adminSeriesFilter, setAdminSeriesFilter] = useState('all');
+  const [adminStatusFilter, setAdminStatusFilter] = useState('all');
+  const [adminOwnerFilterUid, setAdminOwnerFilterUid] = useState('');
+  const [adminOwnerFilterName, setAdminOwnerFilterName] = useState('');
   const [adminVisibilityBusyId, setAdminVisibilityBusyId] = useState('');
   const [adminDeletingId, setAdminDeletingId] = useState('');
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [transferEvent, setTransferEvent] = useState(null);
+  const [transferQuery, setTransferQuery] = useState('');
+  const [transferUser, setTransferUser] = useState(null);
+  const [transferBusy, setTransferBusy] = useState(false);
   const [repairLoading, setRepairLoading] = useState(false);
   const [repairEvents, setRepairEvents] = useState([]);
   const [repairMessage, setRepairMessage] = useState('');
@@ -363,12 +397,13 @@ export default function AdminDashboardScreen({
   const [fixYear, setFixYear] = useState('');
   const [fixingId, setFixingId] = useState('');
   const [usersLoading, setUsersLoading] = useState(false);
+  const [usersLoaded, setUsersLoaded] = useState(false);
   const [usersError, setUsersError] = useState('');
   const [usersList, setUsersList] = useState([]);
   const [userQuery, setUserQuery] = useState('');
   const [userCityFilter, setUserCityFilter] = useState('all');
   const [userRoleFilter, setUserRoleFilter] = useState('all');
-  const [userActiveOnly, setUserActiveOnly] = useState(true);
+  const [userCalendarSyncedOnly, setUserCalendarSyncedOnly] = useState(false);
   const [editingUserId, setEditingUserId] = useState('');
   const [editUserName, setEditUserName] = useState('');
   const [editUserEmail, setEditUserEmail] = useState('');
@@ -393,8 +428,17 @@ export default function AdminDashboardScreen({
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [importError, setImportError] = useState('');
+  const [feedbackThreads, setFeedbackThreads] = useState([]);
+  const [newEventType, setNewEventType] = useState('');
+  const [newReciterType, setNewReciterType] = useState('');
+  const [optionStatus, setOptionStatus] = useState('');
+  const [optionBusy, setOptionBusy] = useState(false);
 
   const roleLabel = profile?.role === 'superAdmin' ? 'Super Admin' : 'Admin';
+  const adminDisplayName = profile?.fullName || user?.displayName || user?.email || 'Admin user';
+  const adminScopeLabel = profile?.role === 'superAdmin'
+    ? 'All Australia'
+    : cityLabel(getAdminCity(profile)).replace(', Australia', '');
   const canAccess = profile?.role === 'admin' || profile?.role === 'superAdmin';
   const canManageHijriSettings = profile?.role === 'superAdmin';
 
@@ -405,6 +449,11 @@ export default function AdminDashboardScreen({
     const recurringEvents = events.filter(event => event.seriesId || event.recurringSeriesId).length;
     return { totalEvents, visibleEvents, hiddenEvents, recurringEvents };
   }, [events]);
+
+  useEffect(() => {
+    if (!canAccess) return undefined;
+    return listenAdminFeedbackThreads(profile, setFeedbackThreads);
+  }, [canAccess, profile]);
 
   useEffect(() => {
     if (!canManageHijriSettings) {
@@ -448,31 +497,59 @@ export default function AdminDashboardScreen({
     () => usersList.filter(userRecord => canAdminAccessUser(profile, userRecord)),
     [profile, usersList]
   );
+  const usersById = useMemo(
+    () => new Map(usersList.map(userRecord => [userRecord.id, userRecord])),
+    [usersList]
+  );
+  const activeEventCountByOwner = useMemo(() => {
+    const counts = new Map();
+    adminEvents.forEach(event => {
+      const submitterUid = event.submittedByUserId || event.createdByUserId || event.ownerUid || '';
+      if (submitterUid) counts.set(submitterUid, (counts.get(submitterUid) || 0) + 1);
+    });
+    return counts;
+  }, [adminEvents]);
   const filteredUsers = useMemo(() => {
     return scopedUsers
       .filter(userRecord => userMatchesSearch(userRecord, userQuery))
       .filter(userRecord => userRoleFilter === 'all' || userRecord.role === userRoleFilter)
-      .filter(userRecord => !userActiveOnly || isActiveUserProfile(userRecord))
+      .filter(userRecord => !userCalendarSyncedOnly || userRecord.calendarSynced === true || userRecord.calendarSyncEnabled === true)
       .filter(userRecord => {
         const city = normalizeCity(userRecord.defaultCity || DEFAULT_CITY);
         return userCityFilter === 'all' || city === userCityFilter;
       });
-  }, [scopedUsers, userActiveOnly, userCityFilter, userQuery, userRoleFilter]);
+  }, [scopedUsers, userCalendarSyncedOnly, userCityFilter, userQuery, userRoleFilter]);
   const sortedFilteredUsers = useMemo(
     () => filteredUsers.slice().sort((a, b) => {
-      const left = String(a.fullName || a.email || '').toLowerCase();
-      const right = String(b.fullName || b.email || '').toLowerCase();
-      return left.localeCompare(right);
+      const left = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || Date.parse(a.createdAt || a.joinedAt || '') || 0;
+      const right = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || Date.parse(b.createdAt || b.joinedAt || '') || 0;
+      return right - left || String(a.fullName || a.email || '').localeCompare(String(b.fullName || b.email || ''));
     }),
     [filteredUsers]
   );
   const adminEventSource = adminEventView === 'archived' ? archivedAdminEvents : adminEvents;
+
+  const exportUsersCsv = async () => {
+    const escapeCsv = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const rows = [['Name', 'Email', 'Phone', 'Role', 'City', 'Calendar Synced', 'Date Joined'], ...sortedFilteredUsers.map(item => [
+      item.fullName || item.displayName || '', item.email || '', item.phone || item.phoneNumber || '', item.role || 'user', cityLabel(normalizeCity(item.defaultCity || DEFAULT_CITY)), item.calendarSynced === true || item.calendarSyncEnabled === true ? 'Yes' : 'No', item.createdAt?.toDate?.()?.toISOString?.() || item.createdAt || item.joinedAt || '',
+    ])];
+    await Share.share({ title: 'Community Events users CSV', message: rows.map(row => row.map(escapeCsv).join(',')).join('\n') });
+  };
   const displayedAdminEvents = useMemo(() => {
     const textQuery = adminEventQuery.trim().toLowerCase();
     return adminEventSource
+      .filter(event => !adminOwnerFilterUid || (event.submittedByUserId || event.createdByUserId || event.ownerUid) === adminOwnerFilterUid)
       .filter(event => {
         if (adminEventType === 'centre') return (event.organiserType || event.organisationType) !== 'private';
         if (adminEventType === 'private') return (event.organiserType || event.organisationType) === 'private';
+        return true;
+      })
+      .filter(event => {
+        if (adminStatusFilter === 'visible') return !event.hidden;
+        if (adminStatusFilter === 'hidden') return event.hidden === true;
+        if (adminStatusFilter === 'live') return event.isLive === true;
+        if (adminStatusFilter === 'stale') return event.isLive === true && event.eventDate < todayIso();
         return true;
       })
       .filter(event => {
@@ -501,7 +578,74 @@ export default function AdminDashboardScreen({
         return haystack.includes(textQuery);
       })
       .sort(compareEventsByDateTime);
-  }, [adminEventQuery, adminEventSource, adminEventType, adminSeriesFilter]);
+  }, [adminEventQuery, adminEventSource, adminEventType, adminOwnerFilterUid, adminSeriesFilter, adminStatusFilter]);
+
+  const transferCandidates = useMemo(() => {
+    const queryText = transferQuery.trim().toLowerCase();
+    if (queryText.length < 2) return [];
+    return scopedUsers
+      .filter(item => item.id !== (transferEvent?.createdByUserId || transferEvent?.ownerUid))
+      .filter(item => [item.fullName, item.displayName, item.email, item.phone, item.phoneNumber].some(value => String(value || '').toLowerCase().includes(queryText)))
+      .slice(0, 8);
+  }, [scopedUsers, transferEvent?.createdByUserId, transferEvent?.ownerUid, transferQuery]);
+
+  const openTransfer = event => {
+    setTransferEvent(current => current?.id === event.id ? null : event);
+    setTransferQuery('');
+    setTransferUser(null);
+    if (!usersLoaded && !usersLoading) loadUsers();
+  };
+  const openUserEvents = userRecord => {
+    setAdminOwnerFilterUid(userRecord.id);
+    setAdminOwnerFilterName(userRecord.fullName || userRecord.displayName || userRecord.email || 'Selected user');
+    setAdminEventView('active');
+    setAdminEventQuery('');
+    setAdminEventType('all');
+    setAdminSeriesFilter('all');
+    setAdminStatusFilter('all');
+    setTransferEvent(null);
+    setPanel('events');
+  };
+  const getSubmissionLine = event => {
+    const submitterUid = event.submittedByUserId || event.createdByUserId || event.ownerUid || '';
+    const submitter = usersById.get(submitterUid);
+    const submitterName = event.submittedByName
+      || submitter?.fullName
+      || submitter?.displayName
+      || event.createdByName
+      || event.createdByUserEmail
+      || event.createdByUserPhone
+      || 'Unknown user';
+    const submittedDate = formatSubmissionDate(event.submittedAt || event.createdAt || event.addedAt);
+    return submittedDate
+      ? `Event submitted by ${submitterName} on ${submittedDate}`
+      : `Event submitted by ${submitterName}`;
+  };
+  const confirmTransfer = async () => {
+    if (!transferEvent || !transferUser) return;
+    setTransferBusy(true);
+    try {
+      const targetName = transferUser.fullName || transferUser.displayName || transferUser.email || 'the selected user';
+      await transferEventOwnership(transferEvent, transferUser);
+      setTransferEvent(null);
+      setTransferUser(null);
+      setTransferQuery('');
+      await loadAdminEvents(adminEventView);
+      Alert.alert('Event transferred', `Event ownership was transferred to ${targetName}.`);
+    } catch (nextError) {
+      Alert.alert('Transfer failed', nextError?.message || 'Could not transfer this event.');
+    } finally {
+      setTransferBusy(false);
+    }
+  };
+
+  const addEventOption = async (kind, value, clear) => {
+    setOptionBusy(true);
+    setOptionStatus('');
+    try { await addDynamicEventOption(kind, value); clear(''); setOptionStatus(`${value.trim()} added. It is now available in Add/Edit Event.`); }
+    catch (nextError) { setOptionStatus(nextError?.message || 'Could not add this option.'); }
+    finally { setOptionBusy(false); }
+  };
 
   const resetHijriObservanceForm = (nextSelection = '') => {
     setHijriObsForm(blankHijriObservanceForm);
@@ -525,12 +669,27 @@ export default function AdminDashboardScreen({
   };
 
   const handleAction = key => {
+    if (key === 'messaging') {
+      setPanel('messaging');
+      setStatus({ message: '', error: false });
+      return;
+    }
+    if (key === 'troubleshooting') {
+      setPanel('troubleshooting');
+      return;
+    }
+    if (key === 'tools') {
+      setPanel('tools');
+      return;
+    }
     if (key === 'settings') {
       setPanel('settings');
       setStatus({ message: '', error: false });
       return;
     }
     if (key === 'events') {
+      setAdminOwnerFilterUid('');
+      setAdminOwnerFilterName('');
       setPanel('events');
       setStatus({ message: '', error: false });
       return;
@@ -542,6 +701,11 @@ export default function AdminDashboardScreen({
     }
     if (key === 'users') {
       setPanel('users');
+      setStatus({ message: '', error: false });
+      return;
+    }
+    if (key === 'businesses') {
+      setPanel('businesses');
       setStatus({ message: '', error: false });
       return;
     }
@@ -589,15 +753,16 @@ export default function AdminDashboardScreen({
     } catch (error) {
       setUsersError(error.message || 'Could not load users.');
     } finally {
+      setUsersLoaded(true);
       setUsersLoading(false);
     }
   };
 
   useEffect(() => {
-    if (panel === 'users' && !usersList.length && !usersLoading) {
+    if ((panel === 'overview' || panel === 'users') && !usersLoaded && !usersLoading) {
       loadUsers();
     }
-  }, [panel, usersList.length, usersLoading]);
+  }, [panel, usersLoaded, usersLoading]);
 
   useEffect(() => {
     if (panel !== 'events') return;
@@ -609,6 +774,12 @@ export default function AdminDashboardScreen({
       loadAdminEvents('archived');
     }
   }, [adminEventView, adminEvents.length, adminEventsLoading, archivedAdminEvents.length, panel]);
+
+  useEffect(() => {
+    if (panel === 'users' && adminEvents.length === 0 && !adminEventsLoading) {
+      loadAdminEvents('active');
+    }
+  }, [adminEvents.length, adminEventsLoading, panel]);
 
   const handleToggleAdminVisibility = async event => {
     setAdminVisibilityBusyId(event.id);
@@ -826,7 +997,7 @@ export default function AdminDashboardScreen({
   };
 
   useEffect(() => {
-    if (panel === 'orgs' && !orgsList.length && !orgsLoading) {
+    if ((panel === 'overview' || panel === 'orgs') && !orgsList.length && !orgsLoading) {
       loadOrganisations();
     }
   }, [orgsList.length, orgsLoading, panel]);
@@ -1358,70 +1529,134 @@ export default function AdminDashboardScreen({
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      removeClippedSubviews={panel === 'events' || panel === 'users'}
+      scrollEventThrottle={16}
     >
-      <View style={styles.hero}>
-        <Text style={styles.title}>Admin Dashboard</Text>
-        <Text style={styles.subtitle}>
-          Native admin entry point aligned to the PWA structure, with Settings now wired and the remaining modules staged next.
-        </Text>
-        <View style={styles.identityCard}>
-          <Text style={styles.identityName}>{profile?.fullName || user?.displayName || user?.email || 'Admin user'}</Text>
-          <View style={styles.rolePill}>
-            <Text style={styles.rolePillText}>{roleLabel}</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.statsRow}>
-        <StatCard label="Total events" value={stats.totalEvents} tone="teal" />
-        <StatCard label="Visible" value={stats.visibleEvents} />
-        <StatCard label="Hidden" value={stats.hiddenEvents} />
-        <StatCard label="Recurring" value={stats.recurringEvents} />
-      </View>
-
       {panel === 'overview' ? (
         <>
-          <View style={styles.section}>
-            <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>Available now in native</Text>
-              <Text style={styles.sectionMeta}>Ready to use</Text>
+          <View style={styles.dashboardProfileCard}>
+            <View style={styles.dashboardGlowLarge} />
+            <View style={styles.dashboardGlowSmall} />
+            <View style={styles.dashboardProfileTop}>
+              <View style={styles.dashboardAvatar}>
+                <Text style={styles.dashboardAvatarText}>{getInitials(adminDisplayName)}</Text>
+              </View>
+              <View style={styles.dashboardIdentity}>
+                <Text style={styles.dashboardEyebrow}>WELCOME BACK</Text>
+                <Text style={styles.dashboardName} numberOfLines={1}>{adminDisplayName}</Text>
+                <View style={styles.dashboardRolePill}>
+                  <Text style={styles.dashboardRoleIcon}>◆</Text>
+                  <Text style={styles.dashboardRoleText}>{roleLabel}</Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.cardList}>
-              {LIVE_ACTIONS.map(action => (
-                <Pressable
-                  key={action.key}
-                  onPress={() => handleAction(action.key)}
-                  style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}
-                >
-                  <View style={styles.cardTop}>
-                    <Text style={styles.cardTitle}>{action.title}</Text>
-                    <View style={[styles.statusPill, styles.statusLive]}>
-                      <Text style={styles.statusPillText}>Live</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.cardDescription}>{action.description}</Text>
-                </Pressable>
-              ))}
+            <View style={styles.dashboardScopePill}>
+              <Text style={styles.dashboardScopeIcon}>⌖</Text>
+              <View style={styles.dashboardScopeTextWrap}>
+                <Text style={styles.dashboardScopeLabel}>ADMIN SCOPE</Text>
+                <Text style={styles.dashboardScopeValue}>{adminScopeLabel}</Text>
+              </View>
             </View>
           </View>
 
-          {PWA_MODULES.length ? (
-            <View style={styles.section}>
-              <View style={styles.sectionHead}>
-                <Text style={styles.sectionTitle}>PWA Admin Dashboard modules</Text>
-                <Text style={styles.sectionMeta}>Next wiring passes</Text>
+          <View style={styles.dashboardIntroRow}>
+            <View>
+              <Text style={styles.dashboardTitle}>Admin Dashboard</Text>
+              <Text style={styles.dashboardSubtitle}>Community overview and management</Text>
+            </View>
+            <View style={styles.dashboardLivePill}>
+              <View style={styles.dashboardLiveDot} />
+              <Text style={styles.dashboardLiveText}>LIVE</Text>
+            </View>
+          </View>
+
+          <View style={styles.dashboardMetricsCard}>
+            <View style={styles.dashboardMetricsRow}>
+              {[
+                { label: 'Users', value: usersLoading && !usersLoaded ? '…' : scopedUsers.length },
+                { label: 'Active Events', value: stats.visibleEvents },
+                { label: 'Organisations', value: orgsList.length },
+                { label: 'Pending Feedback', value: feedbackThreads.filter(item => item.status !== 'resolved').length },
+                { label: 'Inbox Items', value: feedbackThreads.length },
+                { label: 'Videos Streamed', value: events.filter(item => item.liveUrl || item.liveSource || item.youtubeVideoId).length },
+              ].map((metric, index) => (
+                <React.Fragment key={metric.label}>
+                  {index > 0 ? <View style={styles.dashboardMetricDivider} /> : null}
+                  <View style={styles.dashboardMetric}>
+                    <Text style={styles.dashboardMetricValue}>{metric.value}</Text>
+                    <Text style={styles.dashboardMetricLabel}>{metric.label}</Text>
+                  </View>
+                </React.Fragment>
+              ))}
+            </View>
+            <View style={styles.dashboardStatusRow}>
+              <View style={styles.dashboardStatusCopy}>
+                <View style={styles.dashboardStatusDot} />
+                <Text style={styles.dashboardStatusText}>All systems live</Text>
               </View>
-              <View style={styles.cardList}>
-                {PWA_MODULES.map(module => (
-                  <View key={module.key} style={styles.actionCard}>
-                    <View style={styles.cardTop}>
-                      <Text style={styles.cardTitle}>{module.title}</Text>
-                      <View style={styles.statusPill}>
-                        <Text style={styles.statusPillText}>Planned</Text>
+              <Text style={styles.dashboardStatusMeta}>
+                {stats.visibleEvents} visible · {stats.hiddenEvents} hidden
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.dashboardToolsHead}>
+            <Text style={styles.dashboardToolsTitle}>Admin tools</Text>
+            <Text style={styles.dashboardToolsMeta}>{LIVE_ACTIONS.length} modules</Text>
+          </View>
+
+          {ADMIN_ACTION_GROUPS.map(group => (
+            <View key={group.key} style={styles.dashboardGroup}>
+              <Text style={styles.dashboardGroupTitle}>{group.title}</Text>
+              <View style={styles.dashboardGroupCard}>
+                {group.actions.map((actionKey, index) => {
+                  const action = LIVE_ACTIONS.find(item => item.key === actionKey);
+                  const meta = ADMIN_ACTION_META[actionKey] || { icon: '•', tone: colors.tealSoft };
+                  if (!action) return null;
+                  return (
+                    <React.Fragment key={action.key}>
+                      {index > 0 ? <View style={styles.dashboardActionDivider} /> : null}
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Open ${action.title}`}
+                        onPress={() => handleAction(action.key)}
+                        style={({ pressed }) => [styles.dashboardActionRow, pressed && styles.dashboardActionPressed]}
+                      >
+                        <View style={[styles.dashboardActionIcon, { backgroundColor: meta.tone }]}>
+                          <Text style={styles.dashboardActionIconText}>{meta.icon}</Text>
+                        </View>
+                        <View style={styles.dashboardActionCopy}>
+                          <Text style={styles.dashboardActionTitle}>{action.title}</Text>
+                          <Text style={styles.dashboardActionDescription} numberOfLines={2}>
+                            {action.description}
+                          </Text>
+                        </View>
+                        <Text style={styles.dashboardActionChevron}>›</Text>
+                      </Pressable>
+                    </React.Fragment>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
+
+          {PWA_MODULES.length ? (
+            <View style={styles.dashboardGroup}>
+              <Text style={styles.dashboardGroupTitle}>Coming next</Text>
+              <View style={styles.dashboardGroupCard}>
+                {PWA_MODULES.map((module, index) => (
+                  <React.Fragment key={module.key}>
+                    {index > 0 ? <View style={styles.dashboardActionDivider} /> : null}
+                    <View style={styles.dashboardActionRow}>
+                      <View style={[styles.dashboardActionIcon, { backgroundColor: colors.background }]}>
+                        <Text style={styles.dashboardActionIconText}>•</Text>
+                      </View>
+                      <View style={styles.dashboardActionCopy}>
+                        <Text style={styles.dashboardActionTitle}>{module.title}</Text>
+                        <Text style={styles.dashboardActionDescription}>{module.description}</Text>
                       </View>
                     </View>
-                    <Text style={styles.cardDescription}>{module.description}</Text>
-                  </View>
+                  </React.Fragment>
                 ))}
               </View>
             </View>
@@ -1436,17 +1671,41 @@ export default function AdminDashboardScreen({
             </View>
             <View style={styles.rowWrap}>
               <Pressable onPress={() => setPanel('overview')} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Back to Overview</Text>
+                <Text style={styles.secondaryButtonText}>{'\u00AB'} Back</Text>
               </Pressable>
               <Pressable onPress={loadUsers} style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>Refresh</Text>
               </Pressable>
+              <Pressable onPress={exportUsersCsv} style={styles.primaryButton}>
+                <Text style={styles.primaryButtonText}>⇩ Export CSV</Text>
+              </Pressable>
             </View>
           </View>
 
+          {false ? <><View style={styles.eventMetricGrid}>
+            {[
+              ['Active', adminEvents.length, () => { setAdminEventView('active'); setAdminStatusFilter('all'); setAdminSeriesFilter('all'); }],
+              ['Archived', archivedAdminEvents.length, () => { setAdminEventView('archived'); setAdminStatusFilter('all'); }],
+              ['Visible', adminEvents.filter(item => !item.hidden).length, () => { setAdminEventView('active'); setAdminStatusFilter('visible'); }],
+              ['Hidden', adminEvents.filter(item => item.hidden).length, () => { setAdminEventView('active'); setAdminStatusFilter('hidden'); }],
+              ['Live', adminEvents.filter(item => item.isLive).length, () => { setAdminEventView('active'); setAdminStatusFilter('live'); }],
+              ['Recurring', adminEvents.filter(item => item.isRecurring || item.recurringSeriesId).length, () => { setAdminEventView('active'); setAdminSeriesFilter('recurring'); }],
+              ['Single', adminEvents.filter(item => !item.isRecurring && !item.recurringSeriesId && !item.seriesId).length, () => { setAdminEventView('active'); setAdminSeriesFilter('single'); }],
+              ['Old Series', adminEvents.filter(item => item.seriesId && !item.recurringSeriesId).length, () => { setAdminEventView('active'); setAdminSeriesFilter('legacySeries'); }],
+            ].map(([label, value, action]) => <Pressable key={label} onPress={action} style={styles.eventMetric}><Text style={styles.eventMetricValue}>{value}</Text><Text style={styles.eventMetricLabel}>{label}</Text></Pressable>)}
+          </View>
+
+          {transferEvent ? <View style={styles.actionCard}>
+            <Text style={styles.cardTitle}>Transfer Event</Text>
+            <Text style={styles.cardDescription}>Search for the new owner. Confirm Transfer stays disabled until a user is selected.</Text>
+            <TextInput value={transferQuery} onChangeText={value => { setTransferQuery(value); setTransferUser(null); }} placeholder="Search user name, email or phone" placeholderTextColor={colors.muted} style={styles.input} />
+            <View style={styles.stack}>{transferCandidates.map(item => { const selected = transferUser?.id === item.id; return <Pressable key={item.id} onPress={() => setTransferUser(item)} style={[styles.listRow, selected && styles.chipActive]}><View style={styles.listTextWrap}><Text style={[styles.listTitle, selected && styles.chipTextActive]}>{item.fullName || item.email || 'Unnamed user'}</Text><Text style={[styles.listMeta, selected && styles.chipTextActive]}>{item.email || item.phone || item.phoneNumber || cityLabel(normalizeCity(item.defaultCity || DEFAULT_CITY))}</Text></View>{selected ? <Text style={styles.chipTextActive}>✓</Text> : null}</Pressable>; })}</View>
+            <View style={styles.rowWrap}><Pressable disabled={!transferUser || transferBusy} onPress={confirmTransfer} style={[styles.primaryButton, styles.rowButton, (!transferUser || transferBusy) && styles.disabledButton]}><Text style={styles.primaryButtonText}>{transferBusy ? 'Transferring…' : 'Confirm Transfer'}</Text></Pressable><Pressable onPress={() => { setTransferEvent(null); setTransferUser(null); }} style={[styles.secondaryButton, styles.rowButton]}><Text style={styles.secondaryButtonText}>Cancel</Text></Pressable></View>
+          </View> : null}</> : null}
+
           <View style={styles.actionCard}>
             <View style={styles.statsRow}>
-              <StatCard label="Scoped users" value={scopedUsers.length} tone="teal" />
+              <StatCard label="Total Users" value={scopedUsers.length} tone="teal" />
               <StatCard label="Showing" value={sortedFilteredUsers.length} />
               <StatCard label="Admins" value={scopedUsers.filter(item => item.role === 'admin').length} />
               <StatCard label="Super Admins" value={scopedUsers.filter(item => item.role === 'superAdmin').length} />
@@ -1479,33 +1738,36 @@ export default function AdminDashboardScreen({
             </View>
 
             <Text style={styles.inputLabel}>Location filter</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-              {[{ value: 'all', label: 'All locations' }, ...CITY_OPTIONS].map(city => {
-                if (profile?.role !== 'superAdmin' && city.value === 'all') return null;
-                if (profile?.role !== 'superAdmin' && city.value !== getAdminCity(profile)) return null;
-                const active = userCityFilter === city.value || (profile?.role !== 'superAdmin' && city.value === getAdminCity(profile));
-                return (
-                  <Pressable
-                    key={city.value}
-                    onPress={() => setUserCityFilter(city.value)}
-                    style={[styles.chip, active && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {city.value === 'all' ? city.label : `${cityCode(city.value)} - ${city.label.replace(', Australia', '')}`}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            <CompactSelect
+              value={profile?.role === 'superAdmin' ? userCityFilter : getAdminCity(profile)}
+              onChange={setUserCityFilter}
+              options={(profile?.role === 'superAdmin' ? [{ value: 'all', label: 'All locations' }, ...CITY_OPTIONS] : CITY_OPTIONS.filter(city => city.value === getAdminCity(profile))).map(city => ({ value: city.value, label: city.value === 'all' ? city.label : `${cityCode(city.value)} - ${city.label.replace(', Australia', '')}` }))}
+            />
 
-            <View style={styles.switchRow}>
-              <Text style={styles.cardDescription}>Show active/scoped users only</Text>
-              <Switch
-                value={userActiveOnly}
-                onValueChange={setUserActiveOnly}
-                trackColor={{ false: '#d1d5db', true: colors.teal }}
-              />
-            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: userCalendarSyncedOnly }}
+              accessibilityLabel="Filter users who synced the calendar"
+              onPress={() => setUserCalendarSyncedOnly(current => !current)}
+              style={({ pressed }) => [
+                styles.calendarSyncFilter,
+                userCalendarSyncedOnly && styles.calendarSyncFilterActive,
+                pressed && styles.pressed,
+              ]}
+            >
+              <View style={[styles.calendarSyncFilterIcon, userCalendarSyncedOnly && styles.calendarSyncFilterIconActive]}>
+                <Text style={styles.calendarSyncFilterIconText}>{'\uD83D\uDCC5'}</Text>
+              </View>
+              <View style={styles.listTextWrap}>
+                <Text style={[styles.calendarSyncFilterTitle, userCalendarSyncedOnly && styles.calendarSyncFilterTitleActive]}>
+                  {userCalendarSyncedOnly ? 'Showing Synced Users' : `Calendar Sync (${scopedUsers.filter(item => item.calendarSynced === true || item.calendarSyncEnabled === true).length})`}
+                </Text>
+                <Text style={[styles.calendarSyncFilterMeta, userCalendarSyncedOnly && styles.calendarSyncFilterMetaActive]}>
+                  {userCalendarSyncedOnly ? 'Tap to show all users' : 'Tap to filter synced users'}
+                </Text>
+              </View>
+              <Text style={[styles.calendarSyncFilterArrow, userCalendarSyncedOnly && styles.calendarSyncFilterTitleActive]}>{'\u203A'}</Text>
+            </Pressable>
           </View>
 
           {usersError ? (
@@ -1525,6 +1787,7 @@ export default function AdminDashboardScreen({
                 const isEditing = editingUserId === userRecord.id;
                 const isCurrentUser = userRecord.id === user?.uid;
                 const userCity = normalizeCity(userRecord.defaultCity || DEFAULT_CITY);
+                const ownedEventCount = activeEventCountByOwner.get(userRecord.id) || 0;
                 return (
                   <View key={userRecord.id} style={styles.actionCard}>
                     <View style={styles.cardTop}>
@@ -1537,6 +1800,10 @@ export default function AdminDashboardScreen({
                           <Text style={styles.listMeta}>{userRecord.phone || userRecord.phoneNumber}</Text>
                         ) : null}
                         <Text style={styles.listMeta}>{cityCode(userCity)} - {cityLabel(userCity).replace(', Australia', '')}</Text>
+                        <View style={styles.rowWrap}>
+                          <View style={styles.statusPill}><Text style={styles.statusPillText}>{cityCode(userCity)}</Text></View>
+                          {userRecord.calendarSynced === true || userRecord.calendarSyncEnabled === true ? <View style={[styles.statusPill, styles.statusLive]}><Text style={styles.statusPillText}>Calendar Synced</Text></View> : null}
+                        </View>
                       </View>
                       <View style={styles.rowWrap}>
                         <View style={[styles.statusPill, userRecord.role === 'superAdmin' ? styles.statusLive : undefined]}>
@@ -1557,6 +1824,10 @@ export default function AdminDashboardScreen({
 
                     {!isEditing ? (
                       <View style={styles.rowWrap}>
+                        <Pressable onPress={() => openUserEvents(userRecord)} style={styles.userEventsLink}>
+                          <Text style={styles.userEventsLinkText}>View Events ({ownedEventCount})</Text>
+                          <Text style={styles.userEventsLinkArrow}>{'\u203A'}</Text>
+                        </Pressable>
                         <Pressable onPress={() => openUserEditor(userRecord)} style={styles.secondaryButton}>
                           <Text style={styles.secondaryButtonText}>Edit Details</Text>
                         </Pressable>
@@ -1653,6 +1924,10 @@ export default function AdminDashboardScreen({
             </View>
           )}
         </View>
+      ) : panel === 'businesses' ? (
+        <View style={styles.section}>
+          <BusinessApprovalPanel onBack={() => setPanel('overview')} />
+        </View>
       ) : panel === 'import' ? (
         <View style={styles.section}>
           <View style={styles.sectionHead}>
@@ -1661,7 +1936,7 @@ export default function AdminDashboardScreen({
               <Text style={styles.sectionMeta}>Spreadsheet import for large event batches</Text>
             </View>
             <Pressable onPress={() => setPanel('overview')} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Back to Overview</Text>
+              <Text style={styles.secondaryButtonText}>{'\u00AB'} Back</Text>
             </Pressable>
           </View>
 
@@ -1759,13 +2034,38 @@ export default function AdminDashboardScreen({
             </View>
             <View style={styles.rowWrap}>
               <Pressable onPress={() => setPanel('overview')} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Back to Overview</Text>
+                  <Text style={styles.secondaryButtonText}>{'\u00AB'} Back</Text>
               </Pressable>
               <Pressable onPress={() => loadAdminEvents(adminEventView)} style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>Refresh</Text>
               </Pressable>
             </View>
           </View>
+
+          <View style={styles.eventMetricGrid}>
+            {[
+              ['Active', adminEvents.length, () => { setAdminEventView('active'); setAdminStatusFilter('all'); setAdminSeriesFilter('all'); }],
+              ['Archived', archivedAdminEvents.length, () => { setAdminEventView('archived'); setAdminStatusFilter('all'); }],
+              ['Visible', adminEvents.filter(item => !item.hidden).length, () => { setAdminEventView('active'); setAdminStatusFilter('visible'); }],
+              ['Hidden', adminEvents.filter(item => item.hidden).length, () => { setAdminEventView('active'); setAdminStatusFilter('hidden'); }],
+              ['Live', adminEvents.filter(item => item.isLive).length, () => { setAdminEventView('active'); setAdminStatusFilter('live'); }],
+              ['Recurring', adminEvents.filter(item => item.isRecurring || item.recurringSeriesId).length, () => { setAdminEventView('active'); setAdminSeriesFilter('recurring'); }],
+              ['Single', adminEvents.filter(item => !item.isRecurring && !item.recurringSeriesId && !item.seriesId).length, () => { setAdminEventView('active'); setAdminSeriesFilter('single'); }],
+              ['Old Series', adminEvents.filter(item => item.seriesId && !item.recurringSeriesId).length, () => { setAdminEventView('active'); setAdminSeriesFilter('legacySeries'); }],
+            ].map(([label, value, action]) => <Pressable key={label} onPress={action} style={styles.eventMetric}><Text style={styles.eventMetricValue}>{value}</Text><Text style={styles.eventMetricLabel}>{label}</Text></Pressable>)}
+          </View>
+
+          {adminOwnerFilterUid ? (
+            <View style={styles.ownerFilterBanner}>
+              <View style={styles.listTextWrap}>
+                <Text style={styles.ownerFilterTitle}>Events submitted by {adminOwnerFilterName}</Text>
+                <Text style={styles.ownerFilterMeta}>{displayedAdminEvents.length} matching active event{displayedAdminEvents.length === 1 ? '' : 's'}</Text>
+              </View>
+              <Pressable onPress={() => { setAdminOwnerFilterUid(''); setAdminOwnerFilterName(''); }} style={styles.ownerFilterClear}>
+                <Text style={styles.ownerFilterClearText}>Show All</Text>
+              </Pressable>
+            </View>
+          ) : null}
 
           <View style={styles.actionCard}>
             <View style={styles.rowWrap}>
@@ -1796,7 +2096,8 @@ export default function AdminDashboardScreen({
             />
 
             <Text style={styles.inputLabel}>Organiser type</Text>
-            <View style={styles.rowWrap}>
+            <CompactSelect value={adminEventType} onChange={setAdminEventType} options={[{ value: 'all', label: 'All organisers' }, { value: 'centre', label: 'Centre / Organisation' }, { value: 'private', label: 'Private host' }]} />
+            {false ? <View style={styles.rowWrap}>
               {[
                 ['all', 'All'],
                 ['centre', 'Centre'],
@@ -1813,10 +2114,11 @@ export default function AdminDashboardScreen({
                   </Pressable>
                 );
               })}
-            </View>
+            </View> : null}
 
             <Text style={styles.inputLabel}>Event set type</Text>
-            <View style={styles.rowWrap}>
+            <CompactSelect value={adminSeriesFilter} onChange={setAdminSeriesFilter} options={[{ value: 'all', label: 'All event sets' }, { value: 'single', label: 'Single events' }, { value: 'recurring', label: 'Recurring events' }, { value: 'legacySeries', label: 'Old series' }]} />
+            {false ? <View style={styles.rowWrap}>
               {[
                 ['all', 'All'],
                 ['single', 'Single'],
@@ -1834,7 +2136,7 @@ export default function AdminDashboardScreen({
                   </Pressable>
                 );
               })}
-            </View>
+            </View> : null}
           </View>
 
           {adminEventsError ? (
@@ -1878,6 +2180,7 @@ export default function AdminDashboardScreen({
                     </View>
 
                     <EventCard event={event} onPress={() => setSelectedEvent(event)} />
+                    <Text style={styles.submissionAttribution}>{getSubmissionLine(event)}</Text>
 
                     {adminEventView !== 'archived' ? (
                       <View style={styles.rowWrap}>
@@ -1901,6 +2204,68 @@ export default function AdminDashboardScreen({
                             {adminDeletingId === event.id ? 'Deleting...' : 'Delete'}
                           </Text>
                         </Pressable>
+                        <Pressable onPress={() => openTransfer(event)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>⇄ Transfer</Text></Pressable>
+                        {event.isLive && event.eventDate < todayIso() ? <Pressable onPress={() => updateEventSubmission(event.id, { isLive: false, liveUrl: '', liveEndedAt: new Date().toISOString() }).then(() => loadAdminEvents(adminEventView)).catch(nextError => Alert.alert('Could not remove stale live status', nextError?.message || 'Please try again.'))} style={styles.ghostButtonDanger}><Text style={styles.ghostButtonDangerText}>Remove Live Stale</Text></Pressable> : null}
+                      </View>
+                    ) : null}
+
+                    {transferEvent?.id === event.id ? (
+                      <View style={styles.inlineTransferPanel}>
+                        <Text style={styles.inlineTransferTitle}>Transfer Event</Text>
+                        <Text style={styles.inlineTransferMeta}>Type at least two characters, then select the new owner.</Text>
+                        <TextInput
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          value={transferQuery}
+                          onChangeText={value => { setTransferQuery(value); setTransferUser(null); }}
+                          placeholder="Search user name, email or phone"
+                          placeholderTextColor={colors.muted}
+                          style={styles.input}
+                        />
+                        {usersLoading ? (
+                          <View style={styles.inlineTransferLoading}>
+                            <ActivityIndicator color={colors.tealDark} size="small" />
+                            <Text style={styles.inlineTransferMeta}>Loading users…</Text>
+                          </View>
+                        ) : null}
+                        {!usersLoading && transferQuery.trim().length < 2 ? (
+                          <Text style={styles.inlineTransferHint}>Enter at least two characters to search.</Text>
+                        ) : null}
+                        {!usersLoading && transferQuery.trim().length >= 2 && transferCandidates.length === 0 ? (
+                          <Text style={styles.inlineTransferHint}>No matching users found.</Text>
+                        ) : null}
+                        {transferCandidates.length ? (
+                          <View style={styles.transferDropdown}>
+                            {transferCandidates.map(item => {
+                              const selected = transferUser?.id === item.id;
+                              return (
+                                <Pressable
+                                  key={item.id}
+                                  onPress={() => setTransferUser(item)}
+                                  style={[styles.transferResult, selected && styles.transferResultSelected]}
+                                >
+                                  <View style={styles.listTextWrap}>
+                                    <Text style={[styles.transferResultName, selected && styles.transferResultTextSelected]}>{item.fullName || item.displayName || item.email || 'Unnamed user'}</Text>
+                                    <Text style={[styles.transferResultMeta, selected && styles.transferResultTextSelected]}>{item.email || item.phone || item.phoneNumber || cityLabel(normalizeCity(item.defaultCity || DEFAULT_CITY))}</Text>
+                                  </View>
+                                  {selected ? <Text style={styles.transferResultCheck}>✓</Text> : null}
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        ) : null}
+                        <View style={styles.rowWrap}>
+                          <Pressable
+                            disabled={!transferUser || transferBusy}
+                            onPress={confirmTransfer}
+                            style={[styles.primaryButton, styles.rowButton, (!transferUser || transferBusy) && styles.disabledButton]}
+                          >
+                            <Text style={styles.primaryButtonText}>{transferBusy ? 'Transferring…' : transferUser ? `Transfer to ${transferUser.fullName || transferUser.displayName || transferUser.email}` : 'Select a User'}</Text>
+                          </Pressable>
+                          <Pressable onPress={() => { setTransferEvent(null); setTransferUser(null); setTransferQuery(''); }} style={[styles.secondaryButton, styles.rowButton]}>
+                            <Text style={styles.secondaryButtonText}>Cancel</Text>
+                          </Pressable>
+                        </View>
                       </View>
                     ) : null}
                   </View>
@@ -1929,7 +2294,7 @@ export default function AdminDashboardScreen({
             </View>
             <View style={styles.rowWrap}>
               <Pressable onPress={() => setPanel('overview')} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Back to Overview</Text>
+                  <Text style={styles.secondaryButtonText}>{'\u00AB'} Back</Text>
               </Pressable>
               <Pressable onPress={loadRepairEvents} style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>Refresh</Text>
@@ -2048,7 +2413,7 @@ export default function AdminDashboardScreen({
             </View>
             <View style={styles.rowWrap}>
               <Pressable onPress={() => setPanel('overview')} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Back to Overview</Text>
+                  <Text style={styles.secondaryButtonText}>{'\u00AB'} Back</Text>
               </Pressable>
               <Pressable onPress={loadOrganisations} style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>Refresh</Text>
@@ -2280,11 +2645,11 @@ export default function AdminDashboardScreen({
         <View style={styles.section}>
           <View style={styles.sectionHead}>
             <View>
-              <Text style={styles.sectionTitle}>Settings</Text>
-              <Text style={styles.sectionMeta}>Hijri calendar, reminders, and admin messages</Text>
+              <Text style={styles.sectionTitle}>{panel === 'settings' ? 'Calendar Settings' : panel === 'messaging' ? 'Community Messaging' : panel === 'troubleshooting' ? 'Troubleshooting Management' : 'Tools'}</Text>
+              <Text style={styles.sectionMeta}>{panel === 'settings' ? 'Hijri calendar adjustment only' : panel === 'messaging' ? 'Community updates and email reminders' : panel === 'troubleshooting' ? 'Diagnostics and tester support' : 'Live connections and utilities'}</Text>
             </View>
             <Pressable onPress={() => setPanel('overview')} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Back to Overview</Text>
+              <Text style={styles.secondaryButtonText}>{'\u00AB'} Back</Text>
             </Pressable>
           </View>
 
@@ -2294,7 +2659,13 @@ export default function AdminDashboardScreen({
             </View>
           ) : null}
 
-          <View style={styles.actionCard}>
+          {panel === 'troubleshooting' ? <View style={styles.actionCard}>
+            <Text style={styles.cardTitle}>Crash diagnostics</Text>
+            <Text style={styles.cardDescription}>Production crash monitoring records the app version, screen context and anonymous diagnostic session. Typed messages, ABNs, phone numbers, email addresses and exact addresses are excluded.</Text>
+            <Pressable onPress={() => Alert.alert('Report a Problem', 'Open Profile > Help & Policies, copy the Diagnostic Session ID, and include it with the steps that caused the problem.')} style={styles.primaryButton}><Text style={styles.primaryButtonText}>How to report a problem</Text></Pressable>
+          </View> : null}
+
+          {panel === 'messaging' ? <View style={[styles.actionCard, styles.messagingEmailCard]}>
             <Text style={styles.cardTitle}>Email Reminders</Text>
             <Text style={styles.cardDescription}>
               Queue reminder emails for a date, date range, or month. Admins send to their scoped city, while super admins can send to all cities.
@@ -2323,14 +2694,7 @@ export default function AdminDashboardScreen({
             {reminderMode === 'date' ? (
               <>
                 <Text style={styles.inputLabel}>Date</Text>
-                <TextInput
-                  value={reminderDate}
-                  onChangeText={setReminderDate}
-                  placeholder="YYYY-MM-DD"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  style={styles.input}
-                />
+                <NativeDateTimeField value={reminderDate} onChange={setReminderDate} accessibilityLabel="Select reminder date" />
               </>
             ) : null}
 
@@ -2338,25 +2702,11 @@ export default function AdminDashboardScreen({
               <View style={styles.formRow}>
                 <View style={styles.flexField}>
                   <Text style={styles.inputLabel}>From</Text>
-                  <TextInput
-                    value={reminderFrom}
-                    onChangeText={setReminderFrom}
-                    placeholder="YYYY-MM-DD"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    style={styles.input}
-                  />
+                  <NativeDateTimeField value={reminderFrom} onChange={setReminderFrom} accessibilityLabel="Select reminder start date" />
                 </View>
                 <View style={styles.flexField}>
                   <Text style={styles.inputLabel}>To</Text>
-                  <TextInput
-                    value={reminderTo}
-                    onChangeText={setReminderTo}
-                    placeholder="YYYY-MM-DD"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    style={styles.input}
-                  />
+                  <NativeDateTimeField value={reminderTo} onChange={setReminderTo} minimumDate={reminderFrom ? new Date(`${reminderFrom}T12:00:00`) : undefined} accessibilityLabel="Select reminder end date" />
                 </View>
               </View>
             ) : null}
@@ -2364,14 +2714,7 @@ export default function AdminDashboardScreen({
             {reminderMode === 'month' ? (
               <>
                 <Text style={styles.inputLabel}>Month</Text>
-                <TextInput
-                  value={reminderMonth}
-                  onChangeText={value => setReminderMonth(value.slice(0, 7))}
-                  placeholder="YYYY-MM"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  style={styles.input}
-                />
+                <NativeDateTimeField value={reminderMonth} valueFormat="month" onChange={setReminderMonth} accessibilityLabel="Select reminder month" />
               </>
             ) : null}
 
@@ -2384,9 +2727,9 @@ export default function AdminDashboardScreen({
                 {sendingReminder ? 'Queueing reminder...' : 'Send Reminder Email Now'}
               </Text>
             </Pressable>
-          </View>
+          </View> : null}
 
-          <View style={styles.actionCard}>
+          {panel === 'messaging' ? <View style={[styles.actionCard, styles.messagingUpdateCard]}>
             <Text style={styles.cardTitle}>Community Update Message</Text>
             <Text style={styles.cardDescription}>
               Send a custom message to users with reminder emails enabled in the current admin scope.
@@ -2412,15 +2755,6 @@ export default function AdminDashboardScreen({
                   {sendingReminder ? 'Queueing message...' : 'Send to All Users'}
                 </Text>
               </Pressable>
-              <Pressable
-                onPress={confirmStoreAnnouncement}
-                disabled={sendingReminder}
-                style={[styles.secondaryButton, styles.rowButton, sendingReminder && styles.disabledButton]}
-              >
-                <Text style={styles.secondaryButtonText}>
-                  {sendingReminder ? 'Please wait...' : 'Send Store Announcement'}
-                </Text>
-              </Pressable>
             </View>
 
             {reminderResult ? (
@@ -2430,9 +2764,19 @@ export default function AdminDashboardScreen({
                 </Text>
               </View>
             ) : null}
-          </View>
+          </View> : null}
 
-          <View style={styles.actionCard}>
+          {panel === 'tools' ? <View style={styles.actionCard}>
+            <Text style={styles.cardTitle}>Event option management</Text>
+            <Text style={styles.cardDescription}>Add approved Event Type and Reciter Type options. Existing values cannot be deleted, duplicates are blocked case-insensitively, and each addition records the administrator and time.</Text>
+            <Text style={styles.inputLabel}>New Event Type</Text>
+            <View style={styles.formRow}><View style={styles.flexField}><TextInput value={newEventType} onChangeText={setNewEventType} placeholder="Event type" placeholderTextColor={colors.muted} style={styles.input} /></View><Pressable disabled={optionBusy || newEventType.trim().length < 2} onPress={() => addEventOption('eventType', newEventType, setNewEventType)} style={[styles.primaryButton, (optionBusy || newEventType.trim().length < 2) && styles.disabledButton]}><Text style={styles.primaryButtonText}>＋ Add</Text></Pressable></View>
+            <Text style={styles.inputLabel}>New Reciter Type</Text>
+            <View style={styles.formRow}><View style={styles.flexField}><TextInput value={newReciterType} onChangeText={setNewReciterType} placeholder="Reciter type" placeholderTextColor={colors.muted} style={styles.input} /></View><Pressable disabled={optionBusy || newReciterType.trim().length < 2} onPress={() => addEventOption('reciterType', newReciterType, setNewReciterType)} style={[styles.primaryButton, (optionBusy || newReciterType.trim().length < 2) && styles.disabledButton]}><Text style={styles.primaryButtonText}>＋ Add</Text></Pressable></View>
+            {optionStatus ? <Text style={styles.listMeta}>{optionStatus}</Text> : null}
+          </View> : null}
+
+          {panel === 'tools' ? <View style={styles.actionCard}>
             <Text style={styles.cardTitle}>YouTube Live Connection</Text>
             <Text style={styles.cardDescription}>
               Connect the Community Events YouTube channel and refresh stream thumbnails from native admin.
@@ -2492,13 +2836,13 @@ export default function AdminDashboardScreen({
                 </Text>
               </View>
             ) : null}
-          </View>
+          </View> : null}
 
-          {!canManageHijriSettings ? (
+          {panel === 'settings' ? (!canManageHijriSettings ? (
             <View style={styles.actionCard}>
               <Text style={styles.cardTitle}>Hijri settings access</Text>
               <Text style={styles.cardDescription}>
-                In the PWA, Hijri Calendar Adjustment and Important Hijri Dates are super-admin tools. Native follows the same rule while keeping reminder tools available to admins.
+                Hijri Calendar Adjustment follows the PWA access rule and is available to super admins only.
               </Text>
             </View>
           ) : settingsLoading ? (
@@ -2544,14 +2888,7 @@ export default function AdminDashboardScreen({
                 />
 
                 <Text style={styles.inputLabel}>Gregorian anchor date</Text>
-                <TextInput
-                  value={anchorDate}
-                  onChangeText={setAnchorDate}
-                  placeholder="YYYY-MM-DD"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  style={styles.input}
-                />
+                <NativeDateTimeField value={anchorDate} onChange={setAnchorDate} accessibilityLabel="Select Gregorian anchor date" />
 
                 <Pressable
                   onPress={saveHijriAdjustment}
@@ -2583,7 +2920,7 @@ export default function AdminDashboardScreen({
                 ) : null}
               </View>
 
-              <View style={styles.actionCard}>
+              {false ? <View style={styles.actionCard}>
                 <Text style={styles.cardTitle}>Important Hijri Dates</Text>
                 <Text style={styles.cardDescription}>
                   Add, edit, disable, or delete the Islamic dates shown in the Hijri Calendar page.
@@ -2713,9 +3050,9 @@ export default function AdminDashboardScreen({
                     </View>
                   </View>
                 ) : null}
-              </View>
+              </View> : null}
             </>
-          )}
+          )) : null}
         </View>
       )}
 
@@ -2724,6 +3061,14 @@ export default function AdminDashboardScreen({
         visible={Boolean(selectedEvent)}
         onClose={() => setSelectedEvent(null)}
         isGuest={false}
+        user={user}
+        profile={profile}
+        onEdit={adminEventView !== 'archived' && onEditEvent ? event => { setSelectedEvent(null); onEditEvent(event); } : undefined}
+        onCopy={adminEventView !== 'archived' && onCopyEvent ? event => { setSelectedEvent(null); onCopyEvent(event); } : undefined}
+        onEditSeries={adminEventView !== 'archived' && onEditSeries && (selectedEvent?.seriesId || selectedEvent?.recurringSeriesId) ? event => { setSelectedEvent(null); onEditSeries(event); } : undefined}
+        onToggleVisibility={adminEventView !== 'archived' ? event => { setSelectedEvent(null); handleToggleAdminVisibility(event); } : undefined}
+        onTransfer={adminEventView !== 'archived' ? event => { setSelectedEvent(null); openTransfer(event); } : undefined}
+        onRemoveLiveStale={adminEventView !== 'archived' && selectedEvent?.isLive && selectedEvent?.eventDate < todayIso() ? event => { setSelectedEvent(null); updateEventSubmission(event.id, { isLive: false, liveUrl: '', liveEndedAt: new Date().toISOString() }).then(() => loadAdminEvents(adminEventView)).catch(nextError => Alert.alert('Could not remove stale live status', nextError?.message || 'Please try again.')); } : undefined}
         onDelete={adminEventView !== 'archived' ? event => {
           setSelectedEvent(null);
           confirmDeleteAdminEvent(event);
@@ -2742,6 +3087,329 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.lg,
     paddingBottom: spacing.xl,
+  },
+  messagingUpdateCard: { order: 1 },
+  messagingEmailCard: { order: 2 },
+  eventMetricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  eventMetric: { width: '22%', minWidth: 72, flexGrow: 1, minHeight: 66, alignItems: 'center', justifyContent: 'center', padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  eventMetricValue: { color: colors.tealDark, fontSize: 20, fontWeight: '900' },
+  eventMetricLabel: { marginTop: 3, color: colors.muted, fontSize: 9, fontWeight: '900', textAlign: 'center' },
+  dashboardProfileCard: {
+    position: 'relative',
+    overflow: 'hidden',
+    padding: spacing.md,
+    borderRadius: 20,
+    backgroundColor: '#08786c',
+    gap: spacing.sm,
+    shadowColor: '#064b44',
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 5,
+  },
+  dashboardGlowLarge: {
+    position: 'absolute',
+    width: 210,
+    height: 210,
+    borderRadius: 999,
+    right: -90,
+    top: -105,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+  },
+  dashboardGlowSmall: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 999,
+    left: -45,
+    bottom: -70,
+    backgroundColor: 'rgba(0,45,40,0.14)',
+  },
+  dashboardProfileTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  dashboardAvatar: {
+    width: 66,
+    height: 66,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.65)',
+    backgroundColor: 'rgba(255,255,255,0.20)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dashboardAvatarText: {
+    color: '#ffffff',
+    fontSize: 23,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  dashboardIdentity: {
+    flex: 1,
+    gap: 3,
+  },
+  dashboardEyebrow: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+  },
+  dashboardName: {
+    color: '#ffffff',
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '900',
+  },
+  dashboardRolePill: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  dashboardRoleIcon: {
+    color: '#d9fff8',
+    fontSize: 9,
+  },
+  dashboardRoleText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  dashboardScopePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(4,56,51,0.22)',
+  },
+  dashboardScopeIcon: {
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  dashboardScopeTextWrap: {
+    flex: 1,
+    gap: 1,
+  },
+  dashboardScopeLabel: {
+    color: 'rgba(255,255,255,0.62)',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  dashboardScopeValue: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  dashboardIntroRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  dashboardTitle: {
+    color: colors.navy,
+    fontSize: 25,
+    lineHeight: 30,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+  },
+  dashboardSubtitle: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  dashboardLivePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: colors.tealSoft,
+  },
+  dashboardLiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: '#19a974',
+  },
+  dashboardLiveText: {
+    color: colors.tealDark,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  dashboardMetricsCard: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+    ...shadow,
+  },
+  dashboardMetricsRow: {
+    minHeight: 96,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  dashboardMetric: {
+    width: '32%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+  },
+  dashboardMetricDivider: {
+    width: 0,
+    height: 0,
+    backgroundColor: colors.border,
+  },
+  dashboardMetricValue: {
+    color: colors.navy,
+    fontSize: 18,
+    lineHeight: 21,
+    fontWeight: '900',
+  },
+  dashboardMetricLabel: {
+    color: colors.muted,
+    fontSize: 8.5,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  dashboardStatusRow: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: '#fbfdfd',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  dashboardStatusCopy: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  dashboardStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: '#19a974',
+  },
+  dashboardStatusText: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  dashboardStatusMeta: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  dashboardToolsHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+  },
+  dashboardToolsTitle: {
+    color: colors.navy,
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  dashboardToolsMeta: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  dashboardGroup: {
+    gap: spacing.sm,
+  },
+  dashboardGroupTitle: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    paddingLeft: 2,
+  },
+  dashboardGroupCard: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+    ...shadow,
+  },
+  dashboardActionRow: {
+    minHeight: 82,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,
+  },
+  dashboardActionPressed: {
+    backgroundColor: '#f1f8f7',
+  },
+  dashboardActionDivider: {
+    height: 1,
+    marginLeft: 76,
+    backgroundColor: '#e8efee',
+  },
+  dashboardActionIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dashboardActionIconText: {
+    color: colors.tealDark,
+    fontSize: 21,
+    lineHeight: 26,
+    fontWeight: '900',
+  },
+  dashboardActionCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  dashboardActionTitle: {
+    color: colors.navy,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '900',
+  },
+  dashboardActionDescription: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '600',
+  },
+  dashboardActionChevron: {
+    color: '#a7b5b3',
+    fontSize: 28,
+    lineHeight: 30,
+    fontWeight: '500',
   },
   hero: {
     gap: spacing.sm,
@@ -2840,6 +3508,27 @@ const styles = StyleSheet.create({
   cardList: {
     gap: spacing.md,
   },
+  submissionAttribution: { marginTop: -4, paddingHorizontal: 2, color: colors.muted, fontSize: 11, lineHeight: 16, fontStyle: 'italic', fontWeight: '700' },
+  ownerFilterBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: colors.tealSoft },
+  ownerFilterTitle: { color: colors.tealDark, fontSize: 14, lineHeight: 19, fontWeight: '900' },
+  ownerFilterMeta: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  ownerFilterClear: { minHeight: 38, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: colors.surface },
+  ownerFilterClearText: { color: colors.tealDark, fontSize: 11, fontWeight: '900' },
+  userEventsLink: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: colors.tealSoft },
+  userEventsLinkText: { color: colors.tealDark, fontSize: 12, fontWeight: '900' },
+  userEventsLinkArrow: { color: colors.tealDark, fontSize: 20, lineHeight: 22, fontWeight: '900' },
+  inlineTransferPanel: { gap: spacing.sm, marginTop: spacing.xs, padding: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: '#f2fbf9' },
+  inlineTransferTitle: { color: colors.navy, fontSize: 16, fontWeight: '900' },
+  inlineTransferMeta: { color: colors.muted, fontSize: 11, lineHeight: 16, fontWeight: '700' },
+  inlineTransferHint: { paddingVertical: spacing.sm, color: colors.muted, fontSize: 11, fontStyle: 'italic', textAlign: 'center' },
+  inlineTransferLoading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
+  transferDropdown: { overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  transferResult: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  transferResultSelected: { backgroundColor: colors.teal },
+  transferResultName: { color: colors.navy, fontSize: 13, fontWeight: '900' },
+  transferResultMeta: { color: colors.muted, fontSize: 10, lineHeight: 14, fontWeight: '700' },
+  transferResultTextSelected: { color: colors.surface },
+  transferResultCheck: { color: colors.surface, fontSize: 18, fontWeight: '900' },
   actionCard: {
     padding: spacing.lg,
     borderRadius: radius.lg,
@@ -2980,6 +3669,59 @@ const styles = StyleSheet.create({
   statusPillText: {
     color: colors.tealDark,
     fontSize: 11,
+    fontWeight: '900',
+  },
+  calendarSyncFilter: {
+    minHeight: 64,
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  calendarSyncFilterActive: {
+    borderColor: colors.teal,
+    backgroundColor: colors.tealSoft,
+  },
+  calendarSyncFilterIcon: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: '#eef2ff',
+  },
+  calendarSyncFilterIconActive: {
+    backgroundColor: colors.surface,
+  },
+  calendarSyncFilterIconText: {
+    fontSize: 22,
+  },
+  calendarSyncFilterTitle: {
+    color: colors.navy,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  calendarSyncFilterTitleActive: {
+    color: colors.tealDark,
+  },
+  calendarSyncFilterMeta: {
+    marginTop: 2,
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  calendarSyncFilterMetaActive: {
+    color: colors.tealDark,
+  },
+  calendarSyncFilterArrow: {
+    color: colors.muted,
+    fontSize: 24,
     fontWeight: '900',
   },
   primaryButton: {

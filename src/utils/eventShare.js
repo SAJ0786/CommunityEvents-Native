@@ -10,14 +10,14 @@ function normalizeAudience(value = '') {
     : String(value || '').trim();
 }
 
-function getSharePrivacy(profile, event, uid) {
+function getSharePrivacy(profile, event, uid, isGuest) {
   const role = profile?.role;
-  const isGuest = !uid;
+  const guestSession = isGuest || !uid;
   const isAdmin = isAdminRole(role);
   const isPrivate = event?.organiserType === 'private';
   const isOwner = uid && event?.createdByUserId === uid;
 
-  if (isGuest) return { showFullAddress: !isPrivate, showPhone: false };
+  if (guestSession) return { showFullAddress: !isPrivate, showPhone: false };
   if (isAdmin) return { showFullAddress: true, showPhone: true };
   if (!isPrivate || isOwner) return { showFullAddress: true, showPhone: true };
   return { showFullAddress: false, showPhone: false };
@@ -55,7 +55,7 @@ function suburbLabel(event = {}) {
 }
 
 export function buildEventShareMessage(event = {}, { isGuest = true, user = null, profile = null } = {}) {
-  const sharePrivacy = getSharePrivacy(profile, event, user?.uid);
+  const sharePrivacy = getSharePrivacy(profile, event, user?.uid, isGuest);
   const location = sharePrivacy.showFullAddress ? (fullAddressLabel(event) || suburbLabel(event)) : suburbLabel(event);
   const locationLabel = sharePrivacy.showFullAddress ? '*Location:*' : '*Suburb:*';
   const displayType = event.eventSubject?.trim()

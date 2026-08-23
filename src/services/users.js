@@ -16,10 +16,13 @@ export async function getUserProfile(uid) {
   const data = snapshot.data();
   return {
     id: snapshot.id,
+    ...data,
     savedEvents: Array.isArray(data.savedEvents)
       ? data.savedEvents
       : Array.isArray(data.savedEventIds) ? data.savedEventIds : [],
-    ...data,
+    savedBusinesses: Array.isArray(data.savedBusinesses)
+      ? data.savedBusinesses
+      : Array.isArray(data.savedBusinessIds) ? data.savedBusinessIds : [],
   };
 }
 
@@ -60,9 +63,25 @@ export async function toggleSavedEvent(uid, eventId, shouldSave) {
   return getUserProfile(uid);
 }
 
+export async function toggleSavedBusiness(uid, businessId, shouldSave) {
+  if (!uid || !businessId) return null;
+  const ref = doc(db, 'users', uid);
+  await updateDoc(ref, {
+    savedBusinesses: shouldSave ? arrayUnion(businessId) : arrayRemove(businessId),
+    updatedAt: serverTimestamp(),
+  });
+  return getUserProfile(uid);
+}
+
 export async function updateUserPreferences(uid, changes = {}) {
   if (!uid) return null;
-  const allowed = ['fullName', 'email', 'defaultCity', 'reminderEmailEnabled', 'adminAlertEmailEnabled', 'privacyAccepted', 'termsAccepted'];
+  const allowed = [
+    'fullName', 'email', 'defaultCity', 'defaultModule',
+    'pushNotificationsEnabled', 'smsNotificationsEnabled', 'emailNotificationsEnabled',
+    'eventNotificationsEnabled', 'businessNotificationsEnabled',
+    'prayerRemindersEnabled',
+    'reminderEmailEnabled', 'adminAlertEmailEnabled', 'privacyAccepted', 'termsAccepted',
+  ];
   const payload = Object.fromEntries(
     Object.entries(changes).filter(([key]) => allowed.includes(key))
   );

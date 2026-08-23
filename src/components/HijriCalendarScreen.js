@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,20 +25,12 @@ import {
   sortHijriObservances,
 } from '../services/hijriObservances';
 import { calculatePrayerTimes, PRAYER_OPTIONS } from '../services/prayerTimes';
+import { getPrayerReminderSettings, initializeDefaultPrayerReminders, setPrayerReminder } from '../services/reminders';
 import { DEFAULT_CITY, cityLabel, normalizeCity } from '../utils/cities';
+import { getPrayerLocation } from '../utils/prayerLocations';
+import NativeDateTimeField from './NativeDateTimeField';
 
-const CATEGORIES = ['All', 'Wiladat', 'Shahadat', 'Wafat', 'Eid', 'Ayyam-e-Aza', 'Amaal', 'Season', 'Event'];
-
-const CITY_PRAYER_LOCATIONS = {
-  sydney: { suburb: 'Sydney', state: 'NSW', latitude: -33.8688, longitude: 151.2093, fullAddress: 'Sydney NSW, Australia' },
-  melbourne: { suburb: 'Melbourne', state: 'VIC', latitude: -37.8136, longitude: 144.9631, fullAddress: 'Melbourne VIC, Australia' },
-  canberra: { suburb: 'Canberra', state: 'ACT', latitude: -35.2809, longitude: 149.13, fullAddress: 'Canberra ACT, Australia' },
-  brisbane: { suburb: 'Brisbane', state: 'QLD', latitude: -27.4698, longitude: 153.0251, fullAddress: 'Brisbane QLD, Australia' },
-  adelaide: { suburb: 'Adelaide', state: 'SA', latitude: -34.9285, longitude: 138.6007, fullAddress: 'Adelaide SA, Australia' },
-  hobart: { suburb: 'Hobart', state: 'TAS', latitude: -42.8821, longitude: 147.3272, fullAddress: 'Hobart TAS, Australia' },
-  perth: { suburb: 'Perth', state: 'WA', latitude: -31.9523, longitude: 115.8613, fullAddress: 'Perth WA, Australia' },
-  'rest-of-australia': { suburb: 'Sydney', state: 'NSW', latitude: -33.8688, longitude: 151.2093, fullAddress: 'Sydney NSW, Australia' },
-};
+const CATEGORIES = ['Wiladat', 'Shahadat', 'Wafat', 'Eid', 'Ayyam-e-Aza', 'Amaal', 'Season', 'Event'];
 
 function toIsoDate(date) {
   const value = new Date(date);
@@ -82,18 +75,23 @@ function getNextObservance(observances, overrides) {
   return candidates[0] || null;
 }
 
-export default function HijriCalendarScreen({ profile }) {
+export default function HijriCalendarScreen({ profile, selectedCity }) {
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState({ overrides: [] });
   const [observances, setObservances] = useState(DEFAULT_HIJRI_OBSERVANCES);
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('All');
+  const [categories, setCategories] = useState([]);
+  const [currentHijriMonth, setCurrentHijriMonth] = useState(1);
   const [convertMode, setConvertMode] = useState('gregorian');
   const [gInput, setGInput] = useState(todayIso);
   const [hDay, setHDay] = useState('1');
   const [hMonth, setHMonth] = useState('1');
   const [hYear, setHYear] = useState('1448');
+  const [prayerReminderKeys, setPrayerReminderKeys] = useState([]);
+  const [prayerReminderBusy, setPrayerReminderBusy] = useState('');
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const prayerCity = normalizeCity(selectedCity || profile?.defaultCity || DEFAULT_CITY);
 
   useEffect(() => {
     let active = true;
@@ -110,6 +108,7 @@ export default function HijriCalendarScreen({ profile }) {
       setObservances(sortHijriObservances(nextObservances));
       setHDay(String(currentHijri?.day || 1));
       setHMonth(String(currentHijri?.month || 1));
+      setCurrentHijriMonth(Number(currentHijri?.month || 1));
       setHYear(String(currentHijri?.year || 1448));
       setLoading(false);
     }
@@ -121,12 +120,20 @@ export default function HijriCalendarScreen({ profile }) {
     };
   }, [todayIso]);
 
+  useEffect(() => {
+    const loadReminders = profile?.prayerRemindersEnabled === false
+      ? getPrayerReminderSettings()
+      : initializeDefaultPrayerReminders(getPrayerLocation(prayerCity));
+    loadReminders
+      .then(value => setPrayerReminderKeys(value.enabledKeys || []))
+      .catch(() => setPrayerReminderKeys([]));
+  }, [prayerCity, profile?.prayerRemindersEnabled]);
+
   const overrides = settings.overrides || [];
   const todayHijri = getHijriDisplay(todayIso, overrides);
   const nextObservance = useMemo(() => getNextObservance(observances, overrides), [observances, overrides]);
-  const prayerCity = normalizeCity(profile?.defaultCity || DEFAULT_CITY);
   const todayPrayerTimes = useMemo(
-    () => calculatePrayerTimes(todayIso, CITY_PRAYER_LOCATIONS[prayerCity] || CITY_PRAYER_LOCATIONS[DEFAULT_CITY]),
+    () => calculatePrayerTimes(todayIso, getPrayerLocation(prayerCity)),
     [prayerCity, todayIso]
   );
   const currentHijriYear = getCurrentHijriYear(overrides) || Number(hYear) || 1448;
@@ -134,18 +141,33 @@ export default function HijriCalendarScreen({ profile }) {
     const query = search.trim().toLowerCase();
     return sortHijriObservances(observances)
       .filter(item => item.enabled !== false)
-      .filter(item => category === 'All' || item.category === category)
+      .filter(item => categories.length ? categories.includes(item.category) : query ? true : Number(item.month) === currentHijriMonth)
       .filter(item => !query || `${item.name} ${item.notes} ${item.category}`.toLowerCase().includes(query))
       .map(item => ({
         ...item,
         hYear: currentHijriYear,
         gDate: hijriToGregorian(item.day, item.month, currentHijriYear, overrides),
       }));
-  }, [category, currentHijriYear, observances, overrides, search]);
+  }, [categories, currentHijriMonth, currentHijriYear, observances, overrides, search]);
 
   const gToHijri = getHijriDisplay(gInput, overrides);
   const hToGregorian = hijriToGregorian(Number(hDay), Number(hMonth), Number(hYear), overrides);
   const useGregorianInput = convertMode === 'gregorian';
+
+  const togglePrayerReminder = async key => {
+    if (prayerReminderBusy) return;
+    const enabled = !prayerReminderKeys.includes(key);
+    setPrayerReminderBusy(key);
+    try {
+      const value = await setPrayerReminder(key, enabled, getPrayerLocation(prayerCity));
+      setPrayerReminderKeys(value.enabledKeys || []);
+      Alert.alert(enabled ? 'Prayer reminder set' : 'Prayer reminder removed', enabled ? 'This phone will schedule the selected prayer time for the next 21 days. Opening this page lets you refresh or change the selection.' : 'The selected prayer-time reminders were removed.');
+    } catch (error) {
+      Alert.alert('Prayer reminder', error?.message || 'Could not update this reminder.');
+    } finally {
+      setPrayerReminderBusy('');
+    }
+  };
 
   return (
     <ScrollView
@@ -156,7 +178,7 @@ export default function HijriCalendarScreen({ profile }) {
       <View style={styles.hero}>
         <Text style={styles.title}>Hijri Calendar</Text>
         <Text style={styles.subtitle}>
-          Today&apos;s Hijri date, important dates, prayer times, and quick conversion tools.
+          Today&apos;s Hijri date, key Islamic events, prayer times, and quick conversion tools.
         </Text>
       </View>
 
@@ -189,13 +211,20 @@ export default function HijriCalendarScreen({ profile }) {
                   <Text style={styles.sectionTitle}>Prayer Times</Text>
                   <Text style={styles.sectionMeta}>{cityLabel(prayerCity)}</Text>
                 </View>
+                <Text style={styles.prayerHelp}>Tap the bell on any prayer time to schedule or remove a phone reminder.</Text>
                 <View style={styles.prayerGrid}>
-                  {PRAYER_OPTIONS.map(option => (
-                    <View key={option.key} style={styles.prayerCard}>
-                      <Text style={styles.prayerLabel}>{option.label}</Text>
+                  {PRAYER_OPTIONS.map(option => {
+                    const reminderEnabled = prayerReminderKeys.includes(option.key);
+                    return (
+                    <Pressable accessibilityState={{ selected: reminderEnabled }} disabled={Boolean(prayerReminderBusy)} key={option.key} onPress={() => togglePrayerReminder(option.key)} style={({ pressed }) => [styles.prayerCard, reminderEnabled && styles.prayerCardActive, pressed && styles.pressed]}>
+                      <View style={styles.prayerLabelRow}>
+                        <Text style={styles.prayerLabel}>{option.label}</Text>
+                        {prayerReminderBusy === option.key ? <ActivityIndicator color={colors.tealDark} size="small" /> : <Text style={[styles.prayerBell, reminderEnabled && styles.prayerBellActive]}>{reminderEnabled ? '\u{1F514}' : '\u{1F515}'}</Text>}
+                      </View>
                       <Text style={styles.prayerTime}>{todayPrayerTimes[option.key]}</Text>
-                    </View>
-                  ))}
+                    </Pressable>
+                    );
+                  })}
                 </View>
               </View>
             ) : null}
@@ -225,14 +254,7 @@ export default function HijriCalendarScreen({ profile }) {
             {useGregorianInput ? (
               <View style={styles.fieldStack}>
                 <Text style={styles.fieldLabel}>Gregorian date</Text>
-                <TextInput
-                  value={gInput}
-                  onChangeText={setGInput}
-                  placeholder="YYYY-MM-DD"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  style={styles.input}
-                />
+                <NativeDateTimeField value={gInput} onChange={setGInput} accessibilityLabel="Select Gregorian date to convert" />
               </View>
             ) : (
               <View style={styles.hijriInputRow}>
@@ -300,7 +322,7 @@ export default function HijriCalendarScreen({ profile }) {
           <View style={styles.card}>
             <View style={styles.sectionRow}>
               <View>
-                <Text style={styles.cardTitle}>Important Dates</Text>
+                <Text style={styles.cardTitle}>Key Islamic Events</Text>
                 <Text style={styles.sectionMeta}>{visibleObservances.length} items</Text>
               </View>
             </View>
@@ -308,25 +330,35 @@ export default function HijriCalendarScreen({ profile }) {
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder="Search important dates..."
+              placeholder="Search key Islamic events..."
               placeholderTextColor={colors.textMuted}
               style={styles.input}
             />
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-              {CATEGORIES.map(item => {
-                const active = item === category;
-                return (
-                  <Pressable
-                    key={item}
-                    onPress={() => setCategory(item)}
-                    style={[styles.categoryChip, active && styles.categoryChipActive]}
-                  >
-                    <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>{item}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            <Pressable onPress={() => setCategoryPickerOpen(value => !value)} style={styles.categorySelect}>
+              <View>
+                <Text style={styles.categorySelectLabel}>EVENT TYPES</Text>
+                <Text numberOfLines={1} style={styles.categorySelectValue}>{categories.length ? `${categories.length} selected · ${categories.join(', ')}` : 'All event types'}</Text>
+              </View>
+              <Text style={styles.categorySelectChevron}>{categoryPickerOpen ? '▲' : '▼'}</Text>
+            </Pressable>
+            {categoryPickerOpen ? (
+              <View style={styles.categoryMenu}>
+                {CATEGORIES.map(item => {
+                  const active = categories.includes(item);
+                  return (
+                    <Pressable key={item} onPress={() => setCategories(current => active ? current.filter(value => value !== item) : [...current, item])} style={styles.categoryOption}>
+                      <View style={[styles.categoryCheck, active && styles.categoryCheckActive]}><Text style={styles.categoryCheckText}>{active ? '✓' : ''}</Text></View>
+                      <Text style={[styles.categoryOptionText, active && styles.categoryOptionTextActive]}>{item}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+
+            {!search.trim() && !categories.length ? <Text style={styles.defaultMonthTitle}>Events in {HIJRI_MONTHS.find(item => item.value === currentHijriMonth)?.name || 'Current Hijri Month'}</Text> : (
+              <Pressable onPress={() => { setSearch(''); setCategories([]); }} style={styles.clearFilters}><Text style={styles.clearFiltersText}>Clear search &amp; filters</Text></Pressable>
+            )}
 
             <View style={styles.list}>
               {visibleObservances.length ? visibleObservances.map(item => {
@@ -350,8 +382,8 @@ export default function HijriCalendarScreen({ profile }) {
                 );
               }) : (
                 <View style={styles.emptyBox}>
-                  <Text style={styles.emptyTitle}>No important dates found</Text>
-                  <Text style={styles.emptyText}>Try another search term or category.</Text>
+                  <Text style={styles.emptyTitle}>No key Islamic events found</Text>
+                  <Text style={styles.emptyText}>Try another search term or event type.</Text>
                 </View>
               )}
             </View>
@@ -490,6 +522,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     gap: spacing.xs,
   },
+  prayerCardActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
+  prayerHelp: { color: colors.textMuted, fontSize: 11, lineHeight: 16, fontWeight: '700' },
+  prayerLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs },
+  prayerBell: { color: colors.textMuted, fontSize: 16 },
+  prayerBellActive: { color: colors.tealDark },
   prayerLabel: {
     color: colors.textMuted,
     fontSize: 12,
@@ -600,30 +637,32 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
   },
-  categoryRow: {
+  categorySelect: {
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.sm,
-    paddingRight: spacing.sm,
-  },
-  categoryChip: {
-    paddingVertical: spacing.sm,
+    paddingVertical: 9,
     paddingHorizontal: spacing.md,
-    borderRadius: 999,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.background,
   },
-  categoryChipActive: {
-    backgroundColor: colors.teal,
-    borderColor: colors.teal,
-  },
-  categoryChipText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  categoryChipTextActive: {
-    color: colors.surface,
-  },
+  categorySelectLabel: { color: colors.textMuted, fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
+  categorySelectValue: { maxWidth: 240, marginTop: 3, color: colors.navy, fontSize: 12, fontWeight: '800' },
+  categorySelectChevron: { color: colors.tealDark, fontSize: 12, fontWeight: '900' },
+  categoryMenu: { marginTop: -spacing.xs, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, ...shadow },
+  categoryOption: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  categoryCheck: { width: 19, height: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 5, backgroundColor: colors.background },
+  categoryCheckActive: { borderColor: colors.teal, backgroundColor: colors.teal },
+  categoryCheckText: { color: colors.surface, fontSize: 12, fontWeight: '900' },
+  categoryOptionText: { color: colors.text, fontSize: 12, fontWeight: '700' },
+  categoryOptionTextActive: { color: colors.tealDark, fontWeight: '900' },
+  defaultMonthTitle: { color: colors.navy, fontSize: 15, fontWeight: '900' },
+  clearFilters: { alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: 99, backgroundColor: colors.tealSoft },
+  clearFiltersText: { color: colors.tealDark, fontSize: 11, fontWeight: '900' },
   list: {
     gap: spacing.md,
   },
@@ -689,4 +728,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  pressed: { opacity: 0.78 },
 });

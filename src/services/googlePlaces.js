@@ -3,9 +3,9 @@ import { Platform } from 'react-native';
 
 const PLACES_API_KEY = Constants.expoConfig?.extra?.googlePlacesApiKey || '';
 const ANDROID_PACKAGE = 'info.siza.communityevents.app';
-// EAS Android application-signing certificate. Keep this aligned with the
-// Android application restriction on the Google Maps/Places API key.
-const ANDROID_CERT_SHA1 = 'BD5CF4E7FB8E03AD94BC186FB3049D40132FD041';
+// Expo config supplies the certificate for the active local/store build.
+// Keep every release signer registered on the restricted Maps/Places key.
+const ANDROID_CERT_SHA1 = Constants.expoConfig?.extra?.androidCertificateSha1 || '';
 const AUTOCOMPLETE_URL = 'https://places.googleapis.com/v1/places:autocomplete';
 
 function requestHeaders(fieldMask = '') {
@@ -14,7 +14,7 @@ function requestHeaders(fieldMask = '') {
     'X-Goog-Api-Key': PLACES_API_KEY,
   };
   if (fieldMask) headers['X-Goog-FieldMask'] = fieldMask;
-  if (Platform.OS === 'android') {
+  if (Platform.OS === 'android' && ANDROID_CERT_SHA1) {
     headers['X-Android-Package'] = ANDROID_PACKAGE;
     headers['X-Android-Cert'] = ANDROID_CERT_SHA1;
   }

@@ -176,11 +176,14 @@ export async function createEventSubmission(payload = {}) {
   const ref = await addDoc(collection(db, 'events'), {
     ...payload,
     createdByUserId: user.uid,
+    createdByName: payload.createdByName || payload.submittedByName || user.displayName || '',
     createdByUserEmail: payload.createdByUserEmail || user.email || '',
     createdByUserPhone: payload.createdByUserPhone || user.phoneNumber || '',
+    submittedByUserId: user.uid,
     status: 'active',
     hidden: false,
     createdAt: serverTimestamp(),
+    submittedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
   return ref.id;
@@ -210,8 +213,10 @@ export async function createRecurringEventSeries({ payload = {}, occurrences = [
   const sharedPayload = {
     ...payload,
     createdByUserId: user.uid,
+    createdByName: payload.createdByName || payload.submittedByName || user.displayName || '',
     createdByUserEmail: payload.createdByUserEmail || user.email || '',
     createdByUserPhone: payload.createdByUserPhone || user.phoneNumber || '',
+    submittedByUserId: user.uid,
     status: 'active',
     hidden: false,
     isSeries: true,
@@ -251,6 +256,7 @@ export async function createRecurringEventSeries({ payload = {}, occurrences = [
         recurrenceIndex: index + 1,
         recurrenceTotal: occurrences.length,
         createdAt: serverTimestamp(),
+        submittedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
     });
@@ -324,6 +330,36 @@ export async function setEventVisibility(eventId, hidden) {
   return eventId;
 }
 
+export async function transferEventOwnership(event, newOwner) {
+  if (!event?.id) throw new Error('Event not found.');
+  if (!newOwner?.id) throw new Error('Select a user before transferring this event.');
+  const actor = auth.currentUser;
+  if (!actor || actor.isAnonymous) throw new Error('Sign in to transfer this event.');
+  const eventRef = doc(db, 'events', event.id);
+  const batch = writeBatch(db);
+  batch.update(eventRef, {
+    createdByUserId: newOwner.id,
+    createdByName: newOwner.fullName || newOwner.displayName || newOwner.email || '',
+    createdByUserEmail: newOwner.email || '',
+    createdByUserPhone: newOwner.phone || newOwner.phoneNumber || '',
+    ...(event.ownerUid !== undefined ? { ownerUid: newOwner.id } : {}),
+    transferredAt: serverTimestamp(),
+    ownershipTransferredAt: serverTimestamp(),
+    transferredByUid: actor.uid,
+    updatedAt: serverTimestamp(),
+  });
+  batch.set(doc(collection(db, 'eventAudit')), {
+    eventId: event.id,
+    action: 'event.ownership_transferred',
+    fromUid: event.createdByUserId || event.ownerUid || '',
+    toUid: newOwner.id,
+    actorUid: actor.uid,
+    createdAt: serverTimestamp(),
+  });
+  await batch.commit();
+  return event.id;
+}
+
 function seriesQueryForEvent(event = {}) {
   const seriesId = event.seriesId || event.recurringSeriesId || '';
   if (!seriesId) throw new Error('This recurring series does not have a series ID yet.');
@@ -361,6 +397,10 @@ export async function updateEventSeries(sourceEvent, payload = {}) {
     'createdByUserId',
     'createdByUserEmail',
     'createdByUserPhone',
+    'submittedAt',
+    'submittedByUserId',
+    'submittedByName',
+    'submittedByRole',
     'isLive',
     'liveUrl',
     'liveWatchUrl',

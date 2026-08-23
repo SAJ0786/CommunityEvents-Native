@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   ActivityIndicator,
   Image,
@@ -29,7 +30,7 @@ import {
   PRAYER_OPTIONS,
 } from '../services/prayerTimes';
 import { getHijriSettings } from '../services/settings';
-import { classifyMetroArea, normalizeCity } from '../utils/cities';
+import { cityLabel, classifyMetroArea, normalizeCity } from '../utils/cities';
 import {
   AUDIENCE_TYPES,
   EVENT_TYPES,
@@ -40,6 +41,7 @@ import {
 import { getOrganisations, normalizeOrganisationType } from '../services/organisations';
 import AddressAutocomplete from './AddressAutocomplete';
 import CompactSelect from './CompactSelect';
+import { getDynamicEventOptions } from '../services/eventOptionsAdmin';
 
 function Field({ label, optional = false, error, children }) {
   return (
@@ -97,6 +99,24 @@ function isTime(value) {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || '').trim());
 }
 
+function pickerValue(value, mode) {
+  if (mode === 'date' && isIsoDate(value)) return new Date(`${value}T12:00:00`);
+  const date = new Date();
+  if (mode === 'time' && isTime(value)) {
+    const [hours, minutes] = value.split(':').map(Number);
+    date.setHours(hours, minutes, 0, 0);
+  }
+  return date;
+}
+
+function localIsoDate(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function localTime(date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 function isWebUrl(value) {
   const text = String(value || '').trim();
   if (!text) return true;
@@ -141,7 +161,7 @@ function createFormState(event, defaultCity, defaults = {}) {
 
   return {
     city: normalizeCity(event?.metroArea || defaultCity),
-    eventType: EVENT_TYPES.includes(event?.eventType) ? event.eventType : 'Majlis',
+    eventType: event?.eventType || 'Majlis',
     customEventType: event?.customEventType || '',
     eventSubject: event?.eventSubject || event?.subject || '',
     hostName: source.hostName || defaults.hostName || '',
@@ -209,6 +229,8 @@ export default function CreateEventForm({
   const [calendarMode, setCalendarMode] = useState(initialEvent?.enteredAsHijri ? 'hijri' : 'gregorian');
   const [hijriOverrides, setHijriOverrides] = useState([]);
   const [dynamicOrganisations, setDynamicOrganisations] = useState([]);
+  const [dynamicOptions, setDynamicOptions] = useState({ eventTypes: [], reciterTypes: [] });
+  const [nativePicker, setNativePicker] = useState('');
 
   useEffect(() => {
     setForm(createFormState(initialEvent, defaultCity, defaults));
@@ -226,11 +248,16 @@ export default function CreateEventForm({
     getOrganisations().then(items => {
       if (active) setDynamicOrganisations(Array.isArray(items) ? items : []);
     });
+    getDynamicEventOptions().then(value => {
+      if (active) setDynamicOptions(value);
+    }).catch(() => {});
     return () => { active = false; };
   }, []);
 
   const update = (field, value) => setForm(current => ({ ...current, [field]: value }));
-  const showReligious = RELIGIOUS_EVENT_TYPES.has(form.eventType);
+  const eventTypeOptions = useMemo(() => [...new Set([...EVENT_TYPES.filter(item => item !== 'Custom'), ...dynamicOptions.eventTypes, 'Custom'])], [dynamicOptions.eventTypes]);
+  const reciterTypeOptions = useMemo(() => [...new Set([...RECITER_TYPES.filter(item => item !== 'Custom'), ...dynamicOptions.reciterTypes, 'Custom'])], [dynamicOptions.reciterTypes]);
+  const showReligious = RELIGIOUS_EVENT_TYPES.has(form.eventType) || dynamicOptions.eventTypes.includes(form.eventType);
   const prayerAddress = useMemo(() => ({
     fullAddress: form.fullAddress,
     street: form.street,
@@ -339,19 +366,52 @@ export default function CreateEventForm({
   };
 
   const organiserOptions = useMemo(() => {
-    const extra = dynamicOrganisations
-      .filter(item => !item.builtIn)
-      .map(item => ({
+    const privateOption = {
+      ...(ORGANISER_OPTIONS.find(option => option.value === 'private') || ORGANISER_OPTIONS[0]),
+      group: 'Individual host',
+    };
+    const otherOption = {
+      ...(ORGANISER_OPTIONS.find(option => option.value === 'centre') || {}),
+      value: 'centre',
+      label: 'Other Organisation',
+      name: '',
+      organisationType: 'centre',
+      group: 'Other',
+    };
+    const dynamic = dynamicOrganisations.map(item => {
+      const metroArea = classifyMetroArea({
+        fullAddress: [item.city, item.metroArea, item.location, item.name].filter(Boolean).join(' '),
+      });
+      return {
         value: `org:${item.id}`,
-        label: item.location ? `${item.name} - ${item.location}` : item.name,
+        label: `${item.name}${item.location ? ` \u2014 ${item.location}` : ''}`,
         name: item.name || '',
         organisationType: normalizeOrganisationType(item.type),
-      }));
-    return [...ORGANISER_OPTIONS, ...extra];
+        group: cityLabel(metroArea).replace(', Australia', ''),
+        sortName: item.name || '',
+      };
+    });
+    const dynamicSlugs = new Set(dynamicOrganisations.map(item => String(item.slug || '').trim().toLowerCase()));
+    const compatibility = ORGANISER_OPTIONS
+      .filter(option => option.value !== 'private' && option.value !== 'centre' && !dynamicSlugs.has(option.value))
+      .map(option => {
+        const metroArea = classifyMetroArea({ fullAddress: `${option.name || option.label}` });
+        return {
+          ...option,
+          group: cityLabel(metroArea).replace(', Australia', ''),
+          sortName: option.name || option.label,
+        };
+      });
+    const organisations = [...dynamic, ...compatibility].sort((left, right) => (
+      left.group.localeCompare(right.group) || left.sortName.localeCompare(right.sortName)
+    ));
+    return [privateOption, ...organisations, otherOption];
   }, [dynamicOrganisations]);
 
   const selectedOrganiserValue = useMemo(() => {
     if (form.organiserId && getDynamicOrganisationById(form.organiserId)) return `org:${form.organiserId}`;
+    const matchingOrganisation = getDynamicOrganisationBySlug(form.organiserType);
+    if (matchingOrganisation) return `org:${matchingOrganisation.id}`;
     return form.organiserType || 'private';
   }, [dynamicOrganisations, form.organiserId, form.organiserType]);
 
@@ -621,6 +681,15 @@ export default function CreateEventForm({
     setForm(current => ({ ...current, imageUrl: '', imagePath: '' }));
   };
 
+  const handleNativePicker = (event, value) => {
+    const kind = nativePicker;
+    setNativePicker('');
+    if (event?.type === 'dismissed' || !value) return;
+    if (kind === 'date') setGregorianDate(localIsoDate(value));
+    if (kind === 'start') update('startTime', localTime(value));
+    if (kind === 'end') update('endTime', localTime(value));
+  };
+
   return (
     <ScrollView
       keyboardShouldPersistTaps="handled"
@@ -641,9 +710,17 @@ export default function CreateEventForm({
 
       <View style={styles.card}>
         <Field label="Upload Event Poster" optional error={attempted ? validation.imageUrl : ''}>
-          {localImage?.uri || (isWebUrl(form.imageUrl) && form.imageUrl.trim()) ? (
-            <Image source={{ uri: localImage?.uri || form.imageUrl.trim() }} resizeMode="cover" style={styles.posterPreview} />
-          ) : null}
+          <Pressable onPress={choosePoster} style={({ pressed }) => [styles.posterDropZone, pressed && styles.pressed]}>
+            {localImage?.uri || (isWebUrl(form.imageUrl) && form.imageUrl.trim()) ? (
+              <Image source={{ uri: localImage?.uri || form.imageUrl.trim() }} resizeMode="cover" style={styles.posterPreview} />
+            ) : (
+              <View style={styles.posterPlaceholder}>
+                <Text style={styles.posterPlaceholderIcon}>{'\u{1F4F7}'}</Text>
+                <Text style={styles.posterPlaceholderTitle}>Tap to add event poster</Text>
+                <Text style={styles.posterPlaceholderText}>Choose a clear image from your phone</Text>
+              </View>
+            )}
+          </Pressable>
           <View style={styles.posterActions}>
             <Pressable onPress={choosePoster} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
               <Text style={styles.addButtonText}>{localImage || form.imageUrl ? 'Choose another photo' : 'Upload your event poster'}</Text>
@@ -682,7 +759,7 @@ export default function CreateEventForm({
 
         <Field label="Organiser Type">
           <Text style={styles.helper}>Used to show the correct logo when no poster is uploaded.</Text>
-          <OptionGroup options={organiserOptions} value={selectedOrganiserValue} onChange={selectOrganiser} />
+          <CompactSelect title="Choose organiser" options={organiserOptions} value={selectedOrganiserValue} onChange={selectOrganiser} />
         </Field>
 
         <Field label="Host Name" error={attempted ? validation.hostName : ''}>
@@ -730,16 +807,11 @@ export default function CreateEventForm({
           />
           {calendarMode === 'gregorian' ? (
             <>
-              <TextInput
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
-                value={form.eventDate}
-                onChangeText={setGregorianDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.muted}
-                style={[styles.input, attempted && validation.eventDate && styles.inputInvalid]}
-              />
+              <Pressable onPress={() => setNativePicker('date')} style={[styles.pickerButton, attempted && validation.eventDate && styles.inputInvalid]}>
+                <Text style={styles.pickerIcon}>{'\u{1F4C5}'}</Text>
+                <Text style={[styles.pickerValue, !form.eventDate && styles.pickerPlaceholder]}>{form.eventDate || 'Choose event date'}</Text>
+                <Text style={styles.pickerChevron}>{'\u203A'}</Text>
+              </Pressable>
               {form.hijriDate ? <Text style={styles.convertedDate}>Hijri: {form.hijriDate}</Text> : null}
             </>
           ) : (
@@ -797,30 +869,18 @@ export default function CreateEventForm({
           <View style={styles.twoColumns}>
             <View style={styles.column}>
               <Field label="Start Time" error={attempted ? validation.startTime : ''}>
-                <TextInput
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
-                  value={form.startTime}
-                  onChangeText={value => update('startTime', value)}
-                  placeholder="19:30"
-                  placeholderTextColor={colors.muted}
-                  style={[styles.input, attempted && validation.startTime && styles.inputInvalid]}
-                />
+                <Pressable onPress={() => setNativePicker('start')} style={[styles.pickerButton, attempted && validation.startTime && styles.inputInvalid]}>
+                  <Text style={styles.pickerIcon}>{'\u{1F552}'}</Text>
+                  <Text style={[styles.pickerValue, !form.startTime && styles.pickerPlaceholder]}>{form.startTime || 'Start'}</Text>
+                </Pressable>
               </Field>
             </View>
             <View style={styles.column}>
               <Field label="End Time" optional error={attempted ? validation.endTime : ''}>
-                <TextInput
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
-                  value={form.endTime}
-                  onChangeText={value => update('endTime', value)}
-                  placeholder="21:00"
-                  placeholderTextColor={colors.muted}
-                  style={[styles.input, attempted && validation.endTime && styles.inputInvalid]}
-                />
+                <Pressable onPress={() => setNativePicker('end')} style={[styles.pickerButton, attempted && validation.endTime && styles.inputInvalid]}>
+                  <Text style={styles.pickerIcon}>{'\u{1F552}'}</Text>
+                  <Text style={[styles.pickerValue, !form.endTime && styles.pickerPlaceholder]}>{form.endTime || 'End'}</Text>
+                </Pressable>
               </Field>
             </View>
           </View>
@@ -875,16 +935,10 @@ export default function CreateEventForm({
             )}
             {attempted && validation.startTime ? <Text style={styles.fieldError}>{validation.startTime}</Text> : null}
             <Field label="End Time" optional error={attempted ? validation.endTime : ''}>
-              <TextInput
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
-                value={form.endTime}
-                onChangeText={value => update('endTime', value)}
-                placeholder="21:00"
-                placeholderTextColor={colors.muted}
-                style={[styles.input, attempted && validation.endTime && styles.inputInvalid]}
-              />
+              <Pressable onPress={() => setNativePicker('end')} style={[styles.pickerButton, attempted && validation.endTime && styles.inputInvalid]}>
+                <Text style={styles.pickerIcon}>{'\u{1F552}'}</Text>
+                <Text style={[styles.pickerValue, !form.endTime && styles.pickerPlaceholder]}>{form.endTime || 'Choose end time'}</Text>
+              </Pressable>
             </Field>
           </View>
         ) : null}
@@ -905,7 +959,7 @@ export default function CreateEventForm({
         ) : null}
 
         <Field label="Event Type">
-          <ChoiceGroup options={EVENT_TYPES} value={form.eventType} onChange={value => update('eventType', value)} />
+          <ChoiceGroup options={eventTypeOptions} value={form.eventType} onChange={value => update('eventType', value)} />
         </Field>
 
         {form.eventType === 'Custom' ? (
@@ -969,7 +1023,7 @@ export default function CreateEventForm({
                 </View>
                 <Text style={styles.miniLabel}>Type</Text>
                 <ChoiceGroup
-                  options={RECITER_TYPES}
+                  options={reciterTypeOptions}
                   value={reciter.type}
                   onChange={value => setReciter(index, 'type', value)}
                 />
@@ -1018,6 +1072,17 @@ export default function CreateEventForm({
           />
           <Text style={styles.counter}>{form.notes.length}/500</Text>
         </Field>
+
+        {nativePicker ? (
+          <DateTimePicker
+            value={pickerValue(nativePicker === 'date' ? form.eventDate : nativePicker === 'start' ? form.startTime : form.endTime, nativePicker === 'date' ? 'date' : 'time')}
+            mode={nativePicker === 'date' ? 'date' : 'time'}
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            minimumDate={nativePicker === 'date' ? new Date() : undefined}
+            minuteInterval={5}
+            onChange={handleNativePicker}
+          />
+        ) : null}
 
         {attempted && Object.keys(validation).length ? (
           <Text accessibilityRole="alert" style={styles.error}>Complete the highlighted mandatory fields.</Text>
@@ -1083,7 +1148,17 @@ const styles = StyleSheet.create({
   fieldError: { color: colors.danger, fontSize: 12, fontWeight: '700' },
   helper: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   posterPreview: { width: '100%', height: 180, borderRadius: radius.md, backgroundColor: colors.tealSoft },
+  posterDropZone: { minHeight: 180, overflow: 'hidden', borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.teal, borderRadius: radius.md, backgroundColor: '#eef8f6' },
+  posterPlaceholder: { minHeight: 180, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+  posterPlaceholderIcon: { fontSize: 34 },
+  posterPlaceholderTitle: { marginTop: spacing.sm, color: colors.tealDark, fontSize: 15, fontWeight: '900' },
+  posterPlaceholderText: { marginTop: 3, color: colors.muted, fontSize: 12, fontWeight: '700' },
   posterActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
+  pickerButton: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  pickerIcon: { fontSize: 18 },
+  pickerValue: { flex: 1, color: colors.text, fontSize: 14, fontWeight: '800' },
+  pickerPlaceholder: { color: colors.muted },
+  pickerChevron: { color: colors.tealDark, fontSize: 23, fontWeight: '900' },
   orText: { color: colors.muted, fontSize: 11, fontWeight: '800', textAlign: 'center', textTransform: 'uppercase' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   switchCopy: { flex: 1 },

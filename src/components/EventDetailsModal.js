@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import NativeShare from 'react-native-share';
 import { colors, radius, shadow, spacing } from '../theme';
 import { formatEventDate, formatEventTime } from '../utils/formatters';
@@ -54,7 +55,7 @@ function DetailRow({ label, icon, value }) {
   );
 }
 
-function ActionButton({ label, icon, variant = 'subtle', onPress, disabled = false }) {
+function ActionButton({ label, icon, iconNode, variant = 'subtle', onPress, disabled = false }) {
   return (
     <Pressable
       disabled={disabled}
@@ -70,12 +71,14 @@ function ActionButton({ label, icon, variant = 'subtle', onPress, disabled = fal
         variant === 'share' && styles.actionIconBubbleShare,
         variant === 'primary' && styles.actionIconBubblePrimary,
         variant === 'danger' && styles.actionIconBubbleDanger,
+        variant === 'live' && styles.actionIconBubbleLive,
       ]}>
-        <Text style={styles.actionIcon}>{icon}</Text>
+        {iconNode || <Text style={styles.actionIcon}>{icon}</Text>}
       </View>
       <Text style={[
         styles.actionLabel,
         variant === 'danger' && styles.actionLabelDanger,
+        variant === 'live' && styles.actionLabelLive,
       ]}
       >
         {label}
@@ -132,17 +135,22 @@ export default function EventDetailsModal({
   isGuest = true,
   user = null,
   profile = null,
+  onNiazArrangement,
   onEdit,
   onDelete,
   onCopy,
   onEditSeries,
   onDeleteSeries,
+  onToggleVisibility,
+  onTransfer,
+  onRemoveLiveStale,
   canManageStream = false,
   onManageStream,
 }) {
   const translateY = useRef(new Animated.Value(0)).current;
   const closeRef = useRef(onClose);
   const closingRef = useRef(false);
+  const scrollOffsetRef = useRef(0);
   const [posterUri, setPosterUri] = useState('');
   const [posterOpen, setPosterOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -163,6 +171,7 @@ export default function EventDetailsModal({
   useEffect(() => {
     if (!visible) return;
     closingRef.current = false;
+    scrollOffsetRef.current = 0;
     translateY.setValue(640);
     Animated.timing(translateY, {
       toValue: 0,
@@ -206,7 +215,7 @@ export default function EventDetailsModal({
     };
   }, [event]);
 
-  const animateClose = () => {
+  const animateClose = useCallback(() => {
     if (closingRef.current) return;
     closingRef.current = true;
     Animated.timing(translateY, {
@@ -215,41 +224,55 @@ export default function EventDetailsModal({
       easing: Easing.inOut(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
-      translateY.setValue(0);
       closeRef.current?.();
     });
-  };
+  }, [translateY]);
+
+  const restoreSheet = useCallback(() => {
+    Animated.spring(translateY, {
+      toValue: 0,
+      damping: 24,
+      stiffness: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [translateY]);
+
+  const releaseDrag = useCallback(gesture => {
+    const projectedDistance = gesture.dy + Math.max(0, gesture.vy) * 70;
+    if (gesture.dy > 48 || gesture.vy > 0.42 || projectedDistance > 58) {
+      animateClose();
+      return;
+    }
+    restoreSheet();
+  }, [animateClose, restoreSheet]);
 
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => false,
     onMoveShouldSetPanResponderCapture: (_, gesture) => (
-      gesture.dy > 8
+      gesture.dy > 6
       && Math.abs(gesture.dy) > Math.abs(gesture.dx)
+      && scrollOffsetRef.current <= 1
     ),
     onPanResponderMove: (_, gesture) => {
       translateY.setValue(Math.max(0, gesture.dy));
     },
     onPanResponderRelease: (_, gesture) => {
-      if (gesture.dy > 110 || gesture.vy > 1) {
-        Animated.timing(translateY, {
-          toValue: 900,
-          duration: 260,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-        }).start(() => {
-          translateY.setValue(0);
-          closeRef.current?.();
-        });
-        return;
-      }
-      Animated.spring(translateY, {
-        toValue: 0,
-        damping: 24,
-        stiffness: 180,
-        useNativeDriver: true,
-      }).start();
+      releaseDrag(gesture);
     },
-  }), [translateY]);
+    onPanResponderTerminate: restoreSheet,
+  }), [releaseDrag, restoreSheet, translateY]);
+
+  const headerPanResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, gesture) => (
+      gesture.dy > 2 && Math.abs(gesture.dy) > Math.abs(gesture.dx)
+    ),
+    onPanResponderMove: (_, gesture) => {
+      translateY.setValue(Math.max(0, gesture.dy));
+    },
+    onPanResponderRelease: (_, gesture) => releaseDrag(gesture),
+    onPanResponderTerminate: restoreSheet,
+  }), [releaseDrag, restoreSheet, translateY]);
 
   if (!event) return null;
 
@@ -352,7 +375,10 @@ export default function EventDetailsModal({
   };
 
   const openLiveVideo = async () => {
-    if (!event.liveWatchUrl) return;
+    if (!event.liveWatchUrl) {
+      Alert.alert('Watch on YouTube', 'The YouTube live link is not available yet.');
+      return;
+    }
     try {
       await Linking.openURL(event.liveWatchUrl);
     } catch {
@@ -394,11 +420,11 @@ export default function EventDetailsModal({
 
   return (
     <>
-      <Modal transparent visible={visible} animationType="fade" onRequestClose={animateClose}>
+      <Modal transparent visible={visible} animationType="none" onRequestClose={animateClose}>
         <SafeAreaView style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={animateClose} />
-          <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
-            <View style={styles.sheetHeader} {...panResponder.panHandlers}>
+          <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
+            <View style={styles.sheetHeader} {...headerPanResponder.panHandlers}>
               <View style={styles.dragHandle} />
               <View style={styles.headerRow}>
                 <View style={styles.headerCopy}>
@@ -414,6 +440,8 @@ export default function EventDetailsModal({
             <ScrollView
               contentContainerStyle={styles.content}
               keyboardShouldPersistTaps="handled"
+              onScroll={event => { scrollOffsetRef.current = event.nativeEvent.contentOffset.y; }}
+              scrollEventThrottle={16}
             >
               <View style={styles.card}>
                 <View style={styles.titlePanel}>
@@ -421,13 +449,25 @@ export default function EventDetailsModal({
                 </View>
 
                 <View style={styles.actionGrid}>
+                  {onToggleVisibility ? <ActionButton icon={event.hidden ? '👁️' : '🙈'} label={event.hidden ? 'Make Visible' : 'Hide Event'} onPress={() => onToggleVisibility(event)} /> : null}
+                  {onTransfer ? <ActionButton icon="⇄" label="Transfer" variant="primary" onPress={() => onTransfer(event)} /> : null}
+                  {onRemoveLiveStale ? <ActionButton icon="⏹️" label="Remove Live Stale" variant="danger" onPress={() => onRemoveLiveStale(event)} /> : null}
                   <ActionButton icon="📤" label="Share" variant="share" onPress={() => setShareOpen(true)} />
                   <ActionButton icon="🗺️" label="Directions" variant="primary" onPress={openDirections} disabled={isGuest || !fullAddress} />
                   {canConnectHost ? <ActionButton icon="✉️" label="Contact Host" onPress={() => { setHostMessageStatus(''); setHostMessageOpen(true); }} /> : null}
-                  {!isGuest && event.isLive && event.liveWatchUrl && event.liveAppVisibility !== 'private' ? <ActionButton icon="🔴" label="Watch Live" variant="danger" onPress={openLiveVideo} /> : null}
-                  {canManageStream && onManageStream ? <ActionButton icon="📹" label={event.isLive ? 'Manage Live' : 'Go Live'} variant={event.isLive ? 'danger' : 'primary'} onPress={() => onManageStream(event)} /> : null}
+                  {!isGuest && event.isLive && event.liveWatchUrl && event.liveAppVisibility !== 'private' && !(canManageStream && onManageStream) ? <ActionButton iconNode={<FontAwesome name="youtube-play" size={22} color="#dc2626" />} label="Watch on YouTube" variant="danger" onPress={openLiveVideo} /> : null}
+                  {canManageStream && onManageStream ? (
+                    <ActionButton
+                      icon={event.isLive ? undefined : '🔴'}
+                      iconNode={event.isLive ? <FontAwesome name="youtube-play" size={22} color="#ffffff" /> : undefined}
+                      label={event.isLive ? 'Watch on YouTube' : 'Go Live'}
+                      variant="live"
+                      onPress={event.isLive ? openLiveVideo : () => onManageStream(event)}
+                    />
+                  ) : null}
                   <ActionButton icon={reminder ? "🔔" : "⏰"} label={reminder ? 'Reminder Set' : 'Reminder'} onPress={() => { setReminderError(''); setReminderOpen(true); }} disabled={isGuest} />
-                  <ActionButton icon="📅" label="Calendar" onPress={addToCalendar} disabled={isGuest} />
+                  <ActionButton icon="📅" label="Sync Calendar" variant="primary" onPress={addToCalendar} disabled={isGuest} />
+                  {onNiazArrangement ? <ActionButton icon="🍲" label={'Niaz\nArrangement'} variant="share" onPress={() => onNiazArrangement(event)} /> : null}
                   {onEdit ? <ActionButton icon="✏️" label="Edit" onPress={() => onEdit(event)} /> : null}
                   {onEditSeries ? <ActionButton icon="🗂️" label="Edit Series" onPress={() => onEditSeries(event)} /> : null}
                   {onCopy ? <ActionButton icon="📋" label="Copy" onPress={() => onCopy(event)} /> : null}
@@ -583,7 +623,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   sheet: {
-    maxHeight: '84%',
+    maxHeight: '78%',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     backgroundColor: colors.background,
@@ -599,8 +639,8 @@ const styles = StyleSheet.create({
   },
   dragHandle: {
     alignSelf: 'center',
-    width: 44,
-    height: 5,
+    width: 58,
+    height: 6,
     borderRadius: 3,
     marginBottom: spacing.sm,
     backgroundColor: colors.border,
@@ -638,12 +678,12 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   content: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: 46,
   },
   posterFrame: {
     width: '100%',
-    height: 160,
+    height: 132,
     borderRadius: radius.lg,
     backgroundColor: '#eff5f4',
     overflow: 'hidden',
@@ -673,7 +713,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
-    padding: spacing.md,
+    padding: spacing.sm,
     ...shadow,
   },
   titlePanel: {
@@ -715,6 +755,14 @@ const styles = StyleSheet.create({
   actionIconBubbleShare: { backgroundColor: '#dcfce7' },
   actionIconBubblePrimary: { backgroundColor: '#dbeafe' },
   actionIconBubbleDanger: { backgroundColor: '#fee2e2' },
+  actionIconBubbleLive: {
+    backgroundColor: '#dc2626',
+    shadowColor: '#dc2626',
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
   actionIcon: { fontSize: 20 },
   actionLabel: {
     color: colors.text,
@@ -726,6 +774,7 @@ const styles = StyleSheet.create({
   actionLabelDanger: {
     color: colors.danger,
   },
+  actionLabelLive: { color: '#b91c1c' },
   detailsPanel: {
     marginTop: spacing.sm,
     borderTopWidth: 1,
