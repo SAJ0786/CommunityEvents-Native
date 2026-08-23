@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
-import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { compareEventsByDateTime, getEventTitle } from '../services/events';
 import { colors, radius, shadow, spacing } from '../theme';
 import { formatEventTime } from '../utils/formatters';
@@ -114,8 +114,9 @@ function distanceLabel(from, to) {
 
 export default function EventMapView({ events = [], onSelectEvent }) {
   const mapRef = useRef(null);
-  const markerRefs = useRef({});
+  const markerPressAt = useRef(0);
   const [timeFilter, setTimeFilter] = useState('today');
+  const [previewEvent, setPreviewEvent] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -147,6 +148,12 @@ export default function EventMapView({ events = [], onSelectEvent }) {
   );
 
   const missingCoordinatesCount = filteredEvents.length - mapEvents.length;
+
+  useEffect(() => {
+    if (!previewEvent) return;
+    const stillVisible = mapEvents.some(({ event }) => String(event.id) === String(previewEvent.id));
+    if (!stillVisible) setPreviewEvent(null);
+  }, [mapEvents, previewEvent]);
 
   const fitToMarkers = () => {
     const coordinates = [
@@ -202,7 +209,7 @@ export default function EventMapView({ events = [], onSelectEvent }) {
     <View style={styles.container}>
       <Text style={styles.introTitle}>Map View</Text>
       <Text style={styles.introText}>
-        Browse upcoming events by location. Tap a marker, then tap the callout to open the full event details.
+        Browse upcoming events by location. Tap a marker to preview the event on the map.
       </Text>
 
       <View style={styles.filterBar}>
@@ -248,6 +255,9 @@ export default function EventMapView({ events = [], onSelectEvent }) {
           showsUserLocation={locationEnabled}
           showsMyLocationButton={locationEnabled}
           toolbarEnabled
+          onPress={() => {
+            if (Date.now() - markerPressAt.current > 350) setPreviewEvent(null);
+          }}
         >
           {mapEvents.map(({ event, coords }) => {
             const key = audienceKey(event.audienceType || event.audience);
@@ -255,34 +265,64 @@ export default function EventMapView({ events = [], onSelectEvent }) {
             return (
               <Marker
                 key={markerKey}
-                ref={ref => {
-                  if (ref) markerRefs.current[markerKey] = ref;
-                  else delete markerRefs.current[markerKey];
-                }}
                 coordinate={coords}
                 pinColor={AUDIENCE_COLORS[key]}
-                onPress={() => requestAnimationFrame(() => markerRefs.current[markerKey]?.showCallout?.())}
-              >
-                <Callout tooltip onPress={() => onSelectEvent?.(event)}>
-                  <View style={styles.callout}>
-                    <Text style={styles.calloutTitle}>{getEventTitle(event)}</Text>
-                    <Text style={styles.calloutMeta}>
-                      {eventDateLabel(event)} - {eventTimeLabel(event)} - {event.address?.suburb || event.suburb || ''}
-                    </Text>
-                    <Text style={[styles.calloutAudience, { color: AUDIENCE_COLORS[key] }]}>
-                      {audienceLabel(event.audienceType || event.audience)}
-                    </Text>
-                    {userLocation ? <Text style={styles.calloutDistance}>{distanceLabel(userLocation, coords)}</Text> : null}
-                    <View style={styles.calloutAction}>
-                      <Text style={styles.viewLink}>View event details</Text>
-                      <Text style={styles.calloutChevron}>{'›'}</Text>
-                    </View>
-                  </View>
-                </Callout>
-              </Marker>
+                onPress={pressEvent => {
+                  markerPressAt.current = Date.now();
+                  pressEvent?.stopPropagation?.();
+                  setPreviewEvent(event);
+                  mapRef.current?.animateCamera?.(
+                    { center: coords, zoom: 13 },
+                    { duration: 350 }
+                  );
+                }}
+              />
             );
           })}
         </MapView>
+        {previewEvent ? (() => {
+          const coords = getCoordinates(previewEvent);
+          const key = audienceKey(previewEvent.audienceType || previewEvent.audience);
+          return (
+            <View style={styles.mapPreview}>
+              <View style={[styles.mapPreviewAccent, { backgroundColor: AUDIENCE_COLORS[key] }]} />
+              <View style={styles.mapPreviewContent}>
+                <View style={styles.mapPreviewHeader}>
+                  <Text numberOfLines={2} style={styles.mapPreviewTitle}>{getEventTitle(previewEvent)}</Text>
+                  <Pressable
+                    accessibilityLabel="Close event preview"
+                    hitSlop={10}
+                    onPress={() => setPreviewEvent(null)}
+                    style={({ pressed }) => [styles.mapPreviewClose, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.mapPreviewCloseText}>×</Text>
+                  </Pressable>
+                </View>
+                <Text numberOfLines={2} style={styles.mapPreviewMeta}>
+                  {[eventDateLabel(previewEvent), eventTimeLabel(previewEvent), previewEvent.address?.suburb || previewEvent.suburb]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Text>
+                <View style={styles.mapPreviewFooter}>
+                  <View style={styles.mapPreviewBadges}>
+                    <Text style={[styles.mapPreviewAudience, { color: AUDIENCE_COLORS[key] }]}>
+                      {audienceLabel(previewEvent.audienceType || previewEvent.audience)}
+                    </Text>
+                    {userLocation && coords ? <Text style={styles.mapPreviewDistance}>{distanceLabel(userLocation, coords)}</Text> : null}
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => onSelectEvent?.(previewEvent)}
+                    style={({ pressed }) => [styles.mapPreviewButton, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.mapPreviewButtonText}>View details</Text>
+                    <Text style={styles.mapPreviewButtonArrow}>›</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          );
+        })() : null}
         {!mapReady ? (
           <View pointerEvents="none" style={styles.mapLoading}>
             <ActivityIndicator color={colors.teal} size="large" />
@@ -431,14 +471,33 @@ const styles = StyleSheet.create({
   mapProblemText: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: spacing.sm },
   retryButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.teal, marginTop: spacing.md },
   retryButtonText: { color: colors.surface, fontSize: 13, fontWeight: '900' },
-  callout: { width: 250, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
-  calloutTitle: { color: colors.navy, fontSize: 14, fontWeight: '900', marginBottom: 4 },
-  calloutMeta: { color: colors.muted, fontSize: 12, lineHeight: 17 },
-  calloutAudience: { fontSize: 12, fontWeight: '900', marginTop: 4 },
-  calloutDistance: { color: colors.navy, fontSize: 12, fontWeight: '900', marginTop: 4 },
-  calloutAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: 9, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  viewLink: { color: colors.tealDark, fontSize: 13, fontWeight: '900' },
-  calloutChevron: { color: colors.tealDark, fontSize: 22, lineHeight: 22, fontWeight: '900' },
+  mapPreview: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    bottom: spacing.md,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    ...shadow,
+  },
+  mapPreviewAccent: { width: 6 },
+  mapPreviewContent: { flex: 1, padding: spacing.md },
+  mapPreviewHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  mapPreviewTitle: { flex: 1, color: colors.navy, fontSize: 15, lineHeight: 20, fontWeight: '900' },
+  mapPreviewClose: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, backgroundColor: colors.tealSoft },
+  mapPreviewCloseText: { color: colors.tealDark, fontSize: 23, lineHeight: 25, fontWeight: '800' },
+  mapPreviewMeta: { color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 3 },
+  mapPreviewFooter: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.sm },
+  mapPreviewBadges: { flex: 1, gap: 2 },
+  mapPreviewAudience: { fontSize: 12, fontWeight: '900' },
+  mapPreviewDistance: { color: colors.muted, fontSize: 11, fontWeight: '800' },
+  mapPreviewButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.teal },
+  mapPreviewButtonText: { color: colors.surface, fontSize: 12, fontWeight: '900' },
+  mapPreviewButtonArrow: { color: colors.surface, fontSize: 21, lineHeight: 21, fontWeight: '900' },
   empty: {
     alignItems: 'center',
     padding: spacing.xl,
