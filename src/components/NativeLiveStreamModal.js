@@ -302,8 +302,11 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
 
   return (
     <View pointerEvents="box-none" style={styles.overlayLayer}>
-      <SafeAreaView style={[styles.root, minimized && styles.minimizedRoot]}>
-        <View style={[styles.header, minimized && styles.hidden]}>
+      <SafeAreaView
+        pointerEvents={minimized ? 'none' : 'auto'}
+        style={[styles.root, minimized && styles.streamHostHidden]}
+      >
+        <View style={styles.header}>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>{event.isLive || streaming || step === 'external-live' ? 'LIVE EVENT' : 'EVENT STREAMING'}</Text>
             <Text numberOfLines={2} style={styles.title}>{getEventTitle(event)}</Text>
@@ -349,14 +352,14 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
               }}
               onPermissionsDenied={() => setError('Camera and microphone access are required to stream from this phone.')}
             />
-            <View style={[styles.liveBadge, minimized && styles.miniLiveBadge]}>
+            <View style={styles.liveBadge}>
               <View style={[styles.liveDot, connected && styles.liveDotConnected]} />
               <Text style={styles.liveBadgeText}>{streaming ? (connected ? 'LIVE' : 'CONNECTING') : 'PREVIEW'}</Text>
             </View>
-            <View style={[styles.orientationBadge, minimized && styles.hidden]}>
+            <View style={styles.orientationBadge}>
               <Text style={styles.orientationBadgeText}>{streamOrientation.toUpperCase()} LOCKED</Text>
             </View>
-            <View style={[styles.cameraControls, minimized && styles.hidden]}>
+            <View style={styles.cameraControls}>
               <Pressable onPress={() => setCamera(value => value === 'back' ? 'front' : 'back')} style={styles.cameraControl}>
                 <Text style={styles.cameraControlIcon}>↺</Text>
                 <Text style={styles.cameraControlText}>Camera</Text>
@@ -366,18 +369,9 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
                 <Text style={styles.cameraControlText}>{muted ? 'Unmute' : 'Mute'}</Text>
               </Pressable>
             </View>
-            {minimized ? (
-              <Pressable accessibilityLabel="Return to live stream" onPress={() => setMinimized(false)} style={styles.returnToStreamOverlay}>
-                <Text style={styles.returnToStreamIcon}>●</Text>
-                <View style={styles.returnToStreamCopy}>
-                  <Text style={styles.returnToStreamTitle}>{interrupted ? 'STREAM INTERRUPTED' : 'LIVE STREAM'}</Text>
-                  <Text style={styles.returnToStreamText}>Tap to return</Text>
-                </View>
-              </Pressable>
-            ) : null}
           </View>
         ) : (
-          <ScrollView style={minimized && styles.hidden} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             {step === 'method' ? (
               <>
                 <Text style={styles.sectionTitle}>How do you want to stream?</Text>
@@ -458,7 +452,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
         )}
 
         {step === 'phone' ? (
-          <View style={[styles.phoneFooter, minimized && styles.hidden]}>
+          <View style={styles.phoneFooter}>
             {status ? <Text style={styles.statusText}>{status}</Text> : null}
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
             {!streaming ? (
@@ -484,12 +478,28 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
         ) : null}
 
         {step !== 'phone' && (status || error) ? (
-          <View style={[styles.messageBar, minimized && styles.hidden]}>
+          <View style={styles.messageBar}>
             {status ? <Text style={styles.statusText}>{status}</Text> : null}
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
           </View>
         ) : null}
       </SafeAreaView>
+      {minimized ? (
+        <Pressable
+          accessibilityLabel="Return to live stream"
+          onPress={() => setMinimized(false)}
+          style={({ pressed }) => [styles.floatingStreamController, pressed && styles.pressed]}
+        >
+          <View style={[styles.liveDot, connected && styles.liveDotConnected]} />
+          <View style={styles.floatingStreamCopy}>
+            <Text style={styles.floatingStreamTitle}>
+              {interrupted ? 'STREAM INTERRUPTED' : connected ? 'LIVE ON YOUTUBE' : 'STREAM CONNECTING'}
+            </Text>
+            <Text style={styles.floatingStreamText}>Tap to return to camera</Text>
+          </View>
+          <Text style={styles.floatingStreamExpand}>↗</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -497,8 +507,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
 const styles = StyleSheet.create({
   overlayLayer: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
   root: { flex: 1, backgroundColor: colors.background },
-  minimizedRoot: { position: 'absolute', right: 14, bottom: 92, width: 204, height: 126, flex: 0, overflow: 'hidden', borderWidth: 2, borderColor: '#ef4444', borderRadius: radius.lg, backgroundColor: '#050b12', ...shadow },
-  hidden: { display: 'none' },
+  streamHostHidden: { opacity: 0 },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
   headerCopy: { flex: 1 },
   eyebrow: { color: colors.danger, fontSize: 11, fontWeight: '900', letterSpacing: 1.2 },
@@ -533,7 +542,6 @@ const styles = StyleSheet.create({
   cameraStage: { flex: 1, backgroundColor: '#050b12' },
   camera: { flex: 1, alignSelf: 'stretch', backgroundColor: '#050b12' },
   liveBadge: { position: 'absolute', top: spacing.md, left: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 99, backgroundColor: 'rgba(5,11,18,0.72)' },
-  miniLiveBadge: { top: 7, left: 7, paddingHorizontal: 7, paddingVertical: 4 },
   liveDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#94a3b8' },
   liveDotConnected: { backgroundColor: '#ef4444' },
   liveBadgeText: { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 0.7 },
@@ -543,11 +551,11 @@ const styles = StyleSheet.create({
   cameraControl: { width: 66, minHeight: 60, alignItems: 'center', justifyContent: 'center', borderRadius: radius.lg, backgroundColor: 'rgba(5,11,18,0.7)' },
   cameraControlIcon: { color: '#fff', fontSize: 21 },
   cameraControlText: { color: '#fff', fontSize: 10, fontWeight: '800', marginTop: 3 },
-  returnToStreamOverlay: { ...StyleSheet.absoluteFillObject, flexDirection: 'row', alignItems: 'flex-end', gap: 7, padding: 9, paddingTop: 36, backgroundColor: 'rgba(5,11,18,0.24)' },
-  returnToStreamIcon: { color: '#ef4444', fontSize: 16, lineHeight: 18 },
-  returnToStreamCopy: { flex: 1 },
-  returnToStreamTitle: { color: '#ffffff', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
-  returnToStreamText: { color: '#dbeafe', fontSize: 10, fontWeight: '700', marginTop: 1 },
+  floatingStreamController: { position: 'absolute', right: 14, bottom: 92, width: 218, minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: 9, padding: 12, borderWidth: 2, borderColor: '#ef4444', borderRadius: radius.lg, backgroundColor: '#050b12', ...shadow },
+  floatingStreamCopy: { flex: 1 },
+  floatingStreamTitle: { color: '#ffffff', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+  floatingStreamText: { color: '#dbeafe', fontSize: 10, fontWeight: '700', marginTop: 3 },
+  floatingStreamExpand: { color: '#ffffff', fontSize: 22, lineHeight: 24, fontWeight: '900' },
   phoneFooter: { padding: spacing.md, gap: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
   goLiveButton: { minHeight: 54, alignItems: 'center', justifyContent: 'center', borderRadius: radius.lg, backgroundColor: '#dc2626' },
   goLiveButtonText: { color: '#fff', fontSize: 16, fontWeight: '900' },
