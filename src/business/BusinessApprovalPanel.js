@@ -116,8 +116,8 @@ function BusinessReviewCard({ business, selected, busy, onToggle, onApprove, onR
               <Text style={styles.abrText}>{abrVerified
                 ? `Verified automatically: ${business.abrVerification?.matchedName || business.abrVerification?.entityName || business.name}`
                 : business.abrVerification?.status === 'name_review_required'
-                  ? `Name does not match the ABR record: ${[business.abrVerification?.entityName, ...(business.abrVerification?.businessNames || [])].filter(Boolean).join(', ')}`
-                  : 'The secure server checks that the ABN is active and the submitted name matches an ABR entity or business name.'}</Text>
+                  ? `Name does not match the ABR record: ${[business.abrVerification?.entityName, ...(business.abrVerification?.businessNames || []), ...(business.abrVerification?.tradingNames || [])].filter(Boolean).join(', ')}`
+                  : 'The secure server checks that the ABN is active and the submitted name matches an ABR entity, registered business or current trading name.'}</Text>
               <Pressable onPress={() => Linking.openURL(`https://abr.business.gov.au/ABN/View?abn=${String(business.abn || '').replace(/\D/g, '')}`)} style={styles.abrLink}><Text style={styles.abrLinkText}>Open ABR record ↗</Text></Pressable>
               <Pressable disabled={busy || !validAbn} onPress={() => onVerify?.(business)} style={[styles.abrVerifyButton, (busy || !validAbn) && styles.disabled]}>
                 {busy ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.abrVerifyText}>{abrVerified ? 'Recheck with ABR' : 'Verify with ABR'}</Text>}
@@ -240,7 +240,7 @@ export default function BusinessApprovalPanel({ onBack }) {
       if (result.verified) {
         Alert.alert('ABN verified', `${result.matchedName || result.entityName}\nABN status: ${result.abnStatus || 'Active'}`);
       } else {
-        const officialNames = [result.entityName, ...(result.businessNames || [])].filter(Boolean).join(', ');
+        const officialNames = [result.entityName, ...(result.businessNames || []), ...(result.tradingNames || [])].filter(Boolean).join(', ');
         Alert.alert('ABN not verified', result.status === 'name_review_required'
           ? `The ABN is active, but the submitted name does not match: ${officialNames || 'No official name returned'}.`
           : 'The ABR service did not confirm an active matching ABN. The listing remains private.');
