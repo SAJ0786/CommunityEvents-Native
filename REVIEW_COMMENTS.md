@@ -664,3 +664,12 @@ Implementation status: source complete; pending device verification.
 - Preserve a large accessible touch target and an accessible Log out label for screen readers.
 
 Implementation status: source complete; pending device verification.
+
+### R-079 — Native-safe legal document navigation
+
+- Privacy Policy, Terms of Use and related legal pages opened from the native app must never send the user to the Community Connect Australia PWA through a **Back**, **Home** or **Back to App** link.
+- When an external browser is used, identify the native-app entry context and hide all PWA **Home**, **Back to App** and similar navigation links.
+- Do not use an app deep link for legal-page navigation. Users return using the device app switcher or browser/device back control.
+- Apply this rule when the consolidated legal documents are implemented and before tester/store release.
+
+Implementation status: recorded requirement; pending consolidated legal-page implementation.
