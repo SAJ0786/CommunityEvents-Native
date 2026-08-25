@@ -11,7 +11,6 @@ import {
 import { CITY_OPTIONS, DEFAULT_CITY, cityLabel, normalizeCity } from '../utils/cities';
 import { colors, radius, shadow, spacing } from '../theme';
 import {
-  getAdminCity,
   isAdminRole,
   isSuperAdminRole,
   listenAdminFeedbackThreads,
@@ -19,8 +18,6 @@ import {
   listenThreadMessages,
   markFeedbackThreadRead,
   sendFeedbackMessage,
-  sendFeedbackReaction,
-  sendFeedbackReply,
 } from '../services/messaging';
 
 const formatDateTime = value => {
@@ -79,7 +76,6 @@ export default function FeedbackScreen({ user, profile, selectedCity, onBack }) 
   const [ownThreads, setOwnThreads] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [messages, setMessages] = useState([]);
-  const [reply, setReply] = useState('');
 
   useEffect(() => setCity(defaultCity), [defaultCity]);
 
@@ -121,12 +117,6 @@ export default function FeedbackScreen({ user, profile, selectedCity, onBack }) 
     return listenThreadMessages('adminFeedbackThreads', selected.id, setMessages);
   }, [selected, user, profile]);
 
-  const selectedHasRegisteredSender = Boolean(selected?.senderUid);
-  const canReply = selectedHasRegisteredSender && selected && isAdminRole(profile?.role) && (
-    isSuperAdminRole(profile?.role) ||
-    (selected.target === 'cityAdmins' && selected.city === getAdminCity(profile))
-  );
-
   const handleSend = async () => {
     setStatus('');
     setSending(true);
@@ -141,41 +131,13 @@ export default function FeedbackScreen({ user, profile, selectedCity, onBack }) 
     }
   };
 
-  const handleReply = async () => {
-    setStatus('');
-    setSending(true);
-    try {
-      await sendFeedbackReply({ thread: selected, user, profile, text: reply });
-      setReply('');
-      setStatus('Reply sent.');
-    } catch (error) {
-      setStatus(error.message || 'Could not send reply.');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const handleReaction = async reaction => {
-    if (!selected) return;
-    setStatus('');
-    setSending(true);
-    try {
-      await sendFeedbackReaction({ thread: selected, user, profile, reaction });
-      setStatus(`${reaction} reaction sent.`);
-    } catch (error) {
-      setStatus(error.message || 'Could not send reaction.');
-    } finally {
-      setSending(false);
-    }
-  };
-
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.introCard}>
         <View style={styles.headerRow}>
           <View style={styles.headerCopy}>
             <Text style={styles.title}>Feedback</Text>
-            <Text style={styles.subtitle}>Send app feedback or a support message to city admins or super admins.</Text>
+            <Text style={styles.subtitle}>Send one-way app feedback to city admins or super admins. Feedback is reviewed, but replies are not sent from this page.</Text>
           </View>
           <Pressable onPress={onBack} style={({ pressed }) => [styles.lightButton, pressed && styles.pressed]}>
             <Text style={styles.lightButtonText}>Back</Text>
@@ -184,7 +146,7 @@ export default function FeedbackScreen({ user, profile, selectedCity, onBack }) 
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Send Message</Text>
+        <Text style={styles.sectionTitle}>Submit Feedback</Text>
         <Text style={styles.label}>Send to</Text>
         <SelectPills
           value={target}
@@ -209,7 +171,7 @@ export default function FeedbackScreen({ user, profile, selectedCity, onBack }) 
         <Text style={[styles.label, styles.labelSpaced]}>Message</Text>
         <TextInput
           multiline
-          placeholder="Write your feedback or support message..."
+          placeholder="Write your app feedback..."
           placeholderTextColor={colors.muted}
           style={styles.textarea}
           textAlignVertical="top"
@@ -222,7 +184,7 @@ export default function FeedbackScreen({ user, profile, selectedCity, onBack }) 
           onPress={handleSend}
           style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, (sending || !text.trim()) && styles.disabled]}
         >
-          {sending ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>Send Message</Text>}
+          {sending ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>Submit Feedback</Text>}
         </Pressable>
 
         {status ? <Text style={styles.statusText}>{status}</Text> : null}
@@ -231,7 +193,7 @@ export default function FeedbackScreen({ user, profile, selectedCity, onBack }) 
       {(isRegisteredUser || isAdminRole(profile?.role)) && combinedThreads.length > 0 ? (
         <>
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Feedback Messages</Text>
+            <Text style={styles.sectionTitle}>{isAdminRole(profile?.role) ? 'Feedback Inbox' : 'Submitted Feedback'}</Text>
             {combinedThreads.map(thread => {
               const senderUnread = user?.uid ? Number(thread.unreadBy?.[user.uid] || 0) : 0;
               const adminUnread = isSuperAdminRole(profile?.role)
@@ -274,13 +236,12 @@ export default function FeedbackScreen({ user, profile, selectedCity, onBack }) 
                 {selected.target === 'superAdmins' ? 'Super Admin Feedback' : `${cityLabel(selected.city)} Feedback`}
               </Text>
               <Text style={styles.selectedMeta}>
-                From {selected.senderName || 'Sender'}{!selectedHasRegisteredSender ? ' - guest feedback, one-way message' : ''}
+                From {selected.senderName || 'Sender'} · one-way feedback
               </Text>
 
               <View style={styles.messageList}>
                 {messages.filter(message => !isLegacyBusinessMessage(message)).map(message => {
                   const mine = message.senderUid && message.senderUid === user?.uid;
-                  const canReact = selectedHasRegisteredSender && isRegisteredUser && !mine && message.kind !== 'reaction';
                   return (
                     <View key={message.id} style={[styles.messageBubble, mine ? styles.messageBubbleMine : styles.messageBubbleOther]}>
                       <Text style={[styles.messageSender, mine && styles.messageSenderMine]}>
@@ -288,47 +249,13 @@ export default function FeedbackScreen({ user, profile, selectedCity, onBack }) 
                       </Text>
                       <Text style={[styles.messageText, mine && styles.messageTextMine]}>{message.text}</Text>
                       <Text style={[styles.messageTime, mine && styles.messageTimeMine]}>{formatDateTime(message.createdAt)}</Text>
-                      {canReact ? (
-                        <View style={styles.reactionRow}>
-                          {['Like', 'Love', 'Unlike'].map(reaction => (
-                            <Pressable
-                              key={reaction}
-                              disabled={sending}
-                              onPress={() => handleReaction(reaction)}
-                              style={({ pressed }) => [styles.reactionButton, pressed && styles.pressed, sending && styles.disabled]}
-                            >
-                              <Text style={styles.reactionButtonText}>
-                                {reaction === 'Like' ? '👍 Like' : reaction === 'Love' ? '❤️ Love' : '👎 Unlike'}
-                              </Text>
-                            </Pressable>
-                          ))}
-                        </View>
-                      ) : null}
                     </View>
                   );
                 })}
               </View>
-
-              {canReply ? (
-                <>
-                  <TextInput
-                    multiline
-                    placeholder="Write an admin reply..."
-                    placeholderTextColor={colors.muted}
-                    style={styles.textarea}
-                    textAlignVertical="top"
-                    value={reply}
-                    onChangeText={setReply}
-                  />
-                  <Pressable
-                    disabled={sending || !reply.trim()}
-                    onPress={handleReply}
-                    style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, (sending || !reply.trim()) && styles.disabled]}
-                  >
-                    {sending ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>Send Reply</Text>}
-                  </Pressable>
-                </>
-              ) : null}
+              <View style={styles.oneWayNotice}>
+                <Text style={styles.oneWayNoticeText}>This is a one-way feedback record. No reply or reaction is sent to the submitter.</Text>
+              </View>
             </View>
           ) : null}
         </>
@@ -381,8 +308,7 @@ const styles = StyleSheet.create({
   messageTextMine: { color: colors.surface },
   messageTime: { color: colors.muted, fontSize: 11, marginTop: 6 },
   messageTimeMine: { color: 'rgba(255,255,255,0.72)' },
-  reactionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  reactionButton: { borderWidth: 1, borderColor: 'rgba(15,118,110,0.22)', backgroundColor: colors.surface, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
-  reactionButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '900' },
+  oneWayNotice: { padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.tealSoft },
+  oneWayNoticeText: { color: colors.tealDark, fontSize: 12, lineHeight: 18, fontWeight: '800' },
   pressed: { opacity: 0.78 },
 });

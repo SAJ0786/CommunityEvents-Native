@@ -176,7 +176,8 @@ function BusinessReviewCard({ business, selected, busy, onToggle, onApprove, onR
   );
 }
 
-export default function BusinessApprovalPanel({ onBack }) {
+export default function BusinessApprovalPanel({ mode = 'approvals', onBack }) {
+  const isManagement = mode === 'management';
   const [queueType, setQueueType] = useState('businesses');
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -186,6 +187,13 @@ export default function BusinessApprovalPanel({ onBack }) {
   const [selectedId, setSelectedId] = useState('');
   const [busyId, setBusyId] = useState('');
   const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => {
+    setQueueType('businesses');
+    setFilter(isManagement ? 'all' : 'pending');
+    setQueryText('');
+    setSelectedId('');
+  }, [isManagement]);
 
   useEffect(() => {
     setLoading(true);
@@ -295,16 +303,20 @@ export default function BusinessApprovalPanel({ onBack }) {
       <View style={styles.panelHeader}>
         <View style={styles.panelTitleCopy}>
           <Text style={styles.eyebrow}>BUSINESS DIRECTORY</Text>
-          <Text style={styles.panelTitle}>Central Approval Queue</Text>
-          <Text style={styles.panelSubtitle}>{queueType === 'promotions' ? 'Review promotion content, dates and featured placement.' : 'Verify business details and ABNs before publishing listings.'}</Text>
+          <Text style={styles.panelTitle}>{isManagement ? 'Business Management' : 'Business Approvals'}</Text>
+          <Text style={styles.panelSubtitle}>{isManagement
+            ? 'Search and manage every business listing, including approved, draft, pending and rejected records.'
+            : queueType === 'promotions'
+              ? 'Review promotion content, dates and featured placement.'
+              : 'Review pending business details and ABNs before publishing listings.'}</Text>
         </View>
         <Pressable onPress={onBack} style={styles.backButton}><Text style={styles.backButtonText}>Back</Text></Pressable>
       </View>
 
-      <View style={styles.queueTabs}>
-        <Pressable onPress={() => setQueueType('businesses')} style={[styles.queueTab, queueType === 'businesses' && styles.queueTabActive]}><Text style={[styles.queueTabText, queueType === 'businesses' && styles.queueTabTextActive]}>Businesses</Text></Pressable>
+      {!isManagement ? <View style={styles.queueTabs}>
+        <Pressable onPress={() => setQueueType('businesses')} style={[styles.queueTab, queueType === 'businesses' && styles.queueTabActive]}><Text style={[styles.queueTabText, queueType === 'businesses' && styles.queueTabTextActive]}>Business Listings</Text></Pressable>
         <Pressable onPress={() => setQueueType('promotions')} style={[styles.queueTab, queueType === 'promotions' && styles.queueTabActive]}><Text style={[styles.queueTabText, queueType === 'promotions' && styles.queueTabTextActive]}>Promotions</Text></Pressable>
-      </View>
+      </View> : null}
 
       {queueType === 'promotions' ? <BusinessPromotionApprovalPanel /> : <>
       <View style={styles.metrics}>
@@ -327,7 +339,7 @@ export default function BusinessApprovalPanel({ onBack }) {
 
       {error ? <View style={styles.errorCard}><Text style={styles.errorText}>{error}</Text></View> : null}
       {loading ? <View style={styles.loadingCard}><ActivityIndicator color={colors.teal} /><Text style={styles.loadingText}>Loading approval queue…</Text></View> : null}
-      {!loading && !filtered.length ? <View style={styles.emptyCard}><Text style={styles.emptyIcon}>✓</Text><Text style={styles.emptyTitle}>Queue is clear</Text><Text style={styles.emptyText}>No business listings match this view.</Text></View> : null}
+      {!loading && !filtered.length ? <View style={styles.emptyCard}><Text style={styles.emptyIcon}>✓</Text><Text style={styles.emptyTitle}>{isManagement ? 'No matching businesses' : 'Queue is clear'}</Text><Text style={styles.emptyText}>No business listings match this view.</Text></View> : null}
       <View style={styles.list}>
         {filtered.map(business => (
           <BusinessReviewCard

@@ -617,3 +617,50 @@ Implementation status: source complete in the native approval flow and shared Fi
 - Detect stream disconnection, show **Stream Interrupted**, and provide both **Resume Same Stream** and **End Live Stream** controls.
 - If app backgrounding or an incoming call interrupts capture, hold the existing YouTube session until the broadcaster returns. Do not create a second YouTube broadcast; reconnect the camera to the saved session only.
 - Background camera streaming is not required.
+
+### R-073 — Prevent past event scheduling
+
+- When adding an event, reject a date earlier than today.
+- When adding an event for today, reject a start time earlier than the current time.
+- Show an explanatory prompt and clear the invalid date or time, including values derived through Hijri or prayer-time selection.
+- Preserve administrator access to historical dates when editing an existing event.
+
+Implementation status: source complete; pending device verification.
+
+### R-074 — Preserve live video during in-app minimising
+
+- Keep the same native camera and encoder view mounted when the broadcaster minimises it inside Community Connect Australia.
+- Resize that live view into the floating controller so its preview remains visible and the existing YouTube broadcast is not restarted.
+- Actual app backgrounding or a phone interruption may pause capture; returning resumes the existing session rather than creating a new broadcast.
+
+Implementation status: source complete; requires a real YouTube device-stream test.
+
+### R-075 — Compact streaming controls and microphone meter
+
+- Replace the large fixed bottom panel with compact, colourful camera, microphone, Go Live/End, minimise and close icon controls.
+- Auto-hide the full controls after 4.2 seconds while live and reveal them when the camera surface is touched.
+- Keep the PWA-styled microphone state meter visible at the right edge even when the remaining controls are hidden.
+
+Implementation status: source complete; pending device verification.
+
+### R-076 — Separate Business Approvals and Business Management
+
+- Business Approvals opens the pending business/promotion review workflow.
+- Businesses opens all listing statuses for search and administration, without presenting the promotion approval tabs as the same page.
+
+Implementation status: source complete; pending device verification.
+
+### R-077 — One-way Events Feedback
+
+- Events Feedback is a one-way submission to the selected city admins or super admins.
+- Remove reply and reaction actions and state clearly that no response is sent from this page.
+- Keep Business Directory Contact Us conversations separate; those remain in Business Messaging.
+
+Implementation status: source complete; pending device verification.
+
+### R-078 — Icon-only sign out
+
+- Replace the Log out text and character glyph with a clear, resolution-independent vector logout icon.
+- Preserve a large accessible touch target and an accessible Log out label for screen readers.
+
+Implementation status: source complete; pending device verification.

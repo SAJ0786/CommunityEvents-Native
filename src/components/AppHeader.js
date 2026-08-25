@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Image,
   Modal,
@@ -13,6 +14,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, radius, shadow, spacing } from '../theme';
 
 const EVENT_AUTH_ITEMS = [
@@ -250,9 +252,17 @@ export default function AppHeader({
                     <View style={styles.rolePill}>
                       <Text style={styles.rolePillText}>{roleLabel}</Text>
                     </View>
-                    <Pressable disabled={authBusy} onPress={() => { setMenuOpen(false); onSignOut?.(); }} style={({ pressed }) => [styles.identityLogout, pressed && styles.pressed, authBusy && styles.menuItemDisabled]}>
-                      <Text style={styles.logoutIcon}>{authBusy ? '\u2026' : '\u238B'}</Text>
-                      <Text style={styles.logoutText}>{authBusy ? 'Signing out…' : 'Log out'}</Text>
+                    <Pressable
+                      accessibilityLabel={authBusy ? 'Signing out' : 'Log out'}
+                      accessibilityRole="button"
+                      disabled={authBusy}
+                      hitSlop={8}
+                      onPress={() => { setMenuOpen(false); onSignOut?.(); }}
+                      style={({ pressed }) => [styles.identityLogout, pressed && styles.pressed, authBusy && styles.menuItemDisabled]}
+                    >
+                      {authBusy
+                        ? <ActivityIndicator color="#b52c24" size="small" />
+                        : <MaterialCommunityIcons color="#c8372d" name="logout-variant" size={24} />}
                     </Pressable>
                   </>
                 )}
@@ -553,9 +563,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   logoutButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: '#fff1f0' },
-  identityLogout: { position: 'absolute', top: spacing.sm, right: spacing.sm, minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, borderRadius: 10, backgroundColor: '#fff1f0' },
-  logoutIcon: { color: '#c8372d', fontSize: 20, fontWeight: '900' },
-  logoutText: { color: '#b52c24', fontSize: 14, fontWeight: '900' },
+  identityLogout: { position: 'absolute', top: spacing.sm, right: spacing.sm, width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ffd7d2', borderRadius: 21, backgroundColor: '#fff1f0' },
   pressed: {
     opacity: 0.78,
   },

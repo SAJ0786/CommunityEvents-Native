@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Platform,
   Pressable,
@@ -124,6 +125,14 @@ function localTime(date) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+function pastEventSelection(eventDate, startTime, now = new Date()) {
+  if (!isIsoDate(eventDate)) return '';
+  const today = localIsoDate(now);
+  if (eventDate < today) return 'date';
+  if (eventDate === today && isTime(startTime) && startTime < localTime(now)) return 'time';
+  return '';
+}
+
 function isWebUrl(value) {
   const text = String(value || '').trim();
   if (!text) return true;
@@ -238,6 +247,8 @@ export default function CreateEventForm({
   const [dynamicOrganisations, setDynamicOrganisations] = useState([]);
   const [dynamicOptions, setDynamicOptions] = useState({ eventTypes: [], reciterTypes: [] });
   const [nativePicker, setNativePicker] = useState('');
+  const invalidDateTimeAlertRef = useRef('');
+  const enforceFutureStart = !initialEvent?.id;
 
   useEffect(() => {
     setForm(createFormState(initialEvent, defaultCity, defaults));
@@ -246,6 +257,42 @@ export default function CreateEventForm({
     setPickerError('');
     setCalendarMode(initialEvent?.enteredAsHijri ? 'hijri' : 'gregorian');
   }, [defaultCity, defaults, initialEvent?.id]);
+
+  useEffect(() => {
+    if (!enforceFutureStart) return;
+    const invalidField = pastEventSelection(form.eventDate, form.startTime);
+    if (!invalidField) {
+      invalidDateTimeAlertRef.current = '';
+      return;
+    }
+    const invalidKey = `${invalidField}:${form.eventDate}:${form.startTime}`;
+    if (invalidDateTimeAlertRef.current === invalidKey) return;
+    invalidDateTimeAlertRef.current = invalidKey;
+    Alert.alert(
+      'Choose a future event time',
+      invalidField === 'date'
+        ? 'The event date cannot be earlier than today. Please select another date.'
+        : 'For an event today, the start time must be later than the current time. Please select another time.'
+    );
+    setForm(current => invalidField === 'date'
+      ? {
+        ...current,
+        eventDate: '',
+        hijriDate: '',
+        hijriDay: null,
+        hijriMonth: null,
+        hijriYear: null,
+        enteredAsHijri: false,
+      }
+      : {
+        ...current,
+        startTime: '',
+        prayerName: '',
+        prayerLabel: '',
+        prayerTimeZone: '',
+        timeMode: 'manual',
+      });
+  }, [enforceFutureStart, form.eventDate, form.startTime]);
 
   useEffect(() => {
     let active = true;
@@ -322,11 +369,14 @@ export default function CreateEventForm({
     const errors = {};
     if (!form.hostName.trim()) errors.hostName = 'Enter the host name.';
     if (form.hostName.trim().length > FIELD_LIMITS.hostName) errors.hostName = `Host name must be ${FIELD_LIMITS.hostName} characters or less.`;
-    if (!isIsoDate(form.eventDate)) errors.eventDate = 'Use a valid date in YYYY-MM-DD format.';
+    if (!isIsoDate(form.eventDate)) errors.eventDate = 'Select a valid event date.';
+    else if (enforceFutureStart && pastEventSelection(form.eventDate, '')) errors.eventDate = 'The event date cannot be earlier than today.';
     if (form.timeMode === 'prayer' && !form.prayerName) {
       errors.startTime = 'Select the prayer time for this event.';
     } else if (!isTime(form.startTime)) {
-      errors.startTime = 'Use time format HH:MM (24-hour).';
+      errors.startTime = 'Select the event start time.';
+    } else if (enforceFutureStart && pastEventSelection(form.eventDate, form.startTime) === 'time') {
+      errors.startTime = 'For an event today, select a start time later than now.';
     }
     if (form.endTime.trim() && !isTime(form.endTime)) errors.endTime = 'Use time format HH:MM (24-hour).';
     if (isTime(form.startTime) && isTime(form.endTime) && form.endTime <= form.startTime) {
@@ -352,7 +402,7 @@ export default function CreateEventForm({
     }
     if (!isWebUrl(form.imageUrl)) errors.imageUrl = 'Enter a full http:// or https:// image URL.';
     return errors;
-  }, [form]);
+  }, [enforceFutureStart, form]);
 
   const baseline = useMemo(
     () => createFormState(initialEvent, defaultCity, defaults),
@@ -1098,7 +1148,7 @@ export default function CreateEventForm({
             value={pickerValue(nativePicker === 'date' ? form.eventDate : nativePicker === 'start' ? form.startTime : form.endTime, nativePicker === 'date' ? 'date' : 'time')}
             mode={nativePicker === 'date' ? 'date' : 'time'}
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            minimumDate={nativePicker === 'date' ? new Date() : undefined}
+            minimumDate={nativePicker === 'date' && enforceFutureStart ? new Date() : undefined}
             minuteInterval={5}
             onChange={handleNativePicker}
           />
