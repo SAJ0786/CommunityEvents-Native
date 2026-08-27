@@ -6,7 +6,7 @@ const isBundledRelease = process.env.NODE_ENV === 'production';
 // EAS CLI resolves the config once locally before it loads the selected EAS
 // environment. Permit only that metadata pass; the cloud runner re-evaluates
 // this file with EAS_BUILD=true and must have the real protected Maps key.
-const isEasLocalMetadataPass = Boolean(process.env.EAS_BUILD_PROFILE)
+const isEasLocalMetadataPass = process.env.EXPO_NO_DOTENV === '1'
   && process.env.EAS_BUILD !== 'true';
 
 if ((isBundledRelease || releaseMode === 'tester' || releaseMode === 'production')

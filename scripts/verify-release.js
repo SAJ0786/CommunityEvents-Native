@@ -38,7 +38,8 @@ if (!/versionName\s+["']1\.0\.0["']/.test(androidGradle)) throw new Error('Check
 if (!/versionCode\s+36\b/.test(androidGradle)) throw new Error('Checked-in Android versionCode is not 36.');
 if (!/^android\.compileSdkVersion=36$/m.test(gradleProperties)) throw new Error('Android compile SDK 36 is not pinned.');
 if (!/^android\.targetSdkVersion=36$/m.test(gradleProperties)) throw new Error('Android target SDK 36 is not pinned.');
-if (!dynamicAppConfig.includes('isEasLocalMetadataPass') || !dynamicAppConfig.includes("process.env.EAS_BUILD !== 'true'")) {
+if (!dynamicAppConfig.includes("process.env.EXPO_NO_DOTENV === '1'") ||
+    !dynamicAppConfig.includes("process.env.EAS_BUILD !== 'true'")) {
   throw new Error('EAS local metadata evaluation must remain separate from the protected-key cloud build guard.');
 }
 
