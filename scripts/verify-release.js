@@ -14,6 +14,7 @@ const eas = JSON.parse(read('eas.json'));
 const packageJson = JSON.parse(read('package.json'));
 const androidGradle = read('android/app/build.gradle');
 const gradleProperties = read('android/gradle.properties');
+const dynamicAppConfig = read('app.config.js');
 
 if (app.name !== 'Community Connect Australia') throw new Error(`Unexpected store name: ${app.name}`);
 if (app.version !== '1.0.0' || packageJson.version !== app.version) {
@@ -37,6 +38,9 @@ if (!/versionName\s+["']1\.0\.0["']/.test(androidGradle)) throw new Error('Check
 if (!/versionCode\s+36\b/.test(androidGradle)) throw new Error('Checked-in Android versionCode is not 36.');
 if (!/^android\.compileSdkVersion=36$/m.test(gradleProperties)) throw new Error('Android compile SDK 36 is not pinned.');
 if (!/^android\.targetSdkVersion=36$/m.test(gradleProperties)) throw new Error('Android target SDK 36 is not pinned.');
+if (!dynamicAppConfig.includes('isEasLocalMetadataPass') || !dynamicAppConfig.includes("process.env.EAS_BUILD !== 'true'")) {
+  throw new Error('EAS local metadata evaluation must remain separate from the protected-key cloud build guard.');
+}
 
 const production = eas.build?.production;
 if (production?.environment !== 'production' || production?.env?.APP_RELEASE_MODE !== 'production') {
