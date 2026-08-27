@@ -5,14 +5,14 @@ const HAISHINKIT_WORKAROUND_MARKER = '# Community Connect: HaishinKit Xcode 26 w
 const POST_INSTALL_LINE = 'post_install do |installer|';
 const HAISHINKIT_WORKAROUND = `${POST_INSTALL_LINE}
     ${HAISHINKIT_WORKAROUND_MARKER}
-    # HaishinKit 1.9.3 crashes the Xcode 26 Swift compiler under whole-module
-    # optimisation. Compile this pod per-file while preserving Release -O.
+    # HaishinKit 1.9.3 crashes the Xcode 26 Swift optimiser, including in
+    # per-file mode. Disable optimisation for this legacy pod only.
     installer.pods_project.targets.each do |target|
       next unless target.name == 'HaishinKit'
 
       target.build_configurations.each do |build_config|
         build_config.build_settings['SWIFT_COMPILATION_MODE'] = 'singlefile'
-        build_config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-O'
+        build_config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
       end
     end`;
 

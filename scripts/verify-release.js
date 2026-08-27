@@ -56,7 +56,8 @@ if (!firebaseCocoaPodsPlugin.includes('$RNFirebaseDisableSPM = true')) {
   throw new Error('Firebase CocoaPods resolver plugin does not disable Firebase SPM.');
 }
 if (!firebaseCocoaPodsPlugin.includes("target.name == 'HaishinKit'") ||
-    !firebaseCocoaPodsPlugin.includes("SWIFT_COMPILATION_MODE'] = 'singlefile'")) {
+    !firebaseCocoaPodsPlugin.includes("SWIFT_COMPILATION_MODE'] = 'singlefile'") ||
+    !firebaseCocoaPodsPlugin.includes("SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'")) {
   throw new Error('The target-only HaishinKit Xcode 26 compiler workaround is missing.');
 }
 requireFile('docs/legal/Community_Connect_Australia_Privacy_Policy_DRAFT.md');

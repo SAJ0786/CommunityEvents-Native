@@ -10,7 +10,7 @@ iOS bundle ID: `info.siza.communityevents`
 - Store name is Community Connect Australia; in-app module titles remain Community Events Australia and Community Businesses Australia.
 - Android compile and target SDK are pinned to API 36 for the Google Play requirement effective 31 August 2026.
 - Production EAS builds set `APP_RELEASE_MODE=production`; internal builds retain tester safeguards.
-- iOS production and simulator builds are pinned to EAS `macos-sequoia-15.6-xcode-26.0`, which meets Apple's iOS 26 SDK upload requirement effective 28 April 2026. HaishinKit 1.9.3 is compiled per-file with normal Release optimisation because its whole-module build triggers an Xcode 26 Swift compiler crash; the workaround is isolated to that pod and must be re-evaluated when the livestream SDK is upgraded.
+- iOS production and simulator builds are pinned to EAS `macos-sequoia-15.6-xcode-26.0`, which meets Apple's iOS 26 SDK upload requirement effective 28 April 2026. HaishinKit 1.9.3 is compiled per-file without Swift optimisation because its source triggers an Xcode 26 compiler crash even outside whole-module mode; the workaround is isolated to that legacy pod. Livestream performance must be tested on a real iPhone and this workaround must be removed when the api.video SDK updates its pinned HaishinKit version.
 - iPhone version 1 is intentionally not advertised as iPad-compatible until tablet QA is completed.
 - Store icon is an opaque 1024×1024 PNG. The in-app logo remains unchanged.
 - Android and iOS Firebase application files and stable package identifiers are checked.
