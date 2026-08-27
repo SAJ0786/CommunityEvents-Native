@@ -27,7 +27,7 @@ for (const file of files) {
 const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
 const appJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'app.json'), 'utf8')).expo;
 
-if (packageJson.dependencies.expo !== '~54.0.36') {
+if (packageJson.dependencies.expo !== '~54.0.37') {
   throw new Error(`Expected Expo SDK 54 dependency, found ${packageJson.dependencies.expo || 'missing'}.`);
 }
 if (!appJson.android?.package || !appJson.ios?.bundleIdentifier) {

@@ -714,3 +714,14 @@ Implementation status: source complete; pending device verification.
 - Record the administrator UID and addition time for each new option.
 
 Implementation status: source complete; pending device verification.
+
+### R-085 — Store release candidate and iOS preparation
+
+- Set the public product/store name to Community Connect Australia while preserving the Events and Business module titles in-app.
+- Promote the release configuration to version 1.0.0, Android API 36 and an opaque 1024×1024 store icon.
+- Ensure production builds disable tester-only behaviour and iOS App Store builds use the required iOS 26 SDK through the current EAS image.
+- Keep version 1 scoped to iPhone until tablet-specific QA is completed.
+- Add automated source/release checks and a documented store hand-off covering legal publication, data declarations, reviewer access, screenshots, test-data purge and company Apple signing.
+- Retain Excel import/export with the current authoritative SheetJS 0.20.3 distribution rather than the obsolete npm-registry release.
+
+Implementation status: source and production bundles complete; final real-device regression, consolidated legal publication and company Apple signing remain release gates.

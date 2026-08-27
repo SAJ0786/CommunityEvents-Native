@@ -2,9 +2,9 @@
   "expo": {
     "name": "Community Connect Australia",
     "slug": "community-events-australia-native",
-    "version": "0.3.0",
+    "version": "1.0.0",
     "orientation": "default",
-    "icon": "./assets/logo.png",
+    "icon": "./assets/icon-store-1024.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-community-connect.png",
@@ -16,7 +16,9 @@
     ],
     "ios": {
       "bundleIdentifier": "info.siza.communityevents",
-      "supportsTablet": true,
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "icon": "./assets/icon-store-1024.png",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -26,7 +28,7 @@
     },
     "android": {
       "package": "info.siza.communityevents.app",
-      "versionCode": 35,
+      "versionCode": 36,
       "googleServicesFile": "./google-services.json",
       "allowBackup": false,
       "adaptiveIcon": {
@@ -45,7 +47,18 @@
       "testBuild": true
     },
     "plugins": [
-      "expo-build-properties",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ],
       "expo-font",
       "expo-notifications",
       [
