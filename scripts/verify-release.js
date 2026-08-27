@@ -25,6 +25,11 @@ if (Number(app.android?.versionCode) < 36) throw new Error('Android versionCode 
 if (!app.ios?.buildNumber) throw new Error('iOS buildNumber is required.');
 if (app.ios?.supportsTablet !== false) throw new Error('Version 1 is scoped to iPhone and must not claim untested iPad support.');
 
+const buildProperties = (app.plugins || []).find(plugin => Array.isArray(plugin) && plugin[0] === 'expo-build-properties');
+if (buildProperties?.[1]?.ios?.useFrameworks !== 'dynamic') {
+  throw new Error('iOS must use dynamic frameworks for React Native Firebase Swift Package dependencies.');
+}
+
 if (!/versionName\s+["']1\.0\.0["']/.test(androidGradle)) throw new Error('Checked-in Android versionName is not 1.0.0.');
 if (!/versionCode\s+36\b/.test(androidGradle)) throw new Error('Checked-in Android versionCode is not 36.');
 if (!/^android\.compileSdkVersion=36$/m.test(gradleProperties)) throw new Error('Android compile SDK 36 is not pinned.');
@@ -54,4 +59,4 @@ const colorType = png[25];
 if (width !== 1024 || height !== 1024) throw new Error(`Store icon must be 1024x1024, found ${width}x${height}.`);
 if (colorType === 4 || colorType === 6) throw new Error('Store icon contains an alpha channel; iOS icons must be opaque.');
 
-console.log('Release configuration check passed: v1.0.0, store identities, API 36, iOS 26 build image, Firebase files, legal drafts, and opaque 1024px icon verified.');
+console.log('Release configuration check passed: v1.0.0, store identities, API 36, dynamic iOS frameworks, iOS 26 build image, Firebase files, legal drafts, and opaque 1024px icon verified.');
