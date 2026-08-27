@@ -56,7 +56,7 @@
           },
           "ios": {
             "deploymentTarget": "15.1",
-            "useFrameworks": "dynamic"
+            "useFrameworks": "static"
           }
         }
       ],
@@ -68,6 +68,7 @@
           "initialOrientation": "PORTRAIT_UP"
         }
       ],
+      "./plugins/with-rnfirebase-cocoapods",
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
       "@react-native-firebase/crashlytics",

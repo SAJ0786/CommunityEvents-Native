@@ -26,8 +26,11 @@ if (!app.ios?.buildNumber) throw new Error('iOS buildNumber is required.');
 if (app.ios?.supportsTablet !== false) throw new Error('Version 1 is scoped to iPhone and must not claim untested iPad support.');
 
 const buildProperties = (app.plugins || []).find(plugin => Array.isArray(plugin) && plugin[0] === 'expo-build-properties');
-if (buildProperties?.[1]?.ios?.useFrameworks !== 'dynamic') {
-  throw new Error('iOS must use dynamic frameworks for React Native Firebase Swift Package dependencies.');
+if (buildProperties?.[1]?.ios?.useFrameworks !== 'static') {
+  throw new Error('iOS must use static frameworks with the Firebase CocoaPods resolver.');
+}
+if (!(app.plugins || []).includes('./plugins/with-rnfirebase-cocoapods')) {
+  throw new Error('The iOS Firebase CocoaPods resolver plugin is required.');
 }
 
 if (!/versionName\s+["']1\.0\.0["']/.test(androidGradle)) throw new Error('Checked-in Android versionName is not 1.0.0.');
@@ -47,6 +50,10 @@ if (!production?.autoIncrement) throw new Error('Production build numbers must a
 requireFile('GoogleService-Info.plist');
 requireFile('google-services.json');
 requireFile('android/app/google-services.json');
+const firebaseCocoaPodsPlugin = read('plugins/with-rnfirebase-cocoapods.js');
+if (!firebaseCocoaPodsPlugin.includes('$RNFirebaseDisableSPM = true')) {
+  throw new Error('Firebase CocoaPods resolver plugin does not disable Firebase SPM.');
+}
 requireFile('docs/legal/Community_Connect_Australia_Privacy_Policy_DRAFT.md');
 requireFile('docs/legal/Community_Connect_Australia_Terms_of_Use_DRAFT.md');
 
@@ -59,4 +66,4 @@ const colorType = png[25];
 if (width !== 1024 || height !== 1024) throw new Error(`Store icon must be 1024x1024, found ${width}x${height}.`);
 if (colorType === 4 || colorType === 6) throw new Error('Store icon contains an alpha channel; iOS icons must be opaque.');
 
-console.log('Release configuration check passed: v1.0.0, store identities, API 36, dynamic iOS frameworks, iOS 26 build image, Firebase files, legal drafts, and opaque 1024px icon verified.');
+console.log('Release configuration check passed: v1.0.0, store identities, API 36, static iOS frameworks with Firebase CocoaPods, iOS 26 build image, Firebase files, legal drafts, and opaque 1024px icon verified.');
