@@ -1,13 +1,14 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, shadow, spacing } from '../theme';
 
 const TABS = [
-  { key: 'home', icon: '\u{1F3E0}', label: 'Home' },
-  { key: 'my_events', icon: '\u{1F4C5}', label: 'My Events', restricted: true },
-  { key: 'create', icon: '+', label: 'Add Event', restricted: true, primary: true },
-  { key: 'favourites', icon: '\u2764\uFE0F', label: 'Favourites', restricted: true },
-  { key: 'profile', icon: '\u{1F464}', label: 'Profile' },
+  { key: 'home', icon: 'home-outline', label: 'Home' },
+  { key: 'my_events', icon: 'calendar-outline', label: 'My Events', restricted: true },
+  { key: 'create', icon: 'plus', label: 'Add Event', restricted: true, primary: true },
+  { key: 'favourites', icon: 'heart-outline', label: 'Favourites', restricted: true },
+  { key: 'profile', icon: 'account-outline', label: 'Profile' },
 ];
 
 export default function BottomNavigation({ activeTab, onChange, isGuest = false }) {
@@ -32,17 +33,16 @@ export default function BottomNavigation({ activeTab, onChange, isGuest = false 
               pressed && styles.pressed,
             ]}
           >
-            <Text
-              maxFontSizeMultiplier={1}
-              style={[
-                styles.icon,
-                active && styles.activeIcon,
-                tab.primary && styles.primaryIcon,
-                tab.primary && !disabled && styles.primaryIconEnabled,
-              ]}
-            >
-              {tab.icon}
-            </Text>
+            <View style={[
+              tab.primary ? styles.primaryIcon : styles.iconWrap,
+              tab.primary && !disabled && styles.primaryIconEnabled,
+            ]}>
+              <MaterialCommunityIcons
+                color={tab.primary ? colors.surface : active ? colors.tealDark : colors.muted}
+                name={tab.icon}
+                size={tab.primary ? 34 : 23}
+              />
+            </View>
             <Text
               numberOfLines={1}
               maxFontSizeMultiplier={1.1}
@@ -88,18 +88,15 @@ const styles = StyleSheet.create({
     marginTop: -18,
   },
   disabledTab: { opacity: 0.35 },
-  icon: { color: colors.muted, fontSize: 19, fontWeight: '900', lineHeight: 22 },
-  activeIcon: { color: colors.tealDark },
+  iconWrap: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   primaryIcon: {
     width: 54,
     height: 54,
     borderRadius: 27,
     overflow: 'hidden',
-    color: colors.surface,
     backgroundColor: '#9bb8b4',
-    textAlign: 'center',
-    lineHeight: 48,
-    fontSize: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 4,
     borderColor: colors.surface,
     ...shadow,

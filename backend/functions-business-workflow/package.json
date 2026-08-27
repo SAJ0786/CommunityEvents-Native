@@ -1,0 +1,14 @@
+{
+  "name": "community-connect-business-workflow-functions",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^7.0.0",
+    "nodemailer": "^9.0.5"
+  }
+}

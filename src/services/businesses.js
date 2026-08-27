@@ -254,6 +254,7 @@ export async function createBusinessSubmission(payload = {}) {
     ownerId: user.uid,
     ownerEmail: user.email || payload.contact?.email || '',
     ownerPhone: user.phoneNumber || '',
+    lastSubmittedBy: user.uid,
     status: 'pending',
     tier: 'free',
     abnVerified: false,
@@ -298,6 +299,7 @@ export async function updateBusinessSubmission(businessId, payload = {}) {
     listingConsentAtClient: clean(payload.listingConsentAtClient),
     listingConsentAt: serverTimestamp(),
     rejectionReason: '',
+    lastSubmittedBy: user.uid,
     updatedAt: serverTimestamp(),
     submittedAt: serverTimestamp(),
   });
@@ -584,6 +586,7 @@ export async function createBusinessPromotion(businessId, payload = {}) {
     ...cleanPromotion(payload),
     businessId,
     ownerId: user.uid,
+    lastSubmittedBy: user.uid,
     status: 'pending',
     boosted: false,
     hidden: false,
@@ -612,6 +615,7 @@ export async function updateBusinessPromotion(promotionId, payload = {}) {
     status: 'pending',
     hidden: false,
     rejectionReason: '',
+    lastSubmittedBy: user.uid,
     updatedAt: serverTimestamp(),
     submittedAt: serverTimestamp(),
   });

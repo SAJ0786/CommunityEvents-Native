@@ -101,7 +101,11 @@ export async function updateUserPreferences(uid, changes = {}) {
       roleDemoted = true;
     }
   }
-  await updateDoc(doc(db, 'users', uid), { ...payload, updatedAt: serverTimestamp() });
+  await updateDoc(doc(db, 'users', uid), {
+    ...payload,
+    lastProfileUpdatedBy: uid,
+    updatedAt: serverTimestamp(),
+  });
   const updated = await getUserProfile(uid);
   return roleDemoted ? { ...updated, roleDemoted: true } : updated;
 }

@@ -673,3 +673,34 @@ Implementation status: source complete; pending device verification.
 - Apply this rule when the consolidated legal documents are implemented and before tester/store release.
 
 Implementation status: recorded requirement; pending consolidated legal-page implementation.
+
+### R-080 — Business workflow in-app and email notifications
+
+- Notify the selected-city administrators and all super administrators when a user submits or resubmits a business, promotion or related changes, and when a user updates meaningful profile or notification preferences.
+- Notify the listing owner, selected-city administrators and all super administrators when a business or promotion is approved or changes are requested.
+- Exclude the administrator performing the decision from the administrator recipient list.
+- Respect Business Directory and email notification preferences, keep SMTP credentials server-side, and expose recipient-specific updates in the native Directory notification centre.
+
+Implementation status: native notification centre, recipient-only rules and isolated Firebase workflow functions are complete and deployed; pending end-to-end device/email verification using a test submission and approval.
+
+### R-081 — Stable vector bottom-navigation icons
+
+- Replace the Business Profile dot and all emoji-dependent bottom navigation glyphs with resolution-independent vector icons.
+- Keep active, disabled and primary action colours consistent across Events and Business Directory navigation.
+
+Implementation status: source complete; pending device verification.
+
+### R-082 — Page title before controls
+
+- Put the page title and summary at the top of Events and Business Directory Home pages.
+- Place city, List/Map, Streamed Videos, Hijri Calendar, search, Open and category/service controls in a clearly separated controls section below the title.
+- Keep result content in the following section and retain the same title-first hierarchy on other pages.
+
+Implementation status: Events and Business Directory Home source complete; continuing visual review across secondary pages during device testing.
+
+### R-083 — Red power-style logout control
+
+- Use a round red power button with a white resolution-independent power symbol in the signed-in hamburger profile section.
+- Preserve the accessible Log out label, busy state and large touch target.
+
+Implementation status: source complete; pending device verification.

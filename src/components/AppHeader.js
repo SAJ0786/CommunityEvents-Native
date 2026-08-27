@@ -261,8 +261,8 @@ export default function AppHeader({
                       style={({ pressed }) => [styles.identityLogout, pressed && styles.pressed, authBusy && styles.menuItemDisabled]}
                     >
                       {authBusy
-                        ? <ActivityIndicator color="#b52c24" size="small" />
-                        : <MaterialCommunityIcons color="#c8372d" name="logout-variant" size={24} />}
+                        ? <ActivityIndicator color={colors.surface} size="small" />
+                        : <MaterialCommunityIcons color={colors.surface} name="power" size={27} />}
                     </Pressable>
                   </>
                 )}
@@ -563,7 +563,12 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   logoutButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: '#fff1f0' },
-  identityLogout: { position: 'absolute', top: spacing.sm, right: spacing.sm, width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ffd7d2', borderRadius: 21, backgroundColor: '#fff1f0' },
+  identityLogout: {
+    position: 'absolute', top: spacing.sm, right: spacing.sm,
+    width: 44, height: 44, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#991b1b', borderRadius: 22,
+    backgroundColor: '#dc2626', ...shadow,
+  },
   pressed: {
     opacity: 0.78,
   },

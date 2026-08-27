@@ -1,13 +1,14 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, shadow, spacing } from '../theme';
 
 const TABS = [
-  { key: 'home', icon: '\u2302', label: 'Home' },
-  { key: 'promotions', icon: '\u{1F3F7}\uFE0F', label: 'Promotions' },
-  { key: 'add', icon: '+', label: 'Add Business', primary: true },
-  { key: 'my-businesses', icon: '\u{1F4BC}', label: 'My Business' },
-  { key: 'profile', icon: '\u25CF', label: 'Profile' },
+  { key: 'home', icon: 'home-outline', label: 'Home' },
+  { key: 'promotions', icon: 'tag-outline', label: 'Promotions' },
+  { key: 'add', icon: 'plus', label: 'Add Business', primary: true },
+  { key: 'my-businesses', icon: 'briefcase-outline', label: 'My Business' },
+  { key: 'profile', icon: 'account-outline', label: 'Profile' },
 ];
 
 export default function DirectoryBottomNavigation({ activeTab, onChange }) {
@@ -29,13 +30,13 @@ export default function DirectoryBottomNavigation({ activeTab, onChange }) {
               pressed && styles.pressed,
             ]}
           >
-            <Text maxFontSizeMultiplier={1} style={[
-              styles.icon,
-              active && styles.activeIcon,
-              tab.primary && styles.primaryIcon,
-            ]}>
-              {tab.icon}
-            </Text>
+            <View style={tab.primary ? styles.primaryIcon : styles.iconWrap}>
+              <MaterialCommunityIcons
+                color={tab.primary ? colors.surface : active ? colors.tealDark : colors.muted}
+                name={tab.icon}
+                size={tab.primary ? 34 : 23}
+              />
+            </View>
             <Text numberOfLines={1} maxFontSizeMultiplier={1} style={[
               styles.label,
               active && styles.activeLabel,
@@ -65,8 +66,7 @@ const styles = StyleSheet.create({
   tab: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 12, paddingHorizontal: 2 },
   activeTab: { backgroundColor: colors.tealSoft },
   primaryTab: { marginHorizontal: 2, marginTop: -18 },
-  icon: { color: colors.muted, fontSize: 20, lineHeight: 23, fontWeight: '900' },
-  activeIcon: { color: colors.tealDark },
+  iconWrap: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   primaryIcon: {
     width: 54,
     height: 54,
@@ -75,10 +75,8 @@ const styles = StyleSheet.create({
     borderColor: colors.surface,
     borderRadius: 27,
     backgroundColor: colors.teal,
-    color: colors.surface,
-    fontSize: 33,
-    lineHeight: 47,
-    textAlign: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
     ...shadow,
   },
   label: { marginTop: 2, color: colors.muted, fontSize: 9, fontWeight: '800' },

@@ -4,5 +4,11 @@
   },
   "storage": {
     "rules": "storage.rules"
-  }
+  },
+  "functions": [
+    {
+      "source": "functions-business-workflow",
+      "codebase": "business-workflow"
+    }
+  ]
 }

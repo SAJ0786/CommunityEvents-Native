@@ -1008,6 +1008,28 @@ function MainApp() {
 
   const renderHeader = () => (
     <View style={styles.contentHeader}>
+      <View style={styles.titleRow}>
+        <View style={styles.titleAccent} />
+        <View style={styles.titleCopy}>
+          <Text style={styles.sectionEyebrow}>DISCOVER WHAT'S ON</Text>
+          <Text style={styles.sectionTitle}>Upcoming Events</Text>
+          <Text style={styles.sectionSubtitle}>
+            {displayedEvents.length} event{displayedEvents.length === 1 ? '' : 's'} in {cityLabel(selectedCity)}
+          </Text>
+        </View>
+        {liveEventCount ? (
+          <Pressable accessibilityState={{ selected: liveOnly }} onPress={() => setLiveOnly(current => !current)}>
+            <Animated.View style={[styles.liveFilter, liveOnly && styles.liveFilterActive, { opacity: livePulse }]}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveFilterText}>LIVE {liveEventCount}</Text>
+            </Animated.View>
+          </Pressable>
+        ) : null}
+      </View>
+      <Text style={styles.notice}>
+        Hijri dates are subject to moon sighting. Events are user-submitted, so please verify details with hosts.
+      </Text>
+      <View style={styles.controlSection}>
       <View style={styles.homeControls}>
         <CitySelector compact selectedCity={selectedCity} onChange={handleCityChange} allowCurrentLocation />
         <View style={styles.viewToggle}>
@@ -1046,27 +1068,7 @@ function MainApp() {
           onToggleFilters={() => setShowHomeFilters(current => !current)}
           onClear={() => setHomeFilters({ ...EMPTY_HOME_FILTERS })}
         /> : null}
-      <View style={styles.titleRow}>
-        <View style={styles.titleAccent} />
-        <View style={styles.titleCopy}>
-          <Text style={styles.sectionEyebrow}>DISCOVER WHAT'S ON</Text>
-          <Text style={styles.sectionTitle}>Upcoming Events</Text>
-          <Text style={styles.sectionSubtitle}>
-            {displayedEvents.length} event{displayedEvents.length === 1 ? '' : 's'} in {cityLabel(selectedCity)}
-          </Text>
-        </View>
-        {liveEventCount ? (
-          <Pressable accessibilityState={{ selected: liveOnly }} onPress={() => setLiveOnly(current => !current)}>
-            <Animated.View style={[styles.liveFilter, liveOnly && styles.liveFilterActive, { opacity: livePulse }]}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveFilterText}>LIVE {liveEventCount}</Text>
-            </Animated.View>
-          </Pressable>
-        ) : null}
       </View>
-      <Text style={styles.notice}>
-        Hijri dates are subject to moon sighting. Events are user-submitted, so please verify details with hosts.
-      </Text>
       {isGuest ? (
         <View style={styles.guestNotice}>
           <Text style={styles.guestNoticeText}>Sign in for full event details and app benefits, including directions, adding events, Favourites and reminders.</Text>
@@ -1417,6 +1419,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   homeControls: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  controlSection: { marginTop: spacing.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface },
   eventShortcuts: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   eventShortcut: { flex: 1, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: spacing.sm, borderWidth: 1, borderRadius: 12, backgroundColor: colors.surface },
   streamShortcut: { borderColor: '#ffc4c4' },

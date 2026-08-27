@@ -101,7 +101,7 @@ service cloud.firestore {
         'abnVerified', 'identityVerified', 'verificationBadge',
         'abrVerification', 'abnCheckedAt',
         'rejectionReason', 'listingDeclarationAccepted', 'listingTermsVersion',
-        'listingConsentAtClient', 'listingConsentAt', 'updatedAt', 'submittedAt'
+        'listingConsentAtClient', 'listingConsentAt', 'lastSubmittedBy', 'updatedAt', 'submittedAt'
       ]);
     }
 
@@ -183,7 +183,7 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'title', 'briefText', 'discountText', 'fullDetails',
         'startDate', 'endDate', 'imageUrl', 'imagePath', 'status',
-        'hidden', 'rejectionReason', 'updatedAt', 'submittedAt'
+        'hidden', 'rejectionReason', 'lastSubmittedBy', 'updatedAt', 'submittedAt'
       ]);
     }
 
@@ -257,6 +257,17 @@ service cloud.firestore {
     // ── Mail ───────────────────────────────────────────────────────────────────
     match /mail/{mailId} {
       allow read, write: if false;
+    }
+
+    // Recipient-specific workflow notifications are created only by trusted
+    // Cloud Functions. Users may read their own records and mark them read.
+    match /userNotifications/{notificationId} {
+      allow read: if isRegistered() && resource.data.recipientUid == request.auth.uid;
+      allow create, delete: if false;
+      allow update: if isRegistered()
+        && resource.data.recipientUid == request.auth.uid
+        && request.resource.data.recipientUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
     }
 
     // ── Banned users — readable by anyone logging in (for ban check) ──────────

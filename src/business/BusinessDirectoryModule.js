@@ -9,6 +9,7 @@ import DirectoryBottomNavigation from './DirectoryBottomNavigation';
 import BusinessAdminDashboard from './BusinessAdminDashboard';
 import BusinessInboxScreen from './BusinessInboxScreen';
 import BusinessSupportInboxScreen from './BusinessSupportInboxScreen';
+import BusinessNotificationsScreen from './BusinessNotificationsScreen';
 import {
   BUSINESS_CATEGORIES,
   filterAndRankBusinesses,
@@ -145,7 +146,6 @@ function DirectoryHome({ businesses, city, savedIds, loading, error, initialFilt
 
   return (
     <ScrollView contentContainerStyle={styles.pageContent} keyboardShouldPersistTaps="handled">
-      <CitySelector selectedCity={city} onChange={onCityChange} onLocationResolved={onLocationResolved} allowCurrentLocation />
       <View style={styles.hero}>
         <View style={styles.heroCopy}>
           <Text style={styles.eyebrow}>COMMUNITY BUSINESS DIRECTORY</Text>
@@ -155,6 +155,8 @@ function DirectoryHome({ businesses, city, savedIds, loading, error, initialFilt
         <View style={styles.heroIconWrap}><Text style={styles.heroIcon}>{'\u{1F3EA}'}</Text></View>
       </View>
 
+      <View style={styles.directoryControls}>
+      <CitySelector selectedCity={city} onChange={onCityChange} onLocationResolved={onLocationResolved} allowCurrentLocation />
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
           <Text style={styles.searchIcon}>{'\u2315'}</Text>
@@ -207,6 +209,7 @@ function DirectoryHome({ businesses, city, savedIds, loading, error, initialFilt
           />
         </View>
       ) : null}
+      </View>
 
       {subcategoryId === 'niaz-preparation-and-supply' ? (
         <View style={styles.serviceFilter}>
@@ -372,7 +375,7 @@ function AddBusinessPreview({ onOpenAccount }) {
 function DirectoryProfile({ isGuest, profile, onOpenAccount, onNavigate }) {
   const menuItems = [
     { icon: '\u{1F3EA}', title: 'My Businesses', text: 'Manage your listings and promotions', action: () => isGuest ? onOpenAccount?.() : onNavigate?.('my-businesses') },
-    { icon: '\u{1F514}', title: 'Directory notifications', text: 'Promotion and approval updates', action: onOpenAccount },
+    { icon: '\u{1F514}', title: 'Directory notifications', text: 'Promotion and approval updates', action: () => isGuest ? onOpenAccount?.() : onNavigate?.('notifications') },
     { icon: '\u{1F6E1}\uFE0F', title: 'Help & Policies', text: 'Privacy, terms and business rules', action: onOpenAccount },
   ];
   return (
@@ -820,6 +823,8 @@ export default function BusinessDirectoryModule({
           <BusinessInboxScreen user={currentUser} profile={profile} onBack={() => changeTab('home')} />
         ) : activeTab === 'feedback' ? (
           <BusinessSupportInboxScreen user={currentUser} profile={profile} onBack={() => changeTab('home')} />
+        ) : activeTab === 'notifications' ? (
+          <BusinessNotificationsScreen user={currentUser} onBack={() => changeTab('profile')} />
         ) : activeTab === 'report' ? (
           <DirectorySupportScreen mode="report" businesses={directoryBusinesses} user={currentUser} profile={profile} city={selectedCity} onBack={() => changeTab('home')} />
         ) : activeTab === 'contact' ? (
@@ -893,7 +898,8 @@ const styles = StyleSheet.create({
   readOnlyPill: { borderRadius: 99, paddingHorizontal: 8, paddingVertical: 5, backgroundColor: colors.tealSoft },
   readOnlyText: { color: colors.tealDark, fontSize: 9, fontWeight: '900' },
   pageContent: { padding: spacing.lg, paddingBottom: spacing.xl },
-  hero: { minHeight: 142, flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.tealSoft, overflow: 'hidden' },
+  hero: { minHeight: 142, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.tealSoft, overflow: 'hidden' },
+  directoryControls: { marginTop: spacing.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface },
   heroCopy: { flex: 1, minWidth: 0 },
   eyebrow: { color: colors.tealDark, fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
   heroTitle: { marginTop: 7, color: colors.navy, fontSize: 25, lineHeight: 29, fontWeight: '900' },
