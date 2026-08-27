@@ -55,6 +55,10 @@ const firebaseCocoaPodsPlugin = read('plugins/with-rnfirebase-cocoapods.js');
 if (!firebaseCocoaPodsPlugin.includes('$RNFirebaseDisableSPM = true')) {
   throw new Error('Firebase CocoaPods resolver plugin does not disable Firebase SPM.');
 }
+if (!firebaseCocoaPodsPlugin.includes("target.name == 'HaishinKit'") ||
+    !firebaseCocoaPodsPlugin.includes("SWIFT_COMPILATION_MODE'] = 'singlefile'")) {
+  throw new Error('The target-only HaishinKit Xcode 26 compiler workaround is missing.');
+}
 requireFile('docs/legal/Community_Connect_Australia_Privacy_Policy_DRAFT.md');
 requireFile('docs/legal/Community_Connect_Australia_Terms_of_Use_DRAFT.md');
 
@@ -67,4 +71,4 @@ const colorType = png[25];
 if (width !== 1024 || height !== 1024) throw new Error(`Store icon must be 1024x1024, found ${width}x${height}.`);
 if (colorType === 4 || colorType === 6) throw new Error('Store icon contains an alpha channel; iOS icons must be opaque.');
 
-console.log('Release configuration check passed: v1.0.0, store identities, API 36, static iOS frameworks with Firebase CocoaPods, pinned Xcode 26.0/iOS 26 SDK image, Firebase files, legal drafts, and opaque 1024px icon verified.');
+console.log('Release configuration check passed: v1.0.0, store identities, API 36, static iOS frameworks with Firebase CocoaPods, target-only HaishinKit Xcode 26 workaround, pinned Xcode 26.0/iOS 26 SDK image, Firebase files, legal drafts, and opaque 1024px icon verified.');
