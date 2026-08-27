@@ -42,8 +42,9 @@ const production = eas.build?.production;
 if (production?.environment !== 'production' || production?.env?.APP_RELEASE_MODE !== 'production') {
   throw new Error('EAS production builds must use production environment and disable tester mode.');
 }
-if (production?.ios?.image !== 'latest') {
-  throw new Error('Production iOS must use the current EAS image so App Store builds use the required iOS 26 SDK.');
+const requiredIosImage = 'macos-sequoia-15.6-xcode-26.0';
+if (production?.ios?.image !== requiredIosImage || eas.build?.['ios-simulator']?.ios?.image !== requiredIosImage) {
+  throw new Error('iOS builds must use the pinned Xcode 26.0 image required by the current livestream dependency.');
 }
 if (!production?.autoIncrement) throw new Error('Production build numbers must auto-increment.');
 
@@ -66,4 +67,4 @@ const colorType = png[25];
 if (width !== 1024 || height !== 1024) throw new Error(`Store icon must be 1024x1024, found ${width}x${height}.`);
 if (colorType === 4 || colorType === 6) throw new Error('Store icon contains an alpha channel; iOS icons must be opaque.');
 
-console.log('Release configuration check passed: v1.0.0, store identities, API 36, static iOS frameworks with Firebase CocoaPods, iOS 26 build image, Firebase files, legal drafts, and opaque 1024px icon verified.');
+console.log('Release configuration check passed: v1.0.0, store identities, API 36, static iOS frameworks with Firebase CocoaPods, pinned Xcode 26.0/iOS 26 SDK image, Firebase files, legal drafts, and opaque 1024px icon verified.');

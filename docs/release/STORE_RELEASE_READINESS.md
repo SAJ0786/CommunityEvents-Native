@@ -10,7 +10,7 @@ iOS bundle ID: `info.siza.communityevents`
 - Store name is Community Connect Australia; in-app module titles remain Community Events Australia and Community Businesses Australia.
 - Android compile and target SDK are pinned to API 36 for the Google Play requirement effective 31 August 2026.
 - Production EAS builds set `APP_RELEASE_MODE=production`; internal builds retain tester safeguards.
-- iOS production builds use EAS `latest`, currently Xcode 26.6, to meet Apple's iOS 26 SDK upload requirement effective 28 April 2026.
+- iOS production and simulator builds are pinned to EAS `macos-sequoia-15.6-xcode-26.0`. This meets Apple's iOS 26 SDK upload requirement effective 28 April 2026 and avoids a Swift compiler crash affecting the currently integrated HaishinKit 1.9.3 livestream dependency on later Xcode 26 images.
 - iPhone version 1 is intentionally not advertised as iPad-compatible until tablet QA is completed.
 - Store icon is an opaque 1024×1024 PNG. The in-app logo remains unchanged.
 - Android and iOS Firebase application files and stable package identifiers are checked.

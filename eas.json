@@ -35,7 +35,7 @@
       "distribution": "internal",
       "ios": {
         "simulator": true,
-        "image": "latest"
+        "image": "macos-sequoia-15.6-xcode-26.0"
       },
       "env": {
         "APP_RELEASE_MODE": "tester"
@@ -45,7 +45,7 @@
       "environment": "production",
       "autoIncrement": true,
       "ios": {
-        "image": "latest"
+        "image": "macos-sequoia-15.6-xcode-26.0"
       },
       "env": {
         "APP_RELEASE_MODE": "production"
