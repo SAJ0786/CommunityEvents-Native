@@ -704,3 +704,13 @@ Implementation status: Events and Business Directory Home source complete; conti
 - Preserve the accessible Log out label, busy state and large touch target.
 
 Implementation status: source complete; pending device verification.
+
+### R-084 — Business category and subcategory administration
+
+- Add Category and Subcategory management to Business Directory Admin → Tools, matching the additive Event Type and Reciter Type workflow.
+- Seed the tool from the approved Business Directory matrix and make administrator additions available immediately in Directory search and Add/Edit Business forms.
+- Keep existing options non-deletable so current business records never lose their classification.
+- Block duplicate Categories, Subcategories, Event Types and Reciter Types transactionally, ignoring case, spacing, punctuation and equivalent ampersand/“and” variations.
+- Record the administrator UID and addition time for each new option.
+
+Implementation status: source complete; pending device verification.

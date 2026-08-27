@@ -6,6 +6,8 @@ import { listUsers } from '../services/users';
 import { colors, radius, shadow, spacing } from '../theme';
 import BusinessApprovalPanel from './BusinessApprovalPanel';
 import BusinessSupportInboxScreen from './BusinessSupportInboxScreen';
+import CompactSelect from '../components/CompactSelect';
+import { addBusinessCategory, addBusinessSubcategory } from '../services/businessCategoryAdmin';
 
 const AREAS = [
   ['approvals', '\u2713', 'Business Approvals', 'Review listings and promotions before publication.'],
@@ -13,20 +15,57 @@ const AREAS = [
   ['businesses', '\u{1F3EA}', 'Businesses', 'Manage active, pending, draft and rejected listings.'],
   ['messaging', '\u{1F4E8}', 'Business Messaging', 'Review Business reports and Contact Us conversations.'],
   ['troubleshooting', '\u{1F6E0}', 'Troubleshooting', 'Business diagnostics and tester support details.'],
-  ['tools', '\u{1F50E}', 'Tools', 'Validate an ABN checksum and open its official ABR record.'],
+  ['tools', '\u{1F50E}', 'Tools', 'Manage categories and subcategories, and validate ABNs.'],
 ];
 
 function PanelHeader({ title, subtitle, onBack }) {
   return <View style={styles.panelHead}><Pressable onPress={onBack} style={styles.backButton}><Text style={styles.backText}>{'‹'} Overview</Text></Pressable><Text style={styles.panelTitle}>{title}</Text><Text style={styles.panelSubtitle}>{subtitle}</Text></View>;
 }
 
-export default function BusinessAdminDashboard({ user, profile }) {
+export default function BusinessAdminDashboard({ user, profile, categories = [] }) {
   const [panel, setPanel] = useState('overview');
   const [businesses, setBusinesses] = useState([]);
   const [promotions, setPromotions] = useState([]);
   const [users, setUsers] = useState([]);
   const [userQuery, setUserQuery] = useState('');
   const [abn, setAbn] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [newCategoryIcon, setNewCategoryIcon] = useState('');
+  const [parentCategoryId, setParentCategoryId] = useState('');
+  const [newSubcategory, setNewSubcategory] = useState('');
+  const [categoryBusy, setCategoryBusy] = useState(false);
+  const [categoryStatus, setCategoryStatus] = useState('');
+
+  const addCategory = async () => {
+    setCategoryBusy(true);
+    setCategoryStatus('');
+    try {
+      const next = await addBusinessCategory(newCategory, newCategoryIcon);
+      const created = next.find(item => item.label.toLowerCase() === newCategory.trim().replace(/\s+/g, ' ').toLowerCase());
+      setNewCategory('');
+      setNewCategoryIcon('');
+      if (created) setParentCategoryId(created.id);
+      setCategoryStatus('Category added. It is now available in Directory search and business forms.');
+    } catch (error) {
+      setCategoryStatus(error?.message || 'Could not add the category.');
+    } finally {
+      setCategoryBusy(false);
+    }
+  };
+
+  const addSubcategory = async () => {
+    setCategoryBusy(true);
+    setCategoryStatus('');
+    try {
+      await addBusinessSubcategory(parentCategoryId, newSubcategory);
+      setNewSubcategory('');
+      setCategoryStatus('Subcategory added. It is now available under the selected category.');
+    } catch (error) {
+      setCategoryStatus(error?.message || 'Could not add the subcategory.');
+    } finally {
+      setCategoryBusy(false);
+    }
+  };
 
   useEffect(() => {
     const stopBusinesses = listenBusinessesForAdmin(setBusinesses, () => {});
@@ -61,7 +100,49 @@ export default function BusinessAdminDashboard({ user, profile }) {
   if (panel === 'tools') {
     const normalized = String(abn || '').replace(/\D/g, '').slice(0, 11);
     const valid = normalized.length === 11 && isValidAbn(normalized);
-    return <ScrollView contentContainerStyle={styles.content}><PanelHeader title="Directory Tools" subtitle="ABN format checking and official Australian Business Register access." onBack={() => setPanel('overview')} /><View style={styles.infoCard}><Text style={styles.infoLabel}>ABN LOOKUP</Text><TextInput value={abn} onChangeText={value => setAbn(value.replace(/\D/g, '').slice(0, 11))} keyboardType="number-pad" placeholder="11-digit ABN" placeholderTextColor={colors.muted} style={styles.input} />{normalized.length ? <Text style={[styles.validation, valid ? styles.valid : styles.invalid]}>{valid ? `✓ ${formatAbn(normalized)} passes the ABN checksum` : 'Enter a valid 11-digit ABN'}</Text> : null}<Pressable disabled={!valid} onPress={() => Linking.openURL(`https://abr.business.gov.au/ABN/View?abn=${normalized}`)} style={[styles.primaryButton, !valid && styles.disabled]}><Text style={styles.primaryButtonText}>Open Official ABR Record</Text></Pressable><Text style={styles.infoText}>A checksum is not verification. Approval still requires an administrator to check the active ABR record and name match. No licence, identity, insurance or quality check is performed.</Text></View></ScrollView>;
+    const categoryOptions = categories.map(item => ({ value: item.id, label: `${item.icon}  ${item.label}` }));
+    return (
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <PanelHeader title="Directory Tools" subtitle="Category management and official Australian Business Register access." onBack={() => setPanel('overview')} />
+
+        <View style={styles.infoCard}>
+          <Text style={styles.infoLabel}>CATEGORY MANAGEMENT</Text>
+          <Text style={styles.infoValue}>Add a Business Category</Text>
+          <Text style={styles.infoText}>New categories appear in Directory search and the Add Business form. Existing categories cannot be deleted, protecting current listings.</Text>
+          <View style={styles.formRow}>
+            <TextInput value={newCategoryIcon} onChangeText={setNewCategoryIcon} maxLength={8} placeholder="Icon" placeholderTextColor={colors.muted} style={[styles.input, styles.iconInput]} />
+            <TextInput value={newCategory} onChangeText={setNewCategory} maxLength={60} placeholder="Category name" placeholderTextColor={colors.muted} style={[styles.input, styles.flexInput]} />
+          </View>
+          <Pressable disabled={categoryBusy || newCategory.trim().length < 2} onPress={addCategory} style={[styles.primaryButton, (categoryBusy || newCategory.trim().length < 2) && styles.disabled]}>
+            <Text style={styles.primaryButtonText}>{categoryBusy ? 'Saving...' : '＋ Add Category'}</Text>
+          </Pressable>
+
+          <View style={styles.divider} />
+          <Text style={styles.infoValue}>Add a Subcategory</Text>
+          <Text style={styles.infoText}>Choose its parent category first. Duplicate names under the same category are blocked.</Text>
+          <View style={styles.selectWrap}>
+            <CompactSelect options={categoryOptions} value={parentCategoryId} onChange={setParentCategoryId} placeholder="Choose parent category" />
+          </View>
+          <TextInput value={newSubcategory} onChangeText={setNewSubcategory} maxLength={80} placeholder="Subcategory name" placeholderTextColor={colors.muted} style={styles.input} />
+          <Pressable disabled={categoryBusy || !parentCategoryId || newSubcategory.trim().length < 2} onPress={addSubcategory} style={[styles.primaryButton, (categoryBusy || !parentCategoryId || newSubcategory.trim().length < 2) && styles.disabled]}>
+            <Text style={styles.primaryButtonText}>{categoryBusy ? 'Saving...' : '＋ Add Subcategory'}</Text>
+          </Pressable>
+          {categoryStatus ? <Text style={styles.categoryStatus}>{categoryStatus}</Text> : null}
+
+          <View style={styles.categorySummary}>
+            {categories.map(item => <View key={item.id} style={styles.categorySummaryRow}><Text style={styles.categorySummaryName}>{item.icon} {item.label}</Text><Text style={styles.categorySummaryCount}>{item.subcategories.length} subcategories</Text></View>)}
+          </View>
+        </View>
+
+        <View style={styles.infoCard}>
+          <Text style={styles.infoLabel}>ABN LOOKUP</Text>
+          <TextInput value={abn} onChangeText={value => setAbn(value.replace(/\D/g, '').slice(0, 11))} keyboardType="number-pad" placeholder="11-digit ABN" placeholderTextColor={colors.muted} style={styles.input} />
+          {normalized.length ? <Text style={[styles.validation, valid ? styles.valid : styles.invalid]}>{valid ? `✓ ${formatAbn(normalized)} passes the ABN checksum` : 'Enter a valid 11-digit ABN'}</Text> : null}
+          <Pressable disabled={!valid} onPress={() => Linking.openURL(`https://abr.business.gov.au/ABN/View?abn=${normalized}`)} style={[styles.primaryButton, !valid && styles.disabled]}><Text style={styles.primaryButtonText}>Open Official ABR Record</Text></Pressable>
+          <Text style={styles.infoText}>A checksum is not verification. Approval still requires an administrator to check the active ABR record and name match. No licence, identity, insurance or quality check is performed.</Text>
+        </View>
+      </ScrollView>
+    );
   }
 
   return <ScrollView contentContainerStyle={styles.content}><View style={styles.identity}><View style={styles.identityIcon}><Text style={styles.identityIconText}>{'🏪'}</Text></View><View style={styles.identityCopy}><Text style={styles.eyebrow}>COMMUNITY BUSINESSES AUSTRALIA</Text><Text style={styles.title}>{profile?.fullName || 'Business Admin'}</Text><Text style={styles.subtitle}>Approvals, businesses, promotions and directory support.</Text></View></View><View style={styles.metrics}>{metrics.map(([label, value, target], index) => <Pressable key={label} onPress={() => setPanel(target)} style={[styles.metric, styles[`metricTone${index % 4}`]]}><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></Pressable>)}</View><Text style={styles.sectionTitle}>Management areas</Text><View style={styles.areas}>{AREAS.map(([key, icon, label, description]) => <Pressable key={key} onPress={() => setPanel(key)} style={({ pressed }) => [styles.area, pressed && styles.pressed]}><View style={styles.areaIcon}><Text style={styles.areaIconText}>{icon}</Text></View><View style={styles.areaCopy}><Text style={styles.areaTitle}>{label}</Text><Text style={styles.areaText}>{description}</Text></View><Text style={styles.chevron}>{'›'}</Text></Pressable>)}</View></ScrollView>;
@@ -74,4 +155,5 @@ const styles = StyleSheet.create({
   panelHead: { marginBottom: spacing.md, padding: spacing.md, borderRadius: radius.lg, backgroundColor: '#fff0f6' }, backButton: { alignSelf: 'flex-start', minHeight: 34, justifyContent: 'center' }, backText: { color: '#a33667', fontSize: 12, fontWeight: '900' }, panelTitle: { color: colors.navy, fontSize: 23, fontWeight: '900' }, panelSubtitle: { marginTop: 4, color: colors.muted, fontSize: 12, lineHeight: 18 },
   input: { minHeight: 50, marginTop: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, color: colors.text, fontSize: 14 }, resultCount: { marginTop: spacing.md, color: colors.muted, fontSize: 10, fontWeight: '900' }, userCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface }, userAvatar: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: colors.tealSoft }, userAvatarText: { color: colors.tealDark, fontSize: 17, fontWeight: '900' }, userCopy: { flex: 1 }, userName: { color: colors.navy, fontSize: 14, fontWeight: '900' }, userMeta: { marginTop: 3, color: colors.muted, fontSize: 11 },
   infoCard: { marginBottom: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, ...shadow }, infoLabel: { color: '#a33667', fontSize: 10, fontWeight: '900', letterSpacing: 0.6 }, infoValue: { marginTop: 7, color: colors.navy, fontSize: 15, fontWeight: '900' }, infoText: { marginTop: spacing.sm, color: colors.muted, fontSize: 11, lineHeight: 17 }, validation: { marginTop: spacing.sm, fontSize: 11, fontWeight: '900' }, valid: { color: '#27753a' }, invalid: { color: colors.danger }, primaryButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md, borderRadius: radius.md, backgroundColor: '#a33667' }, primaryButtonText: { color: colors.surface, fontSize: 13, fontWeight: '900' }, disabled: { opacity: 0.4 },
+  formRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, flexInput: { flex: 1 }, iconInput: { width: 76, textAlign: 'center' }, divider: { height: 1, marginVertical: spacing.lg, backgroundColor: colors.border }, selectWrap: { marginTop: spacing.sm }, categoryStatus: { marginTop: spacing.md, color: colors.tealDark, fontSize: 11, lineHeight: 17, fontWeight: '800' }, categorySummary: { marginTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border }, categorySummaryRow: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border }, categorySummaryName: { flex: 1, color: colors.navy, fontSize: 11, fontWeight: '900' }, categorySummaryCount: { color: colors.muted, fontSize: 9, fontWeight: '800' },
 });

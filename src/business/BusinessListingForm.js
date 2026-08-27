@@ -7,7 +7,6 @@ import CompactSelect from '../components/CompactSelect';
 import NativeDateTimeField from '../components/NativeDateTimeField';
 import { classifyMetroArea } from '../utils/cities';
 import { colors, radius, shadow, spacing } from '../theme';
-import { BUSINESS_CATEGORIES } from './businessData';
 import { formatAbn, isValidAbn, normalizeAbn, validateBusinessPayload } from '../services/businesses';
 
 const IS_TEST_BUILD = Constants.expoConfig?.extra?.testBuild !== false;
@@ -145,6 +144,7 @@ function HoursEditor({ hours, onChange }) {
 }
 
 export default function BusinessListingForm({
+  categories = [],
   initialBusiness,
   defaultCity,
   canSubmit,
@@ -171,8 +171,8 @@ export default function BusinessListingForm({
     setPickerError('');
   }, [defaultCity, initialBusiness?.id]);
 
-  const categoryOptions = useMemo(() => BUSINESS_CATEGORIES.map(item => ({ value: item.id, label: `${item.icon}  ${item.label}` })), []);
-  const selectedCategory = useMemo(() => BUSINESS_CATEGORIES.find(item => item.id === form.categoryId), [form.categoryId]);
+  const categoryOptions = useMemo(() => categories.map(item => ({ value: item.id, label: `${item.icon}  ${item.label}` })), [categories]);
+  const selectedCategory = useMemo(() => categories.find(item => item.id === form.categoryId), [categories, form.categoryId]);
   const payload = useMemo(() => {
     const selectedSubcategories = (selectedCategory?.subcategories || []).filter(item => form.subcategoryIds.includes(item.id));
     return {

@@ -1,11 +1,17 @@
 import { doc, getDoc, runTransaction, serverTimestamp } from '@react-native-firebase/firestore';
 import { auth, db } from '../firebase/firebase';
+import { EVENT_TYPES, RECITER_TYPES } from '../utils/eventOptions';
 
 const OPTIONS_REF = () => doc(db, 'settings', 'eventOptions');
 const FIELD_BY_KIND = { eventType: 'eventTypes', reciterType: 'reciterTypes' };
+const BUILT_IN_BY_KIND = { eventType: EVENT_TYPES, reciterType: RECITER_TYPES };
 
 function normalise(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function duplicateKey(value) {
+  return normalise(value).toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
 }
 
 export async function getDynamicEventOptions() {
@@ -28,7 +34,8 @@ export async function addDynamicEventOption(kind, value) {
     const reference = OPTIONS_REF();
     const snapshot = await transaction.get(reference);
     const current = snapshot.exists() && Array.isArray(snapshot.data()?.[field]) ? snapshot.data()[field] : [];
-    const duplicate = current.some(item => normalise(typeof item === 'string' ? item : item.label).toLowerCase() === label.toLowerCase());
+    const allOptions = [...(BUILT_IN_BY_KIND[kind] || []), ...current];
+    const duplicate = allOptions.some(item => duplicateKey(typeof item === 'string' ? item : item.label) === duplicateKey(label));
     if (duplicate) throw new Error(`${label} already exists.`);
     const next = [...current, { label, normalized: label.toLowerCase(), addedByUid: actor.uid, addedAt: new Date().toISOString() }];
     transaction.set(reference, { [field]: next, updatedAt: serverTimestamp() }, { merge: true });

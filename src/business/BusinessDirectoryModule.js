@@ -34,6 +34,7 @@ import { friendlyError } from '../utils/errors';
 import CitySelector from '../components/CitySelector';
 import CompactSelect from '../components/CompactSelect';
 import { sendFeedbackMessage } from '../services/messaging';
+import { listenBusinessCategories } from '../services/businessCategoryAdmin';
 
 function SectionHeading({ title, subtitle, actionLabel, onAction }) {
   return (
@@ -118,12 +119,12 @@ function publicBusinessRecord(business = {}, userLocation = null) {
   };
 }
 
-function DirectoryHome({ businesses, city, savedIds, loading, error, initialFilter, onInitialFilterConsumed, onCityChange, onLocationResolved, onOpenBusiness, onToggleSaved }) {
+function DirectoryHome({ businesses, categories, city, savedIds, loading, error, initialFilter, onInitialFilterConsumed, onCityChange, onLocationResolved, onOpenBusiness, onToggleSaved }) {
   const [query, setQuery] = useState('');
   const [categoryId, setCategoryId] = useState('all');
   const [subcategoryId, setSubcategoryId] = useState('');
   const [openOnly, setOpenOnly] = useState(false);
-  const selectedCategory = BUSINESS_CATEGORIES.find(category => category.id === categoryId);
+  const selectedCategory = categories.find(category => category.id === categoryId);
 
   useEffect(() => {
     if (!initialFilter?.nonce) return;
@@ -187,7 +188,7 @@ function DirectoryHome({ businesses, city, savedIds, loading, error, initialFilt
           <Text style={[styles.categoryIcon, categoryId === 'all' && styles.categoryIconActive]}>{'\u2726'}</Text>
           <Text style={[styles.categoryLabel, categoryId === 'all' && styles.categoryLabelActive]}>All</Text>
         </Pressable>
-        {BUSINESS_CATEGORIES.map(category => {
+        {categories.map(category => {
           const active = categoryId === category.id;
           return (
             <Pressable key={category.id} onPress={() => { setCategoryId(category.id); setSubcategoryId(''); }} style={[styles.category, active && styles.categoryActive]}>
@@ -229,7 +230,7 @@ function DirectoryHome({ businesses, city, savedIds, loading, error, initialFilt
       ) : null}
 
       <SectionHeading
-        title={categoryId === 'all' ? 'All businesses' : BUSINESS_CATEGORIES.find(category => category.id === categoryId)?.label || 'Businesses'}
+        title={categoryId === 'all' ? 'All businesses' : categories.find(category => category.id === categoryId)?.label || 'Businesses'}
         subtitle={`${cityBusinesses.length} result${cityBusinesses.length === 1 ? '' : 's'} in ${cityLabel(city).replace(', Australia', '')}`}
       />
       {loading ? (
@@ -500,6 +501,7 @@ export default function BusinessDirectoryModule({
 }) {
   const [savedIds, setSavedIds] = useState([]);
   const [approvedBusinesses, setApprovedBusinesses] = useState([]);
+  const [businessCategories, setBusinessCategories] = useState(BUSINESS_CATEGORIES);
   const [publicLoading, setPublicLoading] = useState(true);
   const [publicError, setPublicError] = useState('');
   const [activePromotions, setActivePromotions] = useState([]);
@@ -543,6 +545,11 @@ export default function BusinessDirectoryModule({
       setPublicLoading(false);
       setPublicError(friendlyError(error, 'Could not load approved businesses.'));
     }
+  ), []);
+
+  useEffect(() => listenBusinessCategories(
+    setBusinessCategories,
+    () => setBusinessCategories(BUSINESS_CATEGORIES)
   ), []);
 
   useEffect(() => listenActiveBusinessPromotions(
@@ -818,7 +825,7 @@ export default function BusinessDirectoryModule({
             onRequireSignIn={onOpenAccount}
           />
         ) : activeTab === 'admin' ? (
-          <BusinessAdminDashboard user={currentUser} profile={profile} />
+          <BusinessAdminDashboard user={currentUser} profile={profile} categories={businessCategories} />
         ) : activeTab === 'inbox' ? (
           <BusinessInboxScreen user={currentUser} profile={profile} onBack={() => changeTab('home')} />
         ) : activeTab === 'feedback' ? (
@@ -830,7 +837,7 @@ export default function BusinessDirectoryModule({
         ) : activeTab === 'contact' ? (
           <DirectorySupportScreen mode="contact" businesses={directoryBusinesses} user={currentUser} profile={profile} city={selectedCity} onBack={() => changeTab('home')} />
         ) : activeTab === 'home' ? (
-          <DirectoryHome businesses={directoryBusinesses} city={selectedCity} savedIds={savedIds} loading={publicLoading} error={publicError} initialFilter={initialFilter} onInitialFilterConsumed={onInitialFilterConsumed} onCityChange={city => { setUserLocation(null); onCityChange?.(city); }} onLocationResolved={setUserLocation} onOpenBusiness={openBusiness} onToggleSaved={toggleSaved} />
+          <DirectoryHome businesses={directoryBusinesses} categories={businessCategories} city={selectedCity} savedIds={savedIds} loading={publicLoading} error={publicError} initialFilter={initialFilter} onInitialFilterConsumed={onInitialFilterConsumed} onCityChange={city => { setUserLocation(null); onCityChange?.(city); }} onLocationResolved={setUserLocation} onOpenBusiness={openBusiness} onToggleSaved={toggleSaved} />
         ) : activeTab === 'promotions' ? (
           <PromotionsScreen city={selectedCity} businesses={directoryBusinesses} promotions={activePromotions} ownerPromotions={ownerPromotions} loading={promotionsLoading || publicLoading} error={promotionsError || publicError} onOpenBusiness={openBusiness} />
         ) : activeTab === 'add' && isGuest ? (
@@ -852,6 +859,7 @@ export default function BusinessDirectoryModule({
           />
         ) : activeTab === 'add' && listingFormOpen ? (
           <BusinessListingForm
+            categories={businessCategories}
             initialBusiness={editingBusiness}
             defaultCity={selectedCity}
             canSubmit={!isGuest}
