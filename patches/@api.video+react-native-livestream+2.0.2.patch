@@ -63,3 +63,15 @@ index 6cf2bbd..f8f4a2a 100644
    private val requestId: Int,
    private val result: Boolean,
    private val error: String? = null
+diff --git a/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamView.mm b/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamView.mm
+--- a/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamView.mm
++++ b/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamView.mm
+@@ -15,5 +15,7 @@
+ // MARK: Swift classes in ObjC++
+-#if __has_include("react-native-livestream/react_native_livestream-Swift.h")
++#if __has_include(<react_native_livestream/react_native_livestream-Swift.h>)
++#import <react_native_livestream/react_native_livestream-Swift.h>
++#elif __has_include("react-native-livestream/react_native_livestream-Swift.h")
+ #import "react-native-livestream/react_native_livestream-Swift.h"
+ #else
+ #import "react_native_livestream-Swift.h"
