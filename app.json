@@ -31,8 +31,9 @@
       "versionCode": 36,
       "googleServicesFile": "./google-services.json",
       "allowBackup": false,
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo.png",
+        "foregroundImage": "./assets/icon-store-1024.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [

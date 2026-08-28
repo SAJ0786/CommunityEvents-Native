@@ -373,38 +373,6 @@ function AddBusinessPreview({ onOpenAccount }) {
   );
 }
 
-function DirectoryProfile({ isGuest, profile, onOpenAccount, onNavigate }) {
-  const menuItems = [
-    { icon: '\u{1F3EA}', title: 'My Businesses', text: 'Manage your listings and promotions', action: () => isGuest ? onOpenAccount?.() : onNavigate?.('my-businesses') },
-    { icon: '\u{1F514}', title: 'Directory notifications', text: 'Promotion and approval updates', action: () => isGuest ? onOpenAccount?.() : onNavigate?.('notifications') },
-    { icon: '\u{1F6E1}\uFE0F', title: 'Help & Policies', text: 'Privacy, terms and business rules', action: onOpenAccount },
-  ];
-  return (
-    <ScrollView contentContainerStyle={styles.pageContent}>
-      <Text style={styles.eyebrow}>SHARED ACCOUNT</Text>
-      <Text style={styles.pageTitle}>Directory Profile</Text>
-      <Text style={styles.pageSubtitle}>Community Businesses Australia uses the same account and default city as Community Events Australia.</Text>
-      <View style={styles.profileCard}>
-        <View style={styles.profileAvatar}><Text style={styles.profileAvatarText}>{isGuest ? '?' : String(profile?.fullName || 'U').trim().slice(0, 1).toUpperCase()}</Text></View>
-        <View style={styles.profileCopy}>
-          <Text style={styles.profileName}>{isGuest ? 'Guest User' : profile?.fullName || 'Community Member'}</Text>
-          <Text style={styles.profileMeta}>{isGuest ? 'Read-only access' : profile?.role === 'superAdmin' ? 'Super Admin' : profile?.role === 'admin' ? 'Admin' : 'Community member'}</Text>
-        </View>
-      </View>
-      <View style={styles.profileMenu}>
-        {menuItems.map(item => (
-          <Pressable key={item.title} accessibilityRole="button" onPress={item.action} style={({ pressed }) => [styles.profileMenuRow, pressed && styles.pressed]}>
-            <View style={styles.profileMenuIcon}><Text>{item.icon}</Text></View>
-            <View style={styles.profileMenuCopy}><Text style={styles.profileMenuTitle}>{item.title}</Text><Text style={styles.profileMenuText}>{item.text}</Text></View>
-            <Text style={styles.chevron}>{'\u203A'}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <Pressable onPress={onOpenAccount} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{isGuest ? 'Open Login / Create Account' : 'Open Profile & Settings'}</Text></Pressable>
-    </ScrollView>
-  );
-}
-
 function DirectorySupportScreen({ mode, onBack, businesses = [], user, profile, city }) {
   const report = mode === 'report';
   const [businessId, setBusinessId] = useState('');
@@ -640,6 +608,10 @@ export default function BusinessDirectoryModule({
     }
   };
   const changeTab = nextTab => {
+    if (nextTab === 'profile') {
+      onOpenAccount?.();
+      return;
+    }
     onSelectBusiness?.('');
     if (nextTab !== 'add') {
       setListingFormOpen(false);
@@ -889,7 +861,7 @@ export default function BusinessDirectoryModule({
             onDeletePromotion={confirmDeletePromotion}
           />
         ) : (
-          <DirectoryProfile isGuest={isGuest} profile={profile} onOpenAccount={onOpenAccount} onNavigate={changeTab} />
+          <DirectoryHome businesses={directoryBusinesses} categories={businessCategories} city={selectedCity} savedIds={savedIds} loading={publicLoading} error={publicError} initialFilter={initialFilter} onInitialFilterConsumed={onInitialFilterConsumed} onCityChange={city => { setUserLocation(null); onCityChange?.(city); }} onLocationResolved={setUserLocation} onOpenBusiness={openBusiness} onToggleSaved={toggleSaved} />
         )}
       </View>
       {!listingFormOpen && !promotionFormOpen ? <DirectoryBottomNavigation activeTab={activeTab} onChange={changeTab} /> : null}
@@ -998,18 +970,6 @@ const styles = StyleSheet.create({
   stepCopy: { flex: 1 },
   stepTitle: { color: colors.navy, fontSize: 14, fontWeight: '900' },
   stepText: { marginTop: 3, color: colors.muted, fontSize: 11, lineHeight: 16, fontWeight: '700' },
-  profileCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
-  profileAvatar: { width: 54, height: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 27, backgroundColor: colors.teal },
-  profileAvatarText: { color: colors.surface, fontSize: 22, fontWeight: '900' },
-  profileCopy: { flex: 1 },
-  profileName: { color: colors.navy, fontSize: 17, fontWeight: '900' },
-  profileMeta: { marginTop: 4, color: colors.muted, fontSize: 12, fontWeight: '700' },
-  profileMenu: { marginTop: spacing.md, paddingHorizontal: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
-  profileMenuRow: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderBottomWidth: 1, borderBottomColor: '#edf2f1' },
-  profileMenuIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.tealSoft },
-  profileMenuCopy: { flex: 1, minWidth: 0 },
-  profileMenuTitle: { color: colors.navy, fontSize: 13, fontWeight: '900' },
-  profileMenuText: { marginTop: 3, color: colors.muted, fontSize: 10.5, fontWeight: '700' },
   pressed: { opacity: 0.76 },
   disabled: { opacity: 0.5 },
 });

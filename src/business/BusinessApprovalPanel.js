@@ -301,6 +301,7 @@ export default function BusinessApprovalPanel({ mode = 'approvals', onBack }) {
   return (
     <View style={styles.panel}>
       <View style={styles.panelHeader}>
+        <Pressable onPress={onBack} style={styles.backButton}><Text style={styles.backButtonText}>{'←'} Back</Text></Pressable>
         <View style={styles.panelTitleCopy}>
           <Text style={styles.eyebrow}>BUSINESS DIRECTORY</Text>
           <Text style={styles.panelTitle}>{isManagement ? 'Business Management' : 'Business Approvals'}</Text>
@@ -310,7 +311,6 @@ export default function BusinessApprovalPanel({ mode = 'approvals', onBack }) {
               ? 'Review promotion content, dates and featured placement.'
               : 'Review pending business details and ABNs before publishing listings.'}</Text>
         </View>
-        <Pressable onPress={onBack} style={styles.backButton}><Text style={styles.backButtonText}>Back</Text></Pressable>
       </View>
 
       {!isManagement ? <View style={styles.queueTabs}>
@@ -320,9 +320,9 @@ export default function BusinessApprovalPanel({ mode = 'approvals', onBack }) {
 
       {queueType === 'promotions' ? <BusinessPromotionApprovalPanel /> : <>
       <View style={styles.metrics}>
-        <View style={styles.metric}><Text style={styles.metricValue}>{counts.pending}</Text><Text style={styles.metricLabel}>PENDING</Text></View>
-        <View style={styles.metric}><Text style={styles.metricValue}>{counts.approved}</Text><Text style={styles.metricLabel}>APPROVED</Text></View>
-        <View style={styles.metric}><Text style={styles.metricValue}>{counts.rejected}</Text><Text style={styles.metricLabel}>CHANGES</Text></View>
+        <Pressable accessibilityRole="button" accessibilityState={{ selected: filter === 'pending' }} onPress={() => setFilter('pending')} style={[styles.metric, filter === 'pending' && styles.metricActive]}><Text style={[styles.metricValue, filter === 'pending' && styles.metricValueActive]}>{counts.pending}</Text><Text style={[styles.metricLabel, filter === 'pending' && styles.metricLabelActive]}>PENDING</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityState={{ selected: filter === 'approved' }} onPress={() => setFilter('approved')} style={[styles.metric, filter === 'approved' && styles.metricActive]}><Text style={[styles.metricValue, filter === 'approved' && styles.metricValueActive]}>{counts.approved}</Text><Text style={[styles.metricLabel, filter === 'approved' && styles.metricLabelActive]}>APPROVED</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityState={{ selected: filter === 'rejected' }} onPress={() => setFilter('rejected')} style={[styles.metric, filter === 'rejected' && styles.metricActive]}><Text style={[styles.metricValue, filter === 'rejected' && styles.metricValueActive]}>{counts.rejected}</Text><Text style={[styles.metricLabel, filter === 'rejected' && styles.metricLabelActive]}>CHANGES</Text></Pressable>
       </View>
       <Pressable disabled={syncing} onPress={syncPublicDirectory} style={({ pressed }) => [styles.syncButton, syncing && styles.disabled, pressed && styles.pressed]}>
         {syncing ? <ActivityIndicator color={colors.tealDark} size="small" /> : <Text style={styles.syncButtonText}>↻ Repair / Republish Approved Listings</Text>}
@@ -362,12 +362,12 @@ export default function BusinessApprovalPanel({ mode = 'approvals', onBack }) {
 
 const styles = StyleSheet.create({
   panel: { gap: spacing.md },
-  panelHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  panelHeader: { alignItems: 'flex-start', gap: spacing.sm },
   panelTitleCopy: { flex: 1, minWidth: 0 },
   eyebrow: { color: colors.tealDark, fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
   panelTitle: { marginTop: 4, color: colors.navy, fontSize: 25, lineHeight: 30, fontWeight: '900' },
   panelSubtitle: { marginTop: 5, color: colors.muted, fontSize: 12, lineHeight: 18, fontWeight: '700' },
-  backButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
+  backButton: { minHeight: 38, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   backButtonText: { color: colors.tealDark, fontSize: 12, fontWeight: '900' },
   queueTabs: { flexDirection: 'row', padding: 3, borderRadius: radius.md, backgroundColor: '#edf2f1' },
   queueTab: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
@@ -376,8 +376,11 @@ const styles = StyleSheet.create({
   queueTabTextActive: { color: colors.tealDark },
   metrics: { flexDirection: 'row', gap: spacing.sm },
   metric: { flex: 1, minWidth: 0, alignItems: 'center', paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, ...shadow },
+  metricActive: { borderColor: colors.teal, backgroundColor: colors.teal },
   metricValue: { color: colors.navy, fontSize: 23, fontWeight: '900' },
+  metricValueActive: { color: colors.surface },
   metricLabel: { marginTop: 3, color: colors.muted, fontSize: 8.5, fontWeight: '900' },
+  metricLabelActive: { color: colors.surface },
   syncButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   syncButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '900', textAlign: 'center' },
   search: { minHeight: 50, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, color: colors.text, fontSize: 14, fontWeight: '700' },
