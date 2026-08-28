@@ -28,7 +28,7 @@
     },
     "android": {
       "package": "info.siza.communityevents.app",
-      "versionCode": 36,
+      "versionCode": 38,
       "googleServicesFile": "./google-services.json",
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
@@ -39,7 +39,8 @@
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
-        "MODIFY_AUDIO_SETTINGS"
+        "MODIFY_AUDIO_SETTINGS",
+        "SCHEDULE_EXACT_ALARM"
       ]
     },
     "extra": {
@@ -62,7 +63,12 @@
         }
       ],
       "expo-font",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "business-alerts"
+        }
+      ],
       [
         "expo-screen-orientation",
         {

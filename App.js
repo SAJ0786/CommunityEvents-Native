@@ -46,10 +46,12 @@ import { auth, confirmPhoneVerification, ensureFirebaseSession, sendPhoneVerific
 import { compareEventsByDateTime, createEventSubmission, createRecurringEventSeries, deleteEventSeries, deleteEventSubmission, getPublicEvents, getUserEventSubmissions, listenActiveEvents, prepareHomeEvents, setEventVisibility, updateEventSeries, updateEventSubmission } from './src/services/events';
 import { uploadEventPoster } from './src/services/images';
 import { deleteMyAccountAndEvents, ensureUserProfile, migratePhoneAccount, toggleSavedEvent, updateUserPreferences } from './src/services/users';
+import { cancelFavouriteReminder, initializeDefaultPrayerReminders, scheduleFavouriteReminder } from './src/services/reminders';
+import { listenForDevicePushTokenChanges, registerDevicePushNotifications } from './src/services/pushNotifications';
+import { getPrayerLocation } from './src/utils/prayerLocations';
 import { DEFAULT_CITY, cityLabel, getEventMetroArea, normalizeCity } from './src/utils/cities';
 import { colors, radius, shadow, spacing } from './src/theme';
 import { friendlyError } from './src/utils/errors';
-import { cancelFavouriteReminder, scheduleFavouriteReminder } from './src/services/reminders';
 import {
   clearDiagnosticUser,
   initializeDiagnostics,
@@ -315,6 +317,58 @@ function MainApp() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!currentUser?.uid || currentUser.isAnonymous || !profile) return undefined;
+    let cancelled = false;
+    let registrationPromise = null;
+    const pushEnabled = profile.pushNotificationsEnabled !== false
+      && profile.businessNotificationsEnabled !== false;
+    const registerPushToken = () => {
+      if (!pushEnabled || cancelled || registrationPromise) return;
+      registrationPromise = registerDevicePushNotifications(currentUser.uid)
+        .catch(error => {
+          if (!cancelled) recordNonFatalError(error, {
+            feature: 'notifications',
+            operation: 'register_business_push_token',
+            current_screen: 'App startup',
+          });
+        })
+        .finally(() => {
+          registrationPromise = null;
+        });
+    };
+    registerPushToken();
+    if (profile.prayerRemindersEnabled !== false) {
+      initializeDefaultPrayerReminders(getPrayerLocation(selectedCity || profile.defaultCity || DEFAULT_CITY))
+        .catch(error => {
+          if (!cancelled) recordNonFatalError(error, {
+            feature: 'notifications',
+            operation: 'schedule_prayer_reminders',
+            current_screen: 'App startup',
+          });
+        });
+    }
+    const removeTokenListener = pushEnabled
+      ? listenForDevicePushTokenChanges(currentUser.uid)
+      : () => {};
+    const appStateSubscription = AppState.addEventListener('change', state => {
+      if (state === 'active') registerPushToken();
+    });
+    return () => {
+      cancelled = true;
+      removeTokenListener();
+      appStateSubscription.remove();
+    };
+  }, [
+    currentUser?.isAnonymous,
+    currentUser?.uid,
+    profile?.businessNotificationsEnabled,
+    profile?.defaultCity,
+    profile?.prayerRemindersEnabled,
+    profile?.pushNotificationsEnabled,
+    selectedCity,
+  ]);
 
   useEffect(() => {
     let active = true;

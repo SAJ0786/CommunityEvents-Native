@@ -163,8 +163,28 @@ async function schedulePrayerReminderKeys(keys, location, currentSettings) {
 
 export async function initializeDefaultPrayerReminders(location) {
   const current = await readPrayerReminderSettings();
-  if (current.initialized) return current;
-  return schedulePrayerReminderKeys(DEFAULT_PRAYER_REMINDER_KEYS, location, current);
+  const savedLocation = current.location || {};
+  const nextLocation = location || {};
+  const locationChanged = String(savedLocation.city || savedLocation.suburb || '')
+    !== String(nextLocation.city || nextLocation.suburb || '');
+  const refreshedAt = new Date(current.refreshedAt || 0).getTime();
+  const scheduleIsStale = !Number.isFinite(refreshedAt)
+    || refreshedAt < Date.now() - (12 * 60 * 60 * 1000);
+
+  if (!current.initialized) {
+    return schedulePrayerReminderKeys(DEFAULT_PRAYER_REMINDER_KEYS, location, current);
+  }
+
+  // Older builds could record reminders as initialized without leaving any
+  // alarms on the phone. When the main Prayer Reminders preference is on,
+  // restore the default reminders rather than silently returning an empty set.
+  const enabledKeys = current.enabledKeys.length
+    ? current.enabledKeys
+    : DEFAULT_PRAYER_REMINDER_KEYS;
+  if (locationChanged || scheduleIsStale || !current.notificationIds.length || !current.enabledKeys.length) {
+    return schedulePrayerReminderKeys(enabledKeys, location, current);
+  }
+  return current;
 }
 
 export async function setPrayerRemindersEnabled(enabled, location) {

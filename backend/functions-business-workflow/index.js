@@ -106,6 +106,59 @@ async function deliver(recipients, notification) {
   });
   await batch.commit();
 
+  const pushRecipients = unique.filter(recipient => recipient.pushNotificationsEnabled !== false);
+  const tokenOwners = [];
+  pushRecipients.forEach(recipient => {
+    const tokens = Array.isArray(recipient.fcmTokens) ? recipient.fcmTokens : [];
+    tokens.filter(Boolean).forEach(token => tokenOwners.push({ uid: recipient.uid, token: clean(token) }));
+  });
+  const uniqueTokenOwners = [...new Map(tokenOwners.map(item => [item.token, item])).values()];
+  for (let offset = 0; offset < uniqueTokenOwners.length; offset += 500) {
+    const chunk = uniqueTokenOwners.slice(offset, offset + 500);
+    try {
+      const response = await admin.messaging().sendEachForMulticast({
+        tokens: chunk.map(item => item.token),
+        notification: {
+          title: notification.title,
+          body: notification.body,
+        },
+        data: {
+          module: 'directory',
+          type: notification.type,
+          entityId: notification.entityId || '',
+          entityType: notification.entityType || '',
+          screen: 'business-notifications',
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'business-alerts',
+            sound: 'default',
+          },
+        },
+      });
+      const staleByUid = new Map();
+      response.responses.forEach((result, index) => {
+        if (result.success) return;
+        const code = clean(result.error?.code);
+        if (!['messaging/registration-token-not-registered', 'messaging/invalid-registration-token'].includes(code)) {
+          logger.error('Business workflow push failed', { code, uid: chunk[index]?.uid });
+          return;
+        }
+        const owner = chunk[index];
+        if (!staleByUid.has(owner.uid)) staleByUid.set(owner.uid, []);
+        staleByUid.get(owner.uid).push(owner.token);
+      });
+      await Promise.all([...staleByUid.entries()].map(([uid, tokens]) => (
+        db.collection('users').doc(uid).update({
+          fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokens),
+        })
+      )));
+    } catch (error) {
+      logger.error('Business workflow push delivery failed', { error: error?.message });
+    }
+  }
+
   const transporter = buildTransporter();
   if (!transporter) {
     logger.warn('Business workflow email skipped because SMTP is not configured.');
@@ -121,7 +174,16 @@ async function deliver(recipients, notification) {
     html: `<div style="font-family:Arial,sans-serif;line-height:1.55;color:#10172f"><h2>${html(notification.title)}</h2><p>${html(notification.body)}</p><p style="color:#64727c">Community Connect Australia</p></div>`,
   })));
   results.forEach((result, index) => {
-    if (result.status === 'rejected') logger.error('Business workflow email failed', { uid: emailRecipients[index]?.uid, error: result.reason?.message });
+    if (result.status === 'rejected') {
+      logger.error('Business workflow email failed', { uid: emailRecipients[index]?.uid, error: result.reason?.message });
+      return;
+    }
+    logger.info('Business workflow email accepted by SMTP provider', {
+      uid: emailRecipients[index]?.uid,
+      messageId: clean(result.value?.messageId),
+      acceptedCount: Array.isArray(result.value?.accepted) ? result.value.accepted.length : 0,
+      rejectedCount: Array.isArray(result.value?.rejected) ? result.value.rejected.length : 0,
+    });
   });
 }
 
