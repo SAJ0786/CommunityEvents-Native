@@ -165,6 +165,7 @@ export default function BusinessListingForm({
   const [abrLookup, setAbrLookup] = useState(null);
   const [abrLookupLoading, setAbrLookupLoading] = useState(false);
   const [abrLookupError, setAbrLookupError] = useState('');
+  const [abrLookupAttempt, setAbrLookupAttempt] = useState(0);
 
   useEffect(() => {
     setForm(createFormState(initialBusiness, defaultCity));
@@ -176,6 +177,7 @@ export default function BusinessListingForm({
     setAbrLookup(null);
     setAbrLookupLoading(false);
     setAbrLookupError('');
+    setAbrLookupAttempt(0);
   }, [defaultCity, initialBusiness?.id]);
 
   useEffect(() => {
@@ -219,7 +221,7 @@ export default function BusinessListingForm({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [form.abn, form.abnStatus]);
+  }, [abrLookupAttempt, form.abn, form.abnStatus]);
 
   const categoryOptions = useMemo(() => categories.map(item => ({ value: item.id, label: `${item.icon}  ${item.label}` })), [categories]);
   const selectedCategory = useMemo(() => categories.find(item => item.id === form.categoryId), [categories, form.categoryId]);
@@ -279,6 +281,15 @@ export default function BusinessListingForm({
     setAttempted(true);
     if (!canSubmit) {
       onRequireSignIn?.();
+      return;
+    }
+    if (form.abnStatus === 'has' && isValidAbn(form.abn) && !abrLookup) {
+      Alert.alert(
+        'ABR lookup required',
+        abrLookupLoading
+          ? 'Wait for the Australian Business Register lookup to finish.'
+          : 'The active ABR record and an official business name must be retrieved before submitting with an ABN. Retry the lookup, change the ABN, or choose the pending/no ABN option.'
+      );
       return;
     }
     if (Object.keys(validation).length || !declarationAccepted) {
@@ -341,6 +352,7 @@ export default function BusinessListingForm({
           {abrLookupLoading ? <View style={styles.abrLoading}><ActivityIndicator color={colors.teal} size="small" /><Text style={styles.helper}>Checking public ABR details…</Text></View> : null}
           {!abrLookupLoading && form.abnStatus === 'has' && form.abn.length === 11 && isValidAbn(form.abn) ? <Text style={styles.validText}>{'\u2713'} Valid ABN checksum</Text> : null}
           {abrLookupError ? <Text style={styles.errorText}>{abrLookupError}</Text> : null}
+          {abrLookupError && form.abnStatus === 'has' && isValidAbn(form.abn) ? <Pressable onPress={() => setAbrLookupAttempt(value => value + 1)} style={styles.abrRetry}><Text style={styles.abrRetryText}>Retry ABR lookup</Text></Pressable> : null}
           {form.abnStatus !== 'has' ? <Text style={styles.helper}>A basic listing may be considered without an ABN, but it will not receive any verification badge. Community Businesses Australia does not verify identity, licences, qualifications or insurance.</Text> : null}
         </Field>
         <Field label="Business name" error={attempted ? validation.name : ''} helper={abrLookup ? 'This name came from the public ABR record. Change the ABN status or ABN number to unlock manual entry.' : 'Enter the registered or public trading name.'}>
@@ -454,7 +466,7 @@ export default function BusinessListingForm({
           {attempted && !declarationAccepted ? <Text style={styles.errorText}>Accept this declaration before submitting.</Text> : null}
         </View>
       </View>
-      <Pressable disabled={submitting} onPress={submit} style={({ pressed }) => [styles.submitButton, pressed && styles.pressed, submitting && styles.disabled]}>
+      <Pressable disabled={submitting || abrLookupLoading} onPress={submit} style={({ pressed }) => [styles.submitButton, pressed && styles.pressed, (submitting || abrLookupLoading) && styles.disabled]}>
         {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.submitText}>{initialBusiness?.id ? 'Save Changes & Resubmit' : 'Submit Business for Review'}</Text>}
       </Pressable>
       {onCancel ? <Pressable disabled={submitting} onPress={onCancel} style={styles.cancelButton}><Text style={styles.cancelText}>Cancel</Text></Pressable> : null}
@@ -498,6 +510,8 @@ const styles = StyleSheet.create({
   abrResultTitle: { color: '#2d7d43', fontSize: 11, fontWeight: '900' },
   abrResultText: { marginTop: 3, color: colors.navy, fontSize: 11, lineHeight: 16, fontWeight: '800' },
   abrDisclaimer: { marginTop: 5, color: colors.muted, fontSize: 9.5, lineHeight: 14, fontWeight: '600' },
+  abrRetry: { alignSelf: 'flex-start', minHeight: 38, justifyContent: 'center', marginTop: spacing.xs, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: colors.tealSoft },
+  abrRetryText: { color: colors.tealDark, fontSize: 10.5, fontWeight: '900' },
   subcategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   subcategoryChip: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 99, backgroundColor: colors.surface },
   subcategoryChipActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
