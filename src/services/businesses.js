@@ -402,6 +402,15 @@ export async function verifyBusinessAbn(businessId) {
   return result.data || {};
 }
 
+export async function lookupBusinessAbnForSubmission(abnValue) {
+  await requireRegisteredUser();
+  const abn = normalizeAbn(abnValue);
+  if (!isValidAbn(abn)) throw new Error('Enter a valid 11-digit ABN.');
+  const callable = httpsCallable(functions, 'lookupBusinessAbnForSubmission');
+  const result = await callable({ abn });
+  return result.data || {};
+}
+
 export async function approveBusinessListing(businessId, options = {}) {
   const user = await requireAdminSession();
   if (!businessId) throw new Error('Business reference is missing.');

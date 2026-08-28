@@ -6,8 +6,9 @@ import AddressAutocomplete from '../components/AddressAutocomplete';
 import CompactSelect from '../components/CompactSelect';
 import NativeDateTimeField from '../components/NativeDateTimeField';
 import { classifyMetroArea } from '../utils/cities';
+import { friendlyError } from '../utils/errors';
 import { colors, radius, shadow, spacing } from '../theme';
-import { formatAbn, isValidAbn, normalizeAbn, validateBusinessPayload } from '../services/businesses';
+import { formatAbn, isValidAbn, lookupBusinessAbnForSubmission, normalizeAbn, validateBusinessPayload } from '../services/businesses';
 
 const IS_TEST_BUILD = Constants.expoConfig?.extra?.testBuild !== false;
 const LISTING_TERMS_VERSION = 'draft-2026-08-20';
@@ -161,6 +162,9 @@ export default function BusinessListingForm({
   const [pickerError, setPickerError] = useState('');
   const [attempted, setAttempted] = useState(false);
   const [declarationAccepted, setDeclarationAccepted] = useState(false);
+  const [abrLookup, setAbrLookup] = useState(null);
+  const [abrLookupLoading, setAbrLookupLoading] = useState(false);
+  const [abrLookupError, setAbrLookupError] = useState('');
 
   useEffect(() => {
     setForm(createFormState(initialBusiness, defaultCity));
@@ -169,7 +173,53 @@ export default function BusinessListingForm({
     setAttempted(false);
     setDeclarationAccepted(false);
     setPickerError('');
+    setAbrLookup(null);
+    setAbrLookupLoading(false);
+    setAbrLookupError('');
   }, [defaultCity, initialBusiness?.id]);
+
+  useEffect(() => {
+    const abn = normalizeAbn(form.abn);
+    if (form.abnStatus !== 'has' || !isValidAbn(abn)) {
+      setAbrLookup(null);
+      setAbrLookupLoading(false);
+      setAbrLookupError('');
+      return undefined;
+    }
+
+    let cancelled = false;
+    setAbrLookup(null);
+    setAbrLookupLoading(true);
+    setAbrLookupError('');
+    const timer = setTimeout(async () => {
+      try {
+        const result = await lookupBusinessAbnForSubmission(abn);
+        if (cancelled) return;
+        if (!result.active) {
+          setAbrLookupError(`The ABR lists this ABN as ${result.abnStatus || 'not active'}. Check the ABN before continuing.`);
+          return;
+        }
+        const officialNames = Array.isArray(result.officialNames) ? result.officialNames.filter(Boolean) : [];
+        const suggestedName = result.suggestedName || officialNames[0] || result.entityName || '';
+        if (!suggestedName) {
+          setAbrLookupError('The ABR returned no current registered name for this ABN. You can enter the business name manually.');
+          return;
+        }
+        const normalizedResult = { ...result, officialNames: officialNames.length ? officialNames : [suggestedName], suggestedName };
+        setAbrLookup(normalizedResult);
+        setForm(current => current.abn === abn ? { ...current, name: suggestedName } : current);
+      } catch (lookupError) {
+        if (!cancelled) setAbrLookupError(friendlyError(lookupError, 'ABR lookup is temporarily unavailable. You can continue entering the business details manually.'));
+      } finally {
+        if (!cancelled) setAbrLookupLoading(false);
+      }
+    }, 650);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [form.abn, form.abnStatus]);
 
   const categoryOptions = useMemo(() => categories.map(item => ({ value: item.id, label: `${item.icon}  ${item.label}` })), [categories]);
   const selectedCategory = useMemo(() => categories.find(item => item.id === form.categoryId), [categories, form.categoryId]);
@@ -277,10 +327,7 @@ export default function BusinessListingForm({
         <Text style={styles.sectionIcon}>{'\u{1F3EA}'}</Text>
         <Text style={styles.sectionTitle}>Business information</Text>
         <Text style={styles.sectionSubtitle}>Tell the community who you are and what you provide.</Text>
-        <Field label="Business name" error={attempted ? validation.name : ''}>
-          <TextInput value={form.name} onChangeText={value => update('name', value)} placeholder="Registered or trading name" placeholderTextColor={colors.muted} style={[styles.input, attempted && validation.name && styles.inputInvalid]} />
-        </Field>
-        <Field label="Australian Business Number (ABN)" optional error={abnLiveError || (attempted ? validation.abn : '')} helper="Tell us your ABN status. Active ABNs are checked against the Australian Business Register during approval.">
+        <Field label="Australian Business Number (ABN)" optional error={abnLiveError || (attempted ? validation.abn : '')} helper="After a valid ABN is entered, the secure server retrieves its public registered names from the Australian Business Register.">
           <CompactSelect
             options={[
               { value: 'has', label: 'I have an ABN' },
@@ -291,8 +338,15 @@ export default function BusinessListingForm({
             onChange={value => setForm(current => ({ ...current, abnStatus: value, abn: value === 'has' ? current.abn : '' }))}
           />
           {form.abnStatus === 'has' ? <TextInput value={formatAbn(form.abn)} onChangeText={value => update('abn', normalizeAbn(value))} keyboardType="number-pad" maxLength={14} placeholder="12 345 678 901" placeholderTextColor={colors.muted} style={[styles.input, (abnLiveError || (attempted && validation.abn)) && styles.inputInvalid]} /> : null}
-          {form.abnStatus === 'has' && form.abn.length === 11 && isValidAbn(form.abn) ? <Text style={styles.validText}>{'\u2713'} Valid ABN format and checksum</Text> : null}
+          {abrLookupLoading ? <View style={styles.abrLoading}><ActivityIndicator color={colors.teal} size="small" /><Text style={styles.helper}>Checking public ABR details…</Text></View> : null}
+          {!abrLookupLoading && form.abnStatus === 'has' && form.abn.length === 11 && isValidAbn(form.abn) ? <Text style={styles.validText}>{'\u2713'} Valid ABN checksum</Text> : null}
+          {abrLookupError ? <Text style={styles.errorText}>{abrLookupError}</Text> : null}
           {form.abnStatus !== 'has' ? <Text style={styles.helper}>A basic listing may be considered without an ABN, but it will not receive any verification badge. Community Businesses Australia does not verify identity, licences, qualifications or insurance.</Text> : null}
+        </Field>
+        <Field label="Business name" error={attempted ? validation.name : ''} helper={abrLookup ? 'This name came from the public ABR record. Change the ABN status or ABN number to unlock manual entry.' : 'Enter the registered or public trading name.'}>
+          {abrLookup?.officialNames?.length > 1 ? <CompactSelect options={abrLookup.officialNames.map(name => ({ value: name, label: name }))} value={form.name} onChange={value => update('name', value)} placeholder="Choose an official ABR name" /> : null}
+          <TextInput editable={!abrLookup} value={form.name} onChangeText={value => update('name', value)} placeholder="Registered or trading name" placeholderTextColor={colors.muted} style={[styles.input, abrLookup && styles.inputLocked, attempted && validation.name && styles.inputInvalid]} />
+          {abrLookup ? <View style={styles.abrResult}><Text style={styles.abrResultTitle}>{'\u2713'} ABR details found</Text><Text style={styles.abrResultText}>{abrLookup.entityTypeName || 'Registered entity'}{abrLookup.state || abrLookup.postcode ? ` · ${[abrLookup.state, abrLookup.postcode].filter(Boolean).join(' ')}` : ''}</Text><Text style={styles.abrDisclaimer}>This assists data entry only. It does not verify the submitter’s identity, ownership, licences, insurance or service quality.</Text></View> : null}
         </Field>
         <Field label="Category" error={attempted ? validation.categoryId : ''}>
           <CompactSelect options={categoryOptions} value={form.categoryId} onChange={value => setForm(current => ({ ...current, categoryId: value, subcategoryIds: [] }))} placeholder="Choose a category" />
@@ -434,10 +488,16 @@ const styles = StyleSheet.create({
   optional: { color: colors.muted, fontSize: 9, fontWeight: '900' },
   input: { minHeight: 50, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, color: colors.text, fontSize: 15, fontWeight: '600' },
   inputInvalid: { borderColor: colors.danger, backgroundColor: '#fffafa' },
+  inputLocked: { color: colors.navy, backgroundColor: '#eef7f5' },
   textArea: { minHeight: 132, paddingTop: spacing.md, textAlignVertical: 'top' },
   helper: { color: colors.muted, fontSize: 11, lineHeight: 16, fontWeight: '600' },
   errorText: { color: colors.danger, fontSize: 11, lineHeight: 16, fontWeight: '800' },
   validText: { color: '#2d7d43', fontSize: 11, fontWeight: '900' },
+  abrLoading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
+  abrResult: { marginTop: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: '#b8ded5', borderRadius: radius.md, backgroundColor: '#edf8f5' },
+  abrResultTitle: { color: '#2d7d43', fontSize: 11, fontWeight: '900' },
+  abrResultText: { marginTop: 3, color: colors.navy, fontSize: 11, lineHeight: 16, fontWeight: '800' },
+  abrDisclaimer: { marginTop: 5, color: colors.muted, fontSize: 9.5, lineHeight: 14, fontWeight: '600' },
   subcategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   subcategoryChip: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 99, backgroundColor: colors.surface },
   subcategoryChipActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
