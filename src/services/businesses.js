@@ -71,7 +71,8 @@ export function validateBusinessPayload(payload = {}) {
   if (clean(payload.name).length < 2) errors.name = 'Enter the registered or trading business name.';
   const abnStatus = clean(payload.abnStatus) || (normalizeAbn(payload.abn) ? 'has' : 'none');
   if (abnStatus === 'has' && !isValidAbn(payload.abn)) errors.abn = 'Enter a valid 11-digit Australian Business Number.';
-  if (!clean(payload.categoryId)) errors.categoryId = 'Choose a business category.';
+  const categoryIds = Array.isArray(payload.categoryIds) ? payload.categoryIds.map(clean).filter(Boolean) : [];
+  if (!categoryIds.length && !clean(payload.categoryId)) errors.categoryId = 'Choose at least one business category.';
   if (!Array.isArray(payload.subcategoryIds) || !payload.subcategoryIds.length) errors.subcategoryIds = 'Choose at least one service subcategory.';
   if (clean(payload.description).length < 40) errors.description = 'Add at least 40 characters describing the business.';
   if (clean(contact.phone).replace(/\D/g, '').length < 8) errors.phone = 'Enter a valid business phone number.';
@@ -89,12 +90,16 @@ function submissionFields(payload = {}) {
   const contact = payload.contact || {};
   const location = payload.location || {};
   const social = payload.social || {};
+  const categoryIds = [...new Set((Array.isArray(payload.categoryIds) ? payload.categoryIds : [payload.categoryId]).map(clean).filter(Boolean))];
+  const categories = [...new Set((Array.isArray(payload.categories) ? payload.categories : [payload.category]).map(clean).filter(Boolean))];
   return {
     name: clean(payload.name),
     nameLower: clean(payload.name).toLowerCase(),
     description: clean(payload.description),
-    categoryId: clean(payload.categoryId),
-    category: clean(payload.category),
+    categoryId: categoryIds[0] || clean(payload.categoryId),
+    categoryIds,
+    category: categories[0] || clean(payload.category),
+    categories,
     subcategoryIds: Array.isArray(payload.subcategoryIds) ? payload.subcategoryIds.map(clean).filter(Boolean) : [],
     subcategories: Array.isArray(payload.subcategories) ? payload.subcategories.map(clean).filter(Boolean) : [],
     abnStatus: clean(payload.abnStatus) || (normalizeAbn(payload.abn) ? 'has' : 'none'),
@@ -158,7 +163,9 @@ function publicBusinessFields(business = {}, approval = {}) {
     nameLower: clean(business.nameLower || business.name).toLowerCase(),
     description: clean(business.description),
     categoryId: clean(business.categoryId),
+    categoryIds: Array.isArray(business.categoryIds) && business.categoryIds.length ? business.categoryIds : [clean(business.categoryId)].filter(Boolean),
     category: clean(business.category),
+    categories: Array.isArray(business.categories) && business.categories.length ? business.categories : [clean(business.category)].filter(Boolean),
     subcategoryIds: Array.isArray(business.subcategoryIds) ? business.subcategoryIds : [],
     subcategories: Array.isArray(business.subcategories) ? business.subcategories : [],
     logoUrl: clean(business.logoUrl),
@@ -186,6 +193,19 @@ function publicBusinessFields(business = {}, approval = {}) {
     foundingMember: Boolean(approval.foundingMember),
     approvedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+  };
+}
+
+function publishedPrivateSnapshot(business = {}) {
+  return {
+    ...submissionFields(business),
+    tier: business.tier || 'free',
+    abnVerified: business.abnVerified === true,
+    identityVerified: business.identityVerified === true,
+    verificationBadge: clean(business.verificationBadge),
+    abrVerification: business.abrVerification || null,
+    abnCheckedAt: business.abnCheckedAt || null,
+    foundingMember: Boolean(business.foundingMember),
   };
 }
 
@@ -284,6 +304,10 @@ export async function updateBusinessSubmission(businessId, payload = {}) {
   if (!snapshot.exists()) throw new Error('This business listing could not be found.');
   const current = snapshot.data() || {};
   if (current.ownerId !== user.uid) throw new Error('Only the listing owner can edit this business.');
+  const publicSnapshot = await getDoc(doc(db, PUBLIC_COLLECTION_NAME, businessId));
+  const hasPublishedVersion = publicSnapshot.exists() || current.hasPublishedVersion === true;
+  const preservedPublishedSnapshot = current.publishedSnapshot
+    || (publicSnapshot.exists() ? publishedPrivateSnapshot(current) : null);
   const batch = writeBatch(db);
   batch.update(reference, {
     ...submissionFields(payload),
@@ -299,12 +323,13 @@ export async function updateBusinessSubmission(businessId, payload = {}) {
     listingConsentAtClient: clean(payload.listingConsentAtClient),
     listingConsentAt: serverTimestamp(),
     rejectionReason: '',
+    hasPublishedVersion,
+    publishedSnapshot: preservedPublishedSnapshot,
+    reviewType: hasPublishedVersion ? 'pending_update' : 'new_listing',
     lastSubmittedBy: user.uid,
     updatedAt: serverTimestamp(),
     submittedAt: serverTimestamp(),
   });
-  batch.delete(doc(db, PUBLIC_COLLECTION_NAME, businessId));
-  batch.delete(doc(db, CONTACT_ROUTES_COLLECTION, businessId));
   await batch.commit();
   return businessId;
 }
@@ -450,6 +475,9 @@ export async function approveBusinessListing(businessId, options = {}) {
     verificationBadge,
     foundingMember: Boolean(options.foundingMember),
     rejectionReason: '',
+    hasPublishedVersion: true,
+    publishedSnapshot: null,
+    reviewType: '',
     approvedBy: user.uid,
     approvedAt: serverTimestamp(),
     reviewedAt: serverTimestamp(),
@@ -481,18 +509,25 @@ export async function rejectBusinessListing(businessId, reason) {
   const cleanReason = clean(reason);
   if (!businessId) throw new Error('Business reference is missing.');
   if (cleanReason.length < 10) throw new Error('Add a clear rejection reason of at least 10 characters.');
+  const publicReference = doc(db, PUBLIC_COLLECTION_NAME, businessId);
+  const publicSnapshot = await getDoc(publicReference);
+  const hasPublishedVersion = publicSnapshot.exists();
   const batch = writeBatch(db);
   batch.update(doc(db, COLLECTION_NAME, businessId), {
     status: 'rejected',
-    hidden: true,
+    hidden: hasPublishedVersion ? false : true,
+    hasPublishedVersion,
+    reviewType: hasPublishedVersion ? 'changes_required_update' : 'changes_required_new',
     rejectionReason: cleanReason,
     rejectedBy: user.uid,
     rejectedAt: serverTimestamp(),
     reviewedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-  batch.delete(doc(db, PUBLIC_COLLECTION_NAME, businessId));
-  batch.delete(doc(db, CONTACT_ROUTES_COLLECTION, businessId));
+  if (!hasPublishedVersion) {
+    batch.delete(publicReference);
+    batch.delete(doc(db, CONTACT_ROUTES_COLLECTION, businessId));
+  }
   batch.set(doc(collection(db, AUDIT_COLLECTION)), auditRecord(user, businessId, 'business.changes_requested', { reason: cleanReason }));
   await batch.commit();
 }

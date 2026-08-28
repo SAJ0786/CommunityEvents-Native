@@ -206,7 +206,11 @@ export function filterAndRankBusinesses({
 } = {}) {
   const normalizedQuery = String(query || '').trim().toLowerCase();
   return businesses
-    .filter(business => categoryId === 'all' || business.categoryId === categoryId)
+    .filter(business => categoryId === 'all' || (
+      Array.isArray(business.categoryIds)
+        ? business.categoryIds.includes(categoryId)
+        : business.categoryId === categoryId
+    ))
     .filter(business => !subcategoryId || (Array.isArray(business.subcategoryIds) && business.subcategoryIds.includes(subcategoryId)))
     .filter(business => !city || business.city === city)
     .filter(business => !openOnly || business.openNow)

@@ -124,18 +124,20 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
   const [categoryId, setCategoryId] = useState('all');
   const [subcategoryId, setSubcategoryId] = useState('');
   const [openOnly, setOpenOnly] = useState(false);
+  const [favouritesOnly, setFavouritesOnly] = useState(false);
   const selectedCategory = categories.find(category => category.id === categoryId);
 
   useEffect(() => {
     if (!initialFilter?.nonce) return;
     setCategoryId(initialFilter.categoryId || 'all');
     setSubcategoryId(initialFilter.subcategoryId || '');
+    setFavouritesOnly(initialFilter.favouritesOnly === true);
     setQuery('');
     setOpenOnly(false);
     onInitialFilterConsumed?.();
   }, [initialFilter?.nonce, onInitialFilterConsumed]);
 
-  const cityBusinesses = useMemo(() => filterAndRankBusinesses({
+  const rankedBusinesses = useMemo(() => filterAndRankBusinesses({
     businesses,
     categoryId,
     subcategoryId,
@@ -143,6 +145,9 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
     query,
     openOnly,
   }), [businesses, categoryId, city, openOnly, query, subcategoryId]);
+  const cityBusinesses = useMemo(() => favouritesOnly
+    ? rankedBusinesses.filter(business => savedIds.includes(business.id))
+    : rankedBusinesses, [favouritesOnly, rankedBusinesses, savedIds]);
   const featured = cityBusinesses.filter(business => business.tier === 'featured');
 
   return (
@@ -182,7 +187,7 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
         </Pressable>
       </View>
 
-      <SectionHeading title="Categories" subtitle={subcategoryId ? `Filtered: ${selectedCategory?.subcategories.find(item => item.id === subcategoryId)?.label || 'Selected service'}` : 'Browse by service'} actionLabel={categoryId === 'all' && !subcategoryId ? '' : 'Clear'} onAction={() => { setCategoryId('all'); setSubcategoryId(''); }} />
+      <SectionHeading title={favouritesOnly ? 'Favourite businesses' : 'Categories'} subtitle={favouritesOnly ? 'Only businesses saved to your profile' : subcategoryId ? `Filtered: ${selectedCategory?.subcategories.find(item => item.id === subcategoryId)?.label || 'Selected service'}` : 'Browse by service'} actionLabel={categoryId === 'all' && !subcategoryId && !favouritesOnly ? '' : 'Clear'} onAction={() => { setCategoryId('all'); setSubcategoryId(''); setFavouritesOnly(false); }} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRail}>
         <Pressable onPress={() => { setCategoryId('all'); setSubcategoryId(''); }} style={[styles.category, categoryId === 'all' && styles.categoryActive]}>
           <Text style={[styles.categoryIcon, categoryId === 'all' && styles.categoryIconActive]}>{'\u2726'}</Text>
@@ -256,7 +261,7 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
                   <Text numberOfLines={1} style={styles.rowTitle}>{business.name}</Text>
                   {business.tier === 'featured' ? <Text style={styles.featuredStar}>{'\u2605'}</Text> : null}
                 </View>
-                <Text numberOfLines={1} style={styles.rowMeta}>{business.category} · {business.suburb}</Text>
+                <Text numberOfLines={1} style={styles.rowMeta}>{(business.categories || [business.category]).filter(Boolean).join(', ')} · {business.suburb}</Text>
                 <View style={styles.rowStatusLine}>
                   {business.distanceKm != null ? <Text style={styles.rowMeta}>{business.distanceKm} km</Text> : null}
                   {typeof business.openNow === 'boolean' ? <Text style={[styles.rowMeta, business.openNow ? styles.openText : styles.closedText]}>{business.openNow ? 'Open now' : 'Closed'}</Text> : null}
@@ -272,7 +277,7 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
           <Text style={styles.emptyIcon}>{'\u2315'}</Text>
           <Text style={styles.emptyTitle}>No businesses found</Text>
           <Text style={styles.emptyText}>Try another search, category or city.</Text>
-          <Pressable onPress={() => { setQuery(''); setCategoryId('all'); setOpenOnly(false); }} style={styles.secondaryButton}>
+          <Pressable onPress={() => { setQuery(''); setCategoryId('all'); setSubcategoryId(''); setOpenOnly(false); setFavouritesOnly(false); }} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>Clear filters</Text>
           </Pressable>
         </View>
@@ -301,10 +306,10 @@ function PromotionsScreen({ city, businesses, promotions, ownerPromotions = [], 
     <ScrollView contentContainerStyle={styles.pageContent}>
       <Text style={styles.eyebrow}>COMMUNITY OFFERS</Text>
       <Text style={styles.pageTitle}>Promotions</Text>
-      <Text style={styles.pageSubtitle}>Your active promotions appear first, followed by current offers for {cityLabel(city).replace(', Australia', '')}. Tap an offer to view the business.</Text>
+      <Text style={styles.pageSubtitle}>Your active promotions appear first, followed by current promotions for {cityLabel(city).replace(', Australia', '')}. Tap a promotion to view the business.</Text>
       {loading ? <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Loading promotions</Text></View> : null}
       {error ? <View style={styles.errorCard}><Text style={styles.errorTitle}>Promotions unavailable</Text><Text style={styles.errorText}>{error}</Text></View> : null}
-      {!loading && !error && !rows.length ? <View style={styles.emptyCard}><Text style={styles.emptyIcon}>{'\u{1F3F7}\uFE0F'}</Text><Text style={styles.emptyTitle}>No active promotions</Text><Text style={styles.emptyText}>Approved community offers will appear here.</Text></View> : null}
+      {!loading && !error && !rows.length ? <View style={styles.emptyCard}><Text style={styles.emptyIcon}>{'\u{1F3F7}\uFE0F'}</Text><Text style={styles.emptyTitle}>No active promotions</Text><Text style={styles.emptyText}>Approved business promotions will appear here.</Text></View> : null}
       <View style={styles.promotionList}>
         {rows.map(item => (
           <Pressable key={item.id} onPress={() => onOpenBusiness(item.business)} style={({ pressed }) => [styles.promotionCard, pressed && styles.pressed]}>
@@ -681,9 +686,11 @@ export default function BusinessDirectoryModule({
       };
       if (editingBusiness?.id) {
         await updateBusinessSubmission(editingBusiness.id, submission);
-        const oldPaths = [editingBusiness.logoPath, editingBusiness.coverPath].filter(Boolean);
-        const retainedPaths = new Set([submission.logoPath, submission.coverPath].filter(Boolean));
-        await Promise.allSettled(oldPaths.filter(path => !retainedPaths.has(path)).map(deleteBusinessImage));
+        if (editingBusiness.status !== 'approved' && editingBusiness.hasPublishedVersion !== true) {
+          const oldPaths = [editingBusiness.logoPath, editingBusiness.coverPath].filter(Boolean);
+          const retainedPaths = new Set([submission.logoPath, submission.coverPath].filter(Boolean));
+          await Promise.allSettled(oldPaths.filter(path => !retainedPaths.has(path)).map(deleteBusinessImage));
+        }
         setListingSuccess('Business updated and resubmitted for approval.');
       } else {
         const reference = await createBusinessSubmission(submission);
@@ -705,7 +712,7 @@ export default function BusinessDirectoryModule({
     }
   };
 
-  const approvedOwnerBusinesses = ownerBusinesses.filter(business => business.status === 'approved' && business.hidden !== true);
+  const approvedOwnerBusinesses = ownerBusinesses.filter(business => (business.status === 'approved' || business.hasPublishedVersion === true) && business.hidden !== true);
 
   const openNewPromotion = business => {
     setPromotionBusinessId(business?.id || approvedOwnerBusinesses[0]?.id || '');

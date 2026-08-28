@@ -37,6 +37,9 @@ function createFormState(business, defaultCity) {
     abn: normalizeAbn(business?.abn),
     abnStatus: business?.abnStatus || (business?.abn ? 'has' : 'none'),
     categoryId: business?.categoryId || '',
+    categoryIds: Array.isArray(business?.categoryIds) && business.categoryIds.length
+      ? business.categoryIds
+      : [business?.categoryId].filter(Boolean),
     subcategoryIds: Array.isArray(business?.subcategoryIds) ? business.subcategoryIds : [],
     description: business?.description || '',
     logoUrl: business?.logoUrl || '',
@@ -223,20 +226,22 @@ export default function BusinessListingForm({
     };
   }, [abrLookupAttempt, form.abn, form.abnStatus]);
 
-  const categoryOptions = useMemo(() => categories.map(item => ({ value: item.id, label: `${item.icon}  ${item.label}` })), [categories]);
-  const selectedCategory = useMemo(() => categories.find(item => item.id === form.categoryId), [categories, form.categoryId]);
+  const selectedCategories = useMemo(() => categories.filter(item => form.categoryIds.includes(item.id)), [categories, form.categoryIds]);
   const payload = useMemo(() => {
-    const selectedSubcategories = (selectedCategory?.subcategories || []).filter(item => form.subcategoryIds.includes(item.id));
+    const selectedSubcategories = selectedCategories.flatMap(category => category.subcategories || []).filter(item => form.subcategoryIds.includes(item.id));
     return {
       ...form,
-      category: selectedCategory?.label || '',
+      categoryId: form.categoryIds[0] || '',
+      categoryIds: form.categoryIds,
+      category: selectedCategories[0]?.label || '',
+      categories: selectedCategories.map(item => item.label),
       subcategories: selectedSubcategories.map(item => item.label),
       location: {
         ...form.location,
         city: form.location.city || classifyMetroArea(form.location),
       },
     };
-  }, [form, selectedCategory]);
+  }, [form, selectedCategories]);
   const validation = useMemo(() => validateBusinessPayload({
     ...payload,
     listingDeclarationAccepted: declarationAccepted,
@@ -360,17 +365,26 @@ export default function BusinessListingForm({
           <TextInput editable={!abrLookup} value={form.name} onChangeText={value => update('name', value)} placeholder="Registered or trading name" placeholderTextColor={colors.muted} style={[styles.input, abrLookup && styles.inputLocked, attempted && validation.name && styles.inputInvalid]} />
           {abrLookup ? <View style={styles.abrResult}><Text style={styles.abrResultTitle}>{'\u2713'} ABR details found</Text><Text style={styles.abrResultText}>{abrLookup.entityTypeName || 'Registered entity'}{abrLookup.state || abrLookup.postcode ? ` · ${[abrLookup.state, abrLookup.postcode].filter(Boolean).join(' ')}` : ''}</Text><Text style={styles.abrDisclaimer}>This assists data entry only. It does not verify the submitter’s identity, ownership, licences, insurance or service quality.</Text></View> : null}
         </Field>
-        <Field label="Category" error={attempted ? validation.categoryId : ''}>
-          <CompactSelect options={categoryOptions} value={form.categoryId} onChange={value => setForm(current => ({ ...current, categoryId: value, subcategoryIds: [] }))} placeholder="Choose a category" />
-        </Field>
-        {selectedCategory ? <Field label="Services / Subcategories" error={attempted ? validation.subcategoryIds : ''} helper="Choose every service this business provides.">
+        <Field label="Categories" error={attempted ? validation.categoryId : ''} helper="Choose every category that applies to this business.">
           <View style={styles.subcategoryGrid}>
-            {selectedCategory.subcategories.map(item => {
+            {categories.map(item => {
+              const selected = form.categoryIds.includes(item.id);
+              return <Pressable key={item.id} onPress={() => setForm(current => {
+                const nextCategoryIds = selected ? current.categoryIds.filter(id => id !== item.id) : [...current.categoryIds, item.id];
+                const removedSubcategoryIds = selected ? new Set((item.subcategories || []).map(row => row.id)) : new Set();
+                return { ...current, categoryId: nextCategoryIds[0] || '', categoryIds: nextCategoryIds, subcategoryIds: current.subcategoryIds.filter(id => !removedSubcategoryIds.has(id)) };
+              })} style={[styles.subcategoryChip, selected && styles.subcategoryChipActive]}><Text style={[styles.subcategoryText, selected && styles.subcategoryTextActive]}>{selected ? '\u2713 ' : ''}{item.icon} {item.label}</Text></Pressable>;
+            })}
+          </View>
+        </Field>
+        {selectedCategories.map(category => <Field key={category.id} label={`${category.label} — Services / Subcategories`} error={attempted ? validation.subcategoryIds : ''} helper="Choose each service or product this business provides.">
+          <View style={styles.subcategoryGrid}>
+            {(category.subcategories || []).map(item => {
               const selected = form.subcategoryIds.includes(item.id);
               return <Pressable key={item.id} onPress={() => setForm(current => ({ ...current, subcategoryIds: selected ? current.subcategoryIds.filter(id => id !== item.id) : [...current.subcategoryIds, item.id] }))} style={[styles.subcategoryChip, selected && styles.subcategoryChipActive]}><Text style={[styles.subcategoryText, selected && styles.subcategoryTextActive]}>{selected ? '\u2713 ' : ''}{item.label}</Text></Pressable>;
             })}
           </View>
-        </Field> : null}
+        </Field>)}
         <Field label="About the business" error={attempted ? validation.description : ''}>
           <TextInput value={form.description} onChangeText={value => update('description', value)} multiline maxLength={1200} placeholder="Describe your services, customers and what makes the business useful to the community." placeholderTextColor={colors.muted} style={[styles.input, styles.textArea, attempted && validation.description && styles.inputInvalid]} />
           <Text style={styles.characterCount}>{form.description.length}/1200</Text>

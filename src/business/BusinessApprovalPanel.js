@@ -23,10 +23,15 @@ const FILTERS = [
 
 const TIERS = ['free', 'standard', 'featured'];
 
-function statusLabel(status) {
+function statusLabel(status, hasPublishedVersion = false) {
   if (status === 'approved') return 'APPROVED';
   if (status === 'rejected') return 'CHANGES REQUIRED';
-  return 'PENDING REVIEW';
+  return hasPublishedVersion ? 'PENDING UPDATE' : 'PENDING REVIEW';
+}
+
+function comparisonValue(value) {
+  if (Array.isArray(value)) return value.join(', ') || 'Not supplied';
+  return String(value || 'Not supplied');
 }
 
 function BusinessReviewCard({ business, selected, busy, onToggle, onApprove, onReject, onVisibility, onVerify }) {
@@ -74,7 +79,9 @@ function BusinessReviewCard({ business, selected, busy, onToggle, onApprove, onR
     }
     Alert.alert(
       'Request changes?',
-      'The listing will remain private and the owner will see your reason.',
+      business.hasPublishedVersion
+        ? 'The proposed changes will not be published. The existing approved listing will remain live and the owner will see your reason.'
+        : 'The new listing will remain private and the owner will see your reason.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Request Changes', style: 'destructive', onPress: () => onReject?.(business, reason.trim()) },
@@ -90,7 +97,7 @@ function BusinessReviewCard({ business, selected, busy, onToggle, onApprove, onR
           <Text numberOfLines={2} style={styles.businessName}>{business.name}</Text>
           <Text style={styles.businessMeta}>{business.category || business.categoryId} · {business.location?.suburb || business.location?.city || 'Australia'}</Text>
           <View style={[styles.statusBadge, business.status === 'approved' && styles.statusApproved, business.status === 'rejected' && styles.statusRejected]}>
-            <Text style={[styles.statusText, business.status === 'approved' && styles.statusTextApproved, business.status === 'rejected' && styles.statusTextRejected]}>{statusLabel(business.status)}</Text>
+            <Text style={[styles.statusText, business.status === 'approved' && styles.statusTextApproved, business.status === 'rejected' && styles.statusTextRejected]}>{statusLabel(business.status, business.hasPublishedVersion)}</Text>
           </View>
         </View>
         <Text style={styles.expandIcon}>{selected ? '−' : '+'}</Text>
@@ -100,6 +107,26 @@ function BusinessReviewCard({ business, selected, busy, onToggle, onApprove, onR
         <View style={styles.reviewBody}>
           {business.coverUrl ? <Image source={{ uri: business.coverUrl }} resizeMode="cover" style={styles.cover} /> : null}
           <Text style={styles.description}>{business.description}</Text>
+
+          {business.publishedSnapshot ? <View style={styles.comparisonCard}>
+            <Text style={styles.comparisonTitle}>Published listing vs proposed update</Text>
+            <Text style={styles.comparisonHelp}>The existing approved listing remains public until this update is approved.</Text>
+            {[
+              ['Business name', business.publishedSnapshot.name, business.name],
+              ['Categories', business.publishedSnapshot.categories || business.publishedSnapshot.category, business.categories || business.category],
+              ['Services', business.publishedSnapshot.subcategories, business.subcategories],
+              ['Description', business.publishedSnapshot.description, business.description],
+              ['Address', business.publishedSnapshot.location?.fullAddress, business.location?.fullAddress],
+              ['Phone', business.publishedSnapshot.contact?.phone, business.contact?.phone],
+              ['Website', business.publishedSnapshot.contact?.website, business.contact?.website],
+            ].map(([label, published, proposed]) => <View key={label} style={styles.comparisonRow}>
+              <Text style={styles.comparisonLabel}>{label}</Text>
+              <View style={styles.comparisonColumns}>
+                <View style={styles.comparisonColumn}><Text style={styles.comparisonEyebrow}>CURRENTLY PUBLIC</Text><Text style={styles.comparisonValue}>{comparisonValue(published)}</Text></View>
+                <View style={[styles.comparisonColumn, styles.proposedColumn]}><Text style={styles.comparisonEyebrow}>PROPOSED</Text><Text style={styles.comparisonValue}>{comparisonValue(proposed)}</Text></View>
+              </View>
+            </View>)}
+          </View> : null}
 
           <View style={styles.detailGrid}>
             <View style={styles.detailItem}><Text style={styles.detailLabel}>ABN</Text><Text style={styles.detailValue}>{hasAbn ? formatAbn(business.abn) : 'Not provided'}</Text>{hasAbn ? <Text style={validAbn ? styles.valid : styles.invalid}>{validAbn ? '✓ Checksum valid' : '✕ Invalid checksum'}</Text> : <Text style={styles.invalid}>No verification badge</Text>}</View>
@@ -409,6 +436,16 @@ const styles = StyleSheet.create({
   reviewBody: { padding: spacing.md, paddingTop: 0, borderTopWidth: 1, borderTopColor: colors.border },
   cover: { height: 150, marginTop: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   description: { marginTop: spacing.md, color: colors.text, fontSize: 13, lineHeight: 20, fontWeight: '600' },
+  comparisonCard: { marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: '#b9ddd6', borderRadius: radius.md, backgroundColor: '#f4fbf9' },
+  comparisonTitle: { color: colors.tealDark, fontSize: 14, fontWeight: '900' },
+  comparisonHelp: { marginTop: 3, color: colors.muted, fontSize: 10, lineHeight: 15, fontWeight: '700' },
+  comparisonRow: { paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: '#dcece8' },
+  comparisonLabel: { marginBottom: 5, color: colors.navy, fontSize: 10, fontWeight: '900' },
+  comparisonColumns: { flexDirection: 'row', gap: spacing.sm },
+  comparisonColumn: { flex: 1, minWidth: 0, padding: spacing.sm, borderRadius: 9, backgroundColor: colors.surface },
+  proposedColumn: { backgroundColor: '#fff8e8' },
+  comparisonEyebrow: { color: colors.muted, fontSize: 7.5, fontWeight: '900' },
+  comparisonValue: { marginTop: 3, color: colors.text, fontSize: 9.5, lineHeight: 14, fontWeight: '700' },
   detailGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   detailItem: { width: '48%', minWidth: 130, padding: spacing.sm, borderRadius: 10, backgroundColor: '#f4f7f6' },
   detailLabel: { color: colors.muted, fontSize: 8, fontWeight: '900' },

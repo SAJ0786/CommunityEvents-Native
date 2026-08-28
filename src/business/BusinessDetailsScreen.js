@@ -53,9 +53,15 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
   const [contactText, setContactText] = useState('');
   const [contactStatus, setContactStatus] = useState('');
   const [contactBusy, setContactBusy] = useState(false);
+  const [servicesExpanded, setServicesExpanded] = useState(false);
   const screenRef = useRef(null);
   const promotionPulse = useRef(new Animated.Value(1)).current;
   const businessPromotions = useMemo(() => promotions.filter(item => item.businessId === business?.id), [business?.id, promotions]);
+  const offeredServices = useMemo(() => {
+    const supplied = Array.isArray(business?.subcategories) ? business.subcategories : [];
+    if (supplied.length) return supplied.map(item => typeof item === 'string' ? item : item?.label).filter(Boolean);
+    return (business?.subcategoryIds || []).map(value => String(value).split('-').map(word => word ? word[0].toUpperCase() + word.slice(1) : '').join(' '));
+  }, [business?.subcategories, business?.subcategoryIds]);
   const hoursRows = useMemo(() => {
     const days = [['mon', 'Monday'], ['tue', 'Tuesday'], ['wed', 'Wednesday'], ['thu', 'Thursday'], ['fri', 'Friday'], ['sat', 'Saturday'], ['sun', 'Sunday']];
     if (!business?.hours || !Object.keys(business.hours).length) return [];
@@ -153,7 +159,7 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
         <Text style={styles.title}>{business.name}</Text>
         {businessPromotions.length ? <Pressable accessibilityLabel="View active promotions" onPress={() => { setTab('promotions'); setTimeout(() => screenRef.current?.scrollTo({ y: 540, animated: true }), 50); }}><Animated.View style={[styles.promotionPulse, { opacity: promotionPulse }]}><Text style={styles.promotionPulseIcon}>🏷️</Text><Text style={styles.promotionPulseText}>PROMO</Text></Animated.View></Pressable> : null}
       </View>
-      <Text style={styles.metaSummary}>{[business.category, business.suburb, business.distanceKm != null ? `${business.distanceKm} km away` : ''].filter(Boolean).join(' · ')}</Text>
+      <Text style={styles.metaSummary}>{[(business.categories || [business.category]).filter(Boolean).join(', '), business.suburb, business.distanceKm != null ? `${business.distanceKm} km away` : ''].filter(Boolean).join(' · ')}</Text>
       {business.abnVerified === true ? (
         <View style={styles.verified}><Text style={styles.verifiedText}>{'\u2713'} ABN Verified{formatVerificationDate(business.abnCheckedAt || business.approvedAt) ? ` · Checked ${formatVerificationDate(business.abnCheckedAt || business.approvedAt)}` : ''}</Text></View>
       ) : null}
@@ -182,7 +188,7 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
         {[
           { id: 'about', label: 'About' },
           { id: 'hours', label: 'Hours' },
-          { id: 'promotions', label: `Offers${businessPromotions.length ? ` (${businessPromotions.length})` : ''}` },
+          { id: 'promotions', label: `Promotions${businessPromotions.length ? ` (${businessPromotions.length})` : ''}` },
         ].map(item => (
           <Pressable
             key={item.id}
@@ -199,6 +205,12 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
       {tab === 'about' ? (
         <View style={styles.section}>
           <Text style={styles.description}>{business.description}</Text>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: servicesExpanded }} onPress={() => setServicesExpanded(value => !value)} style={({ pressed }) => [styles.servicesAction, pressed && styles.pressed]}>
+            <View style={styles.servicesActionIcon}><Text style={styles.servicesActionIconText}>{'\u{1F6CD}\uFE0F'}</Text></View>
+            <View style={styles.servicesActionCopy}><Text style={styles.servicesActionTitle}>Services & Products Offered</Text><Text style={styles.servicesActionText}>{offeredServices.length} selected {offeredServices.length === 1 ? 'item' : 'items'}</Text></View>
+            <Text style={styles.servicesActionChevron}>{servicesExpanded ? '\u2303' : '\u2304'}</Text>
+          </Pressable>
+          {servicesExpanded ? <View style={styles.servicesPanel}>{offeredServices.length ? offeredServices.map(service => <View key={service} style={styles.serviceChip}><Text style={styles.serviceChipText}>{'\u2713'} {service}</Text></View>) : <Text style={styles.servicesEmpty}>No services or products were supplied.</Text>}</View> : null}
           <InfoRow icon={'\u{1F4CD}'} title={business.suburb} text={business.address} onPress={() => openExternal(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address)}`, 'Maps could not open this address.')} />
           <InfoRow icon={'\u{1F552}'} title={business.hoursSummary || 'Opening hours'} text="Opening hours may change on public holidays." onPress={() => setTab('hours')} />
           {business.website ? <InfoRow icon={'\u{1F310}'} title="Website" text={business.website.replace(/^https?:\/\//, '')} onPress={() => openExternal(business.website, 'The website could not be opened.')} /> : null}
@@ -234,7 +246,7 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
           )) : (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>No active promotions</Text>
-              <Text style={styles.emptyText}>Check back later for new community offers.</Text>
+              <Text style={styles.emptyText}>Check back later for new business promotions.</Text>
             </View>
           )}
         </View>
@@ -309,6 +321,17 @@ const styles = StyleSheet.create({
   activeTabText: { color: colors.tealDark, fontWeight: '900' },
   section: { paddingVertical: spacing.lg },
   description: { marginBottom: spacing.lg, color: colors.text, fontSize: 15, lineHeight: 23, fontWeight: '600' },
+  servicesAction: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm, padding: spacing.sm, borderWidth: 1, borderColor: '#b9ddd6', borderRadius: radius.md, backgroundColor: colors.tealSoft },
+  servicesActionIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.surface },
+  servicesActionIconText: { fontSize: 20 },
+  servicesActionCopy: { flex: 1, minWidth: 0 },
+  servicesActionTitle: { color: colors.tealDark, fontSize: 13, fontWeight: '900' },
+  servicesActionText: { marginTop: 2, color: colors.muted, fontSize: 10.5, fontWeight: '700' },
+  servicesActionChevron: { color: colors.tealDark, fontSize: 20, fontWeight: '900' },
+  servicesPanel: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: spacing.md, padding: spacing.sm, borderRadius: radius.md, backgroundColor: '#f7fbfa' },
+  serviceChip: { paddingHorizontal: 9, paddingVertical: 7, borderRadius: 99, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  serviceChipText: { color: colors.text, fontSize: 10.5, fontWeight: '800' },
+  servicesEmpty: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   infoRow: { flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: '#edf2f1' },
   infoIconWrap: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.tealSoft },
   infoIcon: { color: colors.tealDark, fontSize: 17, fontWeight: '900' },

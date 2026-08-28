@@ -94,13 +94,14 @@ service cloud.firestore {
 
     function ownerBusinessFieldsOnly() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        'name', 'nameLower', 'description', 'categoryId', 'category',
+        'name', 'nameLower', 'description', 'categoryId', 'categoryIds', 'category', 'categories',
         'subcategoryIds', 'subcategories', 'abnStatus', 'abn', 'logoUrl', 'logoPath',
         'coverUrl', 'coverPath', 'contact', 'social', 'location',
         'hours', 'hoursSummary', 'previousStatus', 'status',
         'abnVerified', 'identityVerified', 'verificationBadge',
         'abrVerification', 'abnCheckedAt',
-        'rejectionReason', 'listingDeclarationAccepted', 'listingTermsVersion',
+        'rejectionReason', 'publishedSnapshot', 'hasPublishedVersion', 'reviewType',
+        'listingDeclarationAccepted', 'listingTermsVersion',
         'listingConsentAtClient', 'listingConsentAt', 'lastSubmittedBy', 'updatedAt', 'submittedAt'
       ]);
     }
@@ -163,7 +164,8 @@ service cloud.firestore {
     function ownsApprovedPromotionBusiness(data) {
       return data.businessId is string
         && promotionBusiness(data).data.ownerId == request.auth.uid
-        && promotionBusiness(data).data.status == 'approved'
+        && (promotionBusiness(data).data.status == 'approved'
+          || promotionBusiness(data).data.hasPublishedVersion == true)
         && promotionBusiness(data).data.hidden != true;
     }
 

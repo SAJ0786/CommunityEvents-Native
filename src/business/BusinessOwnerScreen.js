@@ -22,6 +22,7 @@ function StatusBadge({ status }) {
 
 function OwnerBusinessCard({ business, onEdit, onAddPromotion }) {
   const imageUrl = business.logoUrl || business.coverUrl;
+  const isPublic = business.status === 'approved' || business.hasPublishedVersion === true;
   return (
     <View style={styles.businessCard}>
       <View style={styles.businessTop}>
@@ -42,7 +43,7 @@ function OwnerBusinessCard({ business, onEdit, onAddPromotion }) {
         <View style={styles.infoItem}><Text style={styles.infoLabel}>SERVICES</Text><Text numberOfLines={1} style={styles.infoValue}>{business.subcategoryIds?.length || 0} selected</Text></View>
       </View>
       {business.status === 'pending' ? (
-        <View style={styles.reviewNotice}><Text style={styles.reviewNoticeText}>Your listing is private while the directory team reviews it. Only ABN status is checked, and only when an ABN is supplied.</Text></View>
+        <View style={styles.reviewNotice}><Text style={styles.reviewNoticeText}>{business.hasPublishedVersion ? 'Your existing approved listing remains public while the directory team reviews these proposed changes.' : 'Your new listing is private while the directory team reviews it. Only ABN status is checked, and only when an ABN is supplied.'}</Text></View>
       ) : null}
       {business.status === 'rejected' ? (
         <View style={styles.rejectionNotice}>
@@ -55,15 +56,15 @@ function OwnerBusinessCard({ business, onEdit, onAddPromotion }) {
           <Text style={styles.editIcon}>{'\u270E'}</Text>
           <Text style={styles.editText}>Edit listing</Text>
         </Pressable>
-        {business.status === 'approved' && !business.hidden ? (
+        {isPublic && !business.hidden ? (
           <Pressable onPress={() => onAddPromotion?.(business)} style={({ pressed }) => [styles.promotionButton, pressed && styles.pressed]}>
             <Text style={styles.promotionButtonIcon}>{'\u{1F3F7}\uFE0F'}</Text>
             <Text style={styles.promotionButtonText}>Add promotion</Text>
           </Pressable>
         ) : null}
         <View style={styles.publicState}>
-          <Text style={styles.publicStateIcon}>{business.status === 'approved' ? '\u{1F310}' : '\u{1F512}'}</Text>
-          <Text style={styles.publicStateText}>{business.status === 'approved' ? 'Public' : 'Not public'}</Text>
+          <Text style={styles.publicStateIcon}>{isPublic ? '\u{1F310}' : '\u{1F512}'}</Text>
+          <Text style={styles.publicStateText}>{isPublic ? 'Public' : 'Not public'}</Text>
         </View>
       </View>
     </View>

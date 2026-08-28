@@ -4,11 +4,11 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, shadow, spacing } from '../theme';
 
 const TABS = [
-  { key: 'home', icon: 'home-outline', label: 'Home' },
-  { key: 'my_events', icon: 'calendar-outline', label: 'My Events', restricted: true },
+  { key: 'home', icon: 'home-variant', label: 'Home', color: '#176b87', soft: '#e5f5fb' },
+  { key: 'my_events', icon: 'calendar-month', label: 'My Events', restricted: true, color: '#8a4dba', soft: '#f2e8fa' },
   { key: 'create', icon: 'plus', label: 'Add Event', restricted: true, primary: true },
-  { key: 'favourites', icon: 'heart-outline', label: 'Favourites', restricted: true },
-  { key: 'profile', icon: 'account-outline', label: 'Profile' },
+  { key: 'favourites', icon: 'heart', label: 'Favourites', restricted: true, color: '#d43867', soft: '#fdeaf0' },
+  { key: 'profile', icon: 'account-circle', label: 'Profile', color: '#c44764', soft: '#fdeaf0' },
 ];
 
 export default function BottomNavigation({ activeTab, onChange, isGuest = false }) {
@@ -34,13 +34,13 @@ export default function BottomNavigation({ activeTab, onChange, isGuest = false 
             ]}
           >
             <View style={[
-              tab.primary ? styles.primaryIcon : styles.iconWrap,
+              tab.primary ? styles.primaryIcon : [styles.iconWrap, { backgroundColor: tab.soft }],
               tab.primary && !disabled && styles.primaryIconEnabled,
             ]}>
               <MaterialCommunityIcons
-                color={tab.primary ? colors.surface : active ? colors.tealDark : colors.muted}
+                color={tab.primary ? colors.surface : tab.color}
                 name={tab.icon}
-                size={tab.primary ? 34 : 23}
+                size={tab.primary ? 36 : 29}
               />
             </View>
             <Text
@@ -51,6 +51,7 @@ export default function BottomNavigation({ activeTab, onChange, isGuest = false 
                 active && styles.activeLabel,
                 tab.primary && styles.primaryLabel,
                 tab.primary && disabled && styles.primaryLabelDisabled,
+                !tab.primary && { color: tab.color },
               ]}
             >
               {tab.label}
@@ -65,7 +66,7 @@ export default function BottomNavigation({ activeTab, onChange, isGuest = false 
 const styles = StyleSheet.create({
   navigation: {
     flexDirection: 'row',
-    minHeight: 76,
+    minHeight: 82,
     paddingHorizontal: spacing.xs,
     paddingTop: 6,
     paddingBottom: spacing.sm,
@@ -82,13 +83,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 2,
   },
-  activeTab: { backgroundColor: colors.tealSoft },
+  activeTab: { backgroundColor: '#f6faf9' },
   primaryTab: {
     marginHorizontal: 2,
     marginTop: -18,
   },
   disabledTab: { opacity: 0.35 },
-  iconWrap: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  iconWrap: { width: 39, height: 39, alignItems: 'center', justifyContent: 'center', borderRadius: 13 },
   primaryIcon: {
     width: 54,
     height: 54,
@@ -104,7 +105,7 @@ const styles = StyleSheet.create({
   primaryIconEnabled: {
     backgroundColor: colors.teal,
   },
-  label: { color: colors.muted, fontSize: 9.5, fontWeight: '800', marginTop: 2 },
+  label: { color: colors.muted, fontSize: 9, fontWeight: '900', marginTop: 3 },
   activeLabel: { color: colors.tealDark },
   primaryLabel: {
     marginTop: 4,

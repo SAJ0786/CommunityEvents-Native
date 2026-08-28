@@ -1006,6 +1006,13 @@ function MainApp() {
       requestSignIn();
       return;
     }
+    if (nextTab === 'business-favourites') {
+      setSelectedBusinessId('');
+      setAppModule('directory');
+      setDirectoryFilter({ favouritesOnly: true, label: 'Favourite Businesses', nonce: Date.now() });
+      setDirectoryTab('home');
+      return;
+    }
     const businessRoutes = {
       'business-home': 'home',
       'business-admin': 'admin',

@@ -40,6 +40,7 @@ const EVENT_GUEST_ITEMS = [
 
 const BUSINESS_AUTH_ITEMS = [
   { key: 'business-home', label: 'Business Directory Home', icon: '\u{1F3EA}' },
+  { key: 'business-favourites', label: 'Favourite Businesses', icon: '\u2764\uFE0F', group: 'Saved' },
   { key: 'business-admin', label: 'Business Settings', icon: '\u2699\uFE0F', group: 'Business Management', adminOnly: true },
   { key: 'business-inbox', label: 'Business Inbox', icon: '\u{1F4E5}', group: 'Messages' },
   { key: 'business-feedback', label: 'Business Feedback', icon: '\u{1F4CB}', group: 'Messages' },
@@ -60,6 +61,7 @@ const GROUP_LABELS = {
   Messages: 'Inbox & Feedback',
   Administration: 'Administration',
   'Business Management': 'Business Management',
+  Saved: 'Saved Businesses',
   Support: 'Help & Support',
   Tools: 'Share & Search',
   Streams: 'Streamed Videos',

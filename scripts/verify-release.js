@@ -35,7 +35,9 @@ if (!(app.plugins || []).includes('./plugins/with-rnfirebase-cocoapods')) {
 }
 
 if (!/versionName\s+["']1\.0\.0["']/.test(androidGradle)) throw new Error('Checked-in Android versionName is not 1.0.0.');
-if (!/versionCode\s+36\b/.test(androidGradle)) throw new Error('Checked-in Android versionCode is not 36.');
+if (!new RegExp(`versionCode\\s+${Number(app.android.versionCode)}\\b`).test(androidGradle)) {
+  throw new Error(`Checked-in Android versionCode does not match app.json (${app.android.versionCode}).`);
+}
 if (!/^android\.compileSdkVersion=36$/m.test(gradleProperties)) throw new Error('Android compile SDK 36 is not pinned.');
 if (!/^android\.targetSdkVersion=36$/m.test(gradleProperties)) throw new Error('Android target SDK 36 is not pinned.');
 if (!dynamicAppConfig.includes("process.env.EXPO_NO_DOTENV === '1'") ||
