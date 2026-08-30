@@ -14,8 +14,9 @@ const SMTP_HOST = defineSecret('SMTP_HOST');
 const SMTP_PORT = defineSecret('SMTP_PORT');
 const SMTP_USER = defineSecret('SMTP_USER');
 const SMTP_PASS = defineSecret('SMTP_PASS');
-const EMAIL_FROM = defineSecret('EMAIL_FROM');
-const EMAIL_SECRETS = [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM];
+const EMAIL_SECRETS = [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS];
+const BUSINESS_FROM_ADDRESS = 'bussiness.support@siza.info';
+const BUSINESS_FROM_NAME = 'Community Businesses Australia';
 const PROFILE_FIELDS = [
   'fullName', 'email', 'phone', 'defaultCity', 'defaultModule',
   'pushNotificationsEnabled', 'smsNotificationsEnabled', 'emailNotificationsEnabled',
@@ -60,8 +61,7 @@ function buildTransporter() {
 }
 
 function sender() {
-  const address = clean(EMAIL_FROM.value()) || clean(SMTP_USER.value());
-  return address ? `"Community Connect Australia" <${address}>` : '';
+  return { name: BUSINESS_FROM_NAME, address: BUSINESS_FROM_ADDRESS };
 }
 
 const EMAIL_REPLY_TO = 'communityeventssydney@gmail.com';
@@ -174,8 +174,8 @@ async function deliver(recipients, notification) {
     replyTo: EMAIL_REPLY_TO,
     to: clean(recipient.email),
     subject: notification.title,
-    text: `${notification.title}\n\n${notification.body}\n\nCommunity Connect Australia`,
-    html: `<div style="font-family:Arial,sans-serif;line-height:1.55;color:#10172f"><h2>${html(notification.title)}</h2><p>${html(notification.body)}</p><p style="color:#64727c">Community Connect Australia</p></div>`,
+    text: `${notification.title}\n\n${notification.body}\n\nCommunity Businesses Australia\nThis is an automated directory update. Replies are sent to Community Events Sydney until siza.info mailbox hosting is activated.`,
+    html: `<div style="margin:0;padding:24px;background:#f3f7f6;font-family:Arial,sans-serif;line-height:1.55;color:#10172f"><div style="max-width:620px;margin:0 auto;overflow:hidden;border:1px solid #d7e4e1;border-radius:14px;background:#ffffff"><div style="padding:22px 24px;background:#138477;color:#ffffff"><div style="font-size:12px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;opacity:.86">Community Businesses Australia</div><h1 style="margin:7px 0 0;font-size:25px;line-height:1.25;color:#ffffff">${html(notification.title)}</h1></div><div style="padding:24px"><p style="margin:0;font-size:16px;line-height:1.65">${html(notification.body)}</p><div style="margin-top:22px;padding-top:16px;border-top:1px solid #e3ecea;color:#64727c;font-size:12px">This is an automated Business Directory update from Community Connect Australia. Replies are currently directed to Community Events Sydney.</div></div></div></div>`,
   })));
   results.forEach((result, index) => {
     if (result.status === 'rejected') {

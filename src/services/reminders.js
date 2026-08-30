@@ -10,7 +10,11 @@ const REMINDER_STORAGE_KEY = '@community-events/event-reminders';
 const REMINDER_CHANNEL_ID = 'event-reminders';
 const PRAYER_REMINDER_CHANNEL_ID = 'prayer-reminders';
 const PRAYER_REMINDER_STORAGE_KEY = '@community-events/prayer-reminders';
+const AZAAN_ALARM_CHANNEL_ID = 'azaan-alarms-v1';
+const AZAAN_ALARM_STORAGE_KEY = '@community-events/azaan-alarms-v1';
+const AZAAN_SOUND_FILE = 'azan_mashad.mp3';
 export const DEFAULT_PRAYER_REMINDER_KEYS = ['fajr', 'zohrain', 'maghreb'];
+export const AZAAN_ALARM_KEYS = ['fajr', 'zohrain', 'maghreb'];
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -154,6 +158,111 @@ async function readPrayerReminderSettings() {
 
 async function cancelPrayerNotificationIds(ids = []) {
   await Promise.all(ids.map(id => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})));
+}
+
+async function readAzaanAlarmSettings() {
+  try {
+    const value = JSON.parse(await AsyncStorage.getItem(AZAAN_ALARM_STORAGE_KEY) || '{}');
+    return {
+      enabledKeys: Array.isArray(value.enabledKeys) ? value.enabledKeys.filter(key => AZAAN_ALARM_KEYS.includes(key)) : [],
+      notificationIds: Array.isArray(value.notificationIds) ? value.notificationIds : [],
+      location: value.location || null,
+      refreshedAt: value.refreshedAt || '',
+    };
+  } catch {
+    return { enabledKeys: [], notificationIds: [], location: null, refreshedAt: '' };
+  }
+}
+
+async function ensureAzaanNotificationPermission() {
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync(AZAAN_ALARM_CHANNEL_ID, {
+      name: 'Azaan alarms',
+      description: 'Azaan alarms selected in the Community Connect Australia Hijri Calendar.',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 300, 180, 300, 180, 500],
+      lightColor: '#129182',
+      sound: AZAAN_SOUND_FILE,
+      audioAttributes: {
+        usage: Notifications.AndroidAudioUsage.ALARM,
+        contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+      },
+    });
+  }
+  const current = await Notifications.getPermissionsAsync();
+  if (current.status === 'granted') return true;
+  const requested = await Notifications.requestPermissionsAsync();
+  return requested.status === 'granted';
+}
+
+export async function getAzaanAlarmSettings() {
+  return readAzaanAlarmSettings();
+}
+
+async function scheduleAzaanAlarmKeys(keys, location, currentSettings) {
+  const current = currentSettings || await readAzaanAlarmSettings();
+  const enabledKeys = [...new Set(keys)].filter(key => AZAAN_ALARM_KEYS.includes(key));
+  const scheduleLocation = location || current.location;
+  await cancelPrayerNotificationIds(current.notificationIds);
+
+  if (!enabledKeys.length) {
+    const cleared = { enabledKeys: [], notificationIds: [], location: scheduleLocation || null, refreshedAt: new Date().toISOString() };
+    await AsyncStorage.setItem(AZAAN_ALARM_STORAGE_KEY, JSON.stringify(cleared));
+    return cleared;
+  }
+  if (!calculatePrayerTimes(localIsoDate(new Date()), scheduleLocation)) {
+    throw new Error('Choose a supported Australian city before setting Azaan alarms.');
+  }
+  if (!(await ensureAzaanNotificationPermission())) {
+    throw new Error('Notifications are disabled. Enable them in your phone settings to use Azaan alarms.');
+  }
+
+  const notificationIds = [];
+  for (let dayOffset = 0; dayOffset < 21; dayOffset += 1) {
+    const day = new Date();
+    day.setDate(day.getDate() + dayOffset);
+    const times = calculatePrayerTimes(localIsoDate(day), scheduleLocation);
+    if (!times) continue;
+    for (const key of enabledKeys) {
+      const match = String(times[key] || '').match(/^(\d{2}):(\d{2})$/);
+      if (!match) continue;
+      const triggerDate = new Date(day);
+      triggerDate.setHours(Number(match[1]), Number(match[2]), 0, 0);
+      if (triggerDate.getTime() <= Date.now()) continue;
+      const notificationId = await scheduleVerifiedNotification({
+        content: {
+          title: `${prayerLabel(key)} Azaan`,
+          body: `${scheduleLocation?.suburb || 'Your city'} · ${times[key]}`,
+          sound: AZAAN_SOUND_FILE,
+          data: { screen: 'hijri-calendar', prayer: key, kind: 'azaan-alarm' },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: triggerDate,
+          ...(Platform.OS === 'android' ? { channelId: AZAAN_ALARM_CHANNEL_ID } : {}),
+        },
+      });
+      notificationIds.push(notificationId);
+    }
+  }
+
+  const next = { enabledKeys, notificationIds, location: scheduleLocation, refreshedAt: new Date().toISOString() };
+  await AsyncStorage.setItem(AZAAN_ALARM_STORAGE_KEY, JSON.stringify(next));
+  return next;
+}
+
+export async function setAzaanAlarm(prayerKey, enabled, location) {
+  const current = await readAzaanAlarmSettings();
+  const enabledKeys = enabled
+    ? [...new Set([...current.enabledKeys, prayerKey])]
+    : current.enabledKeys.filter(key => key !== prayerKey);
+  return scheduleAzaanAlarmKeys(enabledKeys, location, current);
+}
+
+export async function refreshAzaanAlarms(location) {
+  const current = await readAzaanAlarmSettings();
+  if (!current.enabledKeys.length) return current;
+  return scheduleAzaanAlarmKeys(current.enabledKeys, location || current.location, current);
 }
 
 function localIsoDate(date) {

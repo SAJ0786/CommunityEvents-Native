@@ -3,6 +3,7 @@
     "name": "Community Connect Australia",
     "slug": "community-events-australia-native",
     "version": "1.0.0",
+    "newArchEnabled": true,
     "orientation": "default",
     "icon": "./assets/icon-store-1024.png",
     "userInterfaceStyle": "light",
@@ -28,12 +29,12 @@
     },
     "android": {
       "package": "info.siza.communityevents.app",
-      "versionCode": 40,
+      "versionCode": 41,
       "googleServicesFile": "./google-services.json",
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon-store-1024.png",
+        "foregroundImage": "./assets/icon-adaptive-foreground-v2.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
@@ -66,7 +67,10 @@
       [
         "expo-notifications",
         {
-          "defaultChannel": "business-alerts"
+          "defaultChannel": "business-alerts",
+          "sounds": [
+            "./assets/sounds/azan_mashad.mp3"
+          ]
         }
       ],
       [

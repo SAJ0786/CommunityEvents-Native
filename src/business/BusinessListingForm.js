@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import AddressAutocomplete from '../components/AddressAutocomplete';
@@ -11,7 +11,7 @@ import { colors, radius, shadow, spacing } from '../theme';
 import { formatAbn, isValidAbn, lookupBusinessAbnForSubmission, normalizeAbn, validateBusinessPayload } from '../services/businesses';
 
 const IS_TEST_BUILD = Constants.expoConfig?.extra?.testBuild !== false;
-const LISTING_TERMS_VERSION = 'draft-2026-08-20';
+const LISTING_TERMS_VERSION = 'draft-2026-08-30-referrer';
 
 const DAYS = [
   ['mon', 'Monday'],
@@ -71,6 +71,12 @@ function createFormState(business, defaultCity) {
     },
     hours: { ...defaultHours(), ...(business?.hours || {}) },
     hoursSummary: business?.hoursSummary || '',
+    referrer: {
+      name: business?.referrer?.name || '',
+      phone: business?.referrer?.phone || '',
+      location: business?.referrer?.location || '',
+      consentConfirmed: false,
+    },
   };
 }
 
@@ -159,6 +165,8 @@ export default function BusinessListingForm({
   onCancel,
   onRequireSignIn,
 }) {
+  const { width, fontScale } = useWindowDimensions();
+  const compactLayout = width / Math.max(fontScale, 1) < 360;
   const [form, setForm] = useState(() => createFormState(initialBusiness, defaultCity));
   const [localLogo, setLocalLogo] = useState(null);
   const [localCover, setLocalCover] = useState(null);
@@ -253,6 +261,7 @@ export default function BusinessListingForm({
   const update = (field, value) => setForm(current => ({ ...current, [field]: value }));
   const updateContact = (field, value) => setForm(current => ({ ...current, contact: { ...current.contact, [field]: value } }));
   const updateSocial = (field, value) => setForm(current => ({ ...current, social: { ...current.social, [field]: value } }));
+  const updateReferrer = (field, value) => setForm(current => ({ ...current, referrer: { ...current.referrer, [field]: value } }));
 
   const chooseImage = async kind => {
     setPickerError('');
@@ -315,7 +324,7 @@ export default function BusinessListingForm({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={[styles.content, compactLayout && styles.contentCompact]} keyboardShouldPersistTaps="handled">
       {IS_TEST_BUILD ? (
         <View style={styles.testNotice}>
           <Text style={styles.testNoticeTitle}>TEST BUILD</Text>
@@ -464,6 +473,29 @@ export default function BusinessListingForm({
         </Field>
       </View>
 
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionIcon}>{'\u{1F91D}'}</Text>
+        <Text style={styles.sectionTitle}>Community referrer</Text>
+        <Text style={styles.sectionSubtitle}>A community reference is mandatory and is used only by authorised administrators when reviewing this listing. It is never shown in the public directory.</Text>
+        <Field label="Referrer name" error={attempted ? validation.referrerName : ''}>
+          <TextInput value={form.referrer.name} onChangeText={value => updateReferrer('name', value)} autoCapitalize="words" placeholder="Full name" placeholderTextColor={colors.muted} style={[styles.input, attempted && validation.referrerName && styles.inputInvalid]} />
+        </Field>
+        <Field label="Referrer mobile" error={attempted ? validation.referrerPhone : ''} helper="Australian mobile number used only if an administrator needs to confirm the reference.">
+          <TextInput value={form.referrer.phone} onChangeText={value => updateReferrer('phone', value)} keyboardType="phone-pad" placeholder="04XX XXX XXX" placeholderTextColor={colors.muted} style={[styles.input, attempted && validation.referrerPhone && styles.inputInvalid]} />
+        </Field>
+        <Field label="Referrer location" error={attempted ? validation.referrerLocation : ''} helper="Suburb or city only—do not enter a private street address.">
+          <TextInput value={form.referrer.location} onChangeText={value => updateReferrer('location', value)} autoCapitalize="words" placeholder="Suburb or city" placeholderTextColor={colors.muted} style={[styles.input, attempted && validation.referrerLocation && styles.inputInvalid]} />
+        </Field>
+        <View style={[styles.referrerConsent, attempted && validation.referrerConsent && styles.declarationInvalid]}>
+          <Switch accessibilityLabel="Confirm referrer consent" value={form.referrer.consentConfirmed} onValueChange={value => updateReferrer('consentConfirmed', value)} trackColor={{ false: colors.border, true: colors.teal }} />
+          <View style={styles.declarationCopy}>
+            <Text style={styles.declarationTitle}>Referrer consent</Text>
+            <Text style={styles.declarationText}>I confirm this person has agreed to be named as my community referrer and may be contacted by Community Businesses Australia about this listing.</Text>
+            {attempted && validation.referrerConsent ? <Text style={styles.errorText}>{validation.referrerConsent}</Text> : null}
+          </View>
+        </View>
+      </View>
+
       {error ? <View style={styles.messageError}><Text style={styles.messageErrorText}>{error}</Text></View> : null}
       {success ? <View style={styles.messageSuccess}><Text style={styles.messageSuccessText}>{success}</Text></View> : null}
 
@@ -476,7 +508,7 @@ export default function BusinessListingForm({
         />
         <View style={styles.declarationCopy}>
           <Text style={styles.declarationTitle}>{'\u{1F6E1}\uFE0F'} Submission declaration</Text>
-          <Text style={styles.declarationText}>I confirm that I am authorised to submit this listing, the information is accurate, and I have permission to publish the supplied contact details and images. I understand that Community Businesses Australia is a directory only, checks ABN status only where an ABN is supplied, and does not verify identity, ownership, licences, qualifications, insurance, service quality or legal compliance.</Text>
+          <Text style={styles.declarationText}>I confirm that I am authorised to submit this listing, the information is accurate, and I have permission to publish the supplied contact details and images. I also confirm the named community referrer has agreed to be contacted about this listing. I understand that Community Businesses Australia is a directory only, checks ABN status only where an ABN is supplied, and does not verify identity, ownership, licences, qualifications, insurance, service quality or legal compliance.</Text>
           {attempted && !declarationAccepted ? <Text style={styles.errorText}>Accept this declaration before submitting.</Text> : null}
         </View>
       </View>
@@ -490,6 +522,7 @@ export default function BusinessListingForm({
 
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
+  contentCompact: { paddingHorizontal: spacing.md },
   testNotice: { marginBottom: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: '#d99b28', borderRadius: radius.md, backgroundColor: '#fff7df' },
   testNoticeTitle: { color: '#7a4a00', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
   testNoticeText: { marginTop: 4, color: '#6a4b13', fontSize: 11, lineHeight: 16, fontWeight: '700' },
@@ -558,6 +591,7 @@ const styles = StyleSheet.create({
   messageSuccessText: { color: '#2d7d43', fontSize: 12, lineHeight: 18, fontWeight: '800' },
   declaration: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.lg, borderWidth: 1, borderColor: 'transparent', borderRadius: radius.lg, backgroundColor: colors.tealSoft },
   declarationInvalid: { borderColor: colors.danger, backgroundColor: '#fffafa' },
+  referrerConsent: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   declarationCopy: { flex: 1, minWidth: 0 },
   declarationTitle: { color: colors.navy, fontSize: 13, fontWeight: '900' },
   declarationText: { marginTop: 5, color: colors.text, fontSize: 11, lineHeight: 17, fontWeight: '700' },

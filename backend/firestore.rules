@@ -87,6 +87,13 @@ service cloud.firestore {
         && data.subcategoryIds.size() > 0
         && data.contact is map
         && data.location is map
+        && data.referrer is map
+        && data.referrer.name is string
+        && data.referrer.name.size() >= 2
+        && data.referrer.phone is string
+        && data.referrer.location is string
+        && data.referrer.location.size() >= 2
+        && data.referrer.consentConfirmed == true
         && data.listingDeclarationAccepted == true
         && data.listingTermsVersion is string
         && data.listingTermsVersion.size() > 0;
@@ -97,7 +104,7 @@ service cloud.firestore {
         'name', 'nameLower', 'description', 'categoryId', 'categoryIds', 'category', 'categories',
         'subcategoryIds', 'subcategories', 'abnStatus', 'abn', 'logoUrl', 'logoPath',
         'coverUrl', 'coverPath', 'contact', 'social', 'location',
-        'hours', 'hoursSummary', 'previousStatus', 'status',
+        'hours', 'hoursSummary', 'referrer', 'referrerReview', 'previousStatus', 'status',
         'abnVerified', 'identityVerified', 'verificationBadge',
         'abrVerification', 'abnCheckedAt',
         'rejectionReason', 'publishedSnapshot', 'hasPublishedVersion', 'reviewType',
@@ -125,6 +132,8 @@ service cloud.firestore {
                           && request.resource.data.status == 'pending'
                           && request.resource.data.tier == resource.data.tier
                           && request.resource.data.foundingMember == resource.data.foundingMember
+                          && request.resource.data.referrerReview.status == 'pending'
+                          && request.resource.data.referrerReview.checkedBy == ''
                           && request.resource.data.abnVerified == false);
 
       allow delete: if isAdmin();

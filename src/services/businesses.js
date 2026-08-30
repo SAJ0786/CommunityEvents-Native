@@ -68,6 +68,7 @@ export function validateBusinessPayload(payload = {}) {
   const errors = {};
   const contact = payload.contact || {};
   const location = payload.location || {};
+  const referrer = payload.referrer || {};
   if (clean(payload.name).length < 2) errors.name = 'Enter the registered or trading business name.';
   const abnStatus = clean(payload.abnStatus) || (normalizeAbn(payload.abn) ? 'has' : 'none');
   if (abnStatus === 'has' && !isValidAbn(payload.abn)) errors.abn = 'Enter a valid 11-digit Australian Business Number.';
@@ -83,6 +84,11 @@ export function validateBusinessPayload(payload = {}) {
     errors.location = 'Select the full Australian address from Google suggestions.';
   }
   if (payload.listingDeclarationAccepted !== true) errors.declaration = 'Accept the business listing declaration.';
+  if (clean(referrer.name).length < 2) errors.referrerName = 'Enter the community referrer’s name.';
+  const referrerPhone = clean(referrer.phone).replace(/\D/g, '').replace(/^61/, '0');
+  if (!/^04\d{8}$/.test(referrerPhone)) errors.referrerPhone = 'Enter the referrer’s Australian mobile number.';
+  if (clean(referrer.location).length < 2) errors.referrerLocation = 'Enter the referrer’s suburb or city.';
+  if (referrer.consentConfirmed !== true) errors.referrerConsent = 'Confirm that the referrer has agreed to be contacted for this listing.';
   return errors;
 }
 
@@ -133,6 +139,12 @@ function submissionFields(payload = {}) {
     },
     hours: cleanHours(payload.hours),
     hoursSummary: clean(payload.hoursSummary),
+    referrer: {
+      name: clean(payload.referrer?.name),
+      phone: clean(payload.referrer?.phone),
+      location: clean(payload.referrer?.location),
+      consentConfirmed: payload.referrer?.consentConfirmed === true,
+    },
   };
 }
 
@@ -284,6 +296,11 @@ export async function createBusinessSubmission(payload = {}) {
     listingTermsVersion: clean(payload.listingTermsVersion),
     listingConsentAtClient: clean(payload.listingConsentAtClient),
     listingConsentAt: serverTimestamp(),
+    referrerReview: {
+      status: 'pending',
+      checkedBy: '',
+      checkedAt: null,
+    },
     foundingMember: false,
     foundingMemberCandidate: true,
     hidden: false,
@@ -322,6 +339,11 @@ export async function updateBusinessSubmission(businessId, payload = {}) {
     listingTermsVersion: clean(payload.listingTermsVersion),
     listingConsentAtClient: clean(payload.listingConsentAtClient),
     listingConsentAt: serverTimestamp(),
+    referrerReview: {
+      status: 'pending',
+      checkedBy: '',
+      checkedAt: null,
+    },
     rejectionReason: '',
     hasPublishedVersion,
     publishedSnapshot: preservedPublishedSnapshot,
@@ -442,6 +464,12 @@ export async function approveBusinessListing(businessId, options = {}) {
   const snapshot = await getDoc(doc(db, COLLECTION_NAME, businessId));
   if (!snapshot.exists()) throw new Error('This business listing could not be found.');
   const business = snapshot.data() || {};
+  if (!business.referrer?.name || !business.referrer?.phone || !business.referrer?.location) {
+    throw new Error('A complete community referrer is required before this listing can be approved.');
+  }
+  if (options.referrerConfirmed !== true) {
+    throw new Error('Confirm that the community referrer has been checked before approving this listing.');
+  }
   const hasAbn = Boolean(normalizeAbn(business.abn));
   if (hasAbn) {
     const verification = await verifyBusinessAbn(businessId);
@@ -473,6 +501,11 @@ export async function approveBusinessListing(businessId, options = {}) {
     abnVerified: hasAbn,
     identityVerified: false,
     verificationBadge,
+    referrerReview: {
+      status: 'confirmed',
+      checkedBy: user.uid,
+      checkedAt: serverTimestamp(),
+    },
     foundingMember: Boolean(options.foundingMember),
     rejectionReason: '',
     hasPublishedVersion: true,

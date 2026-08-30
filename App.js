@@ -12,6 +12,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
@@ -76,6 +77,12 @@ const EMPTY_HOME_FILTERS = {
   hostName: '',
   suburb: '',
 };
+
+// Keep Android/iOS large-text accessibility enabled while preventing extreme
+// display/font zoom from breaking navigation, compact cards and form controls.
+// Users can still use the OS magnifier and all text remains scalable to 135%.
+Text.defaultProps = { ...(Text.defaultProps || {}), maxFontSizeMultiplier: 1.35 };
+TextInput.defaultProps = { ...(TextInput.defaultProps || {}), maxFontSizeMultiplier: 1.35 };
 
 function withTimeout(promise, milliseconds, code = 'unavailable') {
   return new Promise((resolve, reject) => {

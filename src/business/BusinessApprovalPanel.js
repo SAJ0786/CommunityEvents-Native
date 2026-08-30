@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Linking, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, Pressable, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import {
   approveBusinessListing,
   formatAbn,
@@ -34,24 +34,27 @@ function comparisonValue(value) {
   return String(value || 'Not supplied');
 }
 
-function BusinessReviewCard({ business, selected, busy, onToggle, onApprove, onReject, onVisibility, onVerify }) {
+function BusinessReviewCard({ business, compactLayout, selected, busy, onToggle, onApprove, onReject, onVisibility, onVerify }) {
   const [tier, setTier] = useState(business.tier || 'free');
   const [foundingMember, setFoundingMember] = useState(Boolean(business.foundingMember || business.foundingMemberCandidate));
   const [publishWithoutAbn, setPublishWithoutAbn] = useState(false);
+  const [referrerConfirmed, setReferrerConfirmed] = useState(business.referrerReview?.status === 'confirmed');
   const [reason, setReason] = useState(business.rejectionReason || '');
   const imageUrl = business.logoUrl || business.coverUrl;
   const initials = String(business.name || 'Business').split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
   const validAbn = isValidAbn(business.abn);
   const hasAbn = Boolean(String(business.abn || '').replace(/\D/g, ''));
   const abrVerified = business.abnVerified === true && business.abrVerification?.status === 'verified';
-  const approvalReady = hasAbn ? validAbn && abrVerified : publishWithoutAbn;
+  const hasCompleteReferrer = Boolean(business.referrer?.name && business.referrer?.phone && business.referrer?.location);
+  const approvalReady = (hasAbn ? validAbn && abrVerified : publishWithoutAbn) && hasCompleteReferrer && referrerConfirmed;
 
   useEffect(() => {
     setTier(business.tier || 'free');
     setFoundingMember(Boolean(business.foundingMember || business.foundingMemberCandidate));
     setPublishWithoutAbn(false);
+    setReferrerConfirmed(business.referrerReview?.status === 'confirmed');
     setReason(business.rejectionReason || '');
-  }, [business.abnVerified, business.foundingMember, business.foundingMemberCandidate, business.id, business.rejectionReason, business.tier]);
+  }, [business.abnVerified, business.foundingMember, business.foundingMemberCandidate, business.id, business.referrerReview?.status, business.rejectionReason, business.tier]);
 
   const confirmApproval = () => {
     if (hasAbn && !validAbn) {
@@ -67,7 +70,7 @@ function BusinessReviewCard({ business, selected, busy, onToggle, onApprove, onR
       `${business.name} will be visible in the public Business Directory.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Approve', onPress: () => onApprove?.(business, { tier: hasAbn ? tier : 'free', foundingMember, publishWithoutAbn: !hasAbn && publishWithoutAbn }) },
+        { text: 'Approve', onPress: () => onApprove?.(business, { tier: hasAbn ? tier : 'free', foundingMember, publishWithoutAbn: !hasAbn && publishWithoutAbn, referrerConfirmed }) },
       ]
     );
   };
@@ -99,6 +102,7 @@ function BusinessReviewCard({ business, selected, busy, onToggle, onApprove, onR
           <View style={[styles.statusBadge, business.status === 'approved' && styles.statusApproved, business.status === 'rejected' && styles.statusRejected]}>
             <Text style={[styles.statusText, business.status === 'approved' && styles.statusTextApproved, business.status === 'rejected' && styles.statusTextRejected]}>{statusLabel(business.status, business.hasPublishedVersion)}</Text>
           </View>
+
         </View>
         <Text style={styles.expandIcon}>{selected ? '−' : '+'}</Text>
       </Pressable>
@@ -129,12 +133,28 @@ function BusinessReviewCard({ business, selected, busy, onToggle, onApprove, onR
           </View> : null}
 
           <View style={styles.detailGrid}>
-            <View style={styles.detailItem}><Text style={styles.detailLabel}>ABN</Text><Text style={styles.detailValue}>{hasAbn ? formatAbn(business.abn) : 'Not provided'}</Text>{hasAbn ? <Text style={validAbn ? styles.valid : styles.invalid}>{validAbn ? '✓ Checksum valid' : '✕ Invalid checksum'}</Text> : <Text style={styles.invalid}>No verification badge</Text>}</View>
-            <View style={styles.detailItem}><Text style={styles.detailLabel}>SERVICES</Text><Text style={styles.detailValue}>{(business.subcategories || []).join(', ') || business.category || 'Not supplied'}</Text></View>
-            <View style={styles.detailItem}><Text style={styles.detailLabel}>OWNER</Text><Text numberOfLines={2} style={styles.detailValue}>{business.ownerEmail || business.ownerPhone || business.ownerId}</Text></View>
-            <View style={styles.detailItem}><Text style={styles.detailLabel}>ADDRESS</Text><Text style={styles.detailValue}>{business.location?.fullAddress || 'Not supplied'}</Text></View>
-            <View style={styles.detailItem}><Text style={styles.detailLabel}>PHONE</Text><Text style={styles.detailValue}>{business.contact?.phone || 'Not supplied'}</Text></View>
-            <View style={styles.detailItem}><Text style={styles.detailLabel}>EMAIL</Text><Text style={styles.detailValue}>{business.contact?.email || 'Not supplied'}</Text></View>
+            <View style={[styles.detailItem, compactLayout && styles.detailItemCompact]}><Text style={styles.detailLabel}>ABN</Text><Text style={styles.detailValue}>{hasAbn ? formatAbn(business.abn) : 'Not provided'}</Text>{hasAbn ? <Text style={validAbn ? styles.valid : styles.invalid}>{validAbn ? '✓ Checksum valid' : '✕ Invalid checksum'}</Text> : <Text style={styles.invalid}>No verification badge</Text>}</View>
+            <View style={[styles.detailItem, compactLayout && styles.detailItemCompact]}><Text style={styles.detailLabel}>SERVICES</Text><Text style={styles.detailValue}>{(business.subcategories || []).join(', ') || business.category || 'Not supplied'}</Text></View>
+            <View style={[styles.detailItem, compactLayout && styles.detailItemCompact]}><Text style={styles.detailLabel}>OWNER</Text><Text numberOfLines={2} style={styles.detailValue}>{business.ownerEmail || business.ownerPhone || business.ownerId}</Text></View>
+            <View style={[styles.detailItem, compactLayout && styles.detailItemCompact]}><Text style={styles.detailLabel}>ADDRESS</Text><Text style={styles.detailValue}>{business.location?.fullAddress || 'Not supplied'}</Text></View>
+            <View style={[styles.detailItem, compactLayout && styles.detailItemCompact]}><Text style={styles.detailLabel}>PHONE</Text><Text style={styles.detailValue}>{business.contact?.phone || 'Not supplied'}</Text></View>
+            <View style={[styles.detailItem, compactLayout && styles.detailItemCompact]}><Text style={styles.detailLabel}>EMAIL</Text><Text style={styles.detailValue}>{business.contact?.email || 'Not supplied'}</Text></View>
+          </View>
+
+          <View style={styles.referrerReview}>
+            <View style={styles.referrerCopy}>
+              <Text style={styles.referrerTitle}>Community referrer — admin only</Text>
+              {hasCompleteReferrer ? <>
+                <Text style={styles.referrerValue}>{business.referrer.name}</Text>
+                <Pressable onPress={() => Linking.openURL(`tel:${String(business.referrer.phone).replace(/\s/g, '')}`)}><Text style={styles.referrerLink}>{business.referrer.phone}</Text></Pressable>
+                <Text style={styles.referrerLocation}>{business.referrer.location}</Text>
+                <Text style={styles.referrerHelp}>Confirm only that the reference was contacted and supports this listing. This does not verify licences, insurance or service quality.</Text>
+              </> : <Text style={styles.invalid}>Reference details are missing. Request changes.</Text>}
+            </View>
+            <View style={styles.referrerSwitch}>
+              <Text style={styles.referrerSwitchLabel}>{referrerConfirmed ? 'CONFIRMED' : 'NOT CHECKED'}</Text>
+              <Switch disabled={!hasCompleteReferrer} value={referrerConfirmed} onValueChange={setReferrerConfirmed} trackColor={{ false: colors.border, true: colors.teal }} />
+            </View>
           </View>
 
           {hasAbn ? <View style={styles.abrReview}>
@@ -204,6 +224,8 @@ function BusinessReviewCard({ business, selected, busy, onToggle, onApprove, onR
 }
 
 export default function BusinessApprovalPanel({ mode = 'approvals', onBack }) {
+  const { width, fontScale } = useWindowDimensions();
+  const compactLayout = width / Math.max(fontScale, 1) < 360;
   const isManagement = mode === 'management';
   const [queueType, setQueueType] = useState('businesses');
   const [businesses, setBusinesses] = useState([]);
@@ -372,6 +394,7 @@ export default function BusinessApprovalPanel({ mode = 'approvals', onBack }) {
           <BusinessReviewCard
             key={business.id}
             business={business}
+            compactLayout={compactLayout}
             selected={selectedId === business.id}
             busy={busyId === business.id}
             onToggle={() => setSelectedId(current => current === business.id ? '' : business.id)}
@@ -448,6 +471,7 @@ const styles = StyleSheet.create({
   comparisonValue: { marginTop: 3, color: colors.text, fontSize: 9.5, lineHeight: 14, fontWeight: '700' },
   detailGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   detailItem: { width: '48%', minWidth: 130, padding: spacing.sm, borderRadius: 10, backgroundColor: '#f4f7f6' },
+  detailItemCompact: { width: '100%', minWidth: 0 },
   detailLabel: { color: colors.muted, fontSize: 8, fontWeight: '900' },
   detailValue: { marginTop: 3, color: colors.navy, fontSize: 10.5, lineHeight: 15, fontWeight: '800' },
   valid: { marginTop: 3, color: '#2f7740', fontSize: 9, fontWeight: '900' },
@@ -464,6 +488,15 @@ const styles = StyleSheet.create({
   abrStatusVerified: { backgroundColor: '#dff4e5' },
   abrStatusText: { color: colors.danger, fontSize: 7.5, lineHeight: 10, fontWeight: '900', textAlign: 'center' },
   abrStatusTextVerified: { color: '#2f7740' },
+  referrerReview: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: '#d4c58b', borderRadius: radius.md, backgroundColor: '#fff9e8' },
+  referrerCopy: { flex: 1, minWidth: 0 },
+  referrerTitle: { color: colors.navy, fontSize: 12, fontWeight: '900' },
+  referrerValue: { marginTop: 5, color: colors.text, fontSize: 11, fontWeight: '900' },
+  referrerLink: { marginTop: 4, color: colors.tealDark, fontSize: 11, fontWeight: '900', textDecorationLine: 'underline' },
+  referrerLocation: { marginTop: 3, color: colors.text, fontSize: 10.5, fontWeight: '700' },
+  referrerHelp: { marginTop: 6, color: colors.muted, fontSize: 9, lineHeight: 13, fontWeight: '700' },
+  referrerSwitch: { alignItems: 'center', gap: 5 },
+  referrerSwitchLabel: { maxWidth: 78, color: colors.tealDark, fontSize: 7.5, lineHeight: 10, fontWeight: '900', textAlign: 'center' },
   controlLabel: { marginTop: spacing.md, marginBottom: 6, color: colors.navy, fontSize: 10, fontWeight: '900' },
   tierRow: { flexDirection: 'row', gap: 6 },
   tierButton: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.surface },

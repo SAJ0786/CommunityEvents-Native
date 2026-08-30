@@ -5,8 +5,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -26,7 +28,7 @@ import {
   sortHijriObservances,
 } from '../services/hijriObservances';
 import { calculatePrayerTimes, PRAYER_OPTIONS } from '../services/prayerTimes';
-import { getPrayerReminderSettings, initializeDefaultPrayerReminders, setPrayerReminder } from '../services/reminders';
+import { getAzaanAlarmSettings, getPrayerReminderSettings, initializeDefaultPrayerReminders, refreshAzaanAlarms, setAzaanAlarm, setPrayerReminder } from '../services/reminders';
 import { DEFAULT_CITY, cityLabel, normalizeCity } from '../utils/cities';
 import { getPrayerLocation } from '../utils/prayerLocations';
 import CompactSelect from './CompactSelect';
@@ -92,6 +94,8 @@ function getNextObservance(observances, overrides) {
 }
 
 export default function HijriCalendarScreen({ profile, selectedCity }) {
+  const { width, fontScale } = useWindowDimensions();
+  const compactLayout = width / Math.max(fontScale, 1) < 360;
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState({ overrides: [] });
@@ -106,6 +110,8 @@ export default function HijriCalendarScreen({ profile, selectedCity }) {
   const [hYear, setHYear] = useState('1448');
   const [prayerReminderKeys, setPrayerReminderKeys] = useState([]);
   const [prayerReminderBusy, setPrayerReminderBusy] = useState('');
+  const [azaanAlarmKeys, setAzaanAlarmKeys] = useState([]);
+  const [azaanAlarmBusy, setAzaanAlarmBusy] = useState('');
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const prayerCity = normalizeCity(selectedCity || profile?.defaultCity || DEFAULT_CITY);
 
@@ -144,6 +150,15 @@ export default function HijriCalendarScreen({ profile, selectedCity }) {
       .then(value => setPrayerReminderKeys(value.enabledKeys || []))
       .catch(() => setPrayerReminderKeys([]));
   }, [prayerCity, profile?.prayerRemindersEnabled]);
+
+  useEffect(() => {
+    getAzaanAlarmSettings()
+      .then(value => value.enabledKeys?.length
+        ? refreshAzaanAlarms(getPrayerLocation(prayerCity))
+        : value)
+      .then(value => setAzaanAlarmKeys(value.enabledKeys || []))
+      .catch(() => setAzaanAlarmKeys([]));
+  }, [prayerCity]);
 
   const overrides = settings.overrides || [];
   const todayHijri = getHijriDisplay(todayIso, overrides);
@@ -197,10 +212,27 @@ export default function HijriCalendarScreen({ profile, selectedCity }) {
     }
   };
 
+  const toggleAzaanAlarm = async key => {
+    if (azaanAlarmBusy) return;
+    const enabled = !azaanAlarmKeys.includes(key);
+    setAzaanAlarmBusy(key);
+    try {
+      const value = await setAzaanAlarm(key, enabled, getPrayerLocation(prayerCity));
+      setAzaanAlarmKeys(value.enabledKeys || []);
+      Alert.alert(enabled ? 'Azaan alarm on' : 'Azaan alarm off', enabled
+        ? 'This phone will play the bundled Azaan clip at the selected prayer time for the next 21 days. The alarm is stored only on this device.'
+        : 'The selected Azaan alarms were removed from this phone.');
+    } catch (error) {
+      Alert.alert('Azaan alarm', error?.message || 'Could not update this Azaan alarm.');
+    } finally {
+      setAzaanAlarmBusy('');
+    }
+  };
+
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, compactLayout && styles.contentCompact]}
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.hero}>
@@ -296,6 +328,29 @@ export default function HijriCalendarScreen({ profile, selectedCity }) {
                     );
                   })}
                 </View>
+              </View>
+              <View style={styles.azaanPanel}>
+                <View style={styles.azaanHeadingRow}>
+                  <View style={styles.azaanIcon}><MaterialCommunityIcons name="volume-high" color={colors.surface} size={18} /></View>
+                  <View style={styles.azaanHeadingCopy}>
+                    <Text style={styles.azaanTitle}>Azaan Alarm</Text>
+                    <Text style={styles.azaanHelp}>Optional on this phone. All alarms are off by default.</Text>
+                  </View>
+                </View>
+                {[
+                  ['fajr', 'Fajr'],
+                  ['zohrain', 'Dhuhr / Zohrain'],
+                  ['maghreb', 'Maghrib'],
+                ].map(([key, label]) => (
+                  <View key={key} style={styles.azaanRow}>
+                    <View style={styles.azaanRowCopy}>
+                      <Text style={styles.azaanRowLabel}>{label}</Text>
+                      <Text style={styles.azaanRowTime}>{todayPrayerTimes[key]}</Text>
+                    </View>
+                    {azaanAlarmBusy === key ? <ActivityIndicator color={colors.tealDark} size="small" /> : <Switch accessibilityLabel={`${label} Azaan alarm`} value={azaanAlarmKeys.includes(key)} onValueChange={() => toggleAzaanAlarm(key)} trackColor={{ false: colors.border, true: colors.teal }} />}
+                  </View>
+                ))}
+                <Text style={styles.azaanPrivacy}>The supplied 17-second Azaan clip is bundled in the app. Android may require Alarms &amp; reminders permission; the phone’s notification settings remain in control.</Text>
               </View>
             </View>
           ) : null}
@@ -460,6 +515,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingBottom: spacing.xl,
   },
+  contentCompact: { paddingHorizontal: spacing.sm },
   hero: {
     position: 'relative',
     minHeight: 98,
@@ -524,6 +580,17 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '900',
   },
+  azaanPanel: { marginTop: spacing.sm, overflow: 'hidden', borderWidth: 1, borderColor: '#b9ddd6', borderRadius: radius.md, backgroundColor: '#f4fbf9' },
+  azaanHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: '#dcece8' },
+  azaanIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.teal },
+  azaanHeadingCopy: { flex: 1, minWidth: 0 },
+  azaanTitle: { color: colors.navy, fontSize: 14, fontWeight: '900' },
+  azaanHelp: { marginTop: 2, color: colors.muted, fontSize: 10, lineHeight: 14, fontWeight: '700' },
+  azaanRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.md, borderBottomWidth: 1, borderBottomColor: '#e3efec' },
+  azaanRowCopy: { flex: 1, minWidth: 0 },
+  azaanRowLabel: { color: colors.navy, fontSize: 12, fontWeight: '900' },
+  azaanRowTime: { marginTop: 2, color: colors.tealDark, fontSize: 11, fontWeight: '800' },
+  azaanPrivacy: { padding: spacing.md, color: colors.muted, fontSize: 9.5, lineHeight: 14, fontWeight: '700' },
   primaryDate: {
     color: colors.muted,
     fontSize: 12,
