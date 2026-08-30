@@ -60,8 +60,11 @@ function buildTransporter() {
 }
 
 function sender() {
-  return clean(EMAIL_FROM.value()) || clean(SMTP_USER.value());
+  const address = clean(EMAIL_FROM.value()) || clean(SMTP_USER.value());
+  return address ? `"Community Connect Australia" <${address}>` : '';
 }
+
+const EMAIL_REPLY_TO = 'communityeventssydney@gmail.com';
 
 async function getAdminRecipients(cities, actorUid = '') {
   const citySet = new Set((Array.isArray(cities) ? cities : [cities]).filter(Boolean).map(normalizeCity));
@@ -168,6 +171,7 @@ async function deliver(recipients, notification) {
   const emailRecipients = unique.filter(recipient => recipient.emailNotificationsEnabled !== false && clean(recipient.email));
   const results = await Promise.allSettled(emailRecipients.map(recipient => transporter.sendMail({
     from,
+    replyTo: EMAIL_REPLY_TO,
     to: clean(recipient.email),
     subject: notification.title,
     text: `${notification.title}\n\n${notification.body}\n\nCommunity Connect Australia`,

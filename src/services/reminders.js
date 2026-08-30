@@ -1,6 +1,8 @@
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import * as IntentLauncher from 'expo-intent-launcher';
+import Constants from 'expo-constants';
 import { getEventSuburb, getEventTitle } from './events';
 import { calculatePrayerTimes, prayerLabel } from './prayerTimes';
 
@@ -60,6 +62,62 @@ async function ensureNotificationPermission() {
   if (current.status === 'granted') return true;
   const requested = await Notifications.requestPermissionsAsync();
   return requested.status === 'granted';
+}
+
+export async function getDeviceNotificationPermission() {
+  const permission = await Notifications.getPermissionsAsync();
+  return permission.status === 'granted';
+}
+
+export async function ensureDeviceNotificationsEnabled() {
+  return ensureNotificationPermission();
+}
+
+export async function openDeviceNotificationSettings({ exactAlarm = false } = {}) {
+  if (Platform.OS !== 'android') {
+    await Linking.openSettings();
+    return;
+  }
+
+  const applicationId = Constants.expoConfig?.android?.package || 'info.siza.communityevents.app';
+  try {
+    await IntentLauncher.startActivityAsync(
+      exactAlarm
+        ? IntentLauncher.ActivityAction.REQUEST_SCHEDULE_EXACT_ALARM
+        : IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
+      { data: `package:${applicationId}` },
+    );
+  } catch {
+    await Linking.openSettings();
+  }
+}
+
+function notificationScheduleError(error) {
+  const message = String(error?.message || '');
+  const exactAlarm = Platform.OS === 'android'
+    && /exact|alarm|securityexception|schedule_exact_alarm/i.test(message);
+  const nextError = new Error(exactAlarm
+    ? 'Exact alarms are blocked for this app. Allow Alarms & reminders, then set the event reminder again.'
+    : 'The phone did not retain this reminder. Check Community Connect Australia notification settings and try again.');
+  nextError.code = exactAlarm ? 'EXACT_ALARM_BLOCKED' : 'REMINDER_NOT_SCHEDULED';
+  return nextError;
+}
+
+async function scheduleVerifiedNotification(request) {
+  let notificationId = '';
+  try {
+    notificationId = await Notifications.scheduleNotificationAsync(request);
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    if (!scheduled.some(item => item.identifier === notificationId)) {
+      throw new Error('Scheduled notification was not retained by Android.');
+    }
+    return notificationId;
+  } catch (error) {
+    if (notificationId) {
+      await Notifications.cancelScheduledNotificationAsync(notificationId).catch(() => {});
+    }
+    throw notificationScheduleError(error);
+  }
 }
 
 async function ensurePrayerNotificationPermission() {
@@ -139,7 +197,7 @@ async function schedulePrayerReminderKeys(keys, location, currentSettings) {
       const triggerDate = new Date(day);
       triggerDate.setHours(Number(match[1]), Number(match[2]), 0, 0);
       if (triggerDate.getTime() <= Date.now()) continue;
-      const id = await Notifications.scheduleNotificationAsync({
+      const id = await scheduleVerifiedNotification({
         content: {
           title: `${prayerLabel(key)} prayer time`,
           body: `${scheduleLocation?.suburb || 'Your city'} · ${times[key]}`,
@@ -236,7 +294,7 @@ export async function scheduleEventReminder(event, minutesBefore) {
   await cancelEventReminder(event.id);
   const title = getEventTitle(event);
   const location = getEventSuburb(event);
-  const notificationId = await Notifications.scheduleNotificationAsync({
+  const notificationId = await scheduleVerifiedNotification({
     content: {
       title: `Upcoming event: ${title}`,
       body: location ? `${location} • Starts ${start.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}` : `Starts ${start.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}`,
@@ -275,7 +333,7 @@ export async function scheduleFavouriteReminder(event) {
   triggerDate.setDate(triggerDate.getDate() - 1);
   if (triggerDate.getTime() <= Date.now()) return null;
   if (!(await ensureNotificationPermission())) return null;
-  const notificationId = await Notifications.scheduleNotificationAsync({
+  const notificationId = await scheduleVerifiedNotification({
     content: {
       title: `Tomorrow: ${getEventTitle(event)}`,
       body: `${getEventSuburb(event) || 'Community event'} \u2022 Tap to view details`,

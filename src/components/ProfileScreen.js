@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Image,
   Linking,
   Pressable,
@@ -18,7 +19,12 @@ import CitySelector from './CitySelector';
 import { STORE_SHARE_LINES } from '../utils/storeLinks';
 import * as Clipboard from 'expo-clipboard';
 import { getDiagnosticSessionId } from '../services/diagnostics';
-import { setPrayerRemindersEnabled } from '../services/reminders';
+import {
+  ensureDeviceNotificationsEnabled,
+  getDeviceNotificationPermission,
+  openDeviceNotificationSettings,
+  setPrayerRemindersEnabled,
+} from '../services/reminders';
 import { getPrayerLocation } from '../utils/prayerLocations';
 
 const sizaLogo = require('../../assets/siza-apps.jpg');
@@ -79,6 +85,7 @@ export default function ProfileScreen({
   const [eventNotifications, setEventNotifications] = useState(profile?.eventNotificationsEnabled !== false);
   const [businessNotifications, setBusinessNotifications] = useState(profile?.businessNotificationsEnabled !== false);
   const [prayerReminders, setPrayerReminders] = useState(profile?.prayerRemindersEnabled !== false);
+  const [deviceNotificationsAllowed, setDeviceNotificationsAllowed] = useState(null);
   const isGuest = !user || user.isAnonymous;
 
   useEffect(() => {
@@ -97,6 +104,23 @@ export default function ProfileScreen({
     setBusinessNotifications(profile?.businessNotificationsEnabled !== false);
     setPrayerReminders(profile?.prayerRemindersEnabled !== false);
   }, [profile?.businessNotificationsEnabled, profile?.emailNotificationsEnabled, profile?.eventNotificationsEnabled, profile?.prayerRemindersEnabled, profile?.pushNotificationsEnabled, profile?.smsNotificationsEnabled]);
+
+  useEffect(() => {
+    let alive = true;
+    const refreshPermission = () => {
+      getDeviceNotificationPermission()
+        .then(value => { if (alive) setDeviceNotificationsAllowed(value); })
+        .catch(() => { if (alive) setDeviceNotificationsAllowed(false); });
+    };
+    refreshPermission();
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') refreshPermission();
+    });
+    return () => {
+      alive = false;
+      subscription.remove();
+    };
+  }, []);
 
   const profileDirty = useMemo(() => (
     fullName.trim() !== String(profile?.fullName || '').trim()
@@ -187,6 +211,13 @@ export default function ProfileScreen({
   const saveNotifications = async () => {
     setProfileValidation('');
     try {
+      if (pushEnabled || prayerReminders) {
+        const allowed = await ensureDeviceNotificationsEnabled();
+        setDeviceNotificationsAllowed(allowed);
+        if (!allowed) {
+          throw new Error('Phone notifications are blocked in Android settings. Enable them before saving push notifications or reminders.');
+        }
+      }
       await setPrayerRemindersEnabled(prayerReminders, getPrayerLocation(defaultCity));
       await onSaveProfile?.({
         pushNotificationsEnabled: pushEnabled,
@@ -493,6 +524,14 @@ export default function ProfileScreen({
             ].map(([label, value, setter]) => (
               <View key={label} style={styles.preferenceRow}><Text style={styles.preferenceLabel}>{label}</Text><Switch value={value} onValueChange={setter} trackColor={{ false: colors.border, true: colors.teal }} /></View>
             ))}
+            {deviceNotificationsAllowed === false ? (
+              <View style={styles.notificationWarning}>
+                <Text style={styles.notificationWarningText}>Android is blocking notifications for this app. The switches above cannot deliver alerts until phone permission is enabled.</Text>
+                <Pressable onPress={() => openDeviceNotificationSettings()} style={styles.notificationSettingsButton}>
+                  <Text style={styles.notificationSettingsButtonText}>Open Phone Settings</Text>
+                </Pressable>
+              </View>
+            ) : null}
             <Text style={styles.inputLabel}>DEFAULT HOME MODULE</Text>
             <View style={styles.moduleChoice}>
               {[['events', 'Events'], ['directory', 'Business Directory']].map(([value, label]) => (
@@ -593,6 +632,24 @@ const styles = StyleSheet.create({
   moduleChoiceTextActive: { color: colors.tealDark, fontWeight: '900' },
   preferenceRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
   preferenceLabel: { flex: 1, color: colors.text, fontSize: 13, fontWeight: '800' },
+  notificationWarning: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: '#f6b7b1',
+    borderRadius: radius.md,
+    backgroundColor: '#fff4f2',
+  },
+  notificationWarningText: { color: colors.danger, fontSize: 12, lineHeight: 18, fontWeight: '800' },
+  notificationSettingsButton: {
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    borderRadius: 10,
+    backgroundColor: colors.danger,
+  },
+  notificationSettingsButtonText: { color: colors.surface, fontSize: 13, fontWeight: '900' },
   input: {
     minHeight: 48,
     borderWidth: 1,

@@ -32,6 +32,7 @@ import {
   cancelEventReminder,
   formatReminderLeadTime,
   getEventReminder,
+  openDeviceNotificationSettings,
   scheduleEventReminder,
 } from '../services/reminders';
 
@@ -396,7 +397,21 @@ export default function EventDetailsModal({
       setReminderOpen(false);
       Alert.alert('Reminder set', `We’ll remind you ${formatReminderLeadTime(minutesBefore)}.`);
     } catch (error) {
-      setReminderError(error?.message || 'Could not set this reminder.');
+      const message = error?.message || 'Could not set this reminder.';
+      setReminderError(message);
+      if (['EXACT_ALARM_BLOCKED', 'REMINDER_NOT_SCHEDULED'].includes(error?.code)) {
+        Alert.alert(
+          'Reminder permission required',
+          message,
+          [
+            { text: 'Not now', style: 'cancel' },
+            {
+              text: 'Open Settings',
+              onPress: () => openDeviceNotificationSettings({ exactAlarm: error?.code === 'EXACT_ALARM_BLOCKED' }),
+            },
+          ],
+        );
+      }
     } finally {
       setReminderBusy(false);
     }
