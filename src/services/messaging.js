@@ -143,6 +143,7 @@ export async function sendBusinessMessage({ business, user, profile, text }) {
   const senderUid = user.uid;
   const threadId = `${business.id}_${senderUid}_${ownerUid}`;
   const threadRef = doc(db, 'businessMessageThreads', threadId);
+  const existingThread = await getDoc(threadRef);
   const senderName = getSenderName(user, profile);
   await setDoc(threadRef, {
     type: 'business', businessId: business.id, businessName: clean(business.name), ownerUid,
@@ -153,6 +154,7 @@ export async function sendBusinessMessage({ business, user, profile, text }) {
     updatedAt: serverTimestamp(), lastMessage: messageText, lastSenderUid: senderUid,
     [`unreadBy.${ownerUid}`]: increment(1), [`unreadBy.${senderUid}`]: 0,
   });
+  return { threadId, isNew: !existingThread.exists() };
 }
 
 export function listenBusinessThreads(uid, callback) {

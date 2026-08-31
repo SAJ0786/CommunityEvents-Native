@@ -151,6 +151,17 @@ service cloud.firestore {
                           == request.auth.uid);
     }
 
+    // Aggregate interaction counters are written only by the trusted callable
+    // function. They contain no message text or customer identity.
+    match /businessStatistics/{businessId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+
+      match /enquiries/{threadId} {
+        allow read, write: if false;
+      }
+    }
+
     // Authenticated contact routing is separate from the public listing. The
     // client receives only the owner UID needed to create an in-app thread.
     match /businessContactRoutes/{businessId} {

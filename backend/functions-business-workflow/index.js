@@ -3,6 +3,7 @@
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 const { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 
@@ -22,6 +23,11 @@ const PROFILE_FIELDS = [
   'pushNotificationsEnabled', 'smsNotificationsEnabled', 'emailNotificationsEnabled',
   'eventNotificationsEnabled', 'businessNotificationsEnabled', 'prayerRemindersEnabled',
 ];
+const BUSINESS_ANALYTICS_ACTIONS = new Set([
+  'page_view', 'contact', 'message_enquiry', 'call', 'whatsapp', 'directions',
+  'share', 'website', 'facebook', 'instagram', 'x', 'promotions', 'services',
+  'hours', 'favourite',
+]);
 
 function clean(value) {
   return String(value || '').trim();
@@ -344,5 +350,68 @@ exports.nativeBusinessProfileUpdated = onDocumentUpdated(
       entityId: event.params.userId,
       entityType: 'user',
     });
+  }
+);
+
+exports.recordBusinessInteraction = onCall(
+  { region: REGION, enforceAppCheck: false },
+  async request => {
+    const businessId = clean(request.data?.businessId);
+    const action = clean(request.data?.action);
+    const threadId = clean(request.data?.threadId);
+    if (!businessId || businessId.length > 160) throw new HttpsError('invalid-argument', 'Business reference is invalid.');
+    if (!BUSINESS_ANALYTICS_ACTIONS.has(action)) throw new HttpsError('invalid-argument', 'Statistics action is invalid.');
+
+    const businessSnapshot = await db.collection('publicBusinesses').doc(businessId).get();
+    if (!businessSnapshot.exists) throw new HttpsError('not-found', 'This public business could not be found.');
+    const business = businessSnapshot.data() || {};
+
+    let enquiryMarker = null;
+    if (action === 'message_enquiry') {
+      if (!request.auth || request.auth.token?.firebase?.sign_in_provider === 'anonymous') {
+        throw new HttpsError('unauthenticated', 'Sign in is required to record an enquiry.');
+      }
+      if (!threadId || threadId.length > 500) throw new HttpsError('invalid-argument', 'Conversation reference is invalid.');
+      const threadSnapshot = await db.collection('businessMessageThreads').doc(threadId).get();
+      const thread = threadSnapshot.data() || {};
+      if (!threadSnapshot.exists || clean(thread.businessId) !== businessId || clean(thread.senderUid) !== request.auth.uid) {
+        throw new HttpsError('permission-denied', 'This enquiry could not be verified.');
+      }
+      enquiryMarker = db.collection('businessStatistics').doc(businessId).collection('enquiries').doc(threadId);
+    }
+
+    const statisticsReference = db.collection('businessStatistics').doc(businessId);
+    const counted = await db.runTransaction(async transaction => {
+      if (enquiryMarker) {
+        const markerSnapshot = await transaction.get(enquiryMarker);
+        if (markerSnapshot.exists) return false;
+      }
+      const statisticsSnapshot = await transaction.get(statisticsReference);
+      const current = statisticsSnapshot.data() || {};
+      const currentActions = current.actions && typeof current.actions === 'object' ? current.actions : {};
+      const next = {
+        businessId,
+        businessName: clean(business.name) || 'Community Business',
+        city: businessCity(business),
+        categoryIds: Array.isArray(business.categoryIds) ? business.categoryIds.map(clean).filter(Boolean) : [clean(business.categoryId)].filter(Boolean),
+        subcategoryIds: Array.isArray(business.subcategoryIds) ? business.subcategoryIds.map(clean).filter(Boolean) : [],
+        pageViews: Number(current.pageViews || 0) + (action === 'page_view' ? 1 : 0),
+        enquiries: Number(current.enquiries || 0) + (action === 'message_enquiry' ? 1 : 0),
+        actions: {
+          ...currentActions,
+          [action]: Number(currentActions[action] || 0) + 1,
+        },
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastInteractionAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      transaction.set(statisticsReference, next, { merge: true });
+      if (enquiryMarker) transaction.set(enquiryMarker, {
+        businessId,
+        threadId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return true;
+    });
+    return { counted };
   }
 );

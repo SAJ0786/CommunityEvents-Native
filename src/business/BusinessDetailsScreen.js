@@ -45,7 +45,7 @@ function formatVerificationDate(value) {
   return date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function BusinessDetailsScreen({ business, promotions = [], saved = false, onBack, onToggleSaved, isGuest = true, user, profile, onRequireSignIn }) {
+export default function BusinessDetailsScreen({ business, promotions = [], saved = false, onBack, onToggleSaved, isGuest = true, user, profile, onRequireSignIn, onTrackAction }) {
   const [tab, setTab] = useState('about');
   const [coverFailed, setCoverFailed] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
@@ -94,7 +94,13 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
     }
   };
 
+  const openTrackedExternal = (action, url, unavailableMessage) => {
+    onTrackAction?.(action);
+    return openExternal(url, unavailableMessage);
+  };
+
   const shareBusiness = async () => {
+    onTrackAction?.('share');
     await Share.share({
       title: business.name,
       message: [
@@ -114,7 +120,8 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
     if (isGuest) { onRequireSignIn?.(); return; }
     setContactBusy(true); setContactStatus('');
     try {
-      await sendBusinessMessage({ business, user, profile, text: contactText });
+      const result = await sendBusinessMessage({ business, user, profile, text: contactText });
+      if (result?.isNew) onTrackAction?.('message_enquiry', { threadId: result.threadId });
       setContactText('');
       setContactStatus('Message sent. Follow the conversation from Business Inbox.');
     } catch (error) {
@@ -157,7 +164,7 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
       </View>
       <View style={styles.titleRow}>
         <Text style={styles.title}>{business.name}</Text>
-        {businessPromotions.length ? <Pressable accessibilityLabel="View active promotions" onPress={() => { setTab('promotions'); setTimeout(() => screenRef.current?.scrollTo({ y: 540, animated: true }), 50); }}><Animated.View style={[styles.promotionPulse, { opacity: promotionPulse }]}><Text style={styles.promotionPulseIcon}>🏷️</Text><Text style={styles.promotionPulseText}>PROMO</Text></Animated.View></Pressable> : null}
+        {businessPromotions.length ? <Pressable accessibilityLabel="View active promotions" onPress={() => { onTrackAction?.('promotions'); setTab('promotions'); setTimeout(() => screenRef.current?.scrollTo({ y: 540, animated: true }), 50); }}><Animated.View style={[styles.promotionPulse, { opacity: promotionPulse }]}><Text style={styles.promotionPulseIcon}>🏷️</Text><Text style={styles.promotionPulseText}>PROMO</Text></Animated.View></Pressable> : null}
       </View>
       <Text style={styles.metaSummary}>{[(business.categories || [business.category]).filter(Boolean).join(', '), business.suburb, business.distanceKm != null ? `${business.distanceKm} km away` : ''].filter(Boolean).join(' · ')}</Text>
       {business.abnVerified === true ? (
@@ -170,18 +177,18 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
       </View>
 
       <View style={styles.actionGrid}>
-        <DetailAction icon={'\u{1F4AC}'} label="Contact" onPress={() => isGuest ? onRequireSignIn?.() : setContactOpen(true)} />
-        {business.phone ? <DetailAction icon={'\u{1F4DE}'} label="Call" onPress={() => openExternal(`tel:${business.phone}`, 'Calling is not available on this device.')} /> : null}
-        {business.whatsapp ? <DetailAction icon={'\u{1F4F1}'} label="WhatsApp" onPress={() => openExternal(`https://wa.me/${business.whatsapp.replace(/\D/g, '')}`, 'WhatsApp is not installed or unavailable.')} /> : null}
-        {business.address ? <DetailAction icon={'\u{1F5FA}\uFE0F'} label="Directions" onPress={() => openExternal(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address)}`, 'Maps could not open this address.')} /> : null}
+        <DetailAction icon={'\u{1F4AC}'} label="Contact" onPress={() => { onTrackAction?.('contact'); isGuest ? onRequireSignIn?.() : setContactOpen(true); }} />
+        {business.phone ? <DetailAction icon={'\u{1F4DE}'} label="Call" onPress={() => openTrackedExternal('call', `tel:${business.phone}`, 'Calling is not available on this device.')} /> : null}
+        {business.whatsapp ? <DetailAction icon={'\u{1F4F1}'} label="WhatsApp" onPress={() => openTrackedExternal('whatsapp', `https://wa.me/${business.whatsapp.replace(/\D/g, '')}`, 'WhatsApp is not installed or unavailable.')} /> : null}
+        {business.address ? <DetailAction icon={'\u{1F5FA}\uFE0F'} label="Directions" onPress={() => openTrackedExternal('directions', `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address)}`, 'Maps could not open this address.')} /> : null}
         <DetailAction icon={'\u{1F4E4}'} label="Share" onPress={shareBusiness} />
       </View>
 
       {(business.website || business.social?.facebook || business.social?.instagram || business.social?.twitter || business.social?.x) ? <View style={styles.socialRow}>
-        {business.website ? <Pressable accessibilityLabel="Open website" onPress={() => openExternal(business.website, 'The website could not be opened.')} style={styles.socialButton}><SocialBrandIcon brand="website" /></Pressable> : null}
-        {business.social?.facebook ? <Pressable accessibilityLabel="Open Facebook" onPress={() => openExternal(business.social.facebook, 'Facebook could not be opened.')} style={styles.socialButton}><SocialBrandIcon brand="facebook" /></Pressable> : null}
-        {business.social?.instagram ? <Pressable accessibilityLabel="Open Instagram" onPress={() => openExternal(business.social.instagram, 'Instagram could not be opened.')} style={styles.socialButton}><SocialBrandIcon brand="instagram" /></Pressable> : null}
-        {(business.social?.twitter || business.social?.x) ? <Pressable accessibilityLabel="Open X" onPress={() => openExternal(business.social.twitter || business.social.x, 'X could not be opened.')} style={styles.socialButton}><SocialBrandIcon brand="x" /></Pressable> : null}
+        {business.website ? <Pressable accessibilityLabel="Open website" onPress={() => openTrackedExternal('website', business.website, 'The website could not be opened.')} style={styles.socialButton}><SocialBrandIcon brand="website" /></Pressable> : null}
+        {business.social?.facebook ? <Pressable accessibilityLabel="Open Facebook" onPress={() => openTrackedExternal('facebook', business.social.facebook, 'Facebook could not be opened.')} style={styles.socialButton}><SocialBrandIcon brand="facebook" /></Pressable> : null}
+        {business.social?.instagram ? <Pressable accessibilityLabel="Open Instagram" onPress={() => openTrackedExternal('instagram', business.social.instagram, 'Instagram could not be opened.')} style={styles.socialButton}><SocialBrandIcon brand="instagram" /></Pressable> : null}
+        {(business.social?.twitter || business.social?.x) ? <Pressable accessibilityLabel="Open X" onPress={() => openTrackedExternal('x', business.social.twitter || business.social.x, 'X could not be opened.')} style={styles.socialButton}><SocialBrandIcon brand="x" /></Pressable> : null}
       </View> : null}
 
       <View style={styles.tabs} accessibilityRole="tablist">
@@ -194,7 +201,7 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
             key={item.id}
             accessibilityRole="tab"
             accessibilityState={{ selected: tab === item.id }}
-            onPress={() => setTab(item.id)}
+            onPress={() => { if (item.id === 'hours') onTrackAction?.('hours'); if (item.id === 'promotions') onTrackAction?.('promotions'); setTab(item.id); }}
             style={[styles.tab, tab === item.id && styles.activeTab]}
           >
             <Text style={[styles.tabText, tab === item.id && styles.activeTabText]}>{item.label}</Text>
@@ -205,15 +212,15 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
       {tab === 'about' ? (
         <View style={styles.section}>
           <Text style={styles.description}>{business.description}</Text>
-          <Pressable accessibilityRole="button" accessibilityState={{ expanded: servicesExpanded }} onPress={() => setServicesExpanded(value => !value)} style={({ pressed }) => [styles.servicesAction, pressed && styles.pressed]}>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: servicesExpanded }} onPress={() => { if (!servicesExpanded) onTrackAction?.('services'); setServicesExpanded(value => !value); }} style={({ pressed }) => [styles.servicesAction, pressed && styles.pressed]}>
             <View style={styles.servicesActionIcon}><Text style={styles.servicesActionIconText}>{'\u{1F6CD}\uFE0F'}</Text></View>
             <View style={styles.servicesActionCopy}><Text style={styles.servicesActionTitle}>Services & Products Offered</Text><Text style={styles.servicesActionText}>{offeredServices.length} selected {offeredServices.length === 1 ? 'item' : 'items'}</Text></View>
             <Text style={styles.servicesActionChevron}>{servicesExpanded ? '\u2303' : '\u2304'}</Text>
           </Pressable>
           {servicesExpanded ? <View style={styles.servicesPanel}>{offeredServices.length ? offeredServices.map(service => <View key={service} style={styles.serviceChip}><Text style={styles.serviceChipText}>{'\u2713'} {service}</Text></View>) : <Text style={styles.servicesEmpty}>No services or products were supplied.</Text>}</View> : null}
-          <InfoRow icon={'\u{1F4CD}'} title={business.suburb} text={business.address} onPress={() => openExternal(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address)}`, 'Maps could not open this address.')} />
-          <InfoRow icon={'\u{1F552}'} title={business.hoursSummary || 'Opening hours'} text="Opening hours may change on public holidays." onPress={() => setTab('hours')} />
-          {business.website ? <InfoRow icon={'\u{1F310}'} title="Website" text={business.website.replace(/^https?:\/\//, '')} onPress={() => openExternal(business.website, 'The website could not be opened.')} /> : null}
+          <InfoRow icon={'\u{1F4CD}'} title={business.suburb} text={business.address} onPress={() => openTrackedExternal('directions', `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address)}`, 'Maps could not open this address.')} />
+          <InfoRow icon={'\u{1F552}'} title={business.hoursSummary || 'Opening hours'} text="Opening hours may change on public holidays." onPress={() => { onTrackAction?.('hours'); setTab('hours'); }} />
+          {business.website ? <InfoRow icon={'\u{1F310}'} title="Website" text={business.website.replace(/^https?:\/\//, '')} onPress={() => openTrackedExternal('website', business.website, 'The website could not be opened.')} /> : null}
         </View>
       ) : null}
 

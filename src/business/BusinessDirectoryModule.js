@@ -35,6 +35,7 @@ import CitySelector from '../components/CitySelector';
 import CompactSelect from '../components/CompactSelect';
 import { sendFeedbackMessage } from '../services/messaging';
 import { listenBusinessCategories } from '../services/businessCategoryAdmin';
+import { trackBusinessInteraction } from '../services/businessAnalytics';
 
 function SectionHeading({ title, subtitle, actionLabel, onAction }) {
   return (
@@ -592,8 +593,13 @@ export default function BusinessDirectoryModule({
     };
   }, [currentUser?.uid, isGuest]);
 
-  const openBusiness = business => onSelectBusiness?.(business?.id || '');
+  const openBusiness = business => {
+    if (!business?.id) return;
+    trackBusinessInteraction(business.id, 'page_view');
+    onSelectBusiness?.(business.id);
+  };
   const toggleSaved = async business => {
+    if (business?.id) trackBusinessInteraction(business.id, 'favourite');
     if (isGuest) {
       Alert.alert('Sign in required', 'Sign in or create an account to save business Favourites.');
       onOpenAccount?.();
@@ -802,6 +808,7 @@ export default function BusinessDirectoryModule({
             user={currentUser}
             profile={profile}
             onRequireSignIn={onOpenAccount}
+            onTrackAction={(action, options) => trackBusinessInteraction(selectedBusiness.id, action, options)}
           />
         ) : activeTab === 'admin' ? (
           <BusinessAdminDashboard user={currentUser} profile={profile} categories={businessCategories} />

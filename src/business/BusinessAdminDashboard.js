@@ -5,11 +5,13 @@ import { getDiagnosticSessionId } from '../services/diagnostics';
 import { listUsers } from '../services/users';
 import { colors, radius, shadow, spacing } from '../theme';
 import BusinessApprovalPanel from './BusinessApprovalPanel';
+import BusinessStatisticsScreen from './BusinessStatisticsScreen';
 import CompactSelect from '../components/CompactSelect';
 import { addBusinessCategory, addBusinessSubcategory } from '../services/businessCategoryAdmin';
 
 const AREAS = [
   ['approvals', '\u2713', 'Business Approvals', 'Review listings and promotions before publication.'],
+  ['statistics', '\u{1F4CA}', 'Business Statistics', 'Business accesses, button activity and in-app enquiries.'],
   ['users', '\u{1F465}', 'Users', 'Search Business Directory accounts and listing owners.'],
   ['businesses', '\u{1F3EA}', 'Businesses', 'Manage active, pending, draft and rejected listings.'],
   ['troubleshooting', '\u{1F6E0}', 'Troubleshooting', 'Business diagnostics and tester support details.'],
@@ -115,6 +117,7 @@ export default function BusinessAdminDashboard({ user, profile, categories = [] 
 
   if (panel === 'approvals') return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView contentContainerStyle={styles.keyboardContent} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets><BusinessApprovalPanel mode="approvals" onBack={() => setPanel('overview')} /></ScrollView></KeyboardAvoidingView>;
   if (panel === 'businesses') return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView contentContainerStyle={styles.keyboardContent} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets><BusinessApprovalPanel mode="management" onBack={() => setPanel('overview')} /></ScrollView></KeyboardAvoidingView>;
+  if (panel === 'statistics') return <BusinessStatisticsScreen businesses={businesses} categories={categories} profile={profile} onBack={() => setPanel('overview')} />;
 
   if (panel === 'users') return <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets><PanelHeader title="Directory Users" subtitle="Newest accounts first. Business Owners includes anyone who has submitted a listing, regardless of approval or visibility." onBack={() => setPanel('overview')} /><TextInput value={userQuery} onChangeText={setUserQuery} placeholder="Search name, email, phone or city" placeholderTextColor={colors.muted} style={styles.input} /><View style={styles.scopeTabs}><Pressable onPress={() => setUserScope('users')} style={[styles.scopeTab, userScope === 'users' && styles.scopeTabActive]}><Text style={[styles.scopeText, userScope === 'users' && styles.scopeTextActive]}>Users</Text></Pressable><Pressable onPress={() => setUserScope('owners')} style={[styles.scopeTab, userScope === 'owners' && styles.scopeTabActive]}><Text style={[styles.scopeText, userScope === 'owners' && styles.scopeTextActive]}>Business Owners</Text></Pressable></View><Text style={styles.resultCount}>{visibleUsers.length} {userScope === 'owners' ? 'BUSINESS OWNERS' : 'USERS'} · NEWEST FIRST</Text>{visibleUsers.map(item => <View key={item.id} style={styles.userCard}><View style={styles.userAvatar}><Text style={styles.userAvatarText}>{String(item.fullName || item.email || 'U').charAt(0).toUpperCase()}</Text></View><View style={styles.userCopy}><Text style={styles.userName}>{item.fullName || 'Unnamed user'}</Text><Text style={styles.userMeta}>{item.email || item.phone || item.phoneNumber || 'No contact detail'}</Text><Text style={styles.userMeta}>{item.defaultCity || 'No default city'} · {item.role || 'user'}</Text><Text style={styles.userJoined}>Joined {joinedDate(item)}</Text></View></View>)}</ScrollView>;
 

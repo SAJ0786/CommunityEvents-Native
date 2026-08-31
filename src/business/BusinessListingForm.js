@@ -177,6 +177,7 @@ export default function BusinessListingForm({
   const [abrLookupLoading, setAbrLookupLoading] = useState(false);
   const [abrLookupError, setAbrLookupError] = useState('');
   const [abrLookupAttempt, setAbrLookupAttempt] = useState(0);
+  const [activeCategoryId, setActiveCategoryId] = useState(() => initialBusiness?.categoryIds?.[0] || initialBusiness?.categoryId || '');
 
   useEffect(() => {
     setForm(createFormState(initialBusiness, defaultCity));
@@ -189,6 +190,7 @@ export default function BusinessListingForm({
     setAbrLookupLoading(false);
     setAbrLookupError('');
     setAbrLookupAttempt(0);
+    setActiveCategoryId(initialBusiness?.categoryIds?.[0] || initialBusiness?.categoryId || '');
   }, [defaultCity, initialBusiness?.id]);
 
   useEffect(() => {
@@ -235,6 +237,7 @@ export default function BusinessListingForm({
   }, [abrLookupAttempt, form.abn, form.abnStatus]);
 
   const selectedCategories = useMemo(() => categories.filter(item => form.categoryIds.includes(item.id)), [categories, form.categoryIds]);
+  const activeCategory = categories.find(item => item.id === activeCategoryId && form.categoryIds.includes(item.id)) || selectedCategories[0] || null;
   const payload = useMemo(() => {
     const selectedSubcategories = selectedCategories.flatMap(category => category.subcategories || []).filter(item => form.subcategoryIds.includes(item.id));
     return {
@@ -374,26 +377,35 @@ export default function BusinessListingForm({
           <TextInput editable={!abrLookup} value={form.name} onChangeText={value => update('name', value)} placeholder="Registered or trading name" placeholderTextColor={colors.muted} style={[styles.input, abrLookup && styles.inputLocked, attempted && validation.name && styles.inputInvalid]} />
           {abrLookup ? <View style={styles.abrResult}><Text style={styles.abrResultTitle}>{'\u2713'} ABR details found</Text><Text style={styles.abrResultText}>{abrLookup.entityTypeName || 'Registered entity'}{abrLookup.state || abrLookup.postcode ? ` · ${[abrLookup.state, abrLookup.postcode].filter(Boolean).join(' ')}` : ''}</Text><Text style={styles.abrDisclaimer}>This assists data entry only. It does not verify the submitter’s identity, ownership, licences, insurance or service quality.</Text></View> : null}
         </Field>
-        <Field label="Categories" error={attempted ? validation.categoryId : ''} helper="Choose every category that applies to this business.">
-          <View style={styles.subcategoryGrid}>
+        <Field label="Categories" error={attempted ? validation.categoryId : ''} helper="Choose every category that applies. Tap a selected category to show its services below.">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRail}>
             {categories.map(item => {
               const selected = form.categoryIds.includes(item.id);
-              return <Pressable key={item.id} onPress={() => setForm(current => {
-                const nextCategoryIds = selected ? current.categoryIds.filter(id => id !== item.id) : [...current.categoryIds, item.id];
-                const removedSubcategoryIds = selected ? new Set((item.subcategories || []).map(row => row.id)) : new Set();
-                return { ...current, categoryId: nextCategoryIds[0] || '', categoryIds: nextCategoryIds, subcategoryIds: current.subcategoryIds.filter(id => !removedSubcategoryIds.has(id)) };
-              })} style={[styles.subcategoryChip, selected && styles.subcategoryChipActive]}><Text style={[styles.subcategoryText, selected && styles.subcategoryTextActive]}>{selected ? '\u2713 ' : ''}{item.icon} {item.label}</Text></Pressable>;
+              const active = activeCategory?.id === item.id;
+              return <Pressable key={item.id} onPress={() => {
+                setActiveCategoryId(item.id);
+                if (!selected) setForm(current => {
+                  const nextCategoryIds = [...current.categoryIds, item.id];
+                  return { ...current, categoryId: nextCategoryIds[0] || '', categoryIds: nextCategoryIds };
+                });
+              }} style={[styles.categoryTile, selected && styles.categoryTileSelected, active && styles.categoryTileActive]}><Text style={styles.categoryTileIcon}>{item.icon}</Text><Text numberOfLines={2} style={[styles.categoryTileText, active && styles.categoryTileTextActive]}>{selected ? '\u2713 ' : ''}{item.label}</Text></Pressable>;
             })}
-          </View>
+          </ScrollView>
         </Field>
-        {selectedCategories.map(category => <Field key={category.id} label={`${category.label} — Services / Subcategories`} error={attempted ? validation.subcategoryIds : ''} helper="Choose each service or product this business provides.">
-          <View style={styles.subcategoryGrid}>
-            {(category.subcategories || []).map(item => {
+        {activeCategory ? <Field label={`${activeCategory.label} — Services / Subcategories`} error={attempted ? validation.subcategoryIds : ''} helper="Choose each service or product this business provides. Your other selected categories remain saved in the strip above.">
+          <View style={styles.activeCategoryHead}><Text style={styles.activeCategorySummary}>{selectedCategories.length} categor{selectedCategories.length === 1 ? 'y' : 'ies'} selected</Text><Pressable onPress={() => {
+            const removedSubcategoryIds = new Set((activeCategory.subcategories || []).map(row => row.id));
+            const remaining = form.categoryIds.filter(id => id !== activeCategory.id);
+            setForm(current => ({ ...current, categoryId: remaining[0] || '', categoryIds: remaining, subcategoryIds: current.subcategoryIds.filter(id => !removedSubcategoryIds.has(id)) }));
+            setActiveCategoryId(remaining[0] || '');
+          }} style={styles.removeCategory}><Text style={styles.removeCategoryText}>Remove category</Text></Pressable></View>
+          <View style={styles.serviceGrid}>
+            {(activeCategory.subcategories || []).map(item => {
               const selected = form.subcategoryIds.includes(item.id);
-              return <Pressable key={item.id} onPress={() => setForm(current => ({ ...current, subcategoryIds: selected ? current.subcategoryIds.filter(id => id !== item.id) : [...current.subcategoryIds, item.id] }))} style={[styles.subcategoryChip, selected && styles.subcategoryChipActive]}><Text style={[styles.subcategoryText, selected && styles.subcategoryTextActive]}>{selected ? '\u2713 ' : ''}{item.label}</Text></Pressable>;
+              return <Pressable key={item.id} onPress={() => setForm(current => ({ ...current, subcategoryIds: selected ? current.subcategoryIds.filter(id => id !== item.id) : [...current.subcategoryIds, item.id] }))} style={[styles.serviceTile, selected && styles.serviceTileActive]}><Text style={[styles.serviceTileText, selected && styles.serviceTileTextActive]}>{selected ? '\u2713 ' : ''}{item.label}</Text></Pressable>;
             })}
           </View>
-        </Field>)}
+        </Field> : null}
         <Field label="About the business" error={attempted ? validation.description : ''}>
           <TextInput value={form.description} onChangeText={value => update('description', value)} multiline maxLength={1200} placeholder="Describe your services, customers and what makes the business useful to the community." placeholderTextColor={colors.muted} style={[styles.input, styles.textArea, attempted && validation.description && styles.inputInvalid]} />
           <Text style={styles.characterCount}>{form.description.length}/1200</Text>
@@ -564,6 +576,22 @@ const styles = StyleSheet.create({
   subcategoryChipActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
   subcategoryText: { color: colors.muted, fontSize: 10, fontWeight: '800' },
   subcategoryTextActive: { color: colors.tealDark, fontWeight: '900' },
+  categoryRail: { gap: spacing.sm, paddingRight: spacing.md },
+  categoryTile: { width: 88, minHeight: 76, alignItems: 'center', justifyContent: 'center', gap: 5, padding: 7, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  categoryTileSelected: { borderColor: '#78c6bd', backgroundColor: colors.tealSoft },
+  categoryTileActive: { borderColor: colors.teal, backgroundColor: colors.teal },
+  categoryTileIcon: { fontSize: 20 },
+  categoryTileText: { color: colors.text, fontSize: 9.5, lineHeight: 12, fontWeight: '800', textAlign: 'center' },
+  categoryTileTextActive: { color: colors.surface },
+  activeCategoryHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  activeCategorySummary: { color: colors.tealDark, fontSize: 10, fontWeight: '900' },
+  removeCategory: { minHeight: 32, justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: '#fff0f0' },
+  removeCategoryText: { color: colors.danger, fontSize: 9, fontWeight: '900' },
+  serviceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  serviceTile: { width: '48%', minHeight: 50, flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing.sm, paddingVertical: 8, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  serviceTileActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
+  serviceTileText: { color: colors.muted, fontSize: 10, lineHeight: 14, fontWeight: '800', textAlign: 'center' },
+  serviceTileTextActive: { color: colors.tealDark, fontWeight: '900' },
   characterCount: { alignSelf: 'flex-end', color: colors.muted, fontSize: 10, fontWeight: '700' },
   logoPreview: { width: 104, height: 104, borderRadius: 24, backgroundColor: colors.tealSoft },
   coverPreview: { width: '100%', height: 170, borderRadius: radius.md, backgroundColor: colors.tealSoft },

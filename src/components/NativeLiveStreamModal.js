@@ -383,6 +383,12 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
               }}
               onPermissionsDenied={() => setError('Camera and microphone access are required to stream from this phone.')}
             />
+            {!minimized && !controlsVisible ? <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Show streaming controls"
+              onPress={showControlsTemporarily}
+              style={styles.controlsWakeLayer}
+            /> : null}
             <View style={[styles.liveBadge, minimized && styles.liveBadgeMinimized]}>
               <View style={[styles.liveDot, connected && styles.liveDotConnected]} />
               <Text style={styles.liveBadgeText}>{streaming ? (connected ? 'LIVE' : 'CONNECTING') : 'PREVIEW'}</Text>
@@ -573,6 +579,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: { color: colors.tealDark, fontSize: 14, fontWeight: '900' },
   cameraStage: { flex: 1, backgroundColor: '#050b12' },
   camera: { flex: 1, alignSelf: 'stretch', backgroundColor: '#050b12' },
+  controlsWakeLayer: { ...StyleSheet.absoluteFillObject, zIndex: 2 },
   liveBadge: { position: 'absolute', top: spacing.md, left: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 99, backgroundColor: 'rgba(5,11,18,0.72)' },
   liveBadgeMinimized: { top: 7, left: 7, paddingHorizontal: 7, paddingVertical: 5 },
   liveDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#94a3b8' },
