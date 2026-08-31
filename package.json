@@ -25,6 +25,7 @@
     "@react-native-firebase/storage": "^26.1.0",
     "babel-preset-expo": "~54.0.10",
     "expo": "~54.0.37",
+    "expo-asset": "~12.0.13",
     "expo-audio": "~1.1.1",
     "expo-build-properties": "~1.0.10",
     "expo-calendar": "~15.0.8",
