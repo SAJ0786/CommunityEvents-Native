@@ -34,8 +34,8 @@ function organiserBadge(event) {
 }
 
 export default function EventCard({ event, onPress, onToggleSaved, isSaved, saving }) {
-  const { width } = useWindowDimensions();
-  const compact = width < 390;
+  const { width, fontScale } = useWindowDimensions();
+  const compact = width / Math.max(fontScale, 1) < 390;
   const [poster, setPoster] = useState(getEventPoster(event) || getImmediatePosterSource(event));
   const [posterOpen, setPosterOpen] = useState(false);
   const chip = dateChip(event.eventDate);
@@ -43,9 +43,6 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
   const host = event.hostName || event.organiserName || event.organizationName || '';
   const title = [displayType, host].filter(Boolean).join(' - ');
   const suburb = getEventSuburb(event);
-  const audience = event.audienceType === 'Mixed Audience'
-    ? 'Family Event'
-    : event.audienceType || event.audience || 'All Welcome';
   const organiser = organiserBadge(event);
   const displayTime = `${event.prayerLabel ? `${event.prayerLabel} ` : ''}${formatEventTime(event.startTime, event.endTime)}`.trim();
   const hasUploadedPoster = Boolean(event.imageUrl || event.posterUrl || event.poster || event.image || event.flyerUrl || event.flyer || event.imagePath || event.posterPath);
@@ -87,61 +84,60 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
         />
         {chip.day ? (
           <View style={styles.dateChip}>
-            <Text style={styles.dateMonth}>{chip.month}</Text>
-            <Text style={styles.dateDay}>{chip.day}</Text>
-            <Text style={styles.dateWeekday}>{chip.weekday}</Text>
+            <Text maxFontSizeMultiplier={1} style={styles.dateMonth}>{chip.month}</Text>
+            <Text maxFontSizeMultiplier={1} style={styles.dateDay}>{chip.day}</Text>
+            <Text maxFontSizeMultiplier={1} style={styles.dateWeekday}>{chip.weekday}</Text>
           </View>
         ) : null}
-        {event.isLive ? <Text style={styles.liveBadge}>LIVE</Text> : null}
-        {hasUploadedPoster && poster ? <Text style={styles.zoomHint}>{'\u2315'}</Text> : null}
+        {event.isLive ? <Text maxFontSizeMultiplier={1} style={styles.liveBadge}>LIVE</Text> : null}
+        {hasUploadedPoster && poster ? <Text maxFontSizeMultiplier={1} style={styles.zoomHint}>{'\u2315'}</Text> : null}
       </Pressable>
 
       <View style={styles.content}>
         <View style={styles.titlePanel}>
-          <Text style={[styles.title, compact && styles.titleCompact]} numberOfLines={2}>{title.toUpperCase()}</Text>
+          <Text maxFontSizeMultiplier={1.06} style={[styles.title, compact && styles.titleCompact]} numberOfLines={2}>{title.toUpperCase()}</Text>
         </View>
-        <Text style={[styles.meta, compact && styles.metaCompact]}>{'\u23F0'} {displayTime || 'Time TBC'}</Text>
-        <Text style={[styles.meta, compact && styles.metaCompact]} numberOfLines={1}>{'\uD83D\uDCCD'} {suburb || 'Location TBC'}</Text>
-        <View style={styles.footerRow}>
-          <View style={styles.badgeRow}>
-            <View style={[styles.badge, audience === 'Family Event' ? styles.familyBadge : styles.audienceBadge]}>
-              <Text style={[styles.badgeText, audience === 'Family Event' ? styles.familyText : styles.audienceText]} numberOfLines={1}>
-                {String(audience).toUpperCase()}
-              </Text>
-            </View>
-            <View style={[styles.badge, { backgroundColor: organiser.backgroundColor }]}>
-              <Text style={[styles.badgeText, { color: organiser.color }]}>{organiser.label}</Text>
-            </View>
+        <View style={styles.detailRow}>
+          <View style={[styles.detailPill, styles.timePill]}>
+            <Text maxFontSizeMultiplier={1.03} numberOfLines={1} style={styles.detailText}>{'\u23F0'} {displayTime || 'TBC'}</Text>
           </View>
-
-          {onToggleSaved ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={isSaved ? 'Remove from Favourites' : 'Add to Favourites'}
-              hitSlop={8}
-              onPress={pressEvent => {
-                pressEvent.stopPropagation?.();
-                onToggleSaved?.();
-              }}
-              style={({ pressed }) => [styles.saveButton, pressed && styles.saveButtonPressed]}
-            >
-              {saving ? (
-                <ActivityIndicator color={colors.tealDark} size="small" />
-              ) : (
-                <Text style={[styles.saveText, isSaved && styles.saveTextActive]}>
-                  {isSaved ? '\u2665' : '\u2661'}
-                </Text>
-              )}
-            </Pressable>
-          ) : null}
+          <View style={[styles.detailPill, styles.locationPill]}>
+            <Text maxFontSizeMultiplier={1.03} numberOfLines={1} style={styles.detailText}>{'\uD83D\uDCCD'} {suburb || 'TBC'}</Text>
+          </View>
+          <View style={[styles.detailPill, styles.typePill]}>
+            <Text maxFontSizeMultiplier={1.02} numberOfLines={1} style={styles.typeText}>{displayType}</Text>
+          </View>
+          <View style={[styles.detailPill, { backgroundColor: organiser.backgroundColor }]}>
+            <Text maxFontSizeMultiplier={1.02} numberOfLines={1} style={[styles.typeText, { color: organiser.color }]}>{organiser.label}</Text>
+          </View>
         </View>
+        {onToggleSaved ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={isSaved ? 'Remove from Favourites' : 'Add to Favourites'}
+            hitSlop={8}
+            onPress={pressEvent => {
+              pressEvent.stopPropagation?.();
+              onToggleSaved?.();
+            }}
+            style={({ pressed }) => [styles.saveButton, pressed && styles.saveButtonPressed]}
+          >
+            {saving ? (
+              <ActivityIndicator color={colors.tealDark} size="small" />
+            ) : (
+              <Text maxFontSizeMultiplier={1} style={[styles.saveText, isSaved && styles.saveTextActive]}>
+                {isSaved ? '\u2665' : '\u2661'}
+              </Text>
+            )}
+          </Pressable>
+        ) : null}
       </View>
     </Pressable>
 
     <Modal transparent visible={posterOpen} animationType="fade" onRequestClose={() => setPosterOpen(false)}>
       <Pressable accessibilityLabel="Close full-screen event poster" onPress={() => setPosterOpen(false)} style={styles.posterModal}>
         {poster ? <Image source={{ uri: poster }} style={styles.posterFullscreen} resizeMode="contain" /> : null}
-        <Text style={styles.posterCloseHint}>Tap anywhere to close</Text>
+        <Text maxFontSizeMultiplier={1.1} style={styles.posterCloseHint}>Tap anywhere to close</Text>
       </Pressable>
     </Modal>
     </>
@@ -149,34 +145,31 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
 }
 
 const styles = StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'stretch', gap: spacing.md, padding: spacing.md, marginBottom: spacing.md, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, ...shadow },
+  card: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: 8, marginBottom: spacing.sm, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, ...shadow },
   cardPressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
-  posterFrame: { width: 92, height: 92, position: 'relative', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: '#f0f4f3' },
-  posterFrameCompact: { width: 82, height: 92 },
+  posterFrame: { width: 72, height: 72, position: 'relative', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: '#f0f4f3' },
+  posterFrameCompact: { width: 66, height: 68 },
   poster: { width: '100%', height: '100%' },
-  dateChip: { position: 'absolute', top: 6, left: 6, minWidth: 36, alignItems: 'center', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8, backgroundColor: colors.surface, ...shadow },
-  dateMonth: { color: '#16a34a', fontSize: 8, fontWeight: '900', letterSpacing: 0.4 },
-  dateDay: { color: colors.text, fontSize: 16, lineHeight: 17, fontWeight: '900' },
-  dateWeekday: { color: colors.muted, fontSize: 8, fontWeight: '800' },
+  dateChip: { position: 'absolute', top: 4, left: 4, minWidth: 31, alignItems: 'center', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 7, backgroundColor: colors.surface, ...shadow },
+  dateMonth: { color: '#16a34a', fontSize: 7, fontWeight: '900', letterSpacing: 0.3 },
+  dateDay: { color: colors.text, fontSize: 14, lineHeight: 14, fontWeight: '900' },
+  dateWeekday: { color: colors.muted, fontSize: 7, fontWeight: '800' },
   liveBadge: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingVertical: 2, color: colors.surface, backgroundColor: colors.teal, fontSize: 9, fontWeight: '900', textAlign: 'center' },
   zoomHint: { position: 'absolute', right: 5, bottom: 5, width: 22, height: 22, borderRadius: 11, color: colors.surface, backgroundColor: 'rgba(0,0,0,0.58)', fontSize: 15, lineHeight: 22, fontWeight: '900', textAlign: 'center' },
-  content: { flex: 1, minWidth: 0, justifyContent: 'center' },
-  titlePanel: { alignSelf: 'stretch', paddingHorizontal: 9, paddingVertical: 7, marginBottom: 5, borderLeftWidth: 3, borderLeftColor: colors.teal, borderRadius: 9, backgroundColor: '#edf8f6' },
-  title: { color: colors.navy, fontSize: 13, lineHeight: 17, fontWeight: '900', letterSpacing: 0.25 },
-  titleCompact: { fontSize: 12, lineHeight: 16 },
-  meta: { color: colors.muted, fontSize: 12, lineHeight: 17, fontWeight: '700' },
-  metaCompact: { fontSize: 11 },
-  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 6 },
-  badgeRow: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  badge: { maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  badgeText: { fontSize: 9, fontWeight: '900' },
-  familyBadge: { backgroundColor: '#dbeafe' },
-  familyText: { color: '#1d4ed8' },
-  audienceBadge: { backgroundColor: '#dcfce7' },
-  audienceText: { color: '#15803d' },
-  saveButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  content: { flex: 1, minWidth: 0, position: 'relative', justifyContent: 'center' },
+  titlePanel: { alignSelf: 'stretch', minHeight: 30, justifyContent: 'center', paddingLeft: 7, paddingRight: 32, paddingVertical: 4, marginBottom: 4, borderLeftWidth: 3, borderLeftColor: colors.teal, borderRadius: 8, backgroundColor: '#edf8f6' },
+  title: { color: colors.navy, fontSize: 11.5, lineHeight: 14, fontWeight: '900', letterSpacing: 0.18 },
+  titleCompact: { fontSize: 10.5, lineHeight: 13 },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 3, overflow: 'hidden' },
+  detailPill: { minWidth: 0, maxWidth: '28%', paddingHorizontal: 5, paddingVertical: 3, borderRadius: 8, backgroundColor: '#eef3f2' },
+  timePill: { flexShrink: 1, maxWidth: '31%' },
+  locationPill: { flex: 1, maxWidth: '31%' },
+  typePill: { flexShrink: 1, backgroundColor: '#dcfce7' },
+  detailText: { color: colors.muted, fontSize: 8.5, lineHeight: 11, fontWeight: '800' },
+  typeText: { color: '#15803d', fontSize: 8, lineHeight: 11, fontWeight: '900' },
+  saveButton: { position: 'absolute', right: 1, top: 1, width: 29, height: 29, alignItems: 'center', justifyContent: 'center' },
   saveButtonPressed: { opacity: 0.65 },
-  saveText: { color: '#cbd5d3', fontSize: 24, lineHeight: 28 },
+  saveText: { color: '#cbd5d3', fontSize: 21, lineHeight: 25 },
   saveTextActive: { color: '#d43867' },
   posterModal: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(0,0,0,0.94)' },
   posterFullscreen: { width: '100%', height: '88%' },

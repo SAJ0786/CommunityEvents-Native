@@ -13,6 +13,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
@@ -23,6 +24,7 @@ import AppHeader from './src/components/AppHeader';
 import AppErrorBoundary from './src/components/AppErrorBoundary';
 import AuthLandingScreen from './src/components/AuthLandingScreen';
 import AdminDashboardScreen from './src/components/AdminDashboardScreen';
+import AzaanPlaybackController from './src/components/AzaanPlaybackController';
 import BottomNavigation from './src/components/BottomNavigation';
 import BulkShareScreen from './src/components/BulkShareScreen';
 import AddEventChoice from './src/components/AddEventChoice';
@@ -195,6 +197,8 @@ function EmptyState({ title, text }) {
 }
 
 function MainApp() {
+  const { width: viewportWidth, fontScale } = useWindowDimensions();
+  const compactEventsLayout = viewportWidth / Math.max(fontScale, 1) < 390;
   const [appModule, setAppModule] = useState('events');
   const [preferredModule, setPreferredModule] = useState('events');
   const [directoryTab, setDirectoryTab] = useState('home');
@@ -1075,13 +1079,13 @@ function MainApp() {
   }, [handleCityChange]);
 
   const renderHeader = () => (
-    <View style={styles.contentHeader}>
-      <View style={styles.titleRow}>
-        <View style={styles.titleAccent} />
+    <View style={[styles.contentHeader, compactEventsLayout && styles.contentHeaderCompact]}>
+      <View style={[styles.titleRow, compactEventsLayout && styles.titleRowCompact]}>
+        <View style={[styles.titleAccent, compactEventsLayout && styles.titleAccentCompact]} />
         <View style={styles.titleCopy}>
-          <Text style={styles.sectionEyebrow}>DISCOVER WHAT'S ON</Text>
-          <Text style={styles.sectionTitle}>Upcoming Events</Text>
-          <Text style={styles.sectionSubtitle}>
+          <Text maxFontSizeMultiplier={1.08} style={styles.sectionEyebrow}>DISCOVER WHAT'S ON</Text>
+          <Text maxFontSizeMultiplier={1.08} style={[styles.sectionTitle, compactEventsLayout && styles.sectionTitleCompact]}>Upcoming Events</Text>
+          <Text maxFontSizeMultiplier={1.08} style={[styles.sectionSubtitle, compactEventsLayout && styles.sectionSubtitleCompact]}>
             {displayedEvents.length} event{displayedEvents.length === 1 ? '' : 's'} in {cityLabel(selectedCity)}
           </Text>
         </View>
@@ -1089,41 +1093,41 @@ function MainApp() {
           <Pressable accessibilityState={{ selected: liveOnly }} onPress={() => setLiveOnly(current => !current)}>
             <Animated.View style={[styles.liveFilter, liveOnly && styles.liveFilterActive, { opacity: livePulse }]}>
               <View style={styles.liveDot} />
-              <Text style={styles.liveFilterText}>LIVE {liveEventCount}</Text>
+              <Text maxFontSizeMultiplier={1.05} style={styles.liveFilterText}>LIVE {liveEventCount}</Text>
             </Animated.View>
           </Pressable>
         ) : null}
       </View>
-      <Text style={styles.notice}>
+      <Text maxFontSizeMultiplier={1.08} style={[styles.notice, compactEventsLayout && styles.noticeCompact]}>
         Hijri dates are subject to moon sighting. Events are user-submitted, so please verify details with hosts.
       </Text>
-      <View style={styles.controlSection}>
-      <View style={styles.homeControls}>
+      <View style={[styles.controlSection, compactEventsLayout && styles.controlSectionCompact]}>
+      <View style={[styles.homeControls, compactEventsLayout && styles.homeControlsCompact]}>
         <CitySelector compact selectedCity={selectedCity} onChange={handleCityChange} allowCurrentLocation />
         <View style={styles.viewToggle}>
           {['list', 'map'].map(mode => (
             <Pressable key={mode} onPress={() => setHomeViewMode(mode)} style={[styles.viewToggleButton, homeViewMode === mode && styles.viewToggleButtonActive]}>
-              <Text style={[styles.viewToggleText, homeViewMode === mode && styles.viewToggleTextActive]}>{mode === 'list' ? 'List' : 'Map'}</Text>
+              <Text maxFontSizeMultiplier={1.05} style={[styles.viewToggleText, homeViewMode === mode && styles.viewToggleTextActive]}>{mode === 'list' ? 'List' : 'Map'}</Text>
             </Pressable>
           ))}
         </View>
       </View>
-      <View style={styles.eventShortcuts}>
+      <View style={[styles.eventShortcuts, compactEventsLayout && styles.eventShortcutsCompact]}>
         <Pressable
           accessibilityLabel="Open Streamed Videos"
           onPress={() => requestTabChange('streams')}
-          style={({ pressed }) => [styles.eventShortcut, styles.streamShortcut, pressed && styles.eventShortcutPressed]}
+          style={({ pressed }) => [styles.eventShortcut, compactEventsLayout && styles.eventShortcutCompact, styles.streamShortcut, pressed && styles.eventShortcutPressed]}
         >
           <View style={[styles.eventShortcutIcon, styles.streamShortcutIcon]}><Text style={styles.streamShortcutIconText}>{'\u25B6'}</Text></View>
-          <Text style={styles.eventShortcutText}>Streamed Videos</Text>
+          <Text maxFontSizeMultiplier={1.05} numberOfLines={1} style={[styles.eventShortcutText, compactEventsLayout && styles.eventShortcutTextCompact]}>Streamed Videos</Text>
         </Pressable>
         <Pressable
           accessibilityLabel="Open Hijri Calendar"
           onPress={() => requestTabChange('hijri-calendar')}
-          style={({ pressed }) => [styles.eventShortcut, styles.hijriShortcut, pressed && styles.eventShortcutPressed]}
+          style={({ pressed }) => [styles.eventShortcut, compactEventsLayout && styles.eventShortcutCompact, styles.hijriShortcut, pressed && styles.eventShortcutPressed]}
         >
           <View style={[styles.eventShortcutIcon, styles.hijriShortcutIcon]}><Text style={styles.hijriShortcutIconText}>{'\u263E'}</Text></View>
-          <Text style={styles.eventShortcutText}>Hijri Calendar</Text>
+          <Text maxFontSizeMultiplier={1.05} numberOfLines={1} style={[styles.eventShortcutText, compactEventsLayout && styles.eventShortcutTextCompact]}>Hijri Calendar</Text>
         </Pressable>
       </View>
       {homeViewMode === 'list' ? <HomeFilters
@@ -1252,7 +1256,7 @@ function MainApp() {
           )}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmpty}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, compactEventsLayout && styles.listContentCompact]}
         />
       ) : activeTab === 'my_events' ? (
         <MyEventsScreen
@@ -1397,8 +1401,8 @@ function MainApp() {
       {appModule === 'events' && activeTab === 'home' ? (
         <View pointerEvents="box-none" style={styles.floatingCtaWrap}>
           <Pressable onPress={() => setActiveTab('calendar')} style={({ pressed }) => [styles.floatingCta, pressed && styles.floatingCtaPressed]}>
-            <Text style={styles.floatingCtaText}>View Calendar &amp; Sync</Text>
-            <Text style={styles.floatingCtaArrow}>›</Text>
+            <Text maxFontSizeMultiplier={1.08} style={styles.floatingCtaText}>View Calendar &amp; Sync</Text>
+            <Text maxFontSizeMultiplier={1} style={styles.floatingCtaArrow}>›</Text>
           </Pressable>
         </View>
       ) : null}
@@ -1446,6 +1450,12 @@ function MainApp() {
             setMyEvents(current => current.map(item => item.id === updatedEvent.id ? { ...item, ...updatedEvent } : item));
           }}
         />
+        <AzaanPlaybackController
+          onOpenHijriCalendar={() => {
+            setAppModule('events');
+            setActiveTab('hijri-calendar');
+          }}
+        />
         {appModule === 'events' ? (
           <BottomNavigation
             activeTab={activeTab === 'bulk_share' || activeTab === 'admin' ? 'profile' : activeTab === 'calendar' || activeTab === 'hijri-calendar' || activeTab === 'streams' || activeTab === 'feedback' || activeTab === 'inbox' ? 'home' : activeTab}
@@ -1480,16 +1490,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: 148,
   },
+  listContentCompact: { paddingHorizontal: spacing.sm },
   mapScrollContent: { paddingBottom: 148 },
   mapHeader: { paddingHorizontal: spacing.lg },
   contentHeader: {
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
   },
+  contentHeaderCompact: { paddingTop: spacing.sm },
   homeControls: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  homeControlsCompact: { gap: 6 },
   controlSection: { marginTop: spacing.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface },
+  controlSectionCompact: { marginTop: spacing.sm, padding: 6 },
   eventShortcuts: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  eventShortcutsCompact: { gap: 6, marginTop: 6 },
   eventShortcut: { flex: 1, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: spacing.sm, borderWidth: 1, borderRadius: 12, backgroundColor: colors.surface },
+  eventShortcutCompact: { minHeight: 39, gap: 5, paddingHorizontal: 5 },
   streamShortcut: { borderColor: '#ffc4c4' },
   hijriShortcut: { borderColor: '#d9cff8' },
   eventShortcutIcon: { width: 27, height: 27, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
@@ -1498,6 +1514,7 @@ const styles = StyleSheet.create({
   streamShortcutIconText: { color: colors.surface, fontSize: 12, fontWeight: '900' },
   hijriShortcutIconText: { color: '#ffd66b', fontSize: 17, fontWeight: '900' },
   eventShortcutText: { color: colors.navy, fontSize: 11.5, fontWeight: '900' },
+  eventShortcutTextCompact: { fontSize: 10.5 },
   eventShortcutPressed: { opacity: 0.76 },
   viewToggle: {
     flex: 1,
@@ -1525,7 +1542,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.md,
   },
+  titleRowCompact: { alignItems: 'flex-start', gap: 7, marginTop: spacing.sm },
   titleAccent: { width: 5, height: 48, borderRadius: 3, backgroundColor: colors.teal },
+  titleAccentCompact: { height: 42 },
   titleCopy: { flex: 1, minWidth: 0 },
   sectionEyebrow: { color: colors.tealDark, fontSize: 10, fontWeight: '900', letterSpacing: 1.25 },
   sectionTitle: {
@@ -1534,6 +1553,7 @@ const styles = StyleSheet.create({
     lineHeight: 27,
     fontWeight: '900',
   },
+  sectionTitleCompact: { fontSize: 19, lineHeight: 23 },
   liveFilter: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, borderRadius: 19, backgroundColor: '#ef4444' },
   liveFilterActive: { backgroundColor: '#b91c1c' },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.surface },
@@ -1544,6 +1564,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 2,
   },
+  sectionSubtitleCompact: { fontSize: 12, lineHeight: 16 },
   notice: {
     color: colors.muted,
     fontSize: 13,
@@ -1551,6 +1572,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: spacing.md,
   },
+  noticeCompact: { fontSize: 11.5, lineHeight: 16, marginTop: spacing.sm },
   guestNotice: {
     marginBottom: spacing.md,
     padding: spacing.md,

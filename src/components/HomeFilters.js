@@ -7,7 +7,7 @@ import CompactSelect from './CompactSelect';
 function FilterChoices({ label, options, value, onChange }) {
   return (
     <View style={styles.group}>
-      <Text style={styles.label}>{label}</Text>
+      <Text maxFontSizeMultiplier={1.08} style={styles.label}>{label}</Text>
       <CompactSelect options={options} value={value} onChange={onChange} />
     </View>
   );
@@ -31,7 +31,7 @@ export default function HomeFilters({
   return (
     <View style={styles.wrap}>
       <View style={styles.searchRow}>
-        <Text style={styles.searchIcon}>{'\uD83D\uDD0D'}</Text>
+        <Text maxFontSizeMultiplier={1} style={styles.searchIcon}>{'\uD83D\uDD0D'}</Text>
         <TextInput
           autoCapitalize="none"
           autoCorrect={false}
@@ -40,15 +40,16 @@ export default function HomeFilters({
           placeholder="Search events..."
           placeholderTextColor={colors.muted}
           style={styles.searchInput}
+          maxFontSizeMultiplier={1.08}
           value={query}
         />
         {query ? (
           <Pressable accessibilityLabel="Clear search" onPress={() => onQueryChange('')} style={styles.clearSearch}>
-            <Text style={styles.clearSearchText}>x</Text>
+            <Text maxFontSizeMultiplier={1} style={styles.clearSearchText}>x</Text>
           </Pressable>
         ) : null}
         <Pressable onPress={onToggleFilters} style={[styles.filterButton, showFilters && styles.filterButtonActive]}>
-          <Text style={[styles.filterButtonText, showFilters && styles.filterButtonTextActive]}>
+          <Text maxFontSizeMultiplier={1.05} numberOfLines={1} style={[styles.filterButtonText, showFilters && styles.filterButtonTextActive]}>
             Filters{activeCount ? ` (${activeCount})` : ''}
           </Text>
         </Pressable>
@@ -91,29 +92,31 @@ export default function HomeFilters({
           />
           <View style={styles.twoColumns}>
             <View style={styles.column}>
-              <Text style={styles.label}>Host name</Text>
+              <Text maxFontSizeMultiplier={1.08} style={styles.label}>Host name</Text>
               <TextInput
                 onChangeText={value => onFilterChange('hostName', value)}
                 placeholder="All hosts"
                 placeholderTextColor={colors.muted}
                 style={styles.input}
+                maxFontSizeMultiplier={1.08}
                 value={filters.hostName}
               />
             </View>
             <View style={styles.column}>
-              <Text style={styles.label}>Suburb</Text>
+              <Text maxFontSizeMultiplier={1.08} style={styles.label}>Suburb</Text>
               <TextInput
                 onChangeText={value => onFilterChange('suburb', value)}
                 placeholder="All suburbs"
                 placeholderTextColor={colors.muted}
                 style={styles.input}
+                maxFontSizeMultiplier={1.08}
                 value={filters.suburb}
               />
             </View>
           </View>
           {activeCount ? (
             <Pressable onPress={onClear} style={styles.clearButton}>
-              <Text style={styles.clearButtonText}>Clear Filters</Text>
+              <Text maxFontSizeMultiplier={1.08} style={styles.clearButtonText}>Clear Filters</Text>
             </Pressable>
           ) : null}
         </View>
@@ -124,12 +127,12 @@ export default function HomeFilters({
 
 const styles = StyleSheet.create({
   wrap: { marginTop: spacing.sm, marginBottom: spacing.sm },
-  searchRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  searchRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   searchIcon: { color: colors.muted, fontSize: 20, fontWeight: '900' },
   searchInput: { flex: 1, minWidth: 0, minHeight: 46, color: colors.text, fontSize: 14 },
   clearSearch: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: colors.border },
   clearSearchText: { color: colors.surface, fontSize: 20, lineHeight: 23, fontWeight: '900' },
-  filterButton: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.tealSoft },
+  filterButton: { minHeight: 36, maxWidth: 82, justifyContent: 'center', paddingHorizontal: 7, borderRadius: radius.sm, backgroundColor: colors.tealSoft },
   filterButtonActive: { backgroundColor: colors.teal },
   filterButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '900' },
   filterButtonTextActive: { color: colors.surface },

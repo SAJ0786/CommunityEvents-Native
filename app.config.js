@@ -19,6 +19,7 @@ export default ({ config }) => ({
   ...config,
   plugins: [
     ...(config.plugins || []),
+    'expo-audio',
     ['react-native-share', { android: [], ios: [] }],
   ],
   android: {

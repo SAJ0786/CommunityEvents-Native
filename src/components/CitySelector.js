@@ -55,14 +55,14 @@ export default function CitySelector({ selectedCity, onChange, onLocationResolve
     <>
       <Pressable onPress={() => setOpen(true)} style={({ pressed }) => [styles.trigger, compact && styles.triggerCompact, pressed && styles.pressed]}>
         <View style={[styles.triggerCode, compact && styles.triggerCodeCompact]}>
-          <Text style={styles.triggerMarker}>{'\u{1F4CD}'}</Text>
-          <Text style={styles.triggerCodeText}>{cityCode(selectedCity)}</Text>
+          <Text maxFontSizeMultiplier={1} style={styles.triggerMarker}>{'\u{1F4CD}'}</Text>
+          <Text maxFontSizeMultiplier={1.05} style={styles.triggerCodeText}>{cityCode(selectedCity)}</Text>
         </View>
         {!compact ? <View style={styles.triggerCopy}>
-          <Text style={styles.triggerLabel}>City</Text>
-          <Text style={styles.triggerValue}>{selectedLabel}</Text>
+          <Text maxFontSizeMultiplier={1.08} style={styles.triggerLabel}>City</Text>
+          <Text maxFontSizeMultiplier={1.08} style={styles.triggerValue}>{selectedLabel}</Text>
         </View> : null}
-        <Text style={styles.chevron}>▾</Text>
+        <Text maxFontSizeMultiplier={1} style={styles.chevron}>▾</Text>
       </Pressable>
 
       <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -70,9 +70,9 @@ export default function CitySelector({ selectedCity, onChange, onLocationResolve
           <Pressable style={styles.backdrop} onPress={() => setOpen(false)} />
           <View style={styles.sheet}>
             <View style={styles.header}>
-              <Text style={styles.title}>Choose City</Text>
+              <Text maxFontSizeMultiplier={1.12} style={styles.title}>Choose City</Text>
               <Pressable onPress={() => setOpen(false)} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
-                <Text style={styles.closeText}>Close</Text>
+                <Text maxFontSizeMultiplier={1.08} style={styles.closeText}>Close</Text>
               </Pressable>
             </View>
 
@@ -85,16 +85,16 @@ export default function CitySelector({ selectedCity, onChange, onLocationResolve
                 <View style={styles.locationIconCircle}>
                   {locating
                     ? <ActivityIndicator color={colors.surface} size="small" />
-                    : <Text style={styles.locationIcon}>{'\u25CE'}</Text>}
+                    : <Text maxFontSizeMultiplier={1} style={styles.locationIcon}>{'\u25CE'}</Text>}
                 </View>
                 <View style={styles.locationCopy}>
-                  <Text style={styles.locationButtonText}>{locating ? 'Finding your city...' : 'Use my current location'}</Text>
-                  <Text style={styles.locationButtonHint}>Detect the nearest supported city</Text>
+                  <Text maxFontSizeMultiplier={1.08} style={styles.locationButtonText}>{locating ? 'Finding your city...' : 'Use my current location'}</Text>
+                  <Text maxFontSizeMultiplier={1.08} style={styles.locationButtonHint}>Detect the nearest supported city</Text>
                 </View>
-                <Text style={styles.locationArrow}>{'\u203A'}</Text>
+                <Text maxFontSizeMultiplier={1} style={styles.locationArrow}>{'\u203A'}</Text>
               </Pressable>
             ) : null}
-            {locationError ? <Text style={styles.locationError}>{locationError}</Text> : null}
+            {locationError ? <Text maxFontSizeMultiplier={1.08} style={styles.locationError}>{locationError}</Text> : null}
 
             <ScrollView contentContainerStyle={styles.list}>
               {CITY_OPTIONS.map(city => {
@@ -109,9 +109,9 @@ export default function CitySelector({ selectedCity, onChange, onLocationResolve
                     style={({ pressed }) => [styles.option, active && styles.optionActive, pressed && styles.pressed]}
                   >
                     <View style={styles.optionCode}>
-                      <Text style={[styles.optionCodeText, active && styles.optionCodeTextActive]}>{cityCode(city.value)}</Text>
+                      <Text maxFontSizeMultiplier={1.05} style={[styles.optionCodeText, active && styles.optionCodeTextActive]}>{cityCode(city.value)}</Text>
                     </View>
-                    <Text style={[styles.optionLabel, active && styles.optionLabelActive]}>{city.label.replace(', Australia', '')}</Text>
+                    <Text maxFontSizeMultiplier={1.08} style={[styles.optionLabel, active && styles.optionLabelActive]}>{city.label.replace(', Australia', '')}</Text>
                   </Pressable>
                 );
               })}
