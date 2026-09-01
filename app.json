@@ -23,6 +23,10 @@
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [
+          "fetch",
+          "remote-notification"
+        ],
         "NSCameraUsageDescription": "Allow Community Connect Australia to use your camera when you choose to live stream an event.",
         "NSMicrophoneUsageDescription": "Allow Community Connect Australia to use your microphone when you choose to live stream an event."
       }
@@ -59,7 +63,13 @@
           },
           "ios": {
             "deploymentTarget": "15.1",
-            "useFrameworks": "static"
+            "useFrameworks": "static",
+            "extraPods": [
+              {
+                "name": "RecaptchaEnterprise",
+                "version": "18.9.1"
+              }
+            ]
           }
         }
       ],

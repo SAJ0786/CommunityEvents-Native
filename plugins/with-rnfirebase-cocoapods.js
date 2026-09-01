@@ -1,8 +1,9 @@
-const { withPodfile } = require('@expo/config-plugins');
+const { withPodfile, withXcodeProject } = require('@expo/config-plugins');
 
 const DISABLE_SPM_LINE = '$RNFirebaseDisableSPM = true';
 const HAISHINKIT_WORKAROUND_MARKER = '# Community Connect: HaishinKit Xcode 26 workaround';
 const POST_INSTALL_LINE = 'post_install do |installer|';
+const OBJC_LINKER_FLAG = '"-ObjC"';
 const HAISHINKIT_WORKAROUND = `${POST_INSTALL_LINE}
     ${HAISHINKIT_WORKAROUND_MARKER}
     # HaishinKit 1.9.3 crashes the Xcode 26 Swift optimiser, including in
@@ -22,7 +23,7 @@ const HAISHINKIT_WORKAROUND = `${POST_INSTALL_LINE}
  * option. Our livestream dependency needs CocoaPods/static linkage, so keep
  * Firebase on the CocoaPods resolver until the upstream plugin handles this.
  */
-module.exports = function withReactNativeFirebaseCocoaPods(config) {
+function withFirebasePodfile(config) {
   return withPodfile(config, podfileConfig => {
     let podfile = podfileConfig.modResults.contents;
 
@@ -41,4 +42,36 @@ module.exports = function withReactNativeFirebaseCocoaPods(config) {
     podfileConfig.modResults.contents = podfile;
     return podfileConfig;
   });
+}
+
+function withFirebaseObjCLinkerFlag(config) {
+  return withXcodeProject(config, xcodeConfig => {
+    const configurations = xcodeConfig.modResults.pbxXCBuildConfigurationSection();
+
+    for (const [key, configuration] of Object.entries(configurations)) {
+      if (key.endsWith('_comment') || !configuration?.buildSettings) {
+        continue;
+      }
+
+      const currentFlags = configuration.buildSettings.OTHER_LDFLAGS;
+      const flags = Array.isArray(currentFlags)
+        ? [...currentFlags]
+        : currentFlags
+          ? [currentFlags]
+          : ['"$(inherited)"'];
+
+      if (!flags.some(flag => String(flag).replaceAll('"', '') === '-ObjC')) {
+        flags.push(OBJC_LINKER_FLAG);
+      }
+
+      configuration.buildSettings.OTHER_LDFLAGS = flags;
+    }
+
+    return xcodeConfig;
+  });
+}
+
+module.exports = function withReactNativeFirebaseCocoaPods(config) {
+  config = withFirebasePodfile(config);
+  return withFirebaseObjCLinkerFlag(config);
 };
