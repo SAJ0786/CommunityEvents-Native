@@ -34,7 +34,7 @@ import { getHijriSettings } from '../services/settings';
 import { cityLabel, classifyMetroArea, normalizeCity } from '../utils/cities';
 import {
   AUDIENCE_TYPES,
-  EVENT_TYPES,
+  EVENT_TYPE_GROUPS,
   ORGANISER_OPTIONS,
   RECITER_TYPES,
   RELIGIOUS_EVENT_TYPES,
@@ -87,6 +87,57 @@ function ChoiceGroup({ options, value, onChange }) {
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+function EventTypeSelector({ dynamicOptions, value, onChange }) {
+  const groups = EVENT_TYPE_GROUPS.map(group => ({
+    ...group,
+    eventTypes: group.key === 'other'
+      ? [...new Set([...dynamicOptions, ...group.eventTypes])]
+      : group.eventTypes,
+  }));
+  const activeGroup = groups.find(group => group.eventTypes.includes(value)) || groups[0];
+
+  return (
+    <View style={styles.eventTypeSelector}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.eventCategoryStrip}>
+        {groups.map(group => {
+          const selected = group.key === activeGroup.key;
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={group.key}
+              onPress={() => {
+                if (!group.eventTypes.includes(value)) onChange(group.eventTypes[0]);
+              }}
+              style={({ pressed }) => [styles.eventCategoryCard, selected && styles.eventCategoryCardSelected, pressed && styles.pressed]}
+            >
+              <Text maxFontSizeMultiplier={1} style={styles.eventCategoryIcon}>{group.icon}</Text>
+              <Text maxFontSizeMultiplier={1.05} numberOfLines={2} style={[styles.eventCategoryLabel, selected && styles.eventCategoryLabelSelected]}>{group.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      <Text maxFontSizeMultiplier={1.1} style={styles.eventSubcategoryHelp}>Choose an event type</Text>
+      <View style={styles.eventSubcategoryGrid}>
+        {activeGroup.eventTypes.map(option => {
+          const selected = value === option;
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={option}
+              onPress={() => onChange(option)}
+              style={({ pressed }) => [styles.eventSubcategoryCard, selected && styles.eventSubcategoryCardSelected, pressed && styles.pressed]}
+            >
+              <Text maxFontSizeMultiplier={1.08} numberOfLines={2} style={[styles.eventSubcategoryText, selected && styles.eventSubcategoryTextSelected]}>{option}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -309,7 +360,6 @@ export default function CreateEventForm({
   }, []);
 
   const update = (field, value) => setForm(current => ({ ...current, [field]: value }));
-  const eventTypeOptions = useMemo(() => [...new Set([...EVENT_TYPES.filter(item => item !== 'Custom'), ...dynamicOptions.eventTypes, 'Custom'])], [dynamicOptions.eventTypes]);
   const reciterTypeOptions = useMemo(() => [...new Set([...RECITER_TYPES.filter(item => item !== 'Custom'), ...dynamicOptions.reciterTypes, 'Custom'])], [dynamicOptions.reciterTypes]);
   const showReligious = RELIGIOUS_EVENT_TYPES.has(form.eventType) || dynamicOptions.eventTypes.includes(form.eventType);
   const prayerAddress = useMemo(() => ({
@@ -1025,7 +1075,7 @@ export default function CreateEventForm({
         ) : null}
 
         <Field label="Event Type">
-          <ChoiceGroup options={eventTypeOptions} value={form.eventType} onChange={value => update('eventType', value)} />
+          <EventTypeSelector dynamicOptions={dynamicOptions.eventTypes} value={form.eventType} onChange={value => update('eventType', value)} />
         </Field>
 
         {form.eventType === 'Custom' ? (
@@ -1238,6 +1288,19 @@ const styles = StyleSheet.create({
   choiceSelected: { borderColor: colors.teal, backgroundColor: colors.teal },
   choiceText: { color: colors.text, fontSize: 12, fontWeight: '800' },
   choiceTextSelected: { color: colors.surface },
+  eventTypeSelector: { gap: spacing.sm },
+  eventCategoryStrip: { gap: spacing.sm, paddingRight: spacing.md },
+  eventCategoryCard: { width: 126, minHeight: 78, alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  eventCategoryCardSelected: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
+  eventCategoryIcon: { fontSize: 24 },
+  eventCategoryLabel: { color: colors.text, fontSize: 12, lineHeight: 15, fontWeight: '900', textAlign: 'center' },
+  eventCategoryLabelSelected: { color: colors.tealDark },
+  eventSubcategoryHelp: { color: colors.muted, fontSize: 11, fontWeight: '800' },
+  eventSubcategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  eventSubcategoryCard: { minWidth: '46%', flexGrow: 1, flexBasis: 120, minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  eventSubcategoryCardSelected: { borderColor: colors.teal, backgroundColor: colors.teal },
+  eventSubcategoryText: { color: colors.text, fontSize: 12, lineHeight: 15, fontWeight: '800', textAlign: 'center' },
+  eventSubcategoryTextSelected: { color: colors.surface },
   optionList: { gap: spacing.sm },
   option: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   optionSelected: { borderColor: colors.teal, backgroundColor: colors.tealSoft },

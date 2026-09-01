@@ -186,8 +186,8 @@ export default function AppHeader({
         <View style={styles.brandWrap}>
           <Image source={logoSource} style={styles.logo} resizeMode="contain" />
           <View style={styles.brandTextWrap}>
-            <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={[styles.brand, activeModule === 'directory' && styles.brandCompact]}>Community</Text>
-            <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={[styles.brand, activeModule === 'directory' && styles.brandCompact]}>{brandProduct}</Text>
+            <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={[styles.brand, styles.brandCompact]}>Community</Text>
+            <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={[styles.brand, styles.brandCompact]}>{brandProduct}</Text>
           </View>
         </View>
 

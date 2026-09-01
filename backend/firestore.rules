@@ -356,8 +356,10 @@ service cloud.firestore {
         && request.resource.data.participantUids is list
         && request.resource.data.participantUids.size() == 2
         && request.resource.data.participantUids.hasAny([request.auth.uid])
+        && request.resource.data.participantUids.hasAny([request.resource.data.ownerUid])
         && request.resource.data.senderUid == request.auth.uid
-        && get(/databases/$(database)/documents/businesses/$(request.resource.data.businessId)).data.ownerId
+        && get(/databases/$(database)/documents/businessContactRoutes/$(request.resource.data.businessId)).data.active == true
+        && get(/databases/$(database)/documents/businessContactRoutes/$(request.resource.data.businessId)).data.ownerUid
           == request.resource.data.ownerUid;
       allow update: if isBusinessThreadParticipant(resource.data)
         && request.resource.data.participantUids == resource.data.participantUids

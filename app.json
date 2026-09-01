@@ -29,7 +29,7 @@
     },
     "android": {
       "package": "info.siza.communityevents.app",
-      "versionCode": 43,
+      "versionCode": 44,
       "googleServicesFile": "./google-services.json",
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",

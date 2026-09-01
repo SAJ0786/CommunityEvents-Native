@@ -9,6 +9,27 @@ export const EVENT_TYPES = [
   'Custom',
 ];
 
+export const EVENT_TYPE_GROUPS = [
+  {
+    key: 'faith',
+    label: 'Faith & Worship',
+    icon: '\u{1F54C}',
+    eventTypes: ['Majlis', 'Milad', 'Prayers', 'Dua', 'Prayers & Amal'],
+  },
+  {
+    key: 'community',
+    label: 'Community & Social',
+    icon: '\u{1F389}',
+    eventTypes: ['Birthday', 'Informal get together'],
+  },
+  {
+    key: 'other',
+    label: 'Other',
+    icon: '\u2728',
+    eventTypes: ['Custom'],
+  },
+];
+
 export const AUDIENCE_TYPES = [
   'Gents only',
   'Ladies only',

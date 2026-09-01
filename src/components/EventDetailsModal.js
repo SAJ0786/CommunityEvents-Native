@@ -76,7 +76,7 @@ function ActionButton({ label, icon, iconNode, variant = 'subtle', onPress, disa
       ]}>
         {iconNode || <Text style={styles.actionIcon}>{icon}</Text>}
       </View>
-      <Text style={[
+      <Text maxFontSizeMultiplier={1} numberOfLines={2} style={[
         styles.actionLabel,
         variant === 'danger' && styles.actionLabelDanger,
         variant === 'live' && styles.actionLabelLive,
@@ -443,11 +443,11 @@ export default function EventDetailsModal({
               <View style={styles.dragHandle} />
               <View style={styles.headerRow}>
                 <View style={styles.headerCopy}>
-                  <Text style={styles.headerTitle}>Event details</Text>
-                  <Text style={styles.headerHint}>Swipe down to close</Text>
+                  <Text maxFontSizeMultiplier={1.05} style={styles.headerTitle}>Event details</Text>
+                  <Text maxFontSizeMultiplier={1.05} style={styles.headerHint}>Swipe down to close</Text>
                 </View>
                 <Pressable accessibilityLabel="Close event details" onPress={animateClose} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
-                  <Text style={styles.closeText}>{'\u00D7'}</Text>
+                  <Text maxFontSizeMultiplier={1} style={styles.closeText}>{'\u00D7'}</Text>
                 </Pressable>
               </View>
             </View>
@@ -460,7 +460,7 @@ export default function EventDetailsModal({
             >
               <View style={styles.card}>
                 <View style={styles.titlePanel}>
-                  <Text style={styles.title}>{getEventTitle(event).toUpperCase()}</Text>
+                  <Text maxFontSizeMultiplier={1.08} style={styles.title}>{getEventTitle(event).toUpperCase()}</Text>
                 </View>
 
                 <View style={styles.actionGrid}>
@@ -755,6 +755,7 @@ const styles = StyleSheet.create({
   actionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: 6,
     marginTop: spacing.sm,
     marginBottom: spacing.sm,

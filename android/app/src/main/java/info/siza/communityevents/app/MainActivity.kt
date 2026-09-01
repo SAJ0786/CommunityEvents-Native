@@ -2,6 +2,8 @@ package info.siza.communityevents.app
 
 import android.os.Build
 import android.os.Bundle
+import android.content.Context
+import android.content.res.Configuration
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -11,6 +13,14 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 import expo.modules.ReactActivityDelegateWrapper
 
 class MainActivity : ReactActivity() {
+  override fun attachBaseContext(newBase: Context) {
+    val configuration = Configuration(newBase.resources.configuration)
+    // Respect accessibility text sizing while preventing extreme system scaling from
+    // destroying navigation, cards and modal actions on small Android screens.
+    if (configuration.fontScale > 1.2f) configuration.fontScale = 1.2f
+    super.attachBaseContext(newBase.createConfigurationContext(configuration))
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     // Set the theme to AppTheme BEFORE onCreate to support
     // coloring the background, status bar, and navigation bar.

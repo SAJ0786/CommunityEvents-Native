@@ -743,3 +743,77 @@ Implementation status: interactive prototype approved and native source implemen
 - Treat cross-platform parity as a release requirement for new features and record any intentional platform exception in the QA checklist.
 
 Implementation status: shared module configuration, automated portability guard and architecture guide added; broader screen-by-screen PWA parity remains an ongoing conversion workstream.
+
+### R-088 — Business Statistics dashboard
+
+- Provide overall and per-business views, filtered using the same city, category, subcategory and business hierarchy as the public directory.
+- Track listing opens, contact, call, WhatsApp, directions, share, website/social links, promotion opens and received in-app enquiries.
+- Restrict detailed statistics to authorised Business Directory administrators.
+
+Implementation status: source and backend function complete; pending build 44 device verification.
+
+### R-089 — Event Add category and event-type hierarchy
+
+- Show a horizontally scrollable main-category strip without an All item.
+- After a main category is selected, show its event types as selectable panels below it.
+- Keep administrator-added event types under Other and persist the selected event type through the existing event schema.
+
+Implementation status: source complete in build 44; pending device verification.
+
+### R-090 — Restore hidden livestream controls on tap
+
+- Keep the microphone meter visible while other live controls are hidden.
+- Restore the controls immediately when the broadcaster taps the camera surface.
+
+Implementation status: source complete; previous S10 device attempt failed and must be retested with build 44.
+
+### R-091 — Android S22 startup stability
+
+- Open build 43 and later without the Android startup crash introduced by the earlier release configuration.
+
+Implementation status: fixed and passed on the connected S22 in build 43.
+
+### R-092 — Readable two-row compact event metadata
+
+- Keep Time and Location together on the first metadata row.
+- Keep Event Type and Centre/Organisation/Private together on the second row.
+- Preserve a compact card without truncating four unrelated values into one unreadable row.
+
+Implementation status: source complete in build 44; pending device verification.
+
+### R-093 — Consistent Events and Business header titles
+
+- Use the approved Business Directory header text size for both Community Events Australia and Community Businesses Australia.
+- Keep both header lines stable under supported accessibility text scaling.
+
+Implementation status: source complete in build 44; pending device verification.
+
+### R-094 — Centred expanded-event actions
+
+- Centre expanded event action buttons within each wrapped row.
+- Keep icons round, labels below their icons and labels limited to two readable lines.
+
+Implementation status: source complete in build 44; pending device verification.
+
+### R-095 — Large-text and display-zoom resilience
+
+- Preserve Android accessibility text scaling up to 120% while preventing extreme system font scale from breaking primary navigation, cards and modal actions.
+- Use responsive wrapping, explicit line limits and compact component text caps instead of relying on clipped fixed-height content.
+
+Implementation status: source complete in build 44; pending large-text and display-zoom device verification.
+
+### R-096 — Business enquiry permission repair
+
+- Authorise a signed-in user to start an enquiry only when the server-managed active business contact route matches the listing owner.
+- Do not rely on the public business document's owner field, which may differ between published and pending workflow records.
+- Keep business-owner self-messaging blocked and all subsequent reads/replies participant-only.
+
+Implementation status: source complete; Firestore rule deployment and build 44 end-to-end verification required.
+
+### R-097 — Entry-page message alignment
+
+- Show **ONE APP · TWO EXPERIENCES** directly below Community Connect Australia.
+- Replace the previous hero copy with **Everything community, all in one place.**
+- Keep the approved Community Events and Business Directory module cards and their descriptions below this unified message.
+
+Implementation status: native source and approved browser prototype updated; pending build 44 device verification.

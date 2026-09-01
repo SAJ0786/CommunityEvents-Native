@@ -97,18 +97,22 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
         <View style={styles.titlePanel}>
           <Text maxFontSizeMultiplier={1.06} style={[styles.title, compact && styles.titleCompact]} numberOfLines={2}>{title.toUpperCase()}</Text>
         </View>
-        <View style={styles.detailRow}>
-          <View style={[styles.detailPill, styles.timePill]}>
-            <Text maxFontSizeMultiplier={1.03} numberOfLines={1} style={styles.detailText}>{'\u23F0'} {displayTime || 'TBC'}</Text>
+        <View style={styles.detailRows}>
+          <View style={styles.detailRow}>
+            <View style={[styles.detailPill, styles.timePill]}>
+              <Text maxFontSizeMultiplier={1.03} numberOfLines={1} style={styles.detailText}>{'\u23F0'} {displayTime || 'TBC'}</Text>
+            </View>
+            <View style={[styles.detailPill, styles.locationPill]}>
+              <Text maxFontSizeMultiplier={1.03} numberOfLines={1} style={styles.detailText}>{'\uD83D\uDCCD'} {suburb || 'TBC'}</Text>
+            </View>
           </View>
-          <View style={[styles.detailPill, styles.locationPill]}>
-            <Text maxFontSizeMultiplier={1.03} numberOfLines={1} style={styles.detailText}>{'\uD83D\uDCCD'} {suburb || 'TBC'}</Text>
-          </View>
-          <View style={[styles.detailPill, styles.typePill]}>
-            <Text maxFontSizeMultiplier={1.02} numberOfLines={1} style={styles.typeText}>{displayType}</Text>
-          </View>
-          <View style={[styles.detailPill, { backgroundColor: organiser.backgroundColor }]}>
-            <Text maxFontSizeMultiplier={1.02} numberOfLines={1} style={[styles.typeText, { color: organiser.color }]}>{organiser.label}</Text>
+          <View style={styles.detailRow}>
+            <View style={[styles.detailPill, styles.typePill]}>
+              <Text maxFontSizeMultiplier={1.02} numberOfLines={1} style={styles.typeText}>{displayType}</Text>
+            </View>
+            <View style={[styles.detailPill, styles.organiserPill, { backgroundColor: organiser.backgroundColor }]}>
+              <Text maxFontSizeMultiplier={1.02} numberOfLines={1} style={[styles.typeText, { color: organiser.color }]}>{organiser.label}</Text>
+            </View>
           </View>
         </View>
         {onToggleSaved ? (
@@ -160,11 +164,13 @@ const styles = StyleSheet.create({
   titlePanel: { alignSelf: 'stretch', minHeight: 30, justifyContent: 'center', paddingLeft: 7, paddingRight: 32, paddingVertical: 4, marginBottom: 4, borderLeftWidth: 3, borderLeftColor: colors.teal, borderRadius: 8, backgroundColor: '#edf8f6' },
   title: { color: colors.navy, fontSize: 11.5, lineHeight: 14, fontWeight: '900', letterSpacing: 0.18 },
   titleCompact: { fontSize: 10.5, lineHeight: 13 },
-  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 3, overflow: 'hidden' },
-  detailPill: { minWidth: 0, maxWidth: '28%', paddingHorizontal: 5, paddingVertical: 3, borderRadius: 8, backgroundColor: '#eef3f2' },
-  timePill: { flexShrink: 1, maxWidth: '31%' },
-  locationPill: { flex: 1, maxWidth: '31%' },
-  typePill: { flexShrink: 1, backgroundColor: '#dcfce7' },
+  detailRows: { gap: 3 },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 4, overflow: 'hidden' },
+  detailPill: { minWidth: 0, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8, backgroundColor: '#eef3f2' },
+  timePill: { flex: 1 },
+  locationPill: { flex: 1.15 },
+  typePill: { flex: 1.15, backgroundColor: '#dcfce7' },
+  organiserPill: { flex: 0.85 },
   detailText: { color: colors.muted, fontSize: 8.5, lineHeight: 11, fontWeight: '800' },
   typeText: { color: '#15803d', fontSize: 8, lineHeight: 11, fontWeight: '900' },
   saveButton: { position: 'absolute', right: 1, top: 1, width: 29, height: 29, alignItems: 'center', justifyContent: 'center' },

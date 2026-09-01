@@ -55,13 +55,13 @@ export default function ModuleEntryScreen({
         </View>
         <View style={styles.brandCopy}>
           <Text {...cappedText} style={styles.brandMain}>Community Connect Australia</Text>
-          <Text {...cappedText} style={styles.brandSub}>ONE COMMUNITY · TWO EXPERIENCES</Text>
+          <Text {...cappedText} style={styles.brandSub}>ONE APP · TWO EXPERIENCES</Text>
         </View>
       </View>
 
       <View style={styles.intro}>
         <Text {...cappedText} style={styles.eyebrow}>WHERE WOULD YOU LIKE TO START?</Text>
-        <Text {...cappedText} style={styles.title}>Your community,{`\n`}your way.</Text>
+        <Text {...cappedText} style={styles.title}>Everything community,{`\n`}all in one place.</Text>
         <Text {...cappedText} style={styles.subtitle}>Choose an experience now. You can switch between both at any time after entering the app.</Text>
       </View>
 
