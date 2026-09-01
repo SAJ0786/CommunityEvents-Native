@@ -22,7 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onIdTokenChanged, signOut } from '@react-native-firebase/auth';
 import AppHeader from './src/components/AppHeader';
 import AppErrorBoundary from './src/components/AppErrorBoundary';
-import AuthLandingScreen from './src/components/AuthLandingScreen';
+import ModuleEntryScreen from './src/components/ModuleEntryScreen';
 import AdminDashboardScreen from './src/components/AdminDashboardScreen';
 import AzaanPlaybackController from './src/components/AzaanPlaybackController';
 import BottomNavigation from './src/components/BottomNavigation';
@@ -1188,7 +1188,7 @@ function MainApp() {
       <SafeAreaView style={styles.safeArea}>
         <ExpoStatusBar style="dark" />
         <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-        <AuthLandingScreen
+        <ModuleEntryScreen
           logoSource={logo}
           preferredModule={preferredModule}
           busy={authBusy}

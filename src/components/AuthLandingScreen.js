@@ -16,8 +16,12 @@ import { colors, radius, shadow, spacing } from '../theme';
 export default function AuthLandingScreen({
   logoSource,
   preferredModule = 'events',
+  productTitle = 'Community Connect Australia',
+  productSubtitle = 'Sign in for all features, or continue as a guest to browse public listings.',
+  showModuleChoice = true,
   busy = false,
   error = '',
+  onBack,
   onPreferredModuleChange,
   onSendPhoneCode,
   onVerifyPhoneCode,
@@ -30,6 +34,7 @@ export default function AuthLandingScreen({
   const [step, setStep] = useState('phone');
   const [accepted, setAccepted] = useState(false);
   const [validation, setValidation] = useState('');
+  const selectedModuleLabel = preferredModule === 'directory' ? 'Business Directory' : 'Community Events';
 
   const sendCode = async () => {
     if (!accepted) {
@@ -61,6 +66,11 @@ export default function AuthLandingScreen({
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+      {onBack ? (
+        <Pressable accessibilityLabel="Change selected module" onPress={onBack} style={styles.backButton}>
+          <Text maxFontSizeMultiplier={1.1} style={styles.backText}>{'\u2039'} Change module</Text>
+        </Pressable>
+      ) : null}
       <View style={styles.brand}>
         <Image source={logoSource} resizeMode="contain" style={styles.logo} />
         <View style={styles.brandCopy}>
@@ -70,12 +80,12 @@ export default function AuthLandingScreen({
       </View>
 
       <View style={styles.welcome}>
-        <Text style={styles.eyebrow}>WELCOME</Text>
-        <Text style={styles.title}>Connect with your community</Text>
-        <Text style={styles.subtitle}>Sign in for all features, or continue as a guest to browse public listings.</Text>
+        <Text maxFontSizeMultiplier={1.1} style={styles.eyebrow}>WELCOME</Text>
+        <Text maxFontSizeMultiplier={1.12} style={styles.title}>{productTitle}</Text>
+        <Text maxFontSizeMultiplier={1.12} style={styles.subtitle}>{productSubtitle}</Text>
       </View>
 
-      <View style={styles.moduleCard}>
+      {showModuleChoice ? <View style={styles.moduleCard}>
         <Text style={styles.fieldLabel}>OPEN AFTER SIGN IN</Text>
         <View style={styles.moduleChoice}>
           {[
@@ -96,7 +106,7 @@ export default function AuthLandingScreen({
             );
           })}
         </View>
-      </View>
+      </View> : null}
 
       <View style={styles.card}>
         <View style={styles.cardHeading}>
@@ -175,8 +185,8 @@ export default function AuthLandingScreen({
       <Pressable disabled={busy} onPress={onContinueGuest} style={({ pressed }) => [styles.guestButton, pressed && styles.pressed, busy && styles.disabled]}>
         <Text style={styles.guestIcon}>{'\u{1F50E}'}</Text>
         <View style={styles.guestCopy}>
-          <Text style={styles.guestTitle}>Browse as guest</Text>
-          <Text style={styles.guestText}>View public events and businesses without signing in</Text>
+          <Text maxFontSizeMultiplier={1.12} style={styles.guestTitle}>Browse {selectedModuleLabel} as guest</Text>
+          <Text maxFontSizeMultiplier={1.12} style={styles.guestText}>Open the selected public experience without signing in</Text>
         </View>
         <Text style={styles.chevron}>{'\u203A'}</Text>
       </Pressable>
@@ -186,6 +196,8 @@ export default function AuthLandingScreen({
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxl, backgroundColor: colors.background },
+  backButton: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', marginBottom: spacing.sm },
+  backText: { color: colors.tealDark, fontSize: 12, lineHeight: 17, fontWeight: '900' },
   brand: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginBottom: spacing.lg },
   logo: { width: 62, height: 62 }, brandCopy: { minWidth: 0 }, brandLine: { color: colors.navy, fontSize: 25, lineHeight: 27, fontWeight: '900' },
   welcome: { alignItems: 'center', marginBottom: spacing.lg }, eyebrow: { color: colors.tealDark, fontSize: 10, letterSpacing: 1.6, fontWeight: '900' },

@@ -725,3 +725,21 @@ Implementation status: source complete; pending device verification.
 - Retain Excel import/export with the current authoritative SheetJS 0.20.3 distribution rather than the obsolete npm-registry release.
 
 Implementation status: source and production bundles complete; final real-device regression, consolidated legal publication and company Apple signing remain release gates.
+
+### R-086 — Pre-login module entry experience
+
+- Before authentication, show the approved modern Community Connect Australia entry page and ask the user to choose **Community Events** or **Business Directory**.
+- Each module card must render its heading on one line/section and begin the supporting description on the next line below it.
+- Continue to a module-specific login page titled **Community Events Australia** or **Community Businesses Australia**.
+- After sign-in or guest entry, land in the selected module while retaining the in-app Events ↔ Business Directory switch.
+
+Implementation status: interactive prototype approved and native source implementation complete; pending APK/device verification.
+
+### R-087 — Shared native, PWA and Windows experience
+
+- Build new screens from reusable responsive design tokens, content definitions, validation rules and service contracts so the native application can be reproduced as a PWA for the Windows app without redesigning each feature.
+- Keep module names, navigation hierarchy, business rules, empty/error states and accessibility behaviour consistent across Android, iOS, PWA and Windows.
+- Separate platform-specific capabilities such as notifications, camera streaming, background audio and store authentication behind adapters while sharing the user-facing workflow.
+- Treat cross-platform parity as a release requirement for new features and record any intentional platform exception in the QA checklist.
+
+Implementation status: shared module configuration, automated portability guard and architecture guide added; broader screen-by-screen PWA parity remains an ongoing conversion workstream.
