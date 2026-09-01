@@ -733,7 +733,7 @@ Implementation status: source and production bundles complete; final real-device
 - Continue to a module-specific login page titled **Community Events Australia** or **Community Businesses Australia**.
 - After sign-in or guest entry, land in the selected module while retaining the in-app Events ↔ Business Directory switch.
 
-Implementation status: interactive prototype approved and native source implementation complete; pending APK/device verification.
+Implementation status: interactive prototype approved; native build 44 entry page visually verified on S22. Module-specific login and post-login landing remain part of the tester walkthrough.
 
 ### R-087 — Shared native, PWA and Windows experience
 
@@ -816,4 +816,4 @@ Implementation status: source complete; Firestore rule deployment and build 44 e
 - Replace the previous hero copy with **Everything community, all in one place.**
 - Keep the approved Community Events and Business Directory module cards and their descriptions below this unified message.
 
-Implementation status: native source and approved browser prototype updated; pending build 44 device verification.
+Implementation status: native source and approved browser prototype updated; wording and module-card text hierarchy visually verified on S22 in build 44.
