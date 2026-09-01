@@ -41,6 +41,19 @@
         "APP_RELEASE_MODE": "tester"
       }
     },
+    "ios-personal-testflight": {
+      "environment": "preview",
+      "distribution": "store",
+      "autoIncrement": true,
+      "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.0"
+      },
+      "env": {
+        "APP_RELEASE_MODE": "tester",
+        "IOS_BUNDLE_IDENTIFIER": "info.siza.communityconnect.personaltest",
+        "IOS_GOOGLE_SERVICES_FILE": "./GoogleService-Info.personal-test.plist"
+      }
+    },
     "production": {
       "environment": "production",
       "autoIncrement": true,

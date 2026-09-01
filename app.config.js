@@ -1,6 +1,8 @@
 const mapsApiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 const androidCertificateSha1 = process.env.ANDROID_CERT_SHA1
   || '5E8F16062EA3CD2C4A0D547876BAA6F38CABF625';
+const iosBundleIdentifier = process.env.IOS_BUNDLE_IDENTIFIER || '';
+const iosGoogleServicesFile = process.env.IOS_GOOGLE_SERVICES_FILE || '';
 const releaseMode = process.env.APP_RELEASE_MODE || '';
 const isBundledRelease = process.env.NODE_ENV === 'production';
 // EAS CLI resolves the config once locally before it loads the selected EAS
@@ -35,6 +37,11 @@ export default ({ config }) => ({
         },
       },
     } : {}),
+  },
+  ios: {
+    ...config.ios,
+    ...(iosBundleIdentifier ? { bundleIdentifier: iosBundleIdentifier } : {}),
+    ...(iosGoogleServicesFile ? { googleServicesFile: iosGoogleServicesFile } : {}),
   },
   extra: {
     ...(config.extra || {}),
