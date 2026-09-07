@@ -796,13 +796,19 @@ export default function CreateEventForm({
   };
 
   const handleNativePicker = (event, value) => {
-    const kind = nativePicker;
+  const kind = nativePicker;
+
+  if (event?.type === 'dismissed' || !value) {
     setNativePicker('');
-    if (event?.type === 'dismissed' || !value) return;
-    if (kind === 'date') setGregorianDate(localIsoDate(value));
-    if (kind === 'start') update('startTime', localTime(value));
-    if (kind === 'end') update('endTime', localTime(value));
-  };
+    return;
+  }
+
+  if (kind === 'date') setGregorianDate(localIsoDate(value));
+  if (kind === 'start') update('startTime', localTime(value));
+  if (kind === 'end') update('endTime', localTime(value));
+
+  if (Platform.OS !== 'ios') setNativePicker('');
+};
 
   return (
     <ScrollView
@@ -1194,15 +1200,33 @@ export default function CreateEventForm({
         </Field>
 
         {nativePicker ? (
-          <DateTimePicker
-            value={pickerValue(nativePicker === 'date' ? form.eventDate : nativePicker === 'start' ? form.startTime : form.endTime, nativePicker === 'date' ? 'date' : 'time')}
-            mode={nativePicker === 'date' ? 'date' : 'time'}
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            minimumDate={nativePicker === 'date' && enforceFutureStart ? new Date() : undefined}
-            minuteInterval={5}
-            onChange={handleNativePicker}
-          />
-        ) : null}
+  <View style={styles.nativePickerPanel}>
+    <DateTimePicker
+      value={pickerValue(
+        nativePicker === 'date'
+          ? form.eventDate
+          : nativePicker === 'start'
+            ? form.startTime
+            : form.endTime,
+        nativePicker === 'date' ? 'date' : 'time'
+      )}
+      mode={nativePicker === 'date' ? 'date' : 'time'}
+      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+      minimumDate={nativePicker === 'date' && enforceFutureStart ? new Date() : undefined}
+      minuteInterval={5}
+      onChange={handleNativePicker}
+    />
+
+    {Platform.OS === 'ios' ? (
+      <Pressable
+        onPress={() => setNativePicker('')}
+        style={styles.nativePickerDone}
+      >
+        <Text style={styles.nativePickerDoneText}>Done</Text>
+      </Pressable>
+    ) : null}
+  </View>
+) : null}
 
         {attempted && Object.keys(validation).length ? (
           <Text accessibilityRole="alert" style={styles.error}>Complete the highlighted mandatory fields.</Text>
@@ -1279,6 +1303,25 @@ const styles = StyleSheet.create({
   pickerValue: { flex: 1, color: colors.text, fontSize: 14, fontWeight: '600' },
   pickerPlaceholder: { color: colors.muted },
   pickerChevron: { color: colors.tealDark, fontSize: 23, fontWeight: '700' },
+  nativePickerPanel: {
+  marginTop: spacing.sm,
+  padding: spacing.sm,
+  borderWidth: 1,
+  borderColor: colors.border,
+  borderRadius: radius.md,
+  backgroundColor: colors.surface,
+},
+nativePickerDone: {
+  alignSelf: 'flex-end',
+  minHeight: 38,
+  justifyContent: 'center',
+  paddingHorizontal: spacing.md,
+},
+nativePickerDoneText: {
+  color: colors.tealDark,
+  fontSize: 13,
+  fontWeight: '700',
+},
   orText: { color: colors.muted, fontSize: 11, fontWeight: '600', textAlign: 'center', textTransform: 'uppercase' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   switchCopy: { flex: 1 },

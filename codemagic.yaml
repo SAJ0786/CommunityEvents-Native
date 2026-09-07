@@ -36,7 +36,9 @@ workflows:
         script: cd ios && pod install
 
       - name: Configure signing
-        script: xcode-project use-profiles
+        # Limit signing to the generated app project. Dependencies such as
+        # RNDateTimePicker ship their own .xcodeproj files and must not be signed.
+        script: xcode-project use-profiles --project ios/*.xcodeproj
 
       - name: Increment build number
         script: |
