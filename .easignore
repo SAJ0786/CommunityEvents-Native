@@ -1,11 +1,13 @@
 node_modules/
 .expo/
 .expo-export-check-*/
+.tmp-*/
 .gradle/
 .jdk17-build/
 .local-jdk17/
 .tools/
 android/.gradle/
+android/.gradle-codex/
 android/.kotlin/
 android/build/
 android/app/build/

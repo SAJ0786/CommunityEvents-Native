@@ -6,8 +6,10 @@ import {
   FlatList,
   Image,
   Alert,
+  Platform,
   Pressable,
   SafeAreaView,
+  Share,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -17,10 +19,15 @@ import {
   View,
 } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
+import Constants from 'expo-constants';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onIdTokenChanged, signOut } from '@react-native-firebase/auth';
-import AppHeader from './src/components/AppHeader';
+import AppHeader from './src/components/AppHeaderModern';
+import AccountMenuSheet from './src/components/AccountMenuSheet';
+import { isPublicPlayableLiveEvent } from './src/utils/liveVideo';
 import AppErrorBoundary from './src/components/AppErrorBoundary';
 import ModuleEntryScreen from './src/components/ModuleEntryScreen';
 import AdminDashboardScreen from './src/components/AdminDashboardScreen';
@@ -52,9 +59,11 @@ import { deleteMyAccountAndEvents, ensureUserProfile, migratePhoneAccount, toggl
 import { cancelFavouriteReminder, initializeDefaultPrayerReminders, scheduleFavouriteReminder } from './src/services/reminders';
 import { listenForDevicePushTokenChanges, registerDevicePushNotifications } from './src/services/pushNotifications';
 import { getPrayerLocation } from './src/utils/prayerLocations';
+import { EVENT_TYPE_GROUPS } from './src/utils/eventOptions';
 import { DEFAULT_CITY, cityLabel, getEventMetroArea, normalizeCity } from './src/utils/cities';
 import { colors, radius, shadow, spacing } from './src/theme';
 import { friendlyError } from './src/utils/errors';
+import { LEGAL_DOCUMENT_VERSION } from './src/config/legal';
 import {
   clearDiagnosticUser,
   initializeDiagnostics,
@@ -65,8 +74,14 @@ import {
 } from './src/services/diagnostics';
 
 const logo = require('./assets/logo.png');
-const appVersion = require('./app.json').expo.version;
-const appBuild = require('./app.json').expo.android.versionCode;
+const configuredApp = require('./app.json').expo;
+const appVersion = Constants.nativeAppVersion || Constants.expoConfig?.version || configuredApp.version;
+const configuredBuild = Platform.OS === 'ios'
+  ? (Constants.expoConfig?.ios?.buildNumber || configuredApp.ios?.buildNumber)
+  : (Constants.expoConfig?.android?.versionCode || configuredApp.android?.versionCode);
+const appBuild = Platform.OS === 'web'
+  ? ''
+  : (Constants.nativeBuildVersion || (configuredBuild ? String(configuredBuild) : ''));
 const CITY_STORAGE_KEY = '@community-events/selected-city';
 const MODULE_STORAGE_KEY = '@community-connect/default-module';
 const AUTO_EVENT_REFRESH_MS = 60000;
@@ -83,8 +98,10 @@ const EMPTY_HOME_FILTERS = {
 // Keep Android/iOS large-text accessibility enabled while preventing extreme
 // display/font zoom from breaking navigation, compact cards and form controls.
 // Users can still use the OS magnifier and all text remains scalable to 135%.
-Text.defaultProps = { ...(Text.defaultProps || {}), maxFontSizeMultiplier: 1.35 };
-TextInput.defaultProps = { ...(TextInput.defaultProps || {}), maxFontSizeMultiplier: 1.35 };
+// Keep Dynamic Type useful without allowing large accessibility settings to
+// destroy compact cards, forms, and dashboard grids on smaller phones.
+Text.defaultProps = { ...(Text.defaultProps || {}), maxFontSizeMultiplier: 1.15 };
+TextInput.defaultProps = { ...(TextInput.defaultProps || {}), maxFontSizeMultiplier: 1.15 };
 
 function withTimeout(promise, milliseconds, code = 'unavailable') {
   return new Promise((resolve, reject) => {
@@ -110,6 +127,24 @@ function localDateString(offsetDays = 0) {
   return `${year}-${month}-${day}`;
 }
 
+function eventCoordinates(event = {}) {
+  const address = event.address || {};
+  const latitude = Number(address.latitude ?? address.lat ?? event.latitude ?? event.lat ?? event.geo?.latitude ?? event.geo?.lat);
+  const longitude = Number(address.longitude ?? address.lng ?? address.lon ?? event.longitude ?? event.lng ?? event.lon ?? event.geo?.longitude ?? event.geo?.lng);
+  return Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : null;
+}
+
+function eventDistanceKm(from, event) {
+  const to = eventCoordinates(event);
+  if (!from || !to) return null;
+  const radians = degrees => Number(degrees) * Math.PI / 180;
+  const latitudeDelta = radians(to.latitude - from.latitude);
+  const longitudeDelta = radians(to.longitude - from.longitude);
+  const a = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(radians(from.latitude)) * Math.cos(radians(to.latitude)) * Math.sin(longitudeDelta / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function filterHomeEvents(events, query, filters) {
   let displayed = [...events];
   const today = localDateString();
@@ -129,9 +164,13 @@ function filterHomeEvents(events, query, filters) {
     });
   }
   if (filters.eventType) {
-    displayed = displayed.filter(event => (
-      event.eventTypeDisplay || event.customEventType || event.eventType
-    ) === filters.eventType);
+    const communityTypes = EVENT_TYPE_GROUPS.find(group => group.key === 'community')?.eventTypes || [];
+    displayed = displayed.filter(event => {
+      const eventType = event.eventTypeDisplay || event.customEventType || event.eventType;
+      return filters.eventType === 'Community'
+        ? communityTypes.includes(eventType)
+        : eventType === filters.eventType;
+    });
   }
   if (filters.audienceType) {
     displayed = displayed.filter(event => {
@@ -205,6 +244,7 @@ function MainApp() {
   const [directoryFilter, setDirectoryFilter] = useState(null);
   const [selectedBusinessId, setSelectedBusinessId] = useState('');
   const [businessListingOpen, setBusinessListingOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [selectedCity, setSelectedCity] = useState(DEFAULT_CITY);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -236,6 +276,8 @@ function MainApp() {
   const [showHomeFilters, setShowHomeFilters] = useState(false);
   const [homeFilters, setHomeFilters] = useState(EMPTY_HOME_FILTERS);
   const [homeViewMode, setHomeViewMode] = useState('list');
+  const [nearbyEventsOnly, setNearbyEventsOnly] = useState(false);
+  const [eventUserLocation, setEventUserLocation] = useState(null);
   const [liveOnly, setLiveOnly] = useState(false);
   const livePulse = useRef(new Animated.Value(1)).current;
   const [createMode, setCreateMode] = useState('');
@@ -494,11 +536,38 @@ function MainApp() {
     [events, selectedCity]
   );
 
-  const liveEventCount = useMemo(() => visibleEvents.filter(event => event.isLive).length, [visibleEvents]);
+  const liveEventCount = useMemo(() => events.filter(isPublicPlayableLiveEvent).length, [events]);
   const displayedEvents = useMemo(() => {
     const filtered = filterHomeEvents(visibleEvents, homeQuery, homeFilters);
-    return liveOnly ? filtered.filter(event => event.isLive) : filtered;
-  }, [homeFilters, homeQuery, liveOnly, visibleEvents]);
+    const liveFiltered = liveOnly ? filtered.filter(event => event.isLive) : filtered;
+    if (!nearbyEventsOnly || !eventUserLocation) return liveFiltered;
+    return liveFiltered.slice().sort((left, right) => {
+      const leftDistance = eventDistanceKm(eventUserLocation, left);
+      const rightDistance = eventDistanceKm(eventUserLocation, right);
+      if (leftDistance == null) return 1;
+      if (rightDistance == null) return -1;
+      return leftDistance - rightDistance;
+    });
+  }, [eventUserLocation, homeFilters, homeQuery, liveOnly, nearbyEventsOnly, visibleEvents]);
+
+  const enableNearbyEvents = async () => {
+    if (nearbyEventsOnly) {
+      setNearbyEventsOnly(false);
+      return;
+    }
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Location needed', 'Allow location access to sort nearby events. Your current event order has not changed.');
+        return;
+      }
+      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setEventUserLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+      setNearbyEventsOnly(true);
+    } catch {
+      Alert.alert('Location unavailable', 'Your location could not be read. Your current event order has not changed.');
+    }
+  };
 
   useEffect(() => {
     if (!liveEventCount) {
@@ -602,6 +671,19 @@ function MainApp() {
     setProfileMessage('');
     try {
       const user = await confirmPhoneVerification(confirmation, code);
+      try {
+        await ensureUserProfile(user.uid, {
+          phone: user.phoneNumber || '',
+          phoneVerified: Boolean(user.phoneNumber),
+          privacyAccepted: true,
+          privacyPolicyVersion: LEGAL_DOCUMENT_VERSION,
+          termsAccepted: true,
+          termsVersion: LEGAL_DOCUMENT_VERSION,
+          legalAcceptedAtClient: new Date().toISOString(),
+        });
+      } catch (consentError) {
+        recordNonFatalError(consentError, { action: 'persist_legal_consent' });
+      }
       setGuestAccessGranted(false);
       setAppModule(preferredModule);
       setProfileMessage('Mobile number verified.');
@@ -969,8 +1051,8 @@ function MainApp() {
     if (!nextModule || nextModule === appModule) return;
 
     const switchModule = () => {
+      setAccountMenuOpen(false);
       setSelectedEvent(null);
-      setStreamEvent(null);
       setSelectedBusinessId('');
       setAppModule(nextModule);
     };
@@ -1017,6 +1099,13 @@ function MainApp() {
       requestSignIn();
       return;
     }
+    if (nextTab === 'share-app') {
+      Share.share({
+        title: 'Community Connect Australia',
+        message: 'Community Connect Australia — one app for Community Events and the Community Business Directory.',
+      }).catch(() => {});
+      return;
+    }
     if (nextTab === 'business-favourites') {
       setSelectedBusinessId('');
       setAppModule('directory');
@@ -1031,6 +1120,7 @@ function MainApp() {
       'business-feedback': 'feedback',
       'business-report': 'report',
       'business-contact': 'contact',
+      'business-notifications': 'notifications',
     };
     if (businessRoutes[nextTab]) {
       setSelectedBusinessId('');
@@ -1081,54 +1171,19 @@ function MainApp() {
   const renderHeader = () => (
     <View style={[styles.contentHeader, compactEventsLayout && styles.contentHeaderCompact]}>
       <View style={[styles.titleRow, compactEventsLayout && styles.titleRowCompact]}>
-        <View style={[styles.titleAccent, compactEventsLayout && styles.titleAccentCompact]} />
         <View style={styles.titleCopy}>
           <Text maxFontSizeMultiplier={1.08} style={styles.sectionEyebrow}>DISCOVER WHAT'S ON</Text>
-          <Text maxFontSizeMultiplier={1.08} style={[styles.sectionTitle, compactEventsLayout && styles.sectionTitleCompact]}>Upcoming Events</Text>
-          <Text maxFontSizeMultiplier={1.08} style={[styles.sectionSubtitle, compactEventsLayout && styles.sectionSubtitleCompact]}>
-            {displayedEvents.length} event{displayedEvents.length === 1 ? '' : 's'} in {cityLabel(selectedCity)}
-          </Text>
+          <Text maxFontSizeMultiplier={1.08} style={[styles.sectionTitle, compactEventsLayout && styles.sectionTitleCompact]}>Upcoming events</Text>
         </View>
+        <View style={styles.cityControl}><CitySelector compact selectedCity={selectedCity} onChange={handleCityChange} allowCurrentLocation /></View>
         {liveEventCount ? (
-          <Pressable accessibilityState={{ selected: liveOnly }} onPress={() => setLiveOnly(current => !current)}>
-            <Animated.View style={[styles.liveFilter, liveOnly && styles.liveFilterActive, { opacity: livePulse }]}>
+          <Pressable accessibilityLabel="Open all live streamed videos" onPress={() => requestTabChange('streams')}>
+            <Animated.View style={[styles.liveFilter, { opacity: livePulse }]}>
               <View style={styles.liveDot} />
               <Text maxFontSizeMultiplier={1.05} style={styles.liveFilterText}>LIVE {liveEventCount}</Text>
             </Animated.View>
           </Pressable>
         ) : null}
-      </View>
-      <Text maxFontSizeMultiplier={1.08} style={[styles.notice, compactEventsLayout && styles.noticeCompact]}>
-        Hijri dates are subject to moon sighting. Events are user-submitted, so please verify details with hosts.
-      </Text>
-      <View style={[styles.controlSection, compactEventsLayout && styles.controlSectionCompact]}>
-      <View style={[styles.homeControls, compactEventsLayout && styles.homeControlsCompact]}>
-        <CitySelector compact selectedCity={selectedCity} onChange={handleCityChange} allowCurrentLocation />
-        <View style={styles.viewToggle}>
-          {['list', 'map'].map(mode => (
-            <Pressable key={mode} onPress={() => setHomeViewMode(mode)} style={[styles.viewToggleButton, homeViewMode === mode && styles.viewToggleButtonActive]}>
-              <Text maxFontSizeMultiplier={1.05} style={[styles.viewToggleText, homeViewMode === mode && styles.viewToggleTextActive]}>{mode === 'list' ? 'List' : 'Map'}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-      <View style={[styles.eventShortcuts, compactEventsLayout && styles.eventShortcutsCompact]}>
-        <Pressable
-          accessibilityLabel="Open Streamed Videos"
-          onPress={() => requestTabChange('streams')}
-          style={({ pressed }) => [styles.eventShortcut, compactEventsLayout && styles.eventShortcutCompact, styles.streamShortcut, pressed && styles.eventShortcutPressed]}
-        >
-          <View style={[styles.eventShortcutIcon, styles.streamShortcutIcon]}><Text style={styles.streamShortcutIconText}>{'\u25B6'}</Text></View>
-          <Text maxFontSizeMultiplier={1.05} numberOfLines={1} style={[styles.eventShortcutText, compactEventsLayout && styles.eventShortcutTextCompact]}>Streamed Videos</Text>
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Open Hijri Calendar"
-          onPress={() => requestTabChange('hijri-calendar')}
-          style={({ pressed }) => [styles.eventShortcut, compactEventsLayout && styles.eventShortcutCompact, styles.hijriShortcut, pressed && styles.eventShortcutPressed]}
-        >
-          <View style={[styles.eventShortcutIcon, styles.hijriShortcutIcon]}><Text style={styles.hijriShortcutIconText}>{'\u263E'}</Text></View>
-          <Text maxFontSizeMultiplier={1.05} numberOfLines={1} style={[styles.eventShortcutText, compactEventsLayout && styles.eventShortcutTextCompact]}>Hijri Calendar</Text>
-        </Pressable>
       </View>
       {homeViewMode === 'list' ? <HomeFilters
           events={visibleEvents}
@@ -1140,7 +1195,43 @@ function MainApp() {
           onToggleFilters={() => setShowHomeFilters(current => !current)}
           onClear={() => setHomeFilters({ ...EMPTY_HOME_FILTERS })}
         /> : null}
+      <View style={styles.sectionHeadingRow}><Text style={styles.homeSectionTitle}>Quick access</Text></View>
+      <View style={styles.quickGrid}>
+        {[
+          [homeViewMode === 'map' ? 'format-list-bulleted' : 'map-outline', homeViewMode === 'map' ? 'List' : 'Map', colors.blueSoft, colors.blue, () => setHomeViewMode(current => current === 'map' ? 'list' : 'map')],
+          ['broadcast', 'Live', colors.roseSoft, colors.rose, () => requestTabChange('streams')],
+          ['moon-waning-crescent', 'Hijri', colors.purpleSoft, colors.purple, () => requestTabChange('hijri-calendar')],
+          ['calendar-month-outline', 'Calendar', colors.tealSoft, colors.tealDark, () => requestTabChange('calendar')],
+        ].map(([icon, label, backgroundColor, color, onPress]) => (
+          <Pressable key={label} onPress={onPress} style={({ pressed }) => [styles.quickAction, pressed && styles.eventShortcutPressed]}>
+            <View style={[styles.quickOrb, { backgroundColor }]}><MaterialCommunityIcons color={color} name={icon} size={22} /></View>
+            <Text style={styles.quickLabel}>{label}</Text>
+          </Pressable>
+        ))}
       </View>
+      <View style={styles.sectionHeadingRow}>
+        <Text style={styles.homeSectionTitle}>Browse events</Text>
+        <Text style={styles.resultCount}>{displayedEvents.length} in {cityLabel(selectedCity).replace(', Australia', '')}</Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.browseChips}>
+        {[
+          ['Upcoming', '', ''],
+          ['Today', 'period', 'today'],
+          ['Near me', 'nearby', 'nearby'],
+          ['This week', 'period', 'week'],
+          ['Prayers', 'eventType', 'Prayers'],
+          ['Majlis', 'eventType', 'Majlis'],
+          ['Milad', 'eventType', 'Milad'],
+          ['Community', 'eventType', 'Community'],
+        ].map(([label, field, value]) => {
+          const active = field === 'nearby' ? nearbyEventsOnly : field ? homeFilters[field] === value : !homeFilters.period && !homeFilters.eventType && !nearbyEventsOnly;
+          const onPress = field === 'nearby'
+            ? enableNearbyEvents
+            : () => { setNearbyEventsOnly(false); setHomeFilters(current => ({ ...current, period: field === 'period' ? value : '', eventType: field === 'eventType' ? value : '' })); };
+          return <Pressable key={label} onPress={onPress} style={[styles.browseChip, active && styles.browseChipActive]}><Text style={[styles.browseChipText, active && styles.browseChipTextActive]}>{label}</Text></Pressable>;
+        })}
+      </ScrollView>
+      <Text maxFontSizeMultiplier={1.08} style={[styles.notice, compactEventsLayout && styles.noticeCompact]}>Hijri dates depend on moon sighting. Please verify user-submitted details with the host.</Text>
       {isGuest ? (
         <View style={styles.guestNotice}>
           <Text style={styles.guestNoticeText}>Sign in for full event details and app benefits, including directions, adding events, Favourites and reminders.</Text>
@@ -1208,16 +1299,9 @@ function MainApp() {
       <ExpoStatusBar style="dark" />
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <AppHeader
-        activeTab={appModule === 'directory' ? directoryTab : activeTab}
         activeModule={appModule}
-        isGuest={isGuest}
-        user={currentUser}
-        profile={profile}
         logoSource={logo}
-        onNavigate={handleHeaderNavigate}
         onModuleChange={requestModuleChange}
-        onSignOut={handleSignOut}
-        authBusy={authBusy}
       />
 
       {appModule === 'directory' ? (
@@ -1231,7 +1315,8 @@ function MainApp() {
           isGuest={isGuest}
           currentUser={currentUser}
           profile={profile}
-          onOpenAccount={openEventsProfile}
+          onOpenAccount={isGuest ? () => requestSignIn() : openEventsProfile}
+          onOpenMenu={() => setAccountMenuOpen(true)}
           onEditingStateChange={setBusinessListingOpen}
           initialFilter={directoryFilter}
           onInitialFilterConsumed={() => setDirectoryFilter(null)}
@@ -1398,14 +1483,6 @@ function MainApp() {
           onPreferredModuleChange={handlePreferredModuleChange}
         />
       )}
-      {appModule === 'events' && activeTab === 'home' ? (
-        <View pointerEvents="box-none" style={styles.floatingCtaWrap}>
-          <Pressable onPress={() => setActiveTab('calendar')} style={({ pressed }) => [styles.floatingCta, pressed && styles.floatingCtaPressed]}>
-            <Text maxFontSizeMultiplier={1.08} style={styles.floatingCtaText}>View Calendar &amp; Sync</Text>
-            <Text maxFontSizeMultiplier={1} style={styles.floatingCtaArrow}>›</Text>
-          </Pressable>
-        </View>
-      ) : null}
       <EventDetailsModal
         event={selectedEvent}
         visible={appModule === 'events' && Boolean(selectedEvent)}
@@ -1456,11 +1533,25 @@ function MainApp() {
             setActiveTab('hijri-calendar');
           }}
         />
+        <AccountMenuSheet
+          visible={accountMenuOpen}
+          activeModule={appModule}
+          isGuest={isGuest}
+          user={currentUser}
+          profile={profile}
+          authBusy={authBusy}
+          onClose={() => setAccountMenuOpen(false)}
+          onNavigate={handleHeaderNavigate}
+          onSignOut={handleSignOut}
+        />
         {appModule === 'events' ? (
           <BottomNavigation
             activeTab={activeTab === 'bulk_share' || activeTab === 'admin' ? 'profile' : activeTab === 'calendar' || activeTab === 'hijri-calendar' || activeTab === 'streams' || activeTab === 'feedback' || activeTab === 'inbox' ? 'home' : activeTab}
             isGuest={isGuest}
             onChange={requestTabChange}
+            onOpenMenu={() => setAccountMenuOpen(true)}
+            user={currentUser}
+            profile={profile}
           />
         ) : null}
     </SafeAreaView>
@@ -1488,19 +1579,16 @@ const styles = StyleSheet.create({
   entryLoadingLogo: { width: 92, height: 92 },
   listContent: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: 148,
+    paddingBottom: 120,
   },
   listContentCompact: { paddingHorizontal: spacing.sm },
-  mapScrollContent: { paddingBottom: 148 },
+  mapScrollContent: { paddingBottom: 120 },
   mapHeader: { paddingHorizontal: spacing.lg },
-  contentHeader: {
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-  },
+  contentHeader: { paddingTop: 18, paddingBottom: spacing.md },
   contentHeaderCompact: { paddingTop: spacing.sm },
   homeControls: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   homeControlsCompact: { gap: 6 },
-  controlSection: { marginTop: spacing.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface },
+  controlSection: { marginTop: spacing.md },
   controlSectionCompact: { marginTop: spacing.sm, padding: 6 },
   eventShortcuts: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   eventShortcutsCompact: { gap: 6, marginTop: 6 },
@@ -1511,9 +1599,9 @@ const styles = StyleSheet.create({
   eventShortcutIcon: { width: 27, height: 27, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   streamShortcutIcon: { backgroundColor: '#ff0000' },
   hijriShortcutIcon: { backgroundColor: '#5b3fb5' },
-  streamShortcutIconText: { color: colors.surface, fontSize: 12, fontWeight: '900' },
-  hijriShortcutIconText: { color: '#ffd66b', fontSize: 17, fontWeight: '900' },
-  eventShortcutText: { color: colors.navy, fontSize: 11.5, fontWeight: '900' },
+  streamShortcutIconText: { color: colors.surface, fontSize: 12, fontWeight: '700' },
+  hijriShortcutIconText: { color: '#ffd66b', fontSize: 17, fontWeight: '700' },
+  eventShortcutText: { color: colors.navy, fontSize: 11.5, fontWeight: '700' },
   eventShortcutTextCompact: { fontSize: 10.5 },
   eventShortcutPressed: { opacity: 0.76 },
   viewToggle: {
@@ -1533,44 +1621,39 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   viewToggleButtonActive: { backgroundColor: colors.surface, ...shadow },
-  viewToggleText: { color: colors.muted, fontSize: 13, fontWeight: '800' },
+  viewToggleText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
   viewToggleTextActive: { color: colors.tealDark },
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
     alignItems: 'center',
     gap: spacing.sm,
-    marginTop: spacing.md,
+    marginTop: 0,
   },
   titleRowCompact: { alignItems: 'flex-start', gap: 7, marginTop: spacing.sm },
-  titleAccent: { width: 5, height: 48, borderRadius: 3, backgroundColor: colors.teal },
-  titleAccentCompact: { height: 42 },
   titleCopy: { flex: 1, minWidth: 0 },
-  sectionEyebrow: { color: colors.tealDark, fontSize: 10, fontWeight: '900', letterSpacing: 1.25 },
+  sectionEyebrow: { color: colors.tealDark, fontSize: 10, fontWeight: '700', letterSpacing: 1.25 },
   sectionTitle: {
     color: colors.navy,
-    fontSize: 22,
-    lineHeight: 27,
-    fontWeight: '900',
+    fontSize: 21,
+    lineHeight: 26,
+    letterSpacing: -0.45,
+    fontWeight: '700',
   },
-  sectionTitleCompact: { fontSize: 19, lineHeight: 23 },
+  sectionTitleCompact: { fontSize: 21, lineHeight: 26 },
+  cityControl: { maxWidth: 146, minWidth: 112 },
   liveFilter: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, borderRadius: 19, backgroundColor: '#ef4444' },
   liveFilterActive: { backgroundColor: '#b91c1c' },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.surface },
-  liveFilterText: { color: colors.surface, fontSize: 11, fontWeight: '900' },
-  sectionSubtitle: {
-    color: colors.muted,
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 2,
-  },
+  liveFilterText: { color: colors.surface, fontSize: 11, fontWeight: '700' },
+  sectionSubtitle: { color: colors.muted, fontSize: 13, fontWeight: '500', marginTop: 2 },
   sectionSubtitleCompact: { fontSize: 12, lineHeight: 16 },
   notice: {
     color: colors.muted,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 16,
     fontStyle: 'italic',
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
   },
   noticeCompact: { fontSize: 11.5, lineHeight: 16, marginTop: spacing.sm },
   guestNotice: {
@@ -1585,8 +1668,20 @@ const styles = StyleSheet.create({
     color: '#09645f',
     fontSize: 12,
     lineHeight: 18,
-    fontWeight: '700',
+    fontWeight: '500',
   },
+  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.md, marginBottom: spacing.sm },
+  homeSectionTitle: { color: colors.navy, fontSize: 16, lineHeight: 21, fontWeight: '700', letterSpacing: -0.2 },
+  resultCount: { flexShrink: 1, color: colors.muted, fontSize: 10.5, fontWeight: '600', textAlign: 'right' },
+  quickGrid: { flexDirection: 'row', gap: 7 },
+  quickAction: { flex: 1, minWidth: 0, minHeight: 70, alignItems: 'center', justifyContent: 'center', gap: 5, padding: 5, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.72)' },
+  quickOrb: { width: 39, height: 39, alignItems: 'center', justifyContent: 'center', borderRadius: 15, transform: [{ rotate: '-2deg' }] },
+  quickLabel: { color: colors.text, fontSize: 10, fontWeight: '600', textAlign: 'center' },
+  browseChips: { gap: 7, paddingRight: spacing.lg },
+  browseChip: { minHeight: 34, justifyContent: 'center', paddingHorizontal: 13, borderWidth: 1, borderColor: colors.border, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.7)' },
+  browseChipActive: { borderColor: colors.blue, backgroundColor: colors.blue },
+  browseChipText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  browseChipTextActive: { color: colors.surface, fontWeight: '700' },
   calendarLink: {
     minHeight: 50,
     flexDirection: 'row',
@@ -1599,41 +1694,41 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surface,
   },
-  calendarLinkText: { color: colors.text, fontSize: 14, fontWeight: '900' },
-  calendarLinkArrow: { color: colors.tealDark, fontSize: 24, fontWeight: '900' },
+  calendarLinkText: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  calendarLinkArrow: { color: colors.tealDark, fontSize: 24, fontWeight: '700' },
   floatingCtaWrap: {
     position: 'absolute',
     left: spacing.lg,
     right: spacing.lg,
-    bottom: 82,
+    bottom: 72,
   },
   floatingCta: {
-    minHeight: 58,
+    minHeight: 50,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.9)',
     ...shadow,
   },
   floatingCtaPressed: { opacity: 0.82 },
   floatingCtaText: {
     color: colors.text,
-    fontSize: 15,
-    fontWeight: '900',
+    fontSize: 13,
+    fontWeight: '700',
   },
   floatingCtaArrow: {
     color: colors.tealDark,
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   error: {
     color: colors.danger,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     marginTop: spacing.md,
   },
   loadingCard: {
@@ -1656,7 +1751,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     color: colors.navy,
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   emptyText: {
     color: colors.muted,

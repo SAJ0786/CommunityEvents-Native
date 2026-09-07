@@ -2,7 +2,27 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, shadow, spacing } from '../theme';
 
-const fallbackBusinessImage = require('../../assets/business-placeholder.png');
+const CATEGORY_ART = {
+  food: '🍽️', events: '🎉', retail: '🛍️', professional: '💼', health: '🩺',
+  education: '🎓', home: '🛠️', automotive: '🚗', construction: '🏗️', technology: '💻',
+};
+
+function categoryArtwork(business = {}) {
+  if (business.categoryIcon) return business.categoryIcon;
+  if (CATEGORY_ART[business.categoryId]) return CATEGORY_ART[business.categoryId];
+  const category = String(business.category || '').toLowerCase();
+  if (category.includes('food')) return CATEGORY_ART.food;
+  if (category.includes('event')) return CATEGORY_ART.events;
+  if (category.includes('retail') || category.includes('fashion')) return CATEGORY_ART.retail;
+  if (category.includes('professional')) return CATEGORY_ART.professional;
+  if (category.includes('health')) return CATEGORY_ART.health;
+  if (category.includes('education')) return CATEGORY_ART.education;
+  if (category.includes('home')) return CATEGORY_ART.home;
+  if (category.includes('auto')) return CATEGORY_ART.automotive;
+  if (category.includes('construct')) return CATEGORY_ART.construction;
+  if (category.includes('tech')) return CATEGORY_ART.technology;
+  return '🏪';
+}
 
 function TierBadge({ tier }) {
   if (tier === 'free') return null;
@@ -33,12 +53,12 @@ export default function BusinessCard({ business, saved = false, onPress, onToggl
     <View style={styles.card}>
       <Pressable onPress={onPress} style={({ pressed }) => [styles.openArea, pressed && styles.pressed]}>
         <View style={[styles.cover, { backgroundColor: business.coverColor || colors.teal }]}> 
-          <Image
-            source={!imageFailed && imageUrl ? { uri: imageUrl } : fallbackBusinessImage}
+          {imageUrl && !imageFailed ? <Image
+            source={{ uri: imageUrl }}
             onError={() => setImageFailed(true)}
             resizeMode="cover"
-            style={[styles.coverImage, (!imageUrl || imageFailed) && styles.fallbackImage]}
-          />
+            style={styles.coverImage}
+          /> : <View style={styles.categoryArtwork}><Text style={styles.categoryArtworkIcon}>{categoryArtwork(business)}</Text></View>}
           <View style={styles.coverAccent} />
           {business.hasActivePromotion ? <Animated.View style={[styles.promotionBadge, { opacity: promotionPulse }]}><Text style={styles.promotionBadgeText}>{'\u{1F3F7}\uFE0F'} PROMO</Text></Animated.View> : null}
         </View>
@@ -99,21 +119,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.13)',
   },
   promotionBadge: { position: 'absolute', left: 7, bottom: 7, paddingHorizontal: 7, paddingVertical: 4, borderRadius: 99, backgroundColor: '#fff0d4' },
-  promotionBadgeText: { color: '#9a5c05', fontSize: 8.5, fontWeight: '900' },
+  promotionBadgeText: { color: '#9a5c05', fontSize: 8.5, fontWeight: '700' },
   coverImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
-  fallbackImage: { padding: 18, backgroundColor: '#eaf7f5' },
-  initials: { color: '#ffffff', fontSize: 28, fontWeight: '900', letterSpacing: 1 },
+  categoryArtwork: { width: 68, height: 68, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.88)' },
+  categoryArtworkIcon: { fontSize: 34 },
+  initials: { color: '#ffffff', fontSize: 28, fontWeight: '700', letterSpacing: 1 },
   copy: { padding: spacing.md },
   badgeRow: { minHeight: 22, flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
   tierBadge: { borderRadius: 99, paddingHorizontal: 7, paddingVertical: 3 },
   featuredBadge: { backgroundColor: '#fff0d4' },
   standardBadge: { backgroundColor: colors.tealSoft },
-  tierText: { fontSize: 9, fontWeight: '900' },
+  tierText: { fontSize: 9, fontWeight: '700' },
   featuredText: { color: '#9a5c05' },
   standardText: { color: colors.tealDark },
   organisationBadge: { borderRadius: 99, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: '#eef3f2' },
-  organisationText: { color: colors.muted, fontSize: 9, fontWeight: '800' },
-  name: { minHeight: 39, marginTop: 6, color: colors.navy, fontSize: 15, lineHeight: 19, fontWeight: '900' },
+  organisationText: { color: colors.muted, fontSize: 9, fontWeight: '600' },
+  name: { minHeight: 39, marginTop: 6, color: colors.navy, fontSize: 15, lineHeight: 19, fontWeight: '700' },
   category: { marginTop: 3, color: colors.muted, fontSize: 11, fontWeight: '700' },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: spacing.sm },
   meta: { color: colors.muted, fontSize: 11, fontWeight: '700' },
@@ -133,7 +154,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.94)',
   },
   saveButtonActive: { backgroundColor: '#fff0f4' },
-  saveIcon: { color: colors.muted, fontSize: 25, lineHeight: 28, fontWeight: '900' },
+  saveIcon: { color: colors.muted, fontSize: 25, lineHeight: 28, fontWeight: '700' },
   saveIconActive: { color: '#d43867' },
   pressed: { opacity: 0.78 },
 });

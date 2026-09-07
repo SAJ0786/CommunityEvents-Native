@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   triggerCodeText: {
     color: colors.tealDark,
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   triggerCopy: {
     flex: 1,
@@ -158,19 +158,19 @@ const styles = StyleSheet.create({
   triggerLabel: {
     color: colors.muted,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
     textTransform: 'uppercase',
   },
   triggerValue: {
     color: colors.text,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
     marginTop: 2,
   },
   chevron: {
     color: colors.tealDark,
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   modalRoot: {
     flex: 1,
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   title: {
     color: colors.navy,
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   closeButton: {
     paddingHorizontal: spacing.md,
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   closeText: {
     color: colors.tealDark,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   locationButton: {
     minHeight: 68,
@@ -231,19 +231,19 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     backgroundColor: colors.teal,
   },
-  locationIcon: { color: colors.surface, fontSize: 25, lineHeight: 27, fontWeight: '900' },
+  locationIcon: { color: colors.surface, fontSize: 25, lineHeight: 27, fontWeight: '700' },
   locationCopy: { flex: 1, minWidth: 0 },
   locationButtonText: {
     color: colors.tealDark,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   locationButtonHint: { color: '#46706c', fontSize: 11, fontWeight: '700', marginTop: 2 },
   locationArrow: { color: colors.tealDark, fontSize: 28, lineHeight: 28, fontWeight: '700' },
   locationError: {
     color: colors.danger,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     lineHeight: 17,
     marginBottom: spacing.md,
   },
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
   optionCodeText: {
     color: colors.tealDark,
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   optionCodeTextActive: {
     color: colors.tealDark,
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.text,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   optionLabelActive: {
     color: colors.tealDark,

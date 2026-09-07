@@ -25,6 +25,8 @@ export const BUSINESS_STATUSES = {
   pending: { label: 'Pending review', tone: 'amber' },
   approved: { label: 'Approved', tone: 'green' },
   rejected: { label: 'Changes required', tone: 'red' },
+  archived: { label: 'Archived', tone: 'grey' },
+  deleted: { label: 'Deleted record', tone: 'red' },
 };
 
 export function normalizeAbn(value) {
@@ -48,6 +50,37 @@ export function isValidAbn(value) {
 
 function clean(value) {
   return String(value || '').trim();
+}
+
+function normalizedDigits(value) {
+  return clean(value).replace(/\D/g, '');
+}
+
+export function businessHistoryMatchReasons(candidate = {}, historical = {}) {
+  if (!['archived', 'deleted'].includes(historical.status)) return [];
+  const reasons = [];
+  const candidateAbn = normalizeAbn(candidate.abn);
+  const historicalAbn = normalizeAbn(historical.abn);
+  if (candidateAbn && historicalAbn && candidateAbn === historicalAbn) reasons.push('same ABN');
+  const candidatePlace = clean(candidate.location?.placeId);
+  const historicalPlace = clean(historical.location?.placeId);
+  if (candidatePlace && historicalPlace && candidatePlace === historicalPlace) reasons.push('same verified address');
+  const candidateName = clean(candidate.nameLower || candidate.name).toLowerCase();
+  const historicalName = clean(historical.nameLower || historical.name).toLowerCase();
+  const candidatePostcode = clean(candidate.location?.postcode);
+  const historicalPostcode = clean(historical.location?.postcode);
+  if (candidateName && candidateName === historicalName && candidatePostcode && candidatePostcode === historicalPostcode) reasons.push('same name and postcode');
+  const candidatePhone = normalizedDigits(candidate.contact?.phone);
+  const historicalPhone = normalizedDigits(historical.contact?.phone);
+  if (candidateName && candidateName === historicalName && candidatePhone && candidatePhone === historicalPhone) reasons.push('same name and phone');
+  return [...new Set(reasons)];
+}
+
+export function priorBusinessHistoryMatches(candidate = {}, businesses = []) {
+  return businesses
+    .filter(item => item.id !== candidate.id)
+    .map(item => ({ ...item, matchReasons: businessHistoryMatchReasons(candidate, item) }))
+    .filter(item => item.matchReasons.length > 0);
 }
 
 function cleanUrl(value) {
@@ -203,6 +236,7 @@ function publicBusinessFields(business = {}, approval = {}) {
     verificationBadge: hasVerifiedAbn ? 'ABN Verified' : '',
     abnCheckedAt: hasVerifiedAbn ? business.abnCheckedAt || null : null,
     foundingMember: Boolean(approval.foundingMember),
+    firstPublishedAt: business.firstPublishedAt || business.approvedAt || serverTimestamp(),
     approvedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -321,6 +355,9 @@ export async function updateBusinessSubmission(businessId, payload = {}) {
   if (!snapshot.exists()) throw new Error('This business listing could not be found.');
   const current = snapshot.data() || {};
   if (current.ownerId !== user.uid) throw new Error('Only the listing owner can edit this business.');
+  if (['archived', 'deleted'].includes(current.status)) {
+    throw new Error('This historical listing cannot be edited. Submit a new listing for administrator review.');
+  }
   const publicSnapshot = await getDoc(doc(db, PUBLIC_COLLECTION_NAME, businessId));
   const hasPublishedVersion = publicSnapshot.exists() || current.hasPublishedVersion === true;
   const preservedPublishedSnapshot = current.publishedSnapshot
@@ -438,7 +475,25 @@ async function requireAdminSession() {
   if (role !== 'admin' && role !== 'superAdmin') {
     throw new Error('Administrator access is required for this action.');
   }
+  return { ...user, role };
+}
+
+async function requireSuperAdminSession() {
+  const user = await requireAdminSession();
+  if (user.role !== 'superAdmin') throw new Error('Super Admin access is required for this action.');
   return user;
+}
+
+export async function getPriorBusinessHistoryMatches(businessId) {
+  await requireAdminSession();
+  if (!businessId) return [];
+  const snapshot = await getDoc(doc(db, COLLECTION_NAME, businessId));
+  if (!snapshot.exists()) return [];
+  const allSnapshot = await getDocs(collection(db, COLLECTION_NAME));
+  return priorBusinessHistoryMatches(
+    { id: snapshot.id, ...snapshot.data() },
+    allSnapshot.docs.map(mapBusiness)
+  );
 }
 
 export async function verifyBusinessAbn(businessId) {
@@ -464,6 +519,13 @@ export async function approveBusinessListing(businessId, options = {}) {
   const snapshot = await getDoc(doc(db, COLLECTION_NAME, businessId));
   if (!snapshot.exists()) throw new Error('This business listing could not be found.');
   const business = snapshot.data() || {};
+  if (['archived', 'deleted'].includes(business.status)) {
+    throw new Error('Restore this historical business for review before approving it.');
+  }
+  const priorMatches = await getPriorBusinessHistoryMatches(businessId);
+  if (priorMatches.length && options.historyReviewed !== true) {
+    throw new Error('This business matches a listing archived or deleted in the past. Review its history and confirm eligibility before approval.');
+  }
   if (!business.referrer?.name || !business.referrer?.phone || !business.referrer?.location) {
     throw new Error('A complete community referrer is required before this listing can be approved.');
   }
@@ -507,6 +569,12 @@ export async function approveBusinessListing(businessId, options = {}) {
       checkedAt: serverTimestamp(),
     },
     foundingMember: Boolean(options.foundingMember),
+    priorHistoryReview: priorMatches.length ? {
+      confirmed: true,
+      confirmedBy: user.uid,
+      confirmedAt: serverTimestamp(),
+      matchedBusinessIds: priorMatches.map(item => item.id).slice(0, 20),
+    } : null,
     rejectionReason: '',
     hasPublishedVersion: true,
     publishedSnapshot: null,
@@ -533,6 +601,97 @@ export async function approveBusinessListing(businessId, options = {}) {
     identityVerified: false,
     publishedWithoutAbn: !hasAbn,
     foundingMember: Boolean(options.foundingMember),
+    priorHistoryReviewed: priorMatches.length > 0,
+    priorHistoryMatches: priorMatches.map(item => ({
+      businessId: item.id,
+      status: item.status,
+      reasons: item.matchReasons,
+    })).slice(0, 20),
+  }));
+  await batch.commit();
+}
+
+async function archiveLinkedPromotions(businessId, actor, lifecycleStatus, reason) {
+  const promotionSnapshot = await getDocs(query(collection(db, PROMOTIONS_COLLECTION), where('businessId', '==', businessId)));
+  for (let start = 0; start < promotionSnapshot.docs.length; start += 200) {
+    const batch = writeBatch(db);
+    promotionSnapshot.docs.slice(start, start + 200).forEach(item => {
+      const promotion = item.data() || {};
+      batch.update(item.ref, {
+        previousStatus: promotion.status || 'pending',
+        status: lifecycleStatus,
+        hidden: true,
+        archivedAt: serverTimestamp(),
+        archivedBy: actor.uid,
+        archiveReason: reason,
+        updatedAt: serverTimestamp(),
+      });
+      batch.delete(doc(db, PUBLIC_PROMOTIONS_COLLECTION, item.id));
+    });
+    await batch.commit();
+  }
+  return promotionSnapshot.size;
+}
+
+export async function archiveBusinessListing(businessId, reason, { markDeleted = false } = {}) {
+  const user = markDeleted ? await requireSuperAdminSession() : await requireAdminSession();
+  const cleanReason = clean(reason);
+  if (!businessId) throw new Error('Business reference is missing.');
+  if (cleanReason.length < 10) throw new Error('Add a clear archive reason of at least 10 characters.');
+  const reference = doc(db, COLLECTION_NAME, businessId);
+  const snapshot = await getDoc(reference);
+  if (!snapshot.exists()) throw new Error('This business listing could not be found.');
+  const business = snapshot.data() || {};
+  const lifecycleStatus = markDeleted ? 'deleted' : 'archived';
+  const nowFields = markDeleted
+    ? { deletedAt: serverTimestamp(), deletedBy: user.uid }
+    : { archivedAt: serverTimestamp(), archivedBy: user.uid };
+  const batch = writeBatch(db);
+  batch.update(reference, {
+    previousStatus: business.status || 'pending',
+    status: lifecycleStatus,
+    lifecycleState: lifecycleStatus,
+    hidden: true,
+    archiveReason: cleanReason,
+    ...nowFields,
+    updatedAt: serverTimestamp(),
+  });
+  batch.delete(doc(db, PUBLIC_COLLECTION_NAME, businessId));
+  batch.delete(doc(db, CONTACT_ROUTES_COLLECTION, businessId));
+  batch.set(doc(collection(db, AUDIT_COLLECTION)), auditRecord(user, businessId, `business.${lifecycleStatus}`, {
+    reason: cleanReason,
+    previousStatus: business.status || 'pending',
+  }));
+  await batch.commit();
+  const promotionsArchived = await archiveLinkedPromotions(businessId, user, lifecycleStatus, cleanReason);
+  return { status: lifecycleStatus, promotionsArchived };
+}
+
+export async function restoreBusinessListing(businessId, reason) {
+  const user = await requireSuperAdminSession();
+  const cleanReason = clean(reason);
+  if (cleanReason.length < 10) throw new Error('Add a clear restoration reason of at least 10 characters.');
+  const reference = doc(db, COLLECTION_NAME, businessId);
+  const snapshot = await getDoc(reference);
+  if (!snapshot.exists()) throw new Error('This business listing could not be found.');
+  const business = snapshot.data() || {};
+  if (!['archived', 'deleted'].includes(business.status)) throw new Error('Only an archived or deleted record can be restored.');
+  const batch = writeBatch(db);
+  batch.update(reference, {
+    status: 'pending',
+    lifecycleState: 'restored_for_review',
+    hidden: true,
+    hasPublishedVersion: false,
+    reviewType: 'restored_listing',
+    restoredAt: serverTimestamp(),
+    restoredBy: user.uid,
+    restorationReason: cleanReason,
+    updatedAt: serverTimestamp(),
+    submittedAt: serverTimestamp(),
+  });
+  batch.set(doc(collection(db, AUDIT_COLLECTION)), auditRecord(user, businessId, 'business.restored_for_review', {
+    reason: cleanReason,
+    priorStatus: business.status,
   }));
   await batch.commit();
 }
@@ -709,7 +868,15 @@ export async function deleteBusinessPromotion(promotionId) {
   const current = snapshot.data() || {};
   if (current.ownerId !== user.uid) throw new Error('Only the promotion owner can delete it.');
   const batch = writeBatch(db);
-  batch.delete(reference);
+  batch.update(reference, {
+    previousStatus: current.status || 'pending',
+    status: 'archived',
+    hidden: true,
+    archivedAt: serverTimestamp(),
+    archivedBy: user.uid,
+    archiveReason: 'Archived by promotion owner',
+    updatedAt: serverTimestamp(),
+  });
   batch.delete(doc(db, PUBLIC_PROMOTIONS_COLLECTION, promotionId));
   await batch.commit();
 }

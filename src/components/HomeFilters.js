@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { AUDIENCE_TYPES } from '../utils/eventOptions';
 import { colors, radius, spacing } from '../theme';
 import CompactSelect from './CompactSelect';
@@ -31,7 +32,7 @@ export default function HomeFilters({
   return (
     <View style={styles.wrap}>
       <View style={styles.searchRow}>
-        <Text maxFontSizeMultiplier={1} style={styles.searchIcon}>{'\uD83D\uDD0D'}</Text>
+        <MaterialCommunityIcons color={colors.muted} name="magnify" size={22} />
         <TextInput
           autoCapitalize="none"
           autoCorrect={false}
@@ -49,9 +50,8 @@ export default function HomeFilters({
           </Pressable>
         ) : null}
         <Pressable onPress={onToggleFilters} style={[styles.filterButton, showFilters && styles.filterButtonActive]}>
-          <Text maxFontSizeMultiplier={1.05} numberOfLines={1} style={[styles.filterButtonText, showFilters && styles.filterButtonTextActive]}>
-            Filters{activeCount ? ` (${activeCount})` : ''}
-          </Text>
+          <MaterialCommunityIcons color={showFilters ? colors.surface : colors.blue} name="tune-variant" size={19} />
+          {activeCount ? <View style={styles.filterCount}><Text style={styles.filterCountText}>{activeCount}</Text></View> : null}
         </Pressable>
       </View>
 
@@ -126,28 +126,30 @@ export default function HomeFilters({
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginTop: spacing.sm, marginBottom: spacing.sm },
-  searchRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
-  searchIcon: { color: colors.muted, fontSize: 20, fontWeight: '900' },
-  searchInput: { flex: 1, minWidth: 0, minHeight: 46, color: colors.text, fontSize: 14 },
+  wrap: { marginTop: spacing.md, marginBottom: 0 },
+  searchRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.82)' },
+  searchIcon: { color: colors.muted, fontSize: 20, fontWeight: '700' },
+  searchInput: { flex: 1, minWidth: 0, minHeight: 49, color: colors.text, fontSize: 14, fontWeight: '500' },
   clearSearch: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: colors.border },
-  clearSearchText: { color: colors.surface, fontSize: 20, lineHeight: 23, fontWeight: '900' },
-  filterButton: { minHeight: 36, maxWidth: 82, justifyContent: 'center', paddingHorizontal: 7, borderRadius: radius.sm, backgroundColor: colors.tealSoft },
-  filterButtonActive: { backgroundColor: colors.teal },
-  filterButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '900' },
+  clearSearchText: { color: colors.surface, fontSize: 20, lineHeight: 23, fontWeight: '700' },
+  filterButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.blueSoft },
+  filterButtonActive: { backgroundColor: colors.blue },
+  filterButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
   filterButtonTextActive: { color: colors.surface },
+  filterCount: { position: 'absolute', right: -3, top: -3, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderRadius: 8, backgroundColor: colors.rose },
+  filterCountText: { color: colors.surface, fontSize: 8, fontWeight: '700' },
   panel: { gap: spacing.md, marginTop: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   group: { gap: 6 },
-  label: { color: colors.muted, fontSize: 11, fontWeight: '900', textTransform: 'uppercase' },
+  label: { color: colors.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
   choiceRow: { gap: spacing.sm },
   choice: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, paddingVertical: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.surface },
   choiceSelected: { borderColor: colors.teal, backgroundColor: colors.teal },
-  choiceText: { color: colors.text, fontSize: 11, fontWeight: '800' },
+  choiceText: { color: colors.text, fontSize: 11, fontWeight: '600' },
   choiceTextSelected: { color: colors.surface },
   twoColumns: { flexDirection: 'row', gap: spacing.sm },
   column: { flex: 1, minWidth: 0, gap: 6 },
   input: { minHeight: 44, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text, backgroundColor: colors.surface, fontSize: 13 },
-  clearButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  clearButtonText: { color: colors.tealDark, fontSize: 13, fontWeight: '900' },
+  clearButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.blueSoft },
+  clearButtonText: { color: colors.blueDark, fontSize: 13, fontWeight: '700' },
   pressed: { opacity: 0.76 },
 });

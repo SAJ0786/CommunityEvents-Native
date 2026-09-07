@@ -24,6 +24,8 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
+          "audio",
+          "voip",
           "fetch",
           "remote-notification"
         ],
@@ -33,7 +35,7 @@
     },
     "android": {
       "package": "info.siza.communityevents.app",
-      "versionCode": 44,
+      "versionCode": 48,
       "googleServicesFile": "./google-services.json",
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",

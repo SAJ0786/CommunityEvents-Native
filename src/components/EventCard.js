@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, radius, shadow, spacing } from '../theme';
 import { formatEventTime } from '../utils/formatters';
 import { getEventPoster, getEventSuburb } from '../services/events';
@@ -90,31 +91,31 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
           </View>
         ) : null}
         {event.isLive ? <Text maxFontSizeMultiplier={1} style={styles.liveBadge}>LIVE</Text> : null}
-        {hasUploadedPoster && poster ? <Text maxFontSizeMultiplier={1} style={styles.zoomHint}>{'\u2315'}</Text> : null}
+        <View style={styles.posterCalendarIcon}>
+          <MaterialCommunityIcons color="#ffffff" name="calendar-blank-outline" size={15} />
+        </View>
       </Pressable>
 
       <View style={styles.content}>
         <View style={styles.titlePanel}>
-          <Text maxFontSizeMultiplier={1.06} style={[styles.title, compact && styles.titleCompact]} numberOfLines={2}>{title.toUpperCase()}</Text>
+          <Text maxFontSizeMultiplier={1.06} style={[styles.title, compact && styles.titleCompact]} numberOfLines={2}>{title}</Text>
         </View>
-        <View style={styles.detailRows}>
-          <View style={styles.detailRow}>
-            <View style={[styles.detailPill, styles.timePill]}>
-              <Text maxFontSizeMultiplier={1.03} numberOfLines={1} style={styles.detailText}>{'\u23F0'} {displayTime || 'TBC'}</Text>
-            </View>
-            <View style={[styles.detailPill, styles.locationPill]}>
-              <Text maxFontSizeMultiplier={1.03} numberOfLines={1} style={styles.detailText}>{'\uD83D\uDCCD'} {suburb || 'TBC'}</Text>
-            </View>
+        <View style={styles.metaRow}>
+          <MaterialCommunityIcons color={colors.blue} name="clock-outline" size={13} />
+          <Text maxFontSizeMultiplier={1.03} numberOfLines={1} style={styles.metaText}>{displayTime || 'TBC'}</Text>
+          <Text maxFontSizeMultiplier={1} style={styles.metaDot}>{'\u2022'}</Text>
+          <MaterialCommunityIcons color={colors.blue} name="map-marker-outline" size={13} />
+          <Text maxFontSizeMultiplier={1.03} numberOfLines={1} style={[styles.metaText, styles.locationText]}>{suburb || 'TBC'}</Text>
+        </View>
+        <View style={styles.badgeRow}>
+          <View style={[styles.badge, styles.typeBadge]}>
+            <Text maxFontSizeMultiplier={1.02} numberOfLines={1} style={styles.typeText}>{displayType}</Text>
           </View>
-          <View style={styles.detailRow}>
-            <View style={[styles.detailPill, styles.typePill]}>
-              <Text maxFontSizeMultiplier={1.02} numberOfLines={1} style={styles.typeText}>{displayType}</Text>
-            </View>
-            <View style={[styles.detailPill, styles.organiserPill, { backgroundColor: organiser.backgroundColor }]}>
-              <Text maxFontSizeMultiplier={1.02} numberOfLines={1} style={[styles.typeText, { color: organiser.color }]}>{organiser.label}</Text>
-            </View>
+          <View style={[styles.badge, { backgroundColor: organiser.backgroundColor }]}>
+            <Text maxFontSizeMultiplier={1.02} numberOfLines={1} style={[styles.typeText, { color: organiser.color }]}>{organiser.label}</Text>
           </View>
         </View>
+        <MaterialCommunityIcons color={colors.blue} name="chevron-right" size={22} style={styles.disclosureIcon} />
         {onToggleSaved ? (
           <Pressable
             accessibilityRole="button"
@@ -149,35 +150,35 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
 }
 
 const styles = StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: 8, marginBottom: spacing.sm, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, ...shadow },
+  card: { minHeight: 94, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: 8, marginBottom: spacing.sm, backgroundColor: colors.glass, borderColor: colors.glassBorder, borderWidth: 1, borderRadius: 24, ...shadow },
   cardPressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
-  posterFrame: { width: 72, height: 72, position: 'relative', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: '#f0f4f3' },
-  posterFrameCompact: { width: 66, height: 68 },
+  posterFrame: { width: 78, height: 78, position: 'relative', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: '#f0f4f3' },
+  posterFrameCompact: { width: 70, height: 74 },
   poster: { width: '100%', height: '100%' },
   dateChip: { position: 'absolute', top: 4, left: 4, minWidth: 31, alignItems: 'center', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 7, backgroundColor: colors.surface, ...shadow },
-  dateMonth: { color: '#16a34a', fontSize: 7, fontWeight: '900', letterSpacing: 0.3 },
-  dateDay: { color: colors.text, fontSize: 14, lineHeight: 14, fontWeight: '900' },
-  dateWeekday: { color: colors.muted, fontSize: 7, fontWeight: '800' },
-  liveBadge: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingVertical: 2, color: colors.surface, backgroundColor: colors.teal, fontSize: 9, fontWeight: '900', textAlign: 'center' },
-  zoomHint: { position: 'absolute', right: 5, bottom: 5, width: 22, height: 22, borderRadius: 11, color: colors.surface, backgroundColor: 'rgba(0,0,0,0.58)', fontSize: 15, lineHeight: 22, fontWeight: '900', textAlign: 'center' },
+  dateMonth: { color: colors.tealDark, fontSize: 7, fontWeight: '700', letterSpacing: 0.3 },
+  dateDay: { color: colors.text, fontSize: 14, lineHeight: 14, fontWeight: '700' },
+  dateWeekday: { color: colors.muted, fontSize: 7, fontWeight: '600' },
+  liveBadge: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingVertical: 2, color: colors.surface, backgroundColor: colors.teal, fontSize: 9, fontWeight: '700', textAlign: 'center' },
+  posterCalendarIcon: { position: 'absolute', right: 5, bottom: 5, width: 25, height: 25, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: 'rgba(37,99,235,0.88)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.76)' },
   content: { flex: 1, minWidth: 0, position: 'relative', justifyContent: 'center' },
-  titlePanel: { alignSelf: 'stretch', minHeight: 30, justifyContent: 'center', paddingLeft: 7, paddingRight: 32, paddingVertical: 4, marginBottom: 4, borderLeftWidth: 3, borderLeftColor: colors.teal, borderRadius: 8, backgroundColor: '#edf8f6' },
-  title: { color: colors.navy, fontSize: 11.5, lineHeight: 14, fontWeight: '900', letterSpacing: 0.18 },
-  titleCompact: { fontSize: 10.5, lineHeight: 13 },
-  detailRows: { gap: 3 },
-  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 4, overflow: 'hidden' },
-  detailPill: { minWidth: 0, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8, backgroundColor: '#eef3f2' },
-  timePill: { flex: 1 },
-  locationPill: { flex: 1.15 },
-  typePill: { flex: 1.15, backgroundColor: '#dcfce7' },
-  organiserPill: { flex: 0.85 },
-  detailText: { color: colors.muted, fontSize: 8.5, lineHeight: 11, fontWeight: '800' },
-  typeText: { color: '#15803d', fontSize: 8, lineHeight: 11, fontWeight: '900' },
-  saveButton: { position: 'absolute', right: 1, top: 1, width: 29, height: 29, alignItems: 'center', justifyContent: 'center' },
+  titlePanel: { alignSelf: 'stretch', minHeight: 30, justifyContent: 'center', paddingRight: 46, marginBottom: 3 },
+  title: { color: colors.navy, fontSize: 13, lineHeight: 17, fontWeight: '700', letterSpacing: -0.15 },
+  titleCompact: { fontSize: 12, lineHeight: 16 },
+  metaRow: { minWidth: 0, flexDirection: 'row', alignItems: 'center', paddingRight: 25, gap: 3, overflow: 'hidden' },
+  metaText: { flexShrink: 0, color: colors.muted, fontSize: 9.5, lineHeight: 13, fontWeight: '600' },
+  locationText: { flex: 1, minWidth: 0 },
+  metaDot: { color: '#aab4c2', fontSize: 10, lineHeight: 13, marginHorizontal: 1 },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingRight: 28, marginTop: 5, overflow: 'hidden' },
+  badge: { maxWidth: '48%', minHeight: 19, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  typeBadge: { backgroundColor: '#eee6ff' },
+  typeText: { color: '#6941c6', fontSize: 8.5, lineHeight: 11, fontWeight: '700' },
+  disclosureIcon: { position: 'absolute', right: 1, bottom: 9 },
+  saveButton: { position: 'absolute', right: 0, top: -2, width: 32, height: 32, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   saveButtonPressed: { opacity: 0.65 },
   saveText: { color: '#cbd5d3', fontSize: 21, lineHeight: 25 },
   saveTextActive: { color: '#d43867' },
   posterModal: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(0,0,0,0.94)' },
   posterFullscreen: { width: '100%', height: '88%' },
-  posterCloseHint: { position: 'absolute', bottom: 34, color: colors.surface, fontSize: 13, fontWeight: '800' },
+  posterCloseHint: { position: 'absolute', bottom: 34, color: colors.surface, fontSize: 13, fontWeight: '600' },
 });

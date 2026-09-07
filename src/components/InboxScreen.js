@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, shadow, spacing } from '../theme';
+import NativeBackButton from './NativeBackButton';
 import {
   listenHostThreads,
   listenThreadMessages,
@@ -81,9 +82,7 @@ export default function InboxScreen({ user, profile, onBack }) {
         <View style={styles.centerCard}>
           <Text style={styles.title}>Inbox</Text>
           <Text style={styles.emptyText}>Please sign in to use your inbox.</Text>
-          <Pressable onPress={onBack} style={({ pressed }) => [styles.lightButton, pressed && styles.pressed]}>
-            <Text style={styles.lightButtonText}>Back</Text>
-          </Pressable>
+          <NativeBackButton onPress={onBack} />
         </View>
       </ScrollView>
     );
@@ -97,9 +96,7 @@ export default function InboxScreen({ user, profile, onBack }) {
             <Text style={styles.title}>Inbox</Text>
             <Text style={styles.subtitle}>Messages between event hosts and community members.</Text>
           </View>
-          <Pressable onPress={onBack} style={({ pressed }) => [styles.lightButton, pressed && styles.pressed]}>
-            <Text style={styles.lightButtonText}>Back</Text>
-          </Pressable>
+          <NativeBackButton onPress={onBack} />
         </View>
       </View>
 
@@ -186,25 +183,25 @@ const styles = StyleSheet.create({
   centerCard: { padding: spacing.xl, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, alignItems: 'center', gap: spacing.md, ...shadow },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   headerCopy: { flex: 1 },
-  title: { color: colors.navy, fontSize: 28, fontWeight: '900' },
+  title: { color: colors.navy, fontSize: 28, fontWeight: '700' },
   subtitle: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: spacing.xs },
-  sectionTitle: { color: colors.navy, fontSize: 18, fontWeight: '900', marginBottom: spacing.sm },
+  sectionTitle: { color: colors.navy, fontSize: 18, fontWeight: '700', marginBottom: spacing.sm },
   emptyText: { color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   lightButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  lightButtonText: { color: colors.tealDark, fontSize: 13, fontWeight: '900' },
+  lightButtonText: { color: colors.tealDark, fontSize: 13, fontWeight: '700' },
   threadCard: { padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, marginTop: spacing.sm },
   threadCardActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
   threadHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm, alignItems: 'center' },
-  threadTitle: { color: colors.text, fontSize: 15, fontWeight: '900', flex: 1 },
+  threadTitle: { color: colors.text, fontSize: 15, fontWeight: '700', flex: 1 },
   unreadBadge: { backgroundColor: colors.danger, borderRadius: 99, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
-  unreadBadgeText: { color: colors.surface, fontSize: 11, fontWeight: '900' },
+  unreadBadgeText: { color: colors.surface, fontSize: 11, fontWeight: '700' },
   threadPreview: { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 6 },
   selectedMeta: { color: colors.muted, fontSize: 13, lineHeight: 18, marginBottom: spacing.md },
   messageList: { gap: spacing.sm, marginBottom: spacing.md },
   messageBubble: { maxWidth: '86%', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 14 },
   messageBubbleMine: { alignSelf: 'flex-end', backgroundColor: colors.teal },
   messageBubbleOther: { alignSelf: 'flex-start', backgroundColor: '#f3f7f6' },
-  messageSender: { color: colors.text, fontSize: 12, fontWeight: '900', marginBottom: 4 },
+  messageSender: { color: colors.text, fontSize: 12, fontWeight: '700', marginBottom: 4 },
   messageSenderMine: { color: colors.surface },
   messageText: { color: colors.text, fontSize: 14, lineHeight: 20 },
   messageTextMine: { color: colors.surface },
@@ -212,8 +209,8 @@ const styles = StyleSheet.create({
   messageTimeMine: { color: 'rgba(255,255,255,0.72)' },
   textarea: { minHeight: 110, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, color: colors.text, backgroundColor: colors.surface, fontSize: 15 },
   primaryButton: { minHeight: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.teal, paddingHorizontal: spacing.lg, marginTop: spacing.md },
-  primaryButtonText: { color: colors.surface, fontSize: 15, fontWeight: '900' },
-  statusText: { color: colors.tealDark, fontSize: 13, fontWeight: '800', marginTop: spacing.md },
+  primaryButtonText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
+  statusText: { color: colors.tealDark, fontSize: 13, fontWeight: '600', marginTop: spacing.md },
   disabled: { opacity: 0.5 },
   pressed: { opacity: 0.78 },
 });

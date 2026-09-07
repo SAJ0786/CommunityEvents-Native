@@ -71,10 +71,10 @@ const styles = StyleSheet.create({
   heroBadgeText: {
     color: colors.tealDark,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
-  title: { color: colors.navy, fontSize: 27, fontWeight: '900' },
+  title: { color: colors.navy, fontSize: 27, fontWeight: '700' },
   subtitle: { color: colors.muted, fontSize: 15, lineHeight: 21, marginTop: 8, marginBottom: spacing.lg },
   choice: {
     flexDirection: 'row',
@@ -103,11 +103,11 @@ const styles = StyleSheet.create({
     fontSize: 28,
   },
   choiceText: { flex: 1 },
-  choiceEyebrow: { color: colors.tealDark, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
-  choiceTitle: { color: colors.navy, fontSize: 18, fontWeight: '900' },
+  choiceEyebrow: { color: colors.tealDark, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
+  choiceTitle: { color: colors.navy, fontSize: 18, fontWeight: '700' },
   choiceDescription: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: 4 },
   choiceMeta: { color: colors.text, fontSize: 13, lineHeight: 18, marginTop: 8 },
-  adminOnly: { color: colors.muted, fontSize: 13, fontWeight: '900', marginTop: 10 },
+  adminOnly: { color: colors.muted, fontSize: 13, fontWeight: '700', marginTop: 10 },
   disabledText: { color: '#9ca3af' },
   pressed: { opacity: 0.72 },
 });

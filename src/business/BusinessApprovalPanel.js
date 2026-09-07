@@ -2,22 +2,28 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Linking, Pressable, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import {
   approveBusinessListing,
+  archiveBusinessListing,
   formatAbn,
   isValidAbn,
   listenBusinessesForAdmin,
+  priorBusinessHistoryMatches,
   rejectBusinessListing,
+  restoreBusinessListing,
   setBusinessVisibility,
   syncApprovedBusinessProjections,
   verifyBusinessAbn,
 } from '../services/businesses';
 import { friendlyError } from '../utils/errors';
 import { colors, radius, shadow, spacing } from '../theme';
+import NativeBackButton from '../components/NativeBackButton';
 import BusinessPromotionApprovalPanel from './BusinessPromotionApprovalPanel';
 
 const FILTERS = [
   { value: 'pending', label: 'Pending' },
   { value: 'approved', label: 'Approved' },
   { value: 'rejected', label: 'Changes Required' },
+  { value: 'archived', label: 'Archived' },
+  { value: 'deleted', label: 'Deleted' },
   { value: 'all', label: 'All' },
 ];
 
@@ -26,6 +32,8 @@ const TIERS = ['free', 'standard', 'featured'];
 function statusLabel(status, hasPublishedVersion = false) {
   if (status === 'approved') return 'APPROVED';
   if (status === 'rejected') return 'CHANGES REQUIRED';
+  if (status === 'archived') return 'ARCHIVED';
+  if (status === 'deleted') return 'DELETED RECORD';
   return hasPublishedVersion ? 'PENDING UPDATE' : 'PENDING REVIEW';
 }
 
@@ -34,11 +42,12 @@ function comparisonValue(value) {
   return String(value || 'Not supplied');
 }
 
-function BusinessReviewCard({ business, compactLayout, selected, busy, onToggle, onApprove, onReject, onVisibility, onVerify }) {
+function BusinessReviewCard({ business, compactLayout, selected, busy, isManagement, isSuperAdmin, historyMatches, onToggle, onApprove, onReject, onVisibility, onVerify, onLifecycle, onRestore }) {
   const [tier, setTier] = useState(business.tier || 'free');
   const [foundingMember, setFoundingMember] = useState(Boolean(business.foundingMember || business.foundingMemberCandidate));
   const [publishWithoutAbn, setPublishWithoutAbn] = useState(false);
   const [referrerConfirmed, setReferrerConfirmed] = useState(business.referrerReview?.status === 'confirmed');
+  const [historyReviewed, setHistoryReviewed] = useState(false);
   const [reason, setReason] = useState(business.rejectionReason || '');
   const imageUrl = business.logoUrl || business.coverUrl;
   const initials = String(business.name || 'Business').split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
@@ -46,7 +55,8 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, onToggle,
   const hasAbn = Boolean(String(business.abn || '').replace(/\D/g, ''));
   const abrVerified = business.abnVerified === true && business.abrVerification?.status === 'verified';
   const hasCompleteReferrer = Boolean(business.referrer?.name && business.referrer?.phone && business.referrer?.location);
-  const approvalReady = (hasAbn ? validAbn && abrVerified : publishWithoutAbn) && hasCompleteReferrer && referrerConfirmed;
+  const hasHistoricalMatch = historyMatches.length > 0;
+  const approvalReady = (hasAbn ? validAbn && abrVerified : publishWithoutAbn) && hasCompleteReferrer && referrerConfirmed && (!hasHistoricalMatch || historyReviewed);
 
   useEffect(() => {
     setTier(business.tier || 'free');
@@ -54,6 +64,7 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, onToggle,
     setPublishWithoutAbn(false);
     setReferrerConfirmed(business.referrerReview?.status === 'confirmed');
     setReason(business.rejectionReason || '');
+    setHistoryReviewed(false);
   }, [business.abnVerified, business.foundingMember, business.foundingMemberCandidate, business.id, business.referrerReview?.status, business.rejectionReason, business.tier]);
 
   const confirmApproval = () => {
@@ -70,7 +81,7 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, onToggle,
       `${business.name} will be visible in the public Business Directory.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Approve', onPress: () => onApprove?.(business, { tier: hasAbn ? tier : 'free', foundingMember, publishWithoutAbn: !hasAbn && publishWithoutAbn, referrerConfirmed }) },
+        { text: 'Approve', onPress: () => onApprove?.(business, { tier: hasAbn ? tier : 'free', foundingMember, publishWithoutAbn: !hasAbn && publishWithoutAbn, referrerConfirmed, historyReviewed }) },
       ]
     );
   };
@@ -92,6 +103,34 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, onToggle,
     );
   };
 
+  const confirmLifecycle = markDeleted => {
+    if (reason.trim().length < 10) {
+      Alert.alert('Add a reason', 'Enter a clear reason of at least 10 characters. It will remain in the permanent audit history.');
+      return;
+    }
+    Alert.alert(
+      markDeleted ? 'Mark business as deleted?' : 'Archive business?',
+      markDeleted
+        ? 'The record and its promotions will remain permanently archived and visible to Super Admins, but will be removed from the public directory.'
+        : 'The record and its promotions will be removed from public view and retained in the archive.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: markDeleted ? 'Mark Deleted' : 'Archive', style: 'destructive', onPress: () => onLifecycle?.(business, reason.trim(), markDeleted) },
+      ]
+    );
+  };
+
+  const confirmRestore = () => {
+    if (reason.trim().length < 10) {
+      Alert.alert('Add a reason', 'Enter a clear restoration reason of at least 10 characters.');
+      return;
+    }
+    Alert.alert('Restore for review?', 'The historical record will return to the private approval queue. It will not be published automatically.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Restore', onPress: () => onRestore?.(business, reason.trim()) },
+    ]);
+  };
+
   return (
     <View style={[styles.card, selected && styles.cardSelected]}>
       <Pressable onPress={onToggle} style={({ pressed }) => [styles.cardHeader, pressed && styles.pressed]}>
@@ -111,6 +150,18 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, onToggle,
         <View style={styles.reviewBody}>
           {business.coverUrl ? <Image source={{ uri: business.coverUrl }} resizeMode="cover" style={styles.cover} /> : null}
           <Text style={styles.description}>{business.description}</Text>
+
+          {hasHistoricalMatch ? <View style={styles.historyWarning}>
+            <Text style={styles.historyWarningTitle}>Previous listing history found</Text>
+            <Text style={styles.historyWarningText}>This submission matches {historyMatches.length} permanently retained business record(s). Review the reason and eligibility before approval.</Text>
+            {historyMatches.slice(0, 5).map(item => (
+              <Text key={item.id} style={styles.historyMatchText}>• {item.name || 'Prior listing'} — {String(item.status || '').toUpperCase()} ({item.matchReasons.join(', ')}){item.archiveReason ? `: ${item.archiveReason}` : ''}</Text>
+            ))}
+            <View style={styles.historyReviewRow}>
+              <Text style={styles.historyReviewLabel}>{historyReviewed ? 'HISTORY REVIEWED' : 'REVIEW REQUIRED'}</Text>
+              <Switch value={historyReviewed} onValueChange={setHistoryReviewed} trackColor={{ false: colors.border, true: '#2563eb' }} />
+            </View>
+          </View> : null}
 
           {business.publishedSnapshot ? <View style={styles.comparisonCard}>
             <Text style={styles.comparisonTitle}>Published listing vs proposed update</Text>
@@ -203,19 +254,27 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, onToggle,
             style={styles.reasonInput}
           />
 
-          <View style={styles.actionRow}>
+          {!['archived', 'deleted'].includes(business.status) ? <View style={styles.actionRow}>
             <Pressable disabled={busy || !approvalReady} onPress={confirmApproval} style={({ pressed }) => [styles.approveButton, (busy || !approvalReady) && styles.disabled, pressed && styles.pressed]}>
               {busy ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.approveText}>✓ Approve & Publish</Text>}
             </Pressable>
             <Pressable disabled={busy} onPress={confirmRejection} style={({ pressed }) => [styles.rejectButton, busy && styles.disabled, pressed && styles.pressed]}>
               <Text style={styles.rejectText}>Request Changes</Text>
             </Pressable>
-          </View>
+          </View> : null}
 
           {business.status === 'approved' ? (
             <Pressable disabled={busy} onPress={() => onVisibility?.(business, !business.hidden)} style={styles.visibilityButton}>
               <Text style={styles.visibilityText}>{business.hidden ? 'Restore Public Listing' : 'Temporarily Hide Listing'}</Text>
             </Pressable>
+          ) : null}
+
+          {isManagement && !['archived', 'deleted'].includes(business.status) ? <View style={styles.lifecycleActions}>
+            <Pressable disabled={busy} onPress={() => confirmLifecycle(false)} style={styles.archiveButton}><Text style={styles.archiveButtonText}>Archive Business</Text></Pressable>
+            {isSuperAdmin ? <Pressable disabled={busy} onPress={() => confirmLifecycle(true)} style={styles.deleteRecordButton}><Text style={styles.deleteRecordText}>Mark as Deleted</Text></Pressable> : null}
+          </View> : null}
+          {isManagement && ['archived', 'deleted'].includes(business.status) && isSuperAdmin ? (
+            <Pressable disabled={busy} onPress={confirmRestore} style={styles.restoreButton}><Text style={styles.restoreButtonText}>Restore for Review</Text></Pressable>
           ) : null}
         </View>
       ) : null}
@@ -223,7 +282,7 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, onToggle,
   );
 }
 
-export default function BusinessApprovalPanel({ mode = 'approvals', onBack }) {
+export default function BusinessApprovalPanel({ mode = 'approvals', onBack, profile }) {
   const { width, fontScale } = useWindowDimensions();
   const compactLayout = width / Math.max(fontScale, 1) < 360;
   const isManagement = mode === 'management';
@@ -265,6 +324,8 @@ export default function BusinessApprovalPanel({ mode = 'approvals', onBack }) {
     pending: businesses.filter(item => item.status === 'pending').length,
     approved: businesses.filter(item => item.status === 'approved').length,
     rejected: businesses.filter(item => item.status === 'rejected').length,
+    archived: businesses.filter(item => item.status === 'archived').length,
+    deleted: businesses.filter(item => item.status === 'deleted').length,
   }), [businesses]);
 
   const filtered = useMemo(() => {
@@ -334,6 +395,33 @@ export default function BusinessApprovalPanel({ mode = 'approvals', onBack }) {
     }
   };
 
+  const changeLifecycle = async (business, reason, markDeleted) => {
+    setBusyId(business.id);
+    setError('');
+    try {
+      const result = await archiveBusinessListing(business.id, reason, { markDeleted });
+      setSelectedId('');
+      Alert.alert(markDeleted ? 'Business marked deleted' : 'Business archived', `${result.promotionsArchived} linked promotion(s) were archived with the business. No historical data was erased.`);
+    } catch (nextError) {
+      setError(friendlyError(nextError, 'Could not archive this business.'));
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const restore = async (business, reason) => {
+    setBusyId(business.id);
+    setError('');
+    try {
+      await restoreBusinessListing(business.id, reason);
+      setSelectedId('');
+    } catch (nextError) {
+      setError(friendlyError(nextError, 'Could not restore this business.'));
+    } finally {
+      setBusyId('');
+    }
+  };
+
   const syncPublicDirectory = async () => {
     setSyncing(true);
     setError('');
@@ -350,7 +438,7 @@ export default function BusinessApprovalPanel({ mode = 'approvals', onBack }) {
   return (
     <View style={styles.panel}>
       <View style={styles.panelHeader}>
-        <Pressable onPress={onBack} style={styles.backButton}><Text style={styles.backButtonText}>{'←'} Back</Text></Pressable>
+        <NativeBackButton onPress={onBack} style={styles.backButton} />
         <View style={styles.panelTitleCopy}>
           <Text style={styles.eyebrow}>BUSINESS DIRECTORY</Text>
           <Text style={styles.panelTitle}>{isManagement ? 'Business Management' : 'Business Approvals'}</Text>
@@ -397,11 +485,16 @@ export default function BusinessApprovalPanel({ mode = 'approvals', onBack }) {
             compactLayout={compactLayout}
             selected={selectedId === business.id}
             busy={busyId === business.id}
+            isManagement={isManagement}
+            isSuperAdmin={profile?.role === 'superAdmin'}
+            historyMatches={priorBusinessHistoryMatches(business, businesses)}
             onToggle={() => setSelectedId(current => current === business.id ? '' : business.id)}
             onApprove={approve}
             onReject={reject}
             onVisibility={changeVisibility}
             onVerify={verifyAbn}
+            onLifecycle={changeLifecycle}
+            onRestore={restore}
           />
         ))}
       </View>
@@ -414,30 +507,30 @@ const styles = StyleSheet.create({
   panel: { gap: spacing.md },
   panelHeader: { alignItems: 'flex-start', gap: spacing.sm },
   panelTitleCopy: { flex: 1, minWidth: 0 },
-  eyebrow: { color: colors.tealDark, fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
-  panelTitle: { marginTop: 4, color: colors.navy, fontSize: 25, lineHeight: 30, fontWeight: '900' },
+  eyebrow: { color: colors.tealDark, fontSize: 10, fontWeight: '700', letterSpacing: 1.1 },
+  panelTitle: { marginTop: 4, color: colors.navy, fontSize: 25, lineHeight: 30, fontWeight: '700' },
   panelSubtitle: { marginTop: 5, color: colors.muted, fontSize: 12, lineHeight: 18, fontWeight: '700' },
   backButton: { minHeight: 38, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  backButtonText: { color: colors.tealDark, fontSize: 12, fontWeight: '900' },
+  backButtonText: { color: colors.tealDark, fontSize: 12, fontWeight: '700' },
   queueTabs: { flexDirection: 'row', padding: 3, borderRadius: radius.md, backgroundColor: '#edf2f1' },
   queueTab: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   queueTabActive: { backgroundColor: colors.surface, ...shadow },
-  queueTabText: { color: colors.muted, fontSize: 11, fontWeight: '900' },
+  queueTabText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   queueTabTextActive: { color: colors.tealDark },
   metrics: { flexDirection: 'row', gap: spacing.sm },
   metric: { flex: 1, minWidth: 0, alignItems: 'center', paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, ...shadow },
   metricActive: { borderColor: colors.teal, backgroundColor: colors.teal },
-  metricValue: { color: colors.navy, fontSize: 23, fontWeight: '900' },
+  metricValue: { color: colors.navy, fontSize: 23, fontWeight: '700' },
   metricValueActive: { color: colors.surface },
-  metricLabel: { marginTop: 3, color: colors.muted, fontSize: 8.5, fontWeight: '900' },
+  metricLabel: { marginTop: 3, color: colors.muted, fontSize: 8.5, fontWeight: '700' },
   metricLabelActive: { color: colors.surface },
   syncButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  syncButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '900', textAlign: 'center' },
+  syncButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '700', textAlign: 'center' },
   search: { minHeight: 50, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, color: colors.text, fontSize: 14, fontWeight: '700' },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   filterButton: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 99, backgroundColor: colors.surface },
   filterButtonActive: { borderColor: colors.teal, backgroundColor: colors.teal },
-  filterText: { color: colors.muted, fontSize: 10, fontWeight: '900' },
+  filterText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
   filterTextActive: { color: colors.surface },
   list: { gap: spacing.md },
   card: { overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
@@ -445,83 +538,96 @@ const styles = StyleSheet.create({
   cardHeader: { minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md },
   logo: { width: 56, height: 56, borderRadius: 16, backgroundColor: colors.tealSoft },
   logoFallback: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: colors.teal },
-  logoText: { color: colors.surface, fontSize: 17, fontWeight: '900' },
+  logoText: { color: colors.surface, fontSize: 17, fontWeight: '700' },
   headerCopy: { flex: 1, minWidth: 0 },
-  businessName: { color: colors.navy, fontSize: 15, lineHeight: 19, fontWeight: '900' },
+  businessName: { color: colors.navy, fontSize: 15, lineHeight: 19, fontWeight: '700' },
   businessMeta: { marginTop: 3, color: colors.muted, fontSize: 10, fontWeight: '700' },
   statusBadge: { alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 99, backgroundColor: '#fff2d8' },
   statusApproved: { backgroundColor: '#e7f5ea' },
   statusRejected: { backgroundColor: '#ffeded' },
-  statusText: { color: '#8b5c08', fontSize: 8, fontWeight: '900' },
+  statusText: { color: '#8b5c08', fontSize: 8, fontWeight: '700' },
   statusTextApproved: { color: '#2f7740' },
   statusTextRejected: { color: colors.danger },
+  historyWarning: { marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: '#e8a317', borderRadius: radius.md, backgroundColor: '#fff8e8' },
+  historyWarningTitle: { color: '#7a4600', fontSize: 14, fontWeight: '700' },
+  historyWarningText: { marginTop: 5, color: colors.text, fontSize: 11, lineHeight: 16, fontWeight: '500' },
+  historyMatchText: { marginTop: 6, color: colors.text, fontSize: 10, lineHeight: 15, fontWeight: '500' },
+  historyReviewRow: { marginTop: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  historyReviewLabel: { color: '#7a4600', fontSize: 9, fontWeight: '700' },
   expandIcon: { width: 32, color: colors.tealDark, fontSize: 24, fontWeight: '700', textAlign: 'center' },
   reviewBody: { padding: spacing.md, paddingTop: 0, borderTopWidth: 1, borderTopColor: colors.border },
   cover: { height: 150, marginTop: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   description: { marginTop: spacing.md, color: colors.text, fontSize: 13, lineHeight: 20, fontWeight: '600' },
   comparisonCard: { marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: '#b9ddd6', borderRadius: radius.md, backgroundColor: '#f4fbf9' },
-  comparisonTitle: { color: colors.tealDark, fontSize: 14, fontWeight: '900' },
+  comparisonTitle: { color: colors.tealDark, fontSize: 14, fontWeight: '700' },
   comparisonHelp: { marginTop: 3, color: colors.muted, fontSize: 10, lineHeight: 15, fontWeight: '700' },
   comparisonRow: { paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: '#dcece8' },
-  comparisonLabel: { marginBottom: 5, color: colors.navy, fontSize: 10, fontWeight: '900' },
+  comparisonLabel: { marginBottom: 5, color: colors.navy, fontSize: 10, fontWeight: '700' },
   comparisonColumns: { flexDirection: 'row', gap: spacing.sm },
   comparisonColumn: { flex: 1, minWidth: 0, padding: spacing.sm, borderRadius: 9, backgroundColor: colors.surface },
   proposedColumn: { backgroundColor: '#fff8e8' },
-  comparisonEyebrow: { color: colors.muted, fontSize: 7.5, fontWeight: '900' },
+  comparisonEyebrow: { color: colors.muted, fontSize: 7.5, fontWeight: '700' },
   comparisonValue: { marginTop: 3, color: colors.text, fontSize: 9.5, lineHeight: 14, fontWeight: '700' },
   detailGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   detailItem: { width: '48%', minWidth: 130, padding: spacing.sm, borderRadius: 10, backgroundColor: '#f4f7f6' },
   detailItemCompact: { width: '100%', minWidth: 0 },
-  detailLabel: { color: colors.muted, fontSize: 8, fontWeight: '900' },
-  detailValue: { marginTop: 3, color: colors.navy, fontSize: 10.5, lineHeight: 15, fontWeight: '800' },
-  valid: { marginTop: 3, color: '#2f7740', fontSize: 9, fontWeight: '900' },
-  invalid: { marginTop: 3, color: colors.danger, fontSize: 9, fontWeight: '900' },
+  detailLabel: { color: colors.muted, fontSize: 8, fontWeight: '700' },
+  detailValue: { marginTop: 3, color: colors.navy, fontSize: 10.5, lineHeight: 15, fontWeight: '600' },
+  valid: { marginTop: 3, color: '#2f7740', fontSize: 9, fontWeight: '700' },
+  invalid: { marginTop: 3, color: colors.danger, fontSize: 9, fontWeight: '700' },
   abrReview: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: '#edf8f5' },
   abrCopy: { flex: 1, minWidth: 0 },
-  abrTitle: { color: colors.navy, fontSize: 12, fontWeight: '900' },
+  abrTitle: { color: colors.navy, fontSize: 12, fontWeight: '700' },
   abrText: { marginTop: 3, color: colors.text, fontSize: 9.5, lineHeight: 14, fontWeight: '700' },
   abrLink: { alignSelf: 'flex-start', minHeight: 34, justifyContent: 'center', marginTop: 5 },
-  abrLinkText: { color: colors.tealDark, fontSize: 10, fontWeight: '900', textDecorationLine: 'underline' },
+  abrLinkText: { color: colors.tealDark, fontSize: 10, fontWeight: '700', textDecorationLine: 'underline' },
   abrVerifyButton: { alignSelf: 'flex-start', minHeight: 38, minWidth: 120, alignItems: 'center', justifyContent: 'center', marginTop: 6, paddingHorizontal: spacing.md, borderRadius: 10, backgroundColor: colors.teal },
-  abrVerifyText: { color: colors.surface, fontSize: 10, fontWeight: '900' },
+  abrVerifyText: { color: colors.surface, fontSize: 10, fontWeight: '700' },
   abrStatus: { maxWidth: 78, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 99, backgroundColor: '#ffeded' },
   abrStatusVerified: { backgroundColor: '#dff4e5' },
-  abrStatusText: { color: colors.danger, fontSize: 7.5, lineHeight: 10, fontWeight: '900', textAlign: 'center' },
+  abrStatusText: { color: colors.danger, fontSize: 7.5, lineHeight: 10, fontWeight: '700', textAlign: 'center' },
   abrStatusTextVerified: { color: '#2f7740' },
   referrerReview: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: '#d4c58b', borderRadius: radius.md, backgroundColor: '#fff9e8' },
   referrerCopy: { flex: 1, minWidth: 0 },
-  referrerTitle: { color: colors.navy, fontSize: 12, fontWeight: '900' },
-  referrerValue: { marginTop: 5, color: colors.text, fontSize: 11, fontWeight: '900' },
-  referrerLink: { marginTop: 4, color: colors.tealDark, fontSize: 11, fontWeight: '900', textDecorationLine: 'underline' },
+  referrerTitle: { color: colors.navy, fontSize: 12, fontWeight: '700' },
+  referrerValue: { marginTop: 5, color: colors.text, fontSize: 11, fontWeight: '700' },
+  referrerLink: { marginTop: 4, color: colors.tealDark, fontSize: 11, fontWeight: '700', textDecorationLine: 'underline' },
   referrerLocation: { marginTop: 3, color: colors.text, fontSize: 10.5, fontWeight: '700' },
   referrerHelp: { marginTop: 6, color: colors.muted, fontSize: 9, lineHeight: 13, fontWeight: '700' },
   referrerSwitch: { alignItems: 'center', gap: 5 },
-  referrerSwitchLabel: { maxWidth: 78, color: colors.tealDark, fontSize: 7.5, lineHeight: 10, fontWeight: '900', textAlign: 'center' },
-  controlLabel: { marginTop: spacing.md, marginBottom: 6, color: colors.navy, fontSize: 10, fontWeight: '900' },
+  referrerSwitchLabel: { maxWidth: 78, color: colors.tealDark, fontSize: 7.5, lineHeight: 10, fontWeight: '700', textAlign: 'center' },
+  controlLabel: { marginTop: spacing.md, marginBottom: 6, color: colors.navy, fontSize: 10, fontWeight: '700' },
   tierRow: { flexDirection: 'row', gap: 6 },
   tierButton: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.surface },
   tierButtonActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
-  tierText: { color: colors.muted, fontSize: 9, fontWeight: '900' },
+  tierText: { color: colors.muted, fontSize: 9, fontWeight: '700' },
   tierTextActive: { color: colors.tealDark },
   foundingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   foundingCopy: { flex: 1, minWidth: 0 },
-  foundingTitle: { color: colors.navy, fontSize: 12, fontWeight: '900' },
+  foundingTitle: { color: colors.navy, fontSize: 12, fontWeight: '700' },
   foundingText: { marginTop: 2, color: colors.text, fontSize: 9.5, lineHeight: 14, fontWeight: '700' },
   reasonInput: { minHeight: 90, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, color: colors.text, fontSize: 12, textAlignVertical: 'top' },
   actionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   approveButton: { flex: 1.2, minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: radius.md, backgroundColor: colors.teal },
-  approveText: { color: colors.surface, fontSize: 11, fontWeight: '900', textAlign: 'center' },
+  approveText: { color: colors.surface, fontSize: 11, fontWeight: '700', textAlign: 'center' },
   rejectButton: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#e2b5b5', borderRadius: radius.md, backgroundColor: '#fff5f5' },
-  rejectText: { color: colors.danger, fontSize: 10.5, fontWeight: '900', textAlign: 'center' },
+  rejectText: { color: colors.danger, fontSize: 10.5, fontWeight: '700', textAlign: 'center' },
   visibilityButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
-  visibilityText: { color: colors.muted, fontSize: 10.5, fontWeight: '900' },
+  visibilityText: { color: colors.muted, fontSize: 10.5, fontWeight: '700' },
+  lifecycleActions: { marginTop: spacing.sm, flexDirection: 'row', gap: spacing.sm },
+  archiveButton: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#fff2d8' },
+  archiveButtonText: { color: '#7a4600', fontSize: 10.5, fontWeight: '700' },
+  deleteRecordButton: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#ffeded' },
+  deleteRecordText: { color: colors.danger, fontSize: 10.5, fontWeight: '700' },
+  restoreButton: { marginTop: spacing.sm, minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#e8efff' },
+  restoreButtonText: { color: '#2563eb', fontSize: 10.5, fontWeight: '700' },
   errorCard: { padding: spacing.md, borderRadius: radius.md, backgroundColor: '#fff0f0' },
-  errorText: { color: colors.danger, fontSize: 11, lineHeight: 17, fontWeight: '800' },
+  errorText: { color: colors.danger, fontSize: 11, lineHeight: 17, fontWeight: '600' },
   loadingCard: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl },
   loadingText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   emptyCard: { alignItems: 'center', padding: spacing.xl, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface },
-  emptyIcon: { color: '#2f7740', fontSize: 35, fontWeight: '900' },
-  emptyTitle: { marginTop: spacing.sm, color: colors.navy, fontSize: 17, fontWeight: '900' },
+  emptyIcon: { color: '#2f7740', fontSize: 35, fontWeight: '700' },
+  emptyTitle: { marginTop: spacing.sm, color: colors.navy, fontSize: 17, fontWeight: '700' },
   emptyText: { marginTop: 4, color: colors.muted, fontSize: 11, fontWeight: '700' },
   disabled: { opacity: 0.5 },
   pressed: { opacity: 0.78 },

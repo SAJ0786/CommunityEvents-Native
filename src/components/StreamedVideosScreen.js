@@ -12,6 +12,7 @@ import {
 import { httpsCallable } from '@react-native-firebase/functions';
 import { functions } from '../firebase/firebase';
 import { colors, radius, shadow, spacing } from '../theme';
+import NativeBackButton from './NativeBackButton';
 
 function formatDate(value) {
   if (!value) return '';
@@ -69,9 +70,7 @@ export default function StreamedVideosScreen({ isGuest = false, onBack }) {
           <Pressable onPress={loadVideos} style={({ pressed }) => [styles.lightButton, pressed && styles.pressed]}>
             <Text style={styles.lightButtonText}>{loading ? 'Loading...' : 'Refresh'}</Text>
           </Pressable>
-          <Pressable onPress={onBack} style={({ pressed }) => [styles.lightButton, pressed && styles.pressed]}>
-            <Text style={styles.lightButtonText}>Back</Text>
-          </Pressable>
+          <NativeBackButton onPress={onBack} />
         </View>
       </View>
 
@@ -162,7 +161,7 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, justifyContent: 'space-between' },
   headerCopy: { flex: 1 },
   headerActions: { gap: spacing.sm },
-  title: { color: colors.navy, fontSize: 28, fontWeight: '900' },
+  title: { color: colors.navy, fontSize: 28, fontWeight: '700' },
   subtitle: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: 4 },
   lightButton: {
     minHeight: 40,
@@ -172,7 +171,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.tealSoft,
   },
-  lightButtonText: { color: colors.tealDark, fontSize: 13, fontWeight: '900' },
+  lightButtonText: { color: colors.tealDark, fontSize: 13, fontWeight: '700' },
   noticeCard: {
     padding: spacing.md,
     borderWidth: 1,
@@ -189,7 +188,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fef2f2',
     gap: spacing.sm,
   },
-  errorText: { color: colors.danger, fontSize: 13, lineHeight: 19, fontWeight: '800' },
+  errorText: { color: colors.danger, fontSize: 13, lineHeight: 19, fontWeight: '600' },
   stateCard: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -200,7 +199,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     ...shadow,
   },
-  emptyTitle: { color: colors.navy, fontSize: 20, fontWeight: '900' },
+  emptyTitle: { color: colors.navy, fontSize: 20, fontWeight: '700' },
   stateText: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: spacing.sm, textAlign: 'center' },
   videoCard: {
     padding: spacing.md,
@@ -225,15 +224,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#f1f5f4',
   },
-  placeholderIcon: { color: colors.muted, fontSize: 34, fontWeight: '900' },
+  placeholderIcon: { color: colors.muted, fontSize: 34, fontWeight: '700' },
   videoBody: { gap: 6 },
   videoTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
-  videoTitle: { flex: 1, color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: '900' },
+  videoTitle: { flex: 1, color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: '700' },
   statusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   livePill: { backgroundColor: '#fee2e2' },
   scheduledPill: { backgroundColor: '#fef3c7' },
   completedPill: { backgroundColor: '#f1f5f9' },
-  statusPillText: { fontSize: 11, fontWeight: '900' },
+  statusPillText: { fontSize: 11, fontWeight: '700' },
   livePillText: { color: '#991b1b' },
   scheduledPillText: { color: '#92400e' },
   completedPillText: { color: '#475569' },
@@ -246,7 +245,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: '#ff0000',
   },
-  watchButtonText: { color: colors.surface, fontSize: 14, fontWeight: '900' },
+  watchButtonText: { color: colors.surface, fontSize: 14, fontWeight: '700' },
   disabledButton: {
     minHeight: 46,
     alignItems: 'center',
@@ -254,6 +253,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: '#e5e7eb',
   },
-  disabledButtonText: { color: colors.muted, fontSize: 14, fontWeight: '800' },
+  disabledButtonText: { color: colors.muted, fontSize: 14, fontWeight: '600' },
   pressed: { opacity: 0.8 },
 });

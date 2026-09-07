@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   brand: {
     color: colors.navy,
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: 24,
   },
   brandCompact: { fontSize: 18, lineHeight: 21 },
@@ -427,11 +427,11 @@ const styles = StyleSheet.create({
   moduleLabel: {
     color: colors.muted,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   moduleLabelActive: {
     color: colors.tealDark,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   modalRoot: {
     flex: 1,
@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
   menuUserTitle: {
     color: colors.tealDark,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   menuUserSubtle: {
     color: colors.muted,
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
   rolePillText: {
     color: colors.tealDark,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   menuList: {
     flexGrow: 0,
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
   groupLabel: {
     color: colors.muted,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
     textTransform: 'uppercase',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
   },
   menuItemTextActive: {
     color: colors.tealDark,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   menuItemTextDisabled: {
     color: colors.muted,
@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
   loginButtonText: {
     color: colors.tealDark,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   logoutButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: '#fff1f0' },
   identityLogout: {

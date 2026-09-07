@@ -48,8 +48,10 @@ You can browse as a guest or sign in with a verified Australian mobile number fo
 - Terms of Use: https://communityevents.siza.info/terms.html
 - Support: https://communityevents.siza.info/support.html
 - Account deletion: https://communityevents.siza.info/delete-account.html
+- Main SIZA website: https://siza.info
+- Support email: support@siza.info
 
-The first two pages currently describe the Events product and must be replaced with the legally reviewed consolidated Community Connect Australia versions before either store submission. Native-entry legal pages must not contain Home, Back to App or PWA navigation links.
+The consolidated local drafts were refreshed on 6 September 2026, but the first two published pages still describe the Events product and must be replaced with legally reviewed consolidated Community Connect Australia versions before either store submission. The User Guide, Support and Account Deletion pages must also replace the legacy Gmail address with `support@siza.info`. Native-entry legal pages must not contain Home, Back to App or PWA navigation links.
 
 ## Reviewer notes draft
 

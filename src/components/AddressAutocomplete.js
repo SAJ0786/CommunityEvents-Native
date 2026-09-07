@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   inputInvalid: { borderColor: colors.danger, backgroundColor: '#fffafa' },
-  searchIcon: { color: colors.tealDark, fontSize: 22, fontWeight: '900' },
+  searchIcon: { color: colors.tealDark, fontSize: 22, fontWeight: '700' },
   input: { flex: 1, minHeight: 50, color: colors.text, fontSize: 15 },
   suggestions: {
     overflow: 'hidden',
@@ -172,10 +172,10 @@ const styles = StyleSheet.create({
   suggestion: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
   pin: { fontSize: 16 },
   suggestionCopy: { flex: 1 },
-  primary: { color: colors.navy, fontSize: 14, fontWeight: '900' },
+  primary: { color: colors.navy, fontSize: 14, fontWeight: '700' },
   secondary: { color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 2 },
-  verified: { color: colors.tealDark, fontSize: 12, fontWeight: '900' },
+  verified: { color: colors.tealDark, fontSize: 12, fontWeight: '700' },
   helper: { color: colors.muted, fontSize: 12, lineHeight: 17 },
-  error: { color: colors.danger, fontSize: 12, fontWeight: '800' },
+  error: { color: colors.danger, fontSize: 12, fontWeight: '600' },
   pressed: { backgroundColor: colors.tealSoft },
 });

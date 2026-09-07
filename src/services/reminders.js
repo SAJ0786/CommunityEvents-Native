@@ -64,7 +64,11 @@ async function ensureNotificationPermission() {
 
   const current = await Notifications.getPermissionsAsync();
   if (current.status === 'granted') return true;
-  const requested = await Notifications.requestPermissionsAsync();
+  const requested = await Notifications.requestPermissionsAsync(
+    Platform.OS === 'ios'
+      ? { ios: { allowAlert: true, allowBadge: true, allowSound: true } }
+      : undefined,
+  );
   return requested.status === 'granted';
 }
 
@@ -111,9 +115,14 @@ async function scheduleVerifiedNotification(request) {
   let notificationId = '';
   try {
     notificationId = await Notifications.scheduleNotificationAsync(request);
+    // On iOS, scheduleNotificationAsync resolving with an identifier is the
+    // native confirmation. An immediate getAllScheduledNotificationsAsync
+    // read can lag behind the write and previously caused a valid reminder to
+    // be cancelled as "not retained".
+    if (Platform.OS === 'ios') return notificationId;
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     if (!scheduled.some(item => item.identifier === notificationId)) {
-      throw new Error('Scheduled notification was not retained by Android.');
+      throw new Error('Scheduled notification was not retained by this device.');
     }
     return notificationId;
   } catch (error) {
@@ -137,7 +146,11 @@ async function ensurePrayerNotificationPermission() {
   }
   const current = await Notifications.getPermissionsAsync();
   if (current.status === 'granted') return true;
-  const requested = await Notifications.requestPermissionsAsync();
+  const requested = await Notifications.requestPermissionsAsync(
+    Platform.OS === 'ios'
+      ? { ios: { allowAlert: true, allowBadge: true, allowSound: true } }
+      : undefined,
+  );
   return requested.status === 'granted';
 }
 
@@ -191,7 +204,11 @@ async function ensureAzaanNotificationPermission() {
   }
   const current = await Notifications.getPermissionsAsync();
   if (current.status === 'granted') return true;
-  const requested = await Notifications.requestPermissionsAsync();
+  const requested = await Notifications.requestPermissionsAsync(
+    Platform.OS === 'ios'
+      ? { ios: { allowAlert: true, allowBadge: true, allowSound: true } }
+      : undefined,
+  );
   return requested.status === 'granted';
 }
 
@@ -218,7 +235,10 @@ async function scheduleAzaanAlarmKeys(keys, location, currentSettings) {
   }
 
   const notificationIds = [];
-  for (let dayOffset = 0; dayOffset < 21; dayOffset += 1) {
+  // iOS retains at most 64 pending local notifications per app. A seven-day
+  // horizon leaves room for event reminders while still covering every prayer.
+  const scheduleDays = Platform.OS === 'ios' ? 7 : 21;
+  for (let dayOffset = 0; dayOffset < scheduleDays; dayOffset += 1) {
     const day = new Date();
     day.setDate(day.getDate() + dayOffset);
     const times = calculatePrayerTimes(localIsoDate(day), scheduleLocation);
@@ -294,7 +314,10 @@ async function schedulePrayerReminderKeys(keys, location, currentSettings) {
   }
 
   const notificationIds = [];
-  for (let dayOffset = 0; dayOffset < 21; dayOffset += 1) {
+  // Leave room within iOS's pending-local-notification limit for event
+  // reminders and optional Azaan alarms.
+  const scheduleDays = Platform.OS === 'ios' ? 7 : 21;
+  for (let dayOffset = 0; dayOffset < scheduleDays; dayOffset += 1) {
     const day = new Date();
     day.setDate(day.getDate() + dayOffset);
     const isoDate = localIsoDate(day);
@@ -397,7 +420,9 @@ export async function scheduleEventReminder(event, minutesBefore) {
 
   const permitted = await ensureNotificationPermission();
   if (!permitted) {
-    throw new Error('Notifications are disabled. Enable them in your phone settings to set a reminder.');
+    const permissionError = new Error('Notifications are disabled. Enable them in your phone settings to set a reminder.');
+    permissionError.code = 'NOTIFICATION_PERMISSION_DENIED';
+    throw permissionError;
   }
 
   await cancelEventReminder(event.id);

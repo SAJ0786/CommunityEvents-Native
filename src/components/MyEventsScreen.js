@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   title: {
     color: colors.navy,
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   subtitle: {
     color: colors.muted,
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     color: colors.navy,
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   emptyText: {
     color: colors.muted,
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   seriesBannerText: {
     color: colors.tealDark,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   visibilityRow: {
     flexDirection: 'row',
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   visibilityText: {
     flexShrink: 1,
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   hiddenText: { color: colors.tealDark },
   visibleText: { color: '#2e7d32' },
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#eef0f3',
   },
   makeVisibleButton: { backgroundColor: colors.tealSoft },
-  visibilityButtonText: { color: colors.tealDark, fontSize: 12, fontWeight: '900' },
+  visibilityButtonText: { color: colors.tealDark, fontSize: 12, fontWeight: '700' },
   hiddenCard: { opacity: 0.62 },
   metaRow: {
     flexDirection: 'row',
@@ -282,27 +282,27 @@ const styles = StyleSheet.create({
   editText: {
     color: colors.tealDark,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   copyText: {
     color: colors.text,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   seriesText: {
     color: '#166534',
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   deleteText: {
     color: colors.danger,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   deleteSeriesText: {
     color: colors.danger,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   pressed: {
     opacity: 0.8,
@@ -318,11 +318,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.teal,
   },
-  addEventText: { color: colors.surface, fontSize: 15, fontWeight: '900' },
+  addEventText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
   error: {
     color: colors.danger,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     marginTop: spacing.md,
   },
 });

@@ -14,6 +14,7 @@ import {
   recurrenceLabel,
 } from '../services/recurrence';
 import { colors, radius, shadow, spacing } from '../theme';
+import NativeBackButton from './NativeBackButton';
 
 const FREQUENCIES = [
   { value: 'day', label: 'Daily' },
@@ -311,9 +312,7 @@ export default function RecurringEventForm({
         >
           <Text style={styles.primaryText}>Continue to Event Details</Text>
         </Pressable>
-        <Pressable onPress={onBackToChoice} style={styles.backButton}>
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
+        <NativeBackButton onPress={onBackToChoice} style={styles.backButton} />
       </View>
     </ScrollView>
   );
@@ -322,40 +321,40 @@ export default function RecurringEventForm({
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: 120 },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.lg, ...shadow },
-  title: { color: colors.navy, fontSize: 27, fontWeight: '900' },
+  title: { color: colors.navy, fontSize: 27, fontWeight: '700' },
   subtitle: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: 4, marginBottom: spacing.lg },
   toggleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: spacing.md },
   toggle: { flexGrow: 1, minWidth: 76, paddingVertical: 10, paddingHorizontal: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 10, alignItems: 'center', backgroundColor: colors.surface },
   toggleActive: { backgroundColor: colors.teal, borderColor: colors.teal },
-  toggleText: { color: colors.text, fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  toggleText: { color: colors.text, fontSize: 12, fontWeight: '600', textAlign: 'center' },
   toggleTextActive: { color: colors.surface },
   field: { marginBottom: spacing.md },
-  label: { color: colors.text, fontSize: 13, fontWeight: '900', marginBottom: 7, textTransform: 'uppercase' },
-  sectionLabel: { color: colors.text, fontSize: 13, fontWeight: '900', marginBottom: 7, textTransform: 'uppercase' },
+  label: { color: colors.text, fontSize: 13, fontWeight: '700', marginBottom: 7, textTransform: 'uppercase' },
+  sectionLabel: { color: colors.text, fontSize: 13, fontWeight: '700', marginBottom: 7, textTransform: 'uppercase' },
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 13, color: colors.text, backgroundColor: colors.surface, fontSize: 16 },
   datePickerButton: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface },
-  datePickerIcon: { fontSize: 18 }, datePickerText: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '800' }, datePickerArrow: { color: colors.tealDark, fontSize: 22, fontWeight: '900' },
+  datePickerIcon: { fontSize: 18 }, datePickerText: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600' }, datePickerArrow: { color: colors.tealDark, fontSize: 22, fontWeight: '700' },
   hijriNumbers: { flexDirection: 'row', gap: spacing.sm },
   dayInput: { flex: 1 },
   yearInput: { flex: 1.5 },
-  monthLabel: { color: colors.muted, fontSize: 12, fontWeight: '800', marginTop: 8 },
+  monthLabel: { color: colors.muted, fontSize: 12, fontWeight: '600', marginTop: 8 },
   months: { gap: 6, paddingVertical: 7 },
   month: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 8 },
   monthActive: { backgroundColor: colors.tealSoft, borderColor: colors.teal },
   monthText: { color: colors.text, fontSize: 12, fontWeight: '700' },
-  monthTextActive: { color: colors.tealDark, fontWeight: '900' },
+  monthTextActive: { color: colors.tealDark, fontWeight: '700' },
   loader: { marginVertical: 24 },
   ruleText: { color: colors.muted, fontSize: 13, lineHeight: 19, marginBottom: spacing.md },
-  error: { color: colors.danger, fontSize: 13, fontWeight: '800', lineHeight: 19, marginBottom: spacing.md },
+  error: { color: colors.danger, fontSize: 13, fontWeight: '600', lineHeight: 19, marginBottom: spacing.md },
   preview: { backgroundColor: colors.tealSoft, borderWidth: 1, borderColor: '#b7ded7', borderRadius: 13, padding: spacing.md, marginBottom: spacing.lg },
-  previewTitle: { color: colors.tealDark, fontSize: 14, fontWeight: '900', marginBottom: 8 },
+  previewTitle: { color: colors.tealDark, fontSize: 14, fontWeight: '700', marginBottom: 8 },
   previewDates: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   dateChip: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 6 },
-  dateChipText: { color: colors.text, fontSize: 11, fontWeight: '800' },
-  more: { color: colors.muted, fontSize: 11, fontWeight: '800', paddingVertical: 6 },
+  dateChipText: { color: colors.text, fontSize: 11, fontWeight: '600' },
+  more: { color: colors.muted, fontSize: 11, fontWeight: '600', paddingVertical: 6 },
   primaryButton: { minHeight: 50, borderRadius: 13, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
   disabledButton: { opacity: 0.42 },
-  primaryText: { color: colors.surface, fontSize: 15, fontWeight: '900', textAlign: 'center' },
+  primaryText: { color: colors.surface, fontSize: 15, fontWeight: '700', textAlign: 'center' },
   backButton: { minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
-  backText: { color: colors.tealDark, fontSize: 14, fontWeight: '900' },
+  backText: { color: colors.tealDark, fontSize: 14, fontWeight: '700' },
 });

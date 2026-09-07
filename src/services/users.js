@@ -1,7 +1,7 @@
 import { arrayRemove, arrayUnion, collection, deleteField, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from '@react-native-firebase/firestore';
 import { httpsCallable } from '@react-native-firebase/functions';
-import { deleteUser } from '@react-native-firebase/auth';
-import { db, functions } from '../firebase/firebase';
+import { signOut } from '@react-native-firebase/auth';
+import { auth, db, functions } from '../firebase/firebase';
 
 const ROLES = {
   USER: 'user',
@@ -47,6 +47,16 @@ export async function ensureUserProfile(uid, defaults = {}) {
     updates.emailLower = updates.email;
   }
   if (!current.fullName && defaults.fullName) updates.fullName = defaults.fullName;
+  if (defaults.privacyAccepted === true && current.privacyPolicyVersion !== defaults.privacyPolicyVersion) {
+    updates.privacyAccepted = true;
+    updates.privacyPolicyVersion = defaults.privacyPolicyVersion;
+    updates.legalAcceptedAtClient = defaults.legalAcceptedAtClient || new Date().toISOString();
+  }
+  if (defaults.termsAccepted === true && current.termsVersion !== defaults.termsVersion) {
+    updates.termsAccepted = true;
+    updates.termsVersion = defaults.termsVersion;
+    updates.legalAcceptedAtClient = defaults.legalAcceptedAtClient || new Date().toISOString();
+  }
   if (Object.keys(updates).length) {
     await updateDoc(ref, { ...updates, updatedAt: serverTimestamp() });
     return { ...current, ...updates };
@@ -80,7 +90,8 @@ export async function updateUserPreferences(uid, changes = {}) {
     'pushNotificationsEnabled', 'smsNotificationsEnabled', 'emailNotificationsEnabled',
     'eventNotificationsEnabled', 'businessNotificationsEnabled',
     'prayerRemindersEnabled',
-    'reminderEmailEnabled', 'adminAlertEmailEnabled', 'privacyAccepted', 'termsAccepted',
+    'reminderEmailEnabled', 'adminAlertEmailEnabled',
+    'privacyAccepted', 'privacyPolicyVersion', 'termsAccepted', 'termsVersion', 'legalAcceptedAtClient',
   ];
   const payload = Object.fromEntries(
     Object.entries(changes).filter(([key]) => allowed.includes(key))
@@ -163,7 +174,41 @@ export async function deleteMyAccountAndEvents(currentUser, archiveEventsNow = f
   if (!currentUser || currentUser.isAnonymous) throw new Error('Sign in before deleting your account.');
   const callable = httpsCallable(functions, 'deleteUserData');
   await callable({ archiveEventsNow: Boolean(archiveEventsNow) });
-  await deleteUser(currentUser);
+  await signOut(auth);
+}
+
+export async function archiveOrBanUser(targetUid, { ban = false } = {}) {
+  if (!targetUid) throw new Error('User ID is required.');
+  const callable = httpsCallable(functions, 'adminDeleteUser');
+  const result = await callable({ targetUid, ban: Boolean(ban) });
+  return result.data || {};
+}
+
+export async function restoreArchivedUser(targetUid) {
+  if (!targetUid) throw new Error('User ID is required.');
+  const callable = httpsCallable(functions, 'adminRestoreUser');
+  const result = await callable({ targetUid });
+  return result.data || {};
+}
+
+export async function listActiveBans() {
+  const snapshot = await getDocs(collection(db, 'bannedUsers'));
+  return snapshot.docs.map(item => ({ id: item.id, ...item.data() })).filter(item => item.active !== false);
+}
+
+export async function unbanUser(banRecord) {
+  if (!banRecord?.id) throw new Error('Ban record is required.');
+  const callable = httpsCallable(functions, 'adminUnbanUser');
+  const result = await callable({
+    bannedDocId: banRecord.id,
+    uid: banRecord.uid,
+    email: banRecord.email,
+    fullName: banRecord.fullName,
+    role: banRecord.role,
+    phone: banRecord.phone,
+    phoneVerified: banRecord.phoneVerified,
+  });
+  return result.data || {};
 }
 
 export async function migratePhoneAccount() {

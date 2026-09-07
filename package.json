@@ -47,7 +47,7 @@
     "promise": "^8.3.0",
     "react": "19.1.0",
     "react-native": "0.81.5",
-    "react-native-maps": "1.20.1",
+    "react-native-maps": "^1.27.2",
     "react-native-share": "^12.3.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },

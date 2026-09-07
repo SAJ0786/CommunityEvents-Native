@@ -15,6 +15,9 @@ const packageJson = JSON.parse(read('package.json'));
 const androidGradle = read('android/app/build.gradle');
 const gradleProperties = read('android/gradle.properties');
 const dynamicAppConfig = read('app.config.js');
+const androidStreamPackage = read('android/app/src/main/java/info/siza/communityevents/app/StreamingPipPackage.kt');
+const androidStreamManager = read('android/app/src/main/java/info/siza/communityevents/app/AndroidRootEncoderLiveStreamManager.java');
+const androidStreamView = read('android/app/src/main/java/info/siza/communityevents/app/AndroidRootEncoderLiveStreamView.java');
 
 if (app.name !== 'Community Connect Australia') throw new Error(`Unexpected store name: ${app.name}`);
 if (app.version !== '1.0.0' || packageJson.version !== app.version) {
@@ -44,13 +47,21 @@ if (!dynamicAppConfig.includes("process.env.EXPO_NO_DOTENV === '1'") ||
     !dynamicAppConfig.includes("process.env.EAS_BUILD !== 'true'")) {
   throw new Error('EAS local metadata evaluation must remain separate from the protected-key cloud build guard.');
 }
+if (!androidGradle.includes('com.github.pedroSG94.RootEncoder:library:2.5.9') ||
+    !androidStreamPackage.includes('AndroidRootEncoderLiveStreamManager()') ||
+    !androidStreamManager.includes('AndroidRootEncoderLiveStreamView') ||
+    !androidStreamView.includes('RtmpCamera2')) {
+  throw new Error('Stable Android RootEncoder streaming implementation is missing or not registered.');
+}
 
 const production = eas.build?.production;
 if (production?.environment !== 'production' || production?.env?.APP_RELEASE_MODE !== 'production') {
   throw new Error('EAS production builds must use production environment and disable tester mode.');
 }
 const requiredIosImage = 'macos-sequoia-15.6-xcode-26.0';
-if (production?.ios?.image !== requiredIosImage || eas.build?.['ios-simulator']?.ios?.image !== requiredIosImage) {
+if (production?.ios?.image !== requiredIosImage ||
+    eas.build?.['ios-simulator']?.ios?.image !== requiredIosImage ||
+    eas.build?.['ios-personal-testflight']?.ios?.image !== requiredIosImage) {
   throw new Error('iOS builds must use the pinned Xcode 26.0 image required by the current livestream dependency.');
 }
 if (!production?.autoIncrement) throw new Error('Production build numbers must auto-increment.');
@@ -71,6 +82,21 @@ const livestreamPatch = read('patches/@api.video+react-native-livestream+2.0.2.p
 if (!livestreamPatch.includes('<react_native_livestream/react_native_livestream-Swift.h>')) {
   throw new Error('The api.video iOS generated Swift-header compatibility patch is missing.');
 }
+if (!livestreamPatch.includes('guard isStreaming else { return }') ||
+    !livestreamPatch.includes('PiPHKView(frame: .zero)') ||
+    !livestreamPatch.includes('AVPictureInPictureController.ContentSource') ||
+    !livestreamPatch.includes('The stream belongs to the user')) {
+  throw new Error('The api.video iOS idempotent streaming teardown patch is missing.');
+}
+if (!firebaseCocoaPodsPlugin.includes('preserve user-owned iOS livestreams') ||
+    !firebaseCocoaPodsPlugin.includes('Community Connect keeps the stream user-owned')) {
+  throw new Error('The ApiVideo forced-background-stop CocoaPods patch is missing.');
+}
+for (const backgroundMode of ['audio', 'voip']) {
+  if (!app.ios?.infoPlist?.UIBackgroundModes?.includes(backgroundMode)) {
+    throw new Error(`iOS release is missing the ${backgroundMode} background mode required by native PiP streaming.`);
+  }
+}
 requireFile('docs/legal/Community_Connect_Australia_Privacy_Policy_DRAFT.md');
 requireFile('docs/legal/Community_Connect_Australia_Terms_of_Use_DRAFT.md');
 
@@ -83,4 +109,4 @@ const colorType = png[25];
 if (width !== 1024 || height !== 1024) throw new Error(`Store icon must be 1024x1024, found ${width}x${height}.`);
 if (colorType === 4 || colorType === 6) throw new Error('Store icon contains an alpha channel; iOS icons must be opaque.');
 
-console.log('Release configuration check passed: v1.0.0, store identities, API 36, static iOS frameworks with Firebase CocoaPods, api.video/HaishinKit Xcode 26 compatibility fixes, pinned Xcode 26.0/iOS 26 SDK image, Firebase files, legal drafts, and opaque 1024px icon verified.');
+console.log('Release configuration check passed: v1.0.0, store identities, API 36, stable Android RootEncoder streaming, native iOS sample-buffer PiP with user-owned RTMP lifecycle, static iOS frameworks with Firebase CocoaPods, api.video/HaishinKit Xcode 26 compatibility fixes, pinned Xcode 26.0/iOS 26 SDK image, Firebase files, legal drafts, and opaque 1024px icon verified.');

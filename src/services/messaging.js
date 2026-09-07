@@ -13,7 +13,8 @@ import {
   updateDoc,
   where,
 } from '@react-native-firebase/firestore';
-import { db } from '../firebase/firebase';
+import { httpsCallable } from '@react-native-firebase/functions';
+import { db, functions } from '../firebase/firebase';
 import { DEFAULT_CITY, cityLabel, normalizeCity } from '../utils/cities';
 
 const GUEST_ID_KEY = '@community-events/feedback-guest-id';
@@ -132,29 +133,20 @@ export async function sendBusinessMessage({ business, user, profile, text }) {
   const messageText = clean(text);
   if (!user?.uid || user.isAnonymous) throw new Error('Please sign in to contact this business.');
   if (!business?.id) throw new Error('This business does not have an in-app contact inbox yet.');
-  const routeSnapshot = await getDoc(doc(db, 'businessContactRoutes', business.id));
-  const ownerUid = clean(routeSnapshot.data()?.ownerUid);
-  if (!routeSnapshot.exists() || routeSnapshot.data()?.active !== true || !ownerUid) {
-    throw new Error('This business does not have an in-app contact inbox yet.');
-  }
-  if (ownerUid === user.uid) throw new Error('This business listing is already managed by you.');
   if (!messageText) throw new Error('Please write a message first.');
   if (messageText.length > 2000) throw new Error('Please keep the message under 2000 characters.');
-  const senderUid = user.uid;
-  const threadId = `${business.id}_${senderUid}_${ownerUid}`;
-  const threadRef = doc(db, 'businessMessageThreads', threadId);
-  const existingThread = await getDoc(threadRef);
   const senderName = getSenderName(user, profile);
-  await setDoc(threadRef, {
-    type: 'business', businessId: business.id, businessName: clean(business.name), ownerUid,
-    senderUid, senderName, participantUids: compact([senderUid, ownerUid]), createdAt: serverTimestamp(),
-  }, { merge: true });
-  await addDoc(collection(threadRef, 'messages'), { senderUid, senderName, text: messageText, kind: 'text', createdAt: serverTimestamp() });
-  await updateDoc(threadRef, {
-    updatedAt: serverTimestamp(), lastMessage: messageText, lastSenderUid: senderUid,
-    [`unreadBy.${ownerUid}`]: increment(1), [`unreadBy.${senderUid}`]: 0,
-  });
-  return { threadId, isNew: !existingThread.exists() };
+  try {
+    const callable = httpsCallable(functions, 'sendBusinessEnquiry');
+    const result = await callable({ businessId: business.id, text: messageText, senderName });
+    return result.data || {};
+  } catch (error) {
+    const code = String(error?.code || '');
+    if (code.includes('not-found') || code.includes('failed-precondition') || code.includes('permission-denied')) {
+      throw new Error('This business does not have an active in-app contact inbox yet. Please use its listed phone, website or WhatsApp option.');
+    }
+    throw new Error(error?.message || 'The message could not be sent. Please try again.');
+  }
 }
 
 export function listenBusinessThreads(uid, callback) {
@@ -166,6 +158,9 @@ export function listenBusinessThreads(uid, callback) {
 export async function sendBusinessReply({ thread, user, profile, text }) {
   const messageText = clean(text);
   if (!user?.uid || !thread?.participantUids?.includes(user.uid)) throw new Error('You cannot reply to this business conversation.');
+  if (thread.adminBlocked === true || Object.values(thread.blockedBy || {}).some(Boolean)) {
+    throw new Error('This conversation is blocked. Unblock it before sending another message.');
+  }
   if (!messageText) throw new Error('Please write a reply first.');
   const recipientUid = thread.participantUids.find(uid => uid !== user.uid);
   const threadRef = doc(db, 'businessMessageThreads', thread.id);
@@ -217,6 +212,7 @@ export async function sendFeedbackMessage({
   subject = '',
   businessId = '',
   businessName = '',
+  reportedThreadId = '',
 }) {
   const messageText = clean(text);
   if (!messageText) throw new Error('Please write your message first.');
@@ -226,12 +222,13 @@ export async function sendFeedbackMessage({
   const safeCity = normalizeCity(city || profile?.defaultCity || DEFAULT_CITY);
   const safeModule = module === 'business' ? 'business' : 'events';
   const safeCategory = clean(category) || 'feedback';
+  const safetyReport = ['business-report', 'business-conversation-report', 'business-appeal'].includes(safeCategory);
   const senderUid = user?.uid && !user?.isAnonymous ? user.uid : null;
   const senderGuestId = senderUid ? null : await guestId();
   const senderName = senderUid ? getSenderName(user, profile) : 'Guest user';
   const routePrefix = safeModule === 'events' && safeCategory === 'feedback'
     ? `${safeTarget}_${safeCity}`
-    : `${safeModule}_${safeCategory.replace(/[^a-z0-9_-]/gi, '-').toLowerCase()}_${safeTarget}_${safeCity}`;
+    : `${safeModule}_${safeCategory.replace(/[^a-z0-9_-]/gi, '-').toLowerCase()}_${safeTarget}_${safeCity}${safetyReport ? `_${clean(reportedThreadId || businessId).replace(/[^a-z0-9_-]/gi, '-').slice(0, 120)}` : ''}`;
   const threadId = senderUid
     ? `${routePrefix}_${senderUid}`
     : `${routePrefix}_${senderGuestId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -246,6 +243,8 @@ export async function sendFeedbackMessage({
     subject: clean(subject),
     businessId: clean(businessId),
     businessName: clean(businessName),
+    reportedThreadId: clean(reportedThreadId),
+    ...(safetyReport ? { moderationStatus: existing?.data()?.moderationStatus || 'open' } : {}),
     target: safeTarget,
     city: safeCity,
     cityLabel: cityLabel(safeCity),

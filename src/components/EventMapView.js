@@ -246,7 +246,15 @@ export default function EventMapView({ events = [], onSelectEvent }) {
           }}
           mapType="standard"
           provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-          onMapReady={() => setMapReady(true)}
+          onMapReady={() => {
+            setMapReady(true);
+            // Apple Maps does not consistently emit onMapLoaded. A ready native
+            // map is already usable, so do not cover it with a false timeout.
+            if (Platform.OS === 'ios') {
+              setMapLoaded(true);
+              setMapLoadSlow(false);
+            }
+          }}
           onMapLoaded={() => {
             setMapLoaded(true);
             setMapLoadSlow(false);
@@ -377,7 +385,7 @@ export default function EventMapView({ events = [], onSelectEvent }) {
 
 const styles = StyleSheet.create({
   container: { paddingHorizontal: spacing.lg, paddingBottom: 120 },
-  introTitle: { color: colors.navy, fontSize: 22, fontWeight: '900' },
+  introTitle: { color: colors.navy, fontSize: 22, fontWeight: '700' },
   introText: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 4, marginBottom: spacing.md },
   filterBar: {
     flexDirection: 'row',
@@ -399,7 +407,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     ...shadow,
   },
-  filterSegmentText: { color: colors.muted, fontSize: 10, lineHeight: 12, fontWeight: '900', textAlign: 'center' },
+  filterSegmentText: { color: colors.muted, fontSize: 10, lineHeight: 12, fontWeight: '700', textAlign: 'center' },
   filterSegmentTextActive: { color: colors.tealDark },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: spacing.md },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -413,7 +421,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  summaryTitle: { color: colors.navy, fontSize: 15, fontWeight: '900' },
+  summaryTitle: { color: colors.navy, fontSize: 15, fontWeight: '700' },
   summaryText: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 4 },
   locationActions: {
     flexDirection: 'row',
@@ -433,7 +441,7 @@ const styles = StyleSheet.create({
   locationButtonText: {
     color: colors.surface,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   secondaryButton: {
     minHeight: 44,
@@ -446,12 +454,12 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: colors.tealDark,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   locationError: {
     color: colors.danger,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     marginBottom: spacing.sm,
   },
   mapShell: {
@@ -465,12 +473,12 @@ const styles = StyleSheet.create({
   },
   map: { flex: 1 },
   mapLoading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.tealSoft },
-  mapLoadingText: { color: colors.tealDark, fontSize: 13, fontWeight: '900' },
+  mapLoadingText: { color: colors.tealDark, fontSize: 13, fontWeight: '700' },
   mapProblem: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, backgroundColor: 'rgba(239,247,246,0.96)' },
-  mapProblemTitle: { color: colors.navy, fontSize: 18, fontWeight: '900', textAlign: 'center' },
+  mapProblemTitle: { color: colors.navy, fontSize: 18, fontWeight: '700', textAlign: 'center' },
   mapProblemText: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: spacing.sm },
   retryButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.teal, marginTop: spacing.md },
-  retryButtonText: { color: colors.surface, fontSize: 13, fontWeight: '900' },
+  retryButtonText: { color: colors.surface, fontSize: 13, fontWeight: '700' },
   mapPreview: {
     position: 'absolute',
     left: spacing.md,
@@ -487,17 +495,17 @@ const styles = StyleSheet.create({
   mapPreviewAccent: { width: 6 },
   mapPreviewContent: { flex: 1, padding: spacing.md },
   mapPreviewHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  mapPreviewTitle: { flex: 1, color: colors.navy, fontSize: 15, lineHeight: 20, fontWeight: '900' },
+  mapPreviewTitle: { flex: 1, color: colors.navy, fontSize: 15, lineHeight: 20, fontWeight: '700' },
   mapPreviewClose: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, backgroundColor: colors.tealSoft },
-  mapPreviewCloseText: { color: colors.tealDark, fontSize: 23, lineHeight: 25, fontWeight: '800' },
+  mapPreviewCloseText: { color: colors.tealDark, fontSize: 23, lineHeight: 25, fontWeight: '600' },
   mapPreviewMeta: { color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 3 },
   mapPreviewFooter: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.sm },
   mapPreviewBadges: { flex: 1, gap: 2 },
-  mapPreviewAudience: { fontSize: 12, fontWeight: '900' },
-  mapPreviewDistance: { color: colors.muted, fontSize: 11, fontWeight: '800' },
+  mapPreviewAudience: { fontSize: 12, fontWeight: '700' },
+  mapPreviewDistance: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   mapPreviewButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.teal },
-  mapPreviewButtonText: { color: colors.surface, fontSize: 12, fontWeight: '900' },
-  mapPreviewButtonArrow: { color: colors.surface, fontSize: 21, lineHeight: 21, fontWeight: '900' },
+  mapPreviewButtonText: { color: colors.surface, fontSize: 12, fontWeight: '700' },
+  mapPreviewButtonArrow: { color: colors.surface, fontSize: 21, lineHeight: 21, fontWeight: '700' },
   empty: {
     alignItems: 'center',
     padding: spacing.xl,
@@ -507,7 +515,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  emptyTitle: { color: colors.navy, fontSize: 18, fontWeight: '900', marginTop: 5 },
+  emptyTitle: { color: colors.navy, fontSize: 18, fontWeight: '700', marginTop: 5 },
   emptyText: { color: colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 19, marginTop: 4 },
   pressed: { opacity: 0.82 },
   disabled: { opacity: 0.55 },

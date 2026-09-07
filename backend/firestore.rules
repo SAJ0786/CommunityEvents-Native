@@ -26,6 +26,10 @@ service cloud.firestore {
     }
     function canUpdateOwnProfile(userId) {
       return request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'role', 'isActive', 'accountStatus', 'archivedAt', 'archivedBy',
+          'accountDeletedAt', 'bannedAt', 'bannedBy'
+        ])
         && (
           role() != 'admin'
           || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['defaultCity'])
@@ -38,7 +42,7 @@ service cloud.firestore {
       allow read:   if isRegistered() && (request.auth.uid == userId || isAdmin());
       allow create: if isRegistered() && request.auth.uid == userId;
       allow update: if isRegistered() && (canUpdateOwnProfile(userId) || isSuperAdmin());
-      allow delete: if isRegistered() && (request.auth.uid == userId || isSuperAdmin());
+      allow delete: if false;
     }
 
     // ── Events ─────────────────────────────────────────────────────────────────
@@ -53,10 +57,9 @@ service cloud.firestore {
                                    || isSuperAdmin()
                                    || (isCityAdminForEvent(resource.data)
                                        && eventCity(request.resource.data) == adminCity()));
-      allow delete:         if isRegistered()
-                               && (resource.data.createdByUserId == request.auth.uid
-                                   || isSuperAdmin()
-                                   || isCityAdminForEvent(resource.data));
+      // Event removal is performed only by the trusted archive callable, which
+      // copies the complete record to archivedEvents before removing it here.
+      allow delete:         if false;
     }
 
     match /eventAudit/{auditId} {
@@ -125,8 +128,14 @@ service cloud.firestore {
                       && request.resource.data.abnVerified == false
                       && request.resource.data.foundingMember == false;
 
-      allow update: if isAdmin()
+      // City admins may archive an active record, but only Super Admins may
+      // mark a record deleted or restore any historical record.
+      allow update: if isSuperAdmin()
+                      || (isAdmin()
+                          && !(resource.data.status in ['archived', 'deleted'])
+                          && request.resource.data.status != 'deleted')
                       || (isBusinessOwner(resource.data)
+                          && !(resource.data.status in ['archived', 'deleted'])
                           && request.resource.data.ownerId == request.auth.uid
                           && ownerBusinessFieldsOnly()
                           && request.resource.data.status == 'pending'
@@ -136,7 +145,9 @@ service cloud.firestore {
                           && request.resource.data.referrerReview.checkedBy == ''
                           && request.resource.data.abnVerified == false);
 
-      allow delete: if isAdmin();
+      // Private business records are permanent. "Delete" is a lifecycle state
+      // and public projections are removed instead of erasing the source record.
+      allow delete: if false;
     }
 
     // Sanitised projection used by the public directory. It deliberately omits
@@ -209,6 +220,16 @@ service cloud.firestore {
       ]);
     }
 
+    function ownerPromotionArchiveOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'previousStatus', 'status', 'hidden', 'archivedAt', 'archivedBy',
+        'archiveReason', 'updatedAt'
+      ])
+        && request.resource.data.status == 'archived'
+        && request.resource.data.hidden == true
+        && request.resource.data.archivedBy == request.auth.uid;
+    }
+
     match /businessPromotions/{promotionId} {
       allow read: if isPromotionOwner(resource.data)
                     || isAdmin();
@@ -221,7 +242,13 @@ service cloud.firestore {
                       && request.resource.data.boosted == false
                       && request.resource.data.hidden == false;
 
-      allow update: if isAdmin()
+      allow update: if isSuperAdmin()
+                      || (isAdmin()
+                          && !(resource.data.status in ['archived', 'deleted'])
+                          && request.resource.data.status != 'deleted')
+                      || (isPromotionOwner(resource.data)
+                          && request.resource.data.ownerId == request.auth.uid
+                          && ownerPromotionArchiveOnly())
                       || (isPromotionOwner(resource.data)
                           && request.resource.data.ownerId == request.auth.uid
                           && request.resource.data.businessId == resource.data.businessId
@@ -232,7 +259,7 @@ service cloud.firestore {
                           && request.resource.data.boosted == resource.data.boosted
                           && request.resource.data.hidden == false);
 
-      allow delete: if isAdmin() || isPromotionOwner(resource.data);
+      allow delete: if false;
     }
 
     // Public promotions are sanitised projections and never include owner or
@@ -260,6 +287,74 @@ service cloud.firestore {
     match /archivedEvents/{eventId} {
       allow read: if isAdmin();
       allow write: if false;
+    }
+
+    // Permanent account snapshots retained for audit and restoration. Only
+    // Super Admins can inspect them; trusted Cloud Functions are the only writer.
+    match /archivedUsers/{userId} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+
+    // ── Privacy-safe diagnostic register ───────────────────────────────────────
+    // Crash stacks remain in Firebase Crashlytics. These documents provide a
+    // searchable installation/session timeline without typed form contents,
+    // addresses, phone numbers, email addresses, credentials or stream keys.
+    function validDiagnosticCreate(data) {
+      return signedIn()
+        && data.reporterUid == request.auth.uid
+        && data.sessionId is string
+        && data.sessionId.size() >= 12
+        && data.sessionId.size() <= 40
+        && data.installationId is string
+        && data.installationId.size() >= 12
+        && data.installationId.size() <= 40
+        && data.platform in ['android', 'ios', 'web']
+        && data.recentEvents is list
+        && data.recentEvents.size() <= 40
+        && data.adminStatus == 'new'
+        && data.archived == false
+        && data.keys().hasOnly([
+          'sessionId', 'installationId', 'reporterUid', 'userUid', 'isAnonymous',
+          'platform', 'osVersion', 'deviceModel', 'appVersion', 'buildNumber',
+          'environment', 'startedAt', 'startedAtClient', 'lastSeenAt',
+          'lastSeenAtClient', 'previousSessionId', 'previousCrashDetected',
+          'crashDetected', 'diagnosticStatus', 'severity', 'errorCount',
+          'currentScreen', 'feature', 'authenticationState', 'appState',
+          'recentEvents', 'adminStatus', 'adminNote', 'archived'
+        ]);
+    }
+
+    function diagnosticOwnerUpdateOnly() {
+      return signedIn()
+        && resource.data.reporterUid == request.auth.uid
+        && request.resource.data.reporterUid == resource.data.reporterUid
+        && request.resource.data.sessionId == resource.data.sessionId
+        && request.resource.data.installationId == resource.data.installationId
+        && request.resource.data.recentEvents is list
+        && request.resource.data.recentEvents.size() <= 40
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'userUid', 'isAnonymous', 'lastSeenAt', 'lastSeenAtClient',
+          'diagnosticStatus', 'severity', 'errorCount', 'currentScreen',
+          'feature', 'authenticationState', 'appState', 'recentEvents',
+          'crashDetected', 'crashDetectedAt', 'crashDetectedAtClient'
+        ]);
+    }
+
+    function diagnosticAdminReviewOnly() {
+      return isSuperAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'adminStatus', 'adminNote', 'archived', 'reviewedBy', 'reviewedAt',
+          'archivedBy', 'archivedAt', 'restoredBy', 'restoredAt'
+        ]);
+    }
+
+    match /diagnosticSessions/{diagnosticId} {
+      allow read: if isSuperAdmin()
+        || (signedIn() && resource.data.reporterUid == request.auth.uid);
+      allow create: if validDiagnosticCreate(request.resource.data);
+      allow update: if diagnosticOwnerUpdateOnly() || diagnosticAdminReviewOnly();
+      allow delete: if false;
     }
 
     // ── Settings ───────────────────────────────────────────────────────────────
@@ -292,9 +387,9 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
     }
 
-    // ── Banned users — readable by anyone logging in (for ban check) ──────────
+    // Ban history is permanent and restricted to Super Admin review.
     match /bannedUsers/{docId} {
-      allow read:  if signedIn();
+      allow read:  if isSuperAdmin();
       allow write: if false;
     }
 
@@ -348,6 +443,28 @@ service cloud.firestore {
         && data.participantUids.hasAny([request.auth.uid]);
     }
 
+    function businessThreadIsBlocked(data) {
+      return data.get('adminBlocked', false) == true
+        || data.get('blockedBy', {}).get(data.ownerUid, false) == true
+        || data.get('blockedBy', {}).get(data.senderUid, false) == true;
+    }
+
+    function businessThreadParticipantUpdateOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'updatedAt', 'lastMessage', 'lastSenderUid', 'unreadBy', 'blockedBy'
+      ])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['blockedBy'])
+          || request.resource.data.get('blockedBy', {}).diff(resource.data.get('blockedBy', {}))
+            .affectedKeys().hasOnly([request.auth.uid]));
+    }
+
+    function businessThreadAdminModerationOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'adminBlocked', 'adminBlockedReason', 'adminBlockedBy',
+        'adminBlockedAt', 'updatedAt'
+      ]);
+    }
+
     match /businessMessageThreads/{threadId} {
       allow read: if isBusinessThreadParticipant(resource.data);
       allow create: if isRegistered()
@@ -361,10 +478,9 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/businessContactRoutes/$(request.resource.data.businessId)).data.active == true
         && get(/databases/$(database)/documents/businessContactRoutes/$(request.resource.data.businessId)).data.ownerUid
           == request.resource.data.ownerUid;
-      allow update: if isBusinessThreadParticipant(resource.data)
-        && request.resource.data.participantUids == resource.data.participantUids
-        && request.resource.data.businessId == resource.data.businessId
-        && request.resource.data.ownerUid == resource.data.ownerUid;
+      allow update: if (isBusinessThreadParticipant(resource.data)
+          && businessThreadParticipantUpdateOnly())
+        || (isAdmin() && businessThreadAdminModerationOnly());
       allow delete: if false;
 
       match /messages/{messageId} {
@@ -374,6 +490,9 @@ service cloud.firestore {
         allow create: if isBusinessThreadParticipant(
           get(/databases/$(database)/documents/businessMessageThreads/$(threadId)).data
         )
+          && !businessThreadIsBlocked(
+            get(/databases/$(database)/documents/businessMessageThreads/$(threadId)).data
+          )
           && request.resource.data.senderUid == request.auth.uid
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
@@ -392,6 +511,24 @@ service cloud.firestore {
           && data.senderUid == request.auth.uid);
     }
 
+    function feedbackMessageStateUpdateOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'updatedAt', 'lastMessage', 'lastSenderUid', 'unreadBy',
+        'unreadForSuperAdmins', 'unreadForCityAdmins'
+      ]);
+    }
+
+    function feedbackModerationUpdateOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'moderationStatus', 'moderationDecision', 'moderationReason',
+        'moderatedBy', 'moderatedAt', 'updatedAt'
+      ])
+        && request.resource.data.moderatedBy == request.auth.uid
+        && request.resource.data.moderationStatus in [
+          'under-review', 'dismissed', 'takedown', 'conversation-blocked', 'closed'
+        ];
+    }
+
     function guestFeedbackCreate(data) {
       return (!signedIn() || isAnonymous())
         && data.type == 'feedback'
@@ -407,7 +544,13 @@ service cloud.firestore {
         || (isRegistered()
           && request.resource.data.type == 'feedback'
           && request.resource.data.senderUid == request.auth.uid);
-      allow update: if canReadFeedbackThread(resource.data);
+      allow update: if (canReadFeedbackThread(resource.data)
+          && feedbackMessageStateUpdateOnly())
+        || (isSuperAdmin() && feedbackModerationUpdateOnly())
+        || (isRegistered() && role() == 'admin'
+          && resource.data.target == 'cityAdmins'
+          && resource.data.city == adminCity()
+          && feedbackModerationUpdateOnly());
       allow delete: if false;
 
       match /messages/{messageId} {
@@ -424,6 +567,43 @@ service cloud.firestore {
         );
         allow update, delete: if false;
       }
+    }
+
+    match /businessModerationNotices/{noticeId} {
+      allow read: if isAdmin()
+        || (isRegistered() && resource.data.ownerUid == request.auth.uid);
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly([
+          'ownerUid', 'businessId', 'businessName', 'reportId', 'decision',
+          'reason', 'appealStatus', 'createdAt'
+        ])
+        && request.resource.data.ownerUid is string
+        && request.resource.data.businessId is string
+        && request.resource.data.reportId is string
+        && request.resource.data.appealStatus == 'not-submitted';
+      allow update: if isRegistered()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'appealStatus', 'appealText', 'appealedAt', 'appealedBy'
+        ])
+        && request.resource.data.appealedBy == request.auth.uid
+        && request.resource.data.appealStatus == 'submitted';
+      allow delete: if false;
+    }
+
+    match /businessModerationAudit/{auditId} {
+      allow read: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'reportId', 'businessId', 'conversationId', 'action', 'reason',
+          'actorUid', 'actorRole', 'createdAt'
+        ])
+        && request.resource.data.actorUid == request.auth.uid
+        && ((isAdmin() && request.resource.data.action in [
+          'under-review', 'dismissed', 'takedown', 'conversation-blocked', 'closed'
+        ]) || request.resource.data.action == 'business.appeal_submitted');
+      allow update, delete: if false;
     }
 
     match /ai_reports/{reportId} {

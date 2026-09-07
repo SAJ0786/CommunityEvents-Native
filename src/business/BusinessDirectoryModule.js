@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as Location from 'expo-location';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import BusinessCard from './BusinessCard';
 import BusinessDetailsScreen from './BusinessDetailsScreen';
 import BusinessListingForm from './BusinessListingForm';
@@ -36,6 +38,7 @@ import CompactSelect from '../components/CompactSelect';
 import { sendFeedbackMessage } from '../services/messaging';
 import { listenBusinessCategories } from '../services/businessCategoryAdmin';
 import { trackBusinessInteraction } from '../services/businessAnalytics';
+import NativeBackButton from '../components/NativeBackButton';
 
 function SectionHeading({ title, subtitle, actionLabel, onAction }) {
   return (
@@ -126,6 +129,8 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
   const [subcategoryId, setSubcategoryId] = useState('');
   const [openOnly, setOpenOnly] = useState(false);
   const [favouritesOnly, setFavouritesOnly] = useState(false);
+  const [nearbyOnly, setNearbyOnly] = useState(false);
+  const [recentOnly, setRecentOnly] = useState(false);
   const selectedCategory = categories.find(category => category.id === categoryId);
 
   useEffect(() => {
@@ -135,6 +140,8 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
     setFavouritesOnly(initialFilter.favouritesOnly === true);
     setQuery('');
     setOpenOnly(false);
+    setNearbyOnly(false);
+    setRecentOnly(false);
     onInitialFilterConsumed?.();
   }, [initialFilter?.nonce, onInitialFilterConsumed]);
 
@@ -146,27 +153,73 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
     query,
     openOnly,
   }), [businesses, categoryId, city, openOnly, query, subcategoryId]);
-  const cityBusinesses = useMemo(() => favouritesOnly
-    ? rankedBusinesses.filter(business => savedIds.includes(business.id))
-    : rankedBusinesses, [favouritesOnly, rankedBusinesses, savedIds]);
+  const cityBusinesses = useMemo(() => {
+    let result = favouritesOnly
+      ? rankedBusinesses.filter(business => savedIds.includes(business.id))
+      : rankedBusinesses;
+    if (nearbyOnly) {
+      result = result
+        .filter(business => business.distanceKm != null)
+        .slice()
+        .sort((left, right) => left.distanceKm - right.distanceKm);
+    }
+    if (recentOnly) {
+      const recentCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const publishedMillis = business => {
+        const value = business.firstPublishedAt || business.createdAt || business.approvedAt;
+        return value?.toMillis?.() || value?.toDate?.()?.getTime?.() || new Date(value || 0).getTime() || 0;
+      };
+      result = result
+        .filter(business => publishedMillis(business) >= recentCutoff)
+        .slice()
+        .sort((left, right) => publishedMillis(right) - publishedMillis(left));
+    }
+    return result;
+  }, [favouritesOnly, nearbyOnly, rankedBusinesses, recentOnly, savedIds]);
   const featured = cityBusinesses.filter(business => business.tier === 'featured');
+  const clearBrowseFilters = () => {
+    setCategoryId('all');
+    setSubcategoryId('');
+    setOpenOnly(false);
+    setFavouritesOnly(false);
+    setNearbyOnly(false);
+    setRecentOnly(false);
+  };
+
+  const enableNearby = async () => {
+    if (nearbyOnly) {
+      setNearbyOnly(false);
+      return;
+    }
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Location needed', 'Allow location access to sort nearby businesses. Your current business order has not changed.');
+        return;
+      }
+      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      onLocationResolved?.({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+      setNearbyOnly(true);
+      setFavouritesOnly(false);
+      setRecentOnly(false);
+    } catch {
+      Alert.alert('Location unavailable', 'Your location could not be read. Your current business order has not changed.');
+    }
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.pageContent} keyboardShouldPersistTaps="handled">
-      <View style={styles.hero}>
+      <View style={styles.directoryTitleRow}>
         <View style={styles.heroCopy}>
           <Text style={styles.eyebrow}>COMMUNITY BUSINESS DIRECTORY</Text>
-          <Text style={styles.heroTitle}>Discover local businesses</Text>
-          <Text style={styles.heroSubtitle}>{cityLabel(city)}</Text>
+          <Text style={styles.heroTitle}>Local businesses</Text>
         </View>
-        <View style={styles.heroIconWrap}><Text style={styles.heroIcon}>{'\u{1F3EA}'}</Text></View>
+        <View style={styles.cityControl}><CitySelector compact selectedCity={city} onChange={onCityChange} onLocationResolved={onLocationResolved} allowCurrentLocation /></View>
       </View>
 
-      <View style={styles.directoryControls}>
-      <CitySelector selectedCity={city} onChange={onCityChange} onLocationResolved={onLocationResolved} allowCurrentLocation />
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
-          <Text style={styles.searchIcon}>{'\u2315'}</Text>
+          <MaterialCommunityIcons color={colors.muted} name="magnify" size={22} />
           <TextInput
             accessibilityLabel="Search businesses"
             value={query}
@@ -184,11 +237,27 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
           onPress={() => setOpenOnly(current => !current)}
           style={({ pressed }) => [styles.openButton, openOnly && styles.openButtonActive, pressed && styles.pressed]}
         >
-          <Text style={[styles.openButtonText, openOnly && styles.openButtonTextActive]}>OPEN</Text>
+          <MaterialCommunityIcons color={openOnly ? colors.surface : colors.blue} name="tune-variant" size={19} />
         </Pressable>
       </View>
 
-      <SectionHeading title={favouritesOnly ? 'Favourite businesses' : 'Categories'} subtitle={favouritesOnly ? 'Only businesses saved to your profile' : subcategoryId ? `Filtered: ${selectedCategory?.subcategories.find(item => item.id === subcategoryId)?.label || 'Selected service'}` : 'Browse by service'} actionLabel={categoryId === 'all' && !subcategoryId && !favouritesOnly ? '' : 'Clear'} onAction={() => { setCategoryId('all'); setSubcategoryId(''); setFavouritesOnly(false); }} />
+      <SectionHeading title="Quick access" subtitle="Swipe for useful ways to explore" actionLabel={categoryId === 'all' && !openOnly && !favouritesOnly && !nearbyOnly && !recentOnly ? '' : 'Clear'} onAction={clearBrowseFilters} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.browseChips}>
+        {[
+          ['view-grid-outline', 'All', colors.blueSoft, colors.blue, clearBrowseFilters, categoryId === 'all' && !openOnly && !favouritesOnly && !nearbyOnly && !recentOnly],
+          ['clock-check-outline', 'Open now', colors.emeraldSoft || '#e6f8f0', '#138a65', () => { setOpenOnly(true); setFavouritesOnly(false); setNearbyOnly(false); setRecentOnly(false); }, openOnly],
+          ['map-marker-radius-outline', 'Near me', colors.purpleSoft, colors.purple, enableNearby, nearbyOnly],
+          ['heart-outline', 'Favourites', colors.roseSoft, colors.rose, () => { setFavouritesOnly(true); setNearbyOnly(false); setRecentOnly(false); }, favouritesOnly],
+          ['clock-plus-outline', 'Recently added', colors.amberSoft, colors.amber, () => { setRecentOnly(true); setFavouritesOnly(false); setNearbyOnly(false); }, recentOnly],
+        ].map(([icon, label, backgroundColor, color, onPress, active]) => (
+          <Pressable key={label} accessibilityState={{ selected: active }} onPress={onPress} style={({ pressed }) => [styles.browseAccess, active && styles.browseAccessActive, pressed && styles.pressed]}>
+            <View style={[styles.browseAccessIcon, { backgroundColor }]}><MaterialCommunityIcons color={color} name={icon} size={20} /></View>
+            <Text numberOfLines={1} style={[styles.browseAccessLabel, active && styles.browseAccessLabelActive]}>{label}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      <SectionHeading title={favouritesOnly ? 'Favourite businesses' : 'Browse businesses'} subtitle={favouritesOnly ? 'Only businesses saved to your profile' : subcategoryId ? `Filtered: ${selectedCategory?.subcategories.find(item => item.id === subcategoryId)?.label || 'Selected service'}` : 'Browse by service'} actionLabel={categoryId === 'all' && !subcategoryId && !favouritesOnly ? '' : 'Clear'} onAction={() => { setCategoryId('all'); setSubcategoryId(''); setFavouritesOnly(false); }} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRail}>
         <Pressable onPress={() => { setCategoryId('all'); setSubcategoryId(''); }} style={[styles.category, categoryId === 'all' && styles.categoryActive]}>
           <Text style={[styles.categoryIcon, categoryId === 'all' && styles.categoryIconActive]}>{'\u2726'}</Text>
@@ -216,8 +285,6 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
           />
         </View>
       ) : null}
-      </View>
-
       {subcategoryId === 'niaz-preparation-and-supply' ? (
         <View style={styles.serviceFilter}>
           <Text style={styles.serviceFilterIcon}>{'\u{1F372}'}</Text>
@@ -255,7 +322,7 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
           {cityBusinesses.map(business => (
             <Pressable key={business.id} onPress={() => onOpenBusiness(business)} style={({ pressed }) => [styles.businessRow, pressed && styles.pressed]}>
               <View style={[styles.rowLogo, { backgroundColor: '#eaf7f5' }]}>
-                <Image source={business.logoUrl ? { uri: business.logoUrl } : require('../../assets/business-placeholder.png')} resizeMode="cover" style={styles.rowLogoImage} />
+                {business.logoUrl ? <Image source={{ uri: business.logoUrl }} resizeMode="cover" style={styles.rowLogoImage} /> : <Text style={styles.rowCategoryIcon}>{categories.find(category => category.id === business.categoryId || category.label === business.category)?.icon || '🏪'}</Text>}
               </View>
               <View style={styles.rowCopy}>
                 <View style={styles.rowTitleLine}>
@@ -278,7 +345,7 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
           <Text style={styles.emptyIcon}>{'\u2315'}</Text>
           <Text style={styles.emptyTitle}>No businesses found</Text>
           <Text style={styles.emptyText}>Try another search, category or city.</Text>
-          <Pressable onPress={() => { setQuery(''); setCategoryId('all'); setSubcategoryId(''); setOpenOnly(false); setFavouritesOnly(false); }} style={styles.secondaryButton}>
+          <Pressable onPress={() => { setQuery(''); clearBrowseFilters(); }} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>Clear filters</Text>
           </Pressable>
         </View>
@@ -427,7 +494,7 @@ function DirectorySupportScreen({ mode, onBack, businesses = [], user, profile, 
 
   return (
     <ScrollView contentContainerStyle={styles.pageContent} keyboardShouldPersistTaps="handled">
-      <Pressable onPress={onBack} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{'\u2039'} Back to Directory</Text></Pressable>
+      <NativeBackButton accessibilityLabel="Back to directory" onPress={onBack} />
       <Text style={styles.eyebrow}>COMMUNITY BUSINESSES AUSTRALIA</Text>
       <Text style={styles.pageTitle}>{report ? 'Report a Business' : 'Contact Us'}</Text>
       <Text style={styles.pageSubtitle}>{report
@@ -468,6 +535,7 @@ export default function BusinessDirectoryModule({
   currentUser,
   profile,
   onOpenAccount,
+  onOpenMenu,
   onEditingStateChange,
   onCityChange,
   initialFilter,
@@ -817,13 +885,13 @@ export default function BusinessDirectoryModule({
         ) : activeTab === 'feedback' ? (
           <BusinessSupportInboxScreen user={currentUser} profile={profile} onBack={() => changeTab('home')} />
         ) : activeTab === 'notifications' ? (
-          <BusinessNotificationsScreen user={currentUser} onBack={() => changeTab('profile')} />
+          <BusinessNotificationsScreen user={currentUser} profile={profile} onBack={() => changeTab('profile')} />
         ) : activeTab === 'report' ? (
           <DirectorySupportScreen mode="report" businesses={directoryBusinesses} user={currentUser} profile={profile} city={selectedCity} onBack={() => changeTab('home')} />
         ) : activeTab === 'contact' ? (
           <DirectorySupportScreen mode="contact" businesses={directoryBusinesses} user={currentUser} profile={profile} city={selectedCity} onBack={() => changeTab('home')} />
         ) : activeTab === 'home' ? (
-          <DirectoryHome businesses={directoryBusinesses} categories={businessCategories} city={selectedCity} savedIds={savedIds} loading={publicLoading} error={publicError} initialFilter={initialFilter} onInitialFilterConsumed={onInitialFilterConsumed} onCityChange={city => { setUserLocation(null); onCityChange?.(city); }} onLocationResolved={setUserLocation} onOpenBusiness={openBusiness} onToggleSaved={toggleSaved} />
+          <DirectoryHome businesses={directoryBusinesses} categories={businessCategories} city={selectedCity} savedIds={savedIds} loading={publicLoading} error={publicError} initialFilter={initialFilter} onInitialFilterConsumed={onInitialFilterConsumed} onCityChange={city => { setUserLocation(null); onCityChange?.(city); }} onLocationResolved={setUserLocation} onOpenBusiness={openBusiness} onToggleSaved={toggleSaved} onQuickNavigate={changeTab} />
         ) : activeTab === 'promotions' ? (
           <PromotionsScreen city={selectedCity} businesses={directoryBusinesses} promotions={activePromotions} ownerPromotions={ownerPromotions} loading={promotionsLoading || publicLoading} error={promotionsError || publicError} onOpenBusiness={openBusiness} />
         ) : activeTab === 'add' && isGuest ? (
@@ -875,10 +943,10 @@ export default function BusinessDirectoryModule({
             onDeletePromotion={confirmDeletePromotion}
           />
         ) : (
-          <DirectoryHome businesses={directoryBusinesses} categories={businessCategories} city={selectedCity} savedIds={savedIds} loading={publicLoading} error={publicError} initialFilter={initialFilter} onInitialFilterConsumed={onInitialFilterConsumed} onCityChange={city => { setUserLocation(null); onCityChange?.(city); }} onLocationResolved={setUserLocation} onOpenBusiness={openBusiness} onToggleSaved={toggleSaved} />
+          <DirectoryHome businesses={directoryBusinesses} categories={businessCategories} city={selectedCity} savedIds={savedIds} loading={publicLoading} error={publicError} initialFilter={initialFilter} onInitialFilterConsumed={onInitialFilterConsumed} onCityChange={city => { setUserLocation(null); onCityChange?.(city); }} onLocationResolved={setUserLocation} onOpenBusiness={openBusiness} onToggleSaved={toggleSaved} onQuickNavigate={changeTab} />
         )}
       </View>
-      {!listingFormOpen && !promotionFormOpen ? <DirectoryBottomNavigation activeTab={activeTab} onChange={changeTab} /> : null}
+      {!listingFormOpen && !promotionFormOpen ? <DirectoryBottomNavigation activeTab={activeTab} onChange={changeTab} onOpenMenu={onOpenMenu} user={currentUser} profile={profile} isGuest={isGuest} /> : null}
     </View>
   );
 }
@@ -887,64 +955,68 @@ const styles = StyleSheet.create({
   module: { flex: 1, backgroundColor: colors.background },
   moduleBody: { flex: 1 },
   directoryBar: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
-  directoryBarEyebrow: { color: colors.tealDark, fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
-  directoryBarTitle: { marginTop: 2, color: colors.navy, fontSize: 14, fontWeight: '900' },
+  directoryBarEyebrow: { color: colors.tealDark, fontSize: 9, fontWeight: '700', letterSpacing: 1.2 },
+  directoryBarTitle: { marginTop: 2, color: colors.navy, fontSize: 14, fontWeight: '700' },
   readOnlyPill: { borderRadius: 99, paddingHorizontal: 8, paddingVertical: 5, backgroundColor: colors.tealSoft },
-  readOnlyText: { color: colors.tealDark, fontSize: 9, fontWeight: '900' },
-  pageContent: { padding: spacing.lg, paddingBottom: spacing.xl },
-  hero: { minHeight: 142, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.tealSoft, overflow: 'hidden' },
-  directoryControls: { marginTop: spacing.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface },
+  readOnlyText: { color: colors.tealDark, fontSize: 9, fontWeight: '700' },
+  pageContent: { padding: spacing.lg, paddingBottom: 116 },
+  directoryTitleRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md },
   heroCopy: { flex: 1, minWidth: 0 },
-  eyebrow: { color: colors.tealDark, fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
-  heroTitle: { marginTop: 7, color: colors.navy, fontSize: 25, lineHeight: 29, fontWeight: '900' },
-  heroSubtitle: { marginTop: spacing.sm, color: colors.tealDark, fontSize: 13, fontWeight: '800' },
-  heroIconWrap: { width: 70, height: 70, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: colors.surface, transform: [{ rotate: '3deg' }], ...shadow },
-  heroIcon: { fontSize: 36 },
+  eyebrow: { color: colors.tealDark, fontSize: 10, fontWeight: '700', letterSpacing: 1.1 },
+  heroTitle: { color: colors.navy, fontSize: 21, lineHeight: 26, letterSpacing: -0.45, fontWeight: '700' },
+  cityControl: { maxWidth: 146, minWidth: 112 },
   searchRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  searchBox: { flex: 1, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
-  searchIcon: { color: colors.muted, fontSize: 22, fontWeight: '900', transform: [{ rotate: '-20deg' }] },
-  searchInput: { flex: 1, minWidth: 0, color: colors.text, fontSize: 14, fontWeight: '700' },
-  openButton: { width: 58, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
-  openButtonActive: { borderColor: colors.teal, backgroundColor: colors.teal },
-  openButtonText: { color: colors.muted, fontSize: 10, fontWeight: '900' },
+  searchBox: { flex: 1, minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.82)' },
+  searchIcon: { color: colors.muted, fontSize: 22, fontWeight: '700', transform: [{ rotate: '-20deg' }] },
+  searchInput: { flex: 1, minWidth: 0, color: colors.text, fontSize: 14, fontWeight: '500' },
+  openButton: { width: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#d8e4ff', borderRadius: 17, backgroundColor: colors.blueSoft },
+  openButtonActive: { borderColor: colors.blue, backgroundColor: colors.blue },
+  openButtonText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
   openButtonTextActive: { color: colors.surface },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.lg, marginBottom: spacing.sm },
   sectionCopy: { flex: 1, minWidth: 0 },
-  sectionTitle: { color: colors.navy, fontSize: 18, fontWeight: '900' },
-  sectionSubtitle: { marginTop: 2, color: colors.muted, fontSize: 11, fontWeight: '700' },
+  sectionTitle: { color: colors.navy, fontSize: 16, lineHeight: 21, fontWeight: '700', letterSpacing: -0.2 },
+  sectionSubtitle: { marginTop: 2, color: colors.muted, fontSize: 11, fontWeight: '500' },
   textButton: { padding: 6 },
-  textButtonLabel: { color: colors.tealDark, fontSize: 12, fontWeight: '900' },
+  textButtonLabel: { color: colors.blue, fontSize: 12, fontWeight: '700' },
+  browseChips: { gap: 9, paddingRight: spacing.lg },
+  browseAccess: { width: 72, minHeight: 61, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 3, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.78)' },
+  browseAccessActive: { borderColor: colors.blue, backgroundColor: '#edf3ff' },
+  browseAccessIcon: { width: 31, height: 31, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
+  browseAccessLabel: { color: colors.text, fontSize: 9.5, fontWeight: '600', textAlign: 'center' },
+  browseAccessLabelActive: { color: colors.blueDark, fontWeight: '700' },
   categoryRail: { gap: spacing.sm, paddingRight: spacing.lg },
-  category: { width: 86, minHeight: 76, alignItems: 'center', justifyContent: 'center', gap: 5, padding: 7, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
-  categoryActive: { borderColor: colors.teal, backgroundColor: colors.teal },
+  category: { width: 82, minHeight: 72, alignItems: 'center', justifyContent: 'center', gap: 5, padding: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.76)' },
+  categoryActive: { borderColor: colors.blue, backgroundColor: colors.blueSoft },
   categoryIcon: { fontSize: 20 },
-  categoryIconActive: { color: colors.surface },
-  categoryLabel: { color: colors.text, fontSize: 9.5, lineHeight: 12, fontWeight: '800', textAlign: 'center' },
-  categoryLabelActive: { color: colors.surface },
+  categoryIconActive: { color: colors.blue },
+  categoryLabel: { color: colors.text, fontSize: 9.5, lineHeight: 12, fontWeight: '600', textAlign: 'center' },
+  categoryLabelActive: { color: colors.blueDark, fontWeight: '700' },
   subcategoryPanel: { marginTop: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
-  subcategoryLabel: { marginBottom: 7, color: colors.tealDark, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  subcategoryLabel: { marginBottom: 7, color: colors.tealDark, fontSize: 9, fontWeight: '700', letterSpacing: 0.8 },
   serviceFilter: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: '#e5c66a', borderRadius: radius.md, backgroundColor: '#fff8df' },
   serviceFilterIcon: { fontSize: 24 },
   serviceFilterCopy: { flex: 1, minWidth: 0 },
-  serviceFilterTitle: { color: '#745009', fontSize: 13, fontWeight: '900' },
+  serviceFilterTitle: { color: '#745009', fontSize: 13, fontWeight: '700' },
   serviceFilterText: { marginTop: 2, color: '#80631e', fontSize: 10.5, fontWeight: '700' },
   cardRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   cardSpacer: { flex: 1 },
   businessList: { gap: spacing.sm },
-  businessRow: { minHeight: 80, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, ...shadow },
-  rowLogo: { width: 60, height: 60, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
-  rowLogoImage: { width: 48, height: 48, borderRadius: 12 },
-  rowLogoText: { color: '#ffffff', fontSize: 18, fontWeight: '900' },
+  businessRow: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: 9, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: 21, backgroundColor: colors.glass, ...shadow },
+  rowLogo: { width: 54, height: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 17 },
+  rowLogoImage: { width: 46, height: 46, borderRadius: 14 },
+  rowCategoryIcon: { fontSize: 27 },
+  rowLogoText: { color: '#ffffff', fontSize: 18, fontWeight: '700' },
   rowCopy: { flex: 1, minWidth: 0 },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  rowTitle: { flexShrink: 1, color: colors.navy, fontSize: 14, fontWeight: '900' },
+  rowTitle: { flexShrink: 1, color: colors.navy, fontSize: 14, fontWeight: '700' },
   featuredStar: { color: '#a76609', fontSize: 13 },
-  rowMeta: { marginTop: 3, color: colors.muted, fontSize: 10.5, fontWeight: '700' },
+  rowMeta: { marginTop: 3, color: colors.muted, fontSize: 10.5, fontWeight: '500' },
   rowStatusLine: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   openText: { color: '#318342' },
   closedText: { color: colors.danger },
-  chevron: { color: colors.tealDark, fontSize: 26, fontWeight: '900' },
-  pageTitle: { marginTop: 5, color: colors.navy, fontSize: 28, fontWeight: '900' },
+  chevron: { color: colors.blue, fontSize: 24, fontWeight: '600' },
+  pageTitle: { marginTop: 5, color: colors.navy, fontSize: 28, fontWeight: '700' },
   pageSubtitle: { marginTop: spacing.sm, marginBottom: spacing.lg, color: colors.muted, fontSize: 13, lineHeight: 19, fontWeight: '700' },
   promotionList: { gap: spacing.md },
   promotionCard: { overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
@@ -952,37 +1024,37 @@ const styles = StyleSheet.create({
   promotionImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   promotionIcon: { fontSize: 32 },
   boostedPill: { position: 'absolute', left: spacing.md, top: spacing.md, borderRadius: 99, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#f4b54a' },
-  boostedText: { color: '#5d3902', fontSize: 9, fontWeight: '900' },
+  boostedText: { color: '#5d3902', fontSize: 9, fontWeight: '700' },
   promotionCopy: { padding: spacing.lg },
-  promotionTitle: { color: colors.navy, fontSize: 17, fontWeight: '900' },
-  promotionOffer: { marginTop: 4, color: '#aa6507', fontSize: 14, fontWeight: '900' },
+  promotionTitle: { color: colors.navy, fontSize: 17, fontWeight: '700' },
+  promotionOffer: { marginTop: 4, color: '#aa6507', fontSize: 14, fontWeight: '700' },
   promotionFooter: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
-  promotionBusiness: { flex: 1, color: colors.text, fontSize: 11, fontWeight: '900' },
+  promotionBusiness: { flex: 1, color: colors.text, fontSize: 11, fontWeight: '700' },
   promotionEnd: { color: colors.muted, fontSize: 10, fontWeight: '700' },
   emptyCard: { alignItems: 'center', padding: spacing.xl, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   errorCard: { marginTop: spacing.md, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: '#fff0f0' },
-  errorTitle: { color: colors.danger, fontSize: 15, fontWeight: '900' },
+  errorTitle: { color: colors.danger, fontSize: 15, fontWeight: '700' },
   errorText: { marginTop: 4, color: colors.text, fontSize: 11, lineHeight: 17, fontWeight: '700' },
-  emptyIcon: { color: colors.tealDark, fontSize: 42, fontWeight: '900' },
-  emptyTitle: { marginTop: spacing.sm, color: colors.navy, fontSize: 19, fontWeight: '900', textAlign: 'center' },
+  emptyIcon: { color: colors.tealDark, fontSize: 42, fontWeight: '700' },
+  emptyTitle: { marginTop: spacing.sm, color: colors.navy, fontSize: 19, fontWeight: '700', textAlign: 'center' },
   emptyText: { marginTop: spacing.sm, color: colors.muted, fontSize: 13, lineHeight: 19, fontWeight: '700', textAlign: 'center' },
   supportCard: { padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   sectionIcon: { fontSize: 32, marginBottom: spacing.sm },
-  supportLabel: { marginTop: spacing.md, marginBottom: 7, color: colors.navy, fontSize: 10, fontWeight: '900', letterSpacing: 0.7 },
+  supportLabel: { marginTop: spacing.md, marginBottom: 7, color: colors.navy, fontSize: 10, fontWeight: '700', letterSpacing: 0.7 },
   supportInput: { minHeight: 132, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, color: colors.text, fontSize: 14, lineHeight: 20 },
   supportSafety: { marginTop: spacing.sm, color: colors.muted, fontSize: 10.5, lineHeight: 16, fontWeight: '700' },
-  supportSuccess: { marginTop: spacing.md, color: '#2f7740', fontSize: 12, lineHeight: 18, fontWeight: '900' },
-  supportError: { marginTop: spacing.md, color: colors.danger, fontSize: 12, lineHeight: 18, fontWeight: '900' },
+  supportSuccess: { marginTop: spacing.md, color: '#2f7740', fontSize: 12, lineHeight: 18, fontWeight: '700' },
+  supportError: { marginTop: spacing.md, color: colors.danger, fontSize: 12, lineHeight: 18, fontWeight: '700' },
   primaryButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg, paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.teal },
-  primaryButtonText: { color: colors.surface, fontSize: 14, fontWeight: '900', textAlign: 'center' },
+  primaryButtonText: { color: colors.surface, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   secondaryButton: { minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg, paddingHorizontal: spacing.lg, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: colors.surface },
-  secondaryButtonText: { color: colors.tealDark, fontSize: 13, fontWeight: '900', textAlign: 'center' },
+  secondaryButtonText: { color: colors.tealDark, fontSize: 13, fontWeight: '700', textAlign: 'center' },
   stepsCard: { paddingHorizontal: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   stepRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: '#edf2f1' },
   stepNumber: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: colors.tealSoft },
-  stepNumberText: { color: colors.tealDark, fontSize: 14, fontWeight: '900' },
+  stepNumberText: { color: colors.tealDark, fontSize: 14, fontWeight: '700' },
   stepCopy: { flex: 1 },
-  stepTitle: { color: colors.navy, fontSize: 14, fontWeight: '900' },
+  stepTitle: { color: colors.navy, fontSize: 14, fontWeight: '700' },
   stepText: { marginTop: 3, color: colors.muted, fontSize: 11, lineHeight: 16, fontWeight: '700' },
   pressed: { opacity: 0.76 },
   disabled: { opacity: 0.5 },

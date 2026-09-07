@@ -14,7 +14,7 @@ const isEasLocalMetadataPass = process.env.EXPO_NO_DOTENV === '1'
 if ((isBundledRelease || releaseMode === 'tester' || releaseMode === 'production')
     && !mapsApiKey
     && !isEasLocalMetadataPass) {
-  throw new Error('GOOGLE_MAPS_API_KEY is required for tester and production builds. Refusing to create an APK with broken maps or address autocomplete.');
+  throw new Error('GOOGLE_MAPS_API_KEY is required for tester and production builds. Refusing to create an APK with broken native maps.');
 }
 
 export default ({ config }) => ({
@@ -45,7 +45,6 @@ export default ({ config }) => ({
   },
   extra: {
     ...(config.extra || {}),
-    googlePlacesApiKey: mapsApiKey,
     androidCertificateSha1,
     testBuild: releaseMode !== 'production',
     eas: {

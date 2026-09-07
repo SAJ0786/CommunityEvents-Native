@@ -1,3 +1,27 @@
+diff --git a/node_modules/@api.video/react-native-livestream/android/src/main/java/video/api/reactnative/livestream/LiveStreamView.kt b/node_modules/@api.video/react-native-livestream/android/src/main/java/video/api/reactnative/livestream/LiveStreamView.kt
+index fb19e2a..c66d209 100644
+--- a/node_modules/@api.video/react-native-livestream/android/src/main/java/video/api/reactnative/livestream/LiveStreamView.kt
++++ b/node_modules/@api.video/react-native-livestream/android/src/main/java/video/api/reactnative/livestream/LiveStreamView.kt
+@@ -242,6 +242,9 @@ class LiveStreamView @JvmOverloads constructor(
+    * [onHostResume].
+    */
+   override fun onHostResume() {
++    val keepAliveForPip = context.getSharedPreferences("community_connect_streaming", Context.MODE_PRIVATE)
++      .getBoolean("pip_stream_active", false)
++    if (keepAliveForPip) return
+     /**
+      * Only start preview if the app has the required permissions.
+      */
+@@ -258,6 +261,9 @@ class LiveStreamView @JvmOverloads constructor(
+   }
+ 
+   override fun onHostPause() {
++    val keepAliveForPip = context.getSharedPreferences("community_connect_streaming", Context.MODE_PRIVATE)
++      .getBoolean("pip_stream_active", false)
++    if (keepAliveForPip) return
+     liveStream.stopStreaming()
+     liveStream.stopPreview()
+   }
 diff --git a/node_modules/@api.video/react-native-livestream/android/src/main/java/video/api/reactnative/livestream/events/OnConnectionFailedEvent.kt b/node_modules/@api.video/react-native-livestream/android/src/main/java/video/api/reactnative/livestream/events/OnConnectionFailedEvent.kt
 index 192fc62..43eb574 100644
 --- a/node_modules/@api.video/react-native-livestream/android/src/main/java/video/api/reactnative/livestream/events/OnConnectionFailedEvent.kt
@@ -64,9 +88,12 @@ index 6cf2bbd..f8f4a2a 100644
    private val result: Boolean,
    private val error: String? = null
 diff --git a/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamView.mm b/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamView.mm
+index 0f6553c..fab8f51 100644
 --- a/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamView.mm
 +++ b/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamView.mm
-@@ -15,5 +15,7 @@
+@@ -13,7 +13,9 @@
+ 
+ 
  // MARK: Swift classes in ObjC++
 -#if __has_include("react-native-livestream/react_native_livestream-Swift.h")
 +#if __has_include(<react_native_livestream/react_native_livestream-Swift.h>)
@@ -75,3 +102,270 @@ diff --git a/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamVie
  #import "react-native-livestream/react_native_livestream-Swift.h"
  #else
  #import "react_native_livestream-Swift.h"
+diff --git a/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamViewImpl.swift b/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamViewImpl.swift
+index 5b23bc9..2cd42e1 100644
+--- a/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamViewImpl.swift
++++ b/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamViewImpl.swift
+@@ -5,8 +5,12 @@
+ 
+ import ApiVideoLiveStream
+ import AVFoundation
++import AVKit
+ import CoreGraphics
++import CoreMedia
+ import Foundation
++import HaishinKit
++import UIKit
+ 
+ extension String {
+     func toCaptureDevicePosition() -> AVCaptureDevice.Position {
+@@ -38,6 +42,8 @@ extension AVCaptureDevice.Position {
+ public class RNLiveStreamViewImpl: UIView {
+     private var liveStream: ApiVideoLiveStream!
+     private var isStreaming: Bool = false
++    private let pictureInPicturePreview = PiPHKView(frame: .zero)
++    private var pictureInPictureController: AVPictureInPictureController?
+ 
+     private lazy var zoomGesture: UIPinchGestureRecognizer = .init(target: self, action: #selector(zoom(sender:)))
+     private let pinchZoomMultiplier: CGFloat = 2.2
+@@ -46,15 +52,51 @@ public class RNLiveStreamViewImpl: UIView {
+         super.init(frame: frame)
+ 
+         do {
+-            liveStream = try ApiVideoLiveStream(preview: self, initialAudioConfig: nil, initialVideoConfig: nil, initialCamera: nil)
++            // PiPHKView uses AVSampleBufferDisplayLayer. It provides the same
++            // inline preview as MTHKView and can also be handed to Apple's
++            // native Picture in Picture controller without duplicating the
++            // camera or encoder pipeline.
++            pictureInPicturePreview.translatesAutoresizingMaskIntoConstraints = false
++            pictureInPicturePreview.videoGravity = .resizeAspectFill
++            addSubview(pictureInPicturePreview)
++            NSLayoutConstraint.activate([
++                pictureInPicturePreview.leadingAnchor.constraint(equalTo: leadingAnchor),
++                pictureInPicturePreview.trailingAnchor.constraint(equalTo: trailingAnchor),
++                pictureInPicturePreview.topAnchor.constraint(equalTo: topAnchor),
++                pictureInPicturePreview.bottomAnchor.constraint(equalTo: bottomAnchor),
++            ])
++
++            liveStream = try ApiVideoLiveStream(
++                preview: pictureInPicturePreview as IOStreamView,
++                initialAudioConfig: nil,
++                initialVideoConfig: nil,
++                initialCamera: nil
++            )
+             liveStream.delegate = self
+         } catch {
+             fatalError("build(): Can't create a live stream instance")
+         }
+ 
++        configurePictureInPicture()
++        NotificationCenter.default.addObserver(
++            self,
++            selector: #selector(applicationWillResignActive),
++            name: UIApplication.willResignActiveNotification,
++            object: nil
++        )
++        NotificationCenter.default.addObserver(
++            self,
++            selector: #selector(applicationDidBecomeActive),
++            name: UIApplication.didBecomeActiveNotification,
++            object: nil
++        )
+         addGestureRecognizer(zoomGesture)
+     }
+ 
++    deinit {
++        NotificationCenter.default.removeObserver(self)
++    }
++
+     @available(*, unavailable)
+     required init?(coder _: NSCoder) {
+         fatalError("init(coder:) has not been implemented")
+@@ -151,6 +193,14 @@ public class RNLiveStreamViewImpl: UIView {
+     }
+ 
+     @objc public func startStreaming(requestId: Int, streamKey: String, url: String?) {
++        if isStreaming {
++            onStartStreaming([
++                "requestId": requestId,
++                "result": false,
++                "error": "A native stream is already starting or active.",
++            ])
++            return
++        }
+         do {
+            if let url = url {
+                try liveStream.startStreaming(streamKey: streamKey, url: url)
+@@ -158,6 +208,7 @@ public class RNLiveStreamViewImpl: UIView {
+                try liveStream.startStreaming(streamKey: streamKey)
+            }
+            isStreaming = true
++           pictureInPictureController?.canStartPictureInPictureAutomaticallyFromInline = true
+            onStartStreaming([
+                "requestId": requestId,
+                "result": true,
+@@ -178,10 +229,39 @@ public class RNLiveStreamViewImpl: UIView {
+     }
+ 
+     @objc public func stopStreaming() {
++        guard isStreaming else { return }
+         isStreaming = false
++        if pictureInPictureController?.isPictureInPictureActive == true {
++            pictureInPictureController?.stopPictureInPicture()
++        }
+         liveStream.stopStreaming()
+     }
+ 
++    private func configurePictureInPicture() {
++        guard AVPictureInPictureController.isPictureInPictureSupported() else { return }
++        let source = AVPictureInPictureController.ContentSource(
++            sampleBufferDisplayLayer: pictureInPicturePreview.layer,
++            playbackDelegate: self
++        )
++        let controller = AVPictureInPictureController(contentSource: source)
++        controller.delegate = self
++        controller.canStartPictureInPictureAutomaticallyFromInline = true
++        pictureInPictureController = controller
++    }
++
++    @objc private func applicationWillResignActive() {
++        guard isStreaming,
++              let controller = pictureInPictureController,
++              controller.isPictureInPicturePossible,
++              !controller.isPictureInPictureActive else { return }
++        controller.startPictureInPicture()
++    }
++
++    @objc private func applicationDidBecomeActive() {
++        guard pictureInPictureController?.isPictureInPictureActive == true else { return }
++        pictureInPictureController?.stopPictureInPicture()
++    }
++
+     @objc public func setZoomRatio(zoomRatio: CGFloat) {
+         liveStream.zoomRatio = zoomRatio
+     }
+@@ -203,8 +283,61 @@ public class RNLiveStreamViewImpl: UIView {
+     @objc public var onStartStreaming: (_ dictionnary: [String: Any]) -> Void = { _ in }
+     
+     @objc override public func removeFromSuperview() {
++        // React Native can temporarily detach a view during an app/background
++        // transition. The stream belongs to the user's explicit End action,
++        // so a UIKit hierarchy change must never terminate the RTMP session.
++        if !isStreaming {
++            liveStream.stopPreview()
++        }
+         super.removeFromSuperview()
+-        liveStream.stopPreview()
++    }
++}
++
++extension RNLiveStreamViewImpl: AVPictureInPictureControllerDelegate {
++    public func pictureInPictureControllerWillStartPictureInPicture(_: AVPictureInPictureController) {}
++    public func pictureInPictureControllerDidStartPictureInPicture(_: AVPictureInPictureController) {}
++    public func pictureInPictureControllerWillStopPictureInPicture(_: AVPictureInPictureController) {}
++    public func pictureInPictureControllerDidStopPictureInPicture(_: AVPictureInPictureController) {}
++}
++
++extension RNLiveStreamViewImpl: AVPictureInPictureSampleBufferPlaybackDelegate {
++    public func pictureInPictureController(
++        _: AVPictureInPictureController,
++        setPlaying _: Bool
++    ) {}
++
++    public func pictureInPictureControllerTimeRangeForPlayback(
++        _: AVPictureInPictureController
++    ) -> CMTimeRange {
++        CMTimeRange(start: .zero, duration: .positiveInfinity)
++    }
++
++    public func pictureInPictureControllerIsPlaybackPaused(
++        _: AVPictureInPictureController
++    ) -> Bool {
++        false
++    }
++
++    public func pictureInPictureController(
++        _: AVPictureInPictureController,
++        didTransitionToRenderSize _: CMVideoDimensions
++    ) {}
++
++    public func pictureInPictureController(
++        _: AVPictureInPictureController,
++        skipByInterval _: CMTime,
++        completion: @escaping () -> Void
++    ) {
++        completion()
++    }
++
++    public func pictureInPictureControllerShouldProhibitBackgroundAudioPlayback(
++        _: AVPictureInPictureController
++    ) -> Bool {
++        false
+     }
+ }
+ 
+@@ -216,13 +349,13 @@ extension RNLiveStreamViewImpl: ApiVideoLiveStreamDelegate {
+ 
+     /// Called when the connection to the rtmp server failed
+     public func connectionFailed(_ code: String) {
+-        isStreaming = false
++        // ApiVideoLiveStream reconnects the same RTMP owner after transient
++        // network/background failures. Keep ownership active until stopStreaming.
+         onConnectionFailed(["code": code])
+     }
+ 
+     /// Called when the connection to the rtmp server is closed
+     public func disconnection() {
+-        isStreaming = false
+         onDisconnect([:])
+     }
+ 
+diff --git a/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamViewManager.swift b/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamViewManager.swift
+index a4f7451..a58002e 100644
+--- a/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamViewManager.swift
++++ b/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamViewManager.swift
+@@ -12,26 +12,38 @@ class RNLiveStreamViewManager: RCTViewManager {
+         return RNLiveStreamViewImpl()
+     }
+ 
++    private func liveStreamView(from candidate: UIView?) -> RNLiveStreamViewImpl? {
++        guard let candidate = candidate else { return nil }
++        if let liveView = candidate as? RNLiveStreamViewImpl { return liveView }
++        for subview in candidate.subviews {
++            if let liveView = liveStreamView(from: subview) { return liveView }
++        }
++        return nil
++    }
++
+     @objc(startStreaming:withRequestId:withStreamKey:withUrl:)
+     func startStreaming(_ reactTag: NSNumber, withRequestId requestId: NSNumber, streamKey: String, url: String?) {
+-        bridge!.uiManager.addUIBlock { (_: RCTUIManager?, viewRegistry: [NSNumber: UIView]?) in
+-            let view: RNLiveStreamViewImpl = (viewRegistry![reactTag] as? RNLiveStreamViewImpl)!
++        guard let uiManager = bridge?.uiManager else { return }
++        uiManager.addUIBlock { (_: RCTUIManager?, viewRegistry: [NSNumber: UIView]?) in
++            guard let view = self.liveStreamView(from: viewRegistry?[reactTag]) else { return }
+             view.startStreaming(requestId: Int(truncating: requestId), streamKey: streamKey, url: url)
+         }
+     }
+ 
+     @objc(stopStreaming:)
+     func stopStreaming(_ reactTag: NSNumber) {
+-        bridge!.uiManager.addUIBlock { (_: RCTUIManager?, viewRegistry: [NSNumber: UIView]?) in
+-            let view: RNLiveStreamViewImpl = (viewRegistry![reactTag] as? RNLiveStreamViewImpl)!
++        guard let uiManager = bridge?.uiManager else { return }
++        uiManager.addUIBlock { (_: RCTUIManager?, viewRegistry: [NSNumber: UIView]?) in
++            guard let view = self.liveStreamView(from: viewRegistry?[reactTag]) else { return }
+             view.stopStreaming()
+         }
+     }
+ 
+     @objc(setZoomRatioCommand:withZoomRatio:)
+     func setZoomRatioCommand(_ reactTag: NSNumber, zoomRatio: NSNumber) {
+-        bridge!.uiManager.addUIBlock { (_: RCTUIManager?, viewRegistry: [NSNumber: UIView]?) in
+-            let view: RNLiveStreamViewImpl = (viewRegistry![reactTag] as? RNLiveStreamViewImpl)!
++        guard let uiManager = bridge?.uiManager else { return }
++        uiManager.addUIBlock { (_: RCTUIManager?, viewRegistry: [NSNumber: UIView]?) in
++            guard let view = self.liveStreamView(from: viewRegistry?[reactTag]) else { return }
+             view.zoomRatio = zoomRatio.floatValue
+         }
+     }

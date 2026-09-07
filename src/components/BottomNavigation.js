@@ -2,16 +2,17 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, shadow, spacing } from '../theme';
+import { userInitials } from './AccountMenuSheet';
 
 const TABS = [
   { key: 'home', icon: 'home-variant', label: 'Home', color: '#176b87', soft: '#e5f5fb' },
   { key: 'my_events', icon: 'calendar-month', label: 'My Events', restricted: true, color: '#8a4dba', soft: '#f2e8fa' },
   { key: 'create', icon: 'plus', label: 'Add Event', restricted: true, primary: true },
   { key: 'favourites', icon: 'heart', label: 'Favourites', restricted: true, color: '#d43867', soft: '#fdeaf0' },
-  { key: 'profile', icon: 'account-circle', label: 'Profile', color: '#c44764', soft: '#fdeaf0' },
+  { key: 'profile', icon: 'account-circle', label: 'Menu', color: '#7357d9', soft: '#eef0ff' },
 ];
 
-export default function BottomNavigation({ activeTab, onChange, isGuest = false }) {
+export default function BottomNavigation({ activeTab, onChange, onOpenMenu, user, profile, isGuest = false }) {
   return (
     <View style={styles.navigation} accessibilityRole="tablist">
       {TABS.map(tab => {
@@ -24,7 +25,7 @@ export default function BottomNavigation({ activeTab, onChange, isGuest = false 
             accessibilityState={{ selected: active, disabled }}
             disabled={disabled}
             key={tab.key}
-            onPress={() => onChange(tab.key)}
+            onPress={() => tab.key === 'profile' ? onOpenMenu?.() : onChange(tab.key)}
             style={({ pressed }) => [
               styles.tab,
               active && styles.activeTab,
@@ -34,14 +35,10 @@ export default function BottomNavigation({ activeTab, onChange, isGuest = false 
             ]}
           >
             <View style={[
-              tab.primary ? styles.primaryIcon : [styles.iconWrap, { backgroundColor: tab.soft }],
+              tab.primary ? styles.primaryIcon : [styles.iconWrap, { backgroundColor: tab.key === 'profile' && !isGuest ? tab.color : tab.soft }],
               tab.primary && !disabled && styles.primaryIconEnabled,
             ]}>
-              <MaterialCommunityIcons
-                color={tab.primary ? colors.surface : tab.color}
-                name={tab.icon}
-                size={tab.primary ? 36 : 29}
-              />
+              {tab.key === 'profile' ? <Text style={[styles.initialsText, isGuest && styles.guestInitials]}> {isGuest ? 'G' : userInitials(user, profile)}</Text> : <MaterialCommunityIcons color={tab.primary ? colors.surface : tab.color} name={tab.icon} size={tab.primary ? 28 : 23} />}
             </View>
             <Text
               numberOfLines={1}
@@ -66,14 +63,19 @@ export default function BottomNavigation({ activeTab, onChange, isGuest = false 
 const styles = StyleSheet.create({
   navigation: {
     flexDirection: 'row',
-    minHeight: 82,
+    minHeight: 66,
+    marginHorizontal: 12,
+    marginBottom: 7,
     paddingHorizontal: spacing.xs,
-    paddingTop: 6,
-    paddingBottom: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.surface,
+    paddingTop: 5,
+    paddingBottom: 6,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.91)',
     ...shadow,
+    zIndex: 100,
+    elevation: 100,
   },
   tab: {
     flex: 1,
@@ -83,17 +85,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 2,
   },
-  activeTab: { backgroundColor: '#f6faf9' },
+  activeTab: { backgroundColor: 'rgba(232,240,255,0.72)' },
   primaryTab: {
     marginHorizontal: 2,
-    marginTop: -18,
+    marginTop: -15,
   },
   disabledTab: { opacity: 0.35 },
-  iconWrap: { width: 39, height: 39, alignItems: 'center', justifyContent: 'center', borderRadius: 13 },
+  iconWrap: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   primaryIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     overflow: 'hidden',
     backgroundColor: '#9bb8b4',
     alignItems: 'center',
@@ -103,17 +105,19 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   primaryIconEnabled: {
-    backgroundColor: colors.teal,
+    backgroundColor: colors.blue,
   },
-  label: { color: colors.muted, fontSize: 9, fontWeight: '900', marginTop: 3 },
-  activeLabel: { color: colors.tealDark },
+  label: { color: colors.muted, fontSize: 8.5, fontWeight: '600', marginTop: 2 },
+  activeLabel: { color: colors.blueDark, fontWeight: '700' },
   primaryLabel: {
     marginTop: 4,
-    color: colors.tealDark,
-    fontWeight: '900',
+    color: colors.blueDark,
+    fontWeight: '700',
   },
   primaryLabelDisabled: {
     color: '#b6c6c4',
   },
+  initialsText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
+  guestInitials: { color: colors.purple },
   pressed: { opacity: 0.7 },
 });

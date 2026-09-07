@@ -1,6 +1,7 @@
 # Community Connect Australia — store release readiness
 
-Status date: 27 August 2026  
+Status date: 6 September 2026
+
 Candidate version: 1.0.0  
 Android application ID: `info.siza.communityevents.app`  
 iOS bundle ID: `info.siza.communityevents`
@@ -27,7 +28,7 @@ iOS bundle ID: `info.siza.communityevents`
 5. Complete Apple App Privacy and Google Play Data safety declarations, including Firebase, Crashlytics, Google Maps/Places, notifications, phone authentication, location, calendar, camera, microphone, image uploads, messaging and YouTube streaming.
 6. Create store screenshots from the final production candidate. Required scenes: login/guest choice, Events home, event drawer, map marker popup, prayer/Hijri view, Business Directory, business page, Promotions and profile/account deletion.
 7. Provide reviewers a working Australian test phone flow or a fully featured review/demo path, and keep all backend services available during review.
-8. Confirm support email monitoring and public support/account-deletion URLs.
+8. Confirm `support@siza.info` monitoring and publish the refreshed Privacy Policy, Terms, Support, User Guide and Account Deletion content. AWS SES sender/reply-to is configured in source as `support@siza.info`; deployment and live-mail verification remain release gates.
 9. Run a closed Android test and iOS TestFlight test before production release.
 
 ## iOS signing hand-off

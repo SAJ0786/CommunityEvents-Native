@@ -4,6 +4,8 @@ import {
   AppState,
   BackHandler,
   Linking,
+  NativeModules,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -18,6 +20,8 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { colors, radius, shadow, spacing } from '../theme';
 import { getEventTitle } from '../services/events';
+import { logDiagnostic, recordNonFatalError } from '../services/diagnostics';
+import NativeBackButton from './NativeBackButton';
 import {
   endEventStream,
   notifyEventLive,
@@ -28,6 +32,17 @@ import {
 } from '../services/streaming';
 
 const STREAM_KEEP_AWAKE_TAG = 'community-connect-live-stream';
+const StreamingPip = NativeModules.StreamingPip;
+const AndroidRootEncoderLiveStreamView = Platform.OS === 'android'
+  ? require('./AndroidRootEncoderLiveStreamView').default
+  : null;
+const PhoneLiveStreamView = Platform.OS === 'android'
+  ? AndroidRootEncoderLiveStreamView
+  : ApiVideoLiveStreamView;
+const CAMERA_SETTLE_MS = 500;
+const NATIVE_STOP_SETTLE_MS = 350;
+
+const wait = duration => new Promise(resolve => setTimeout(resolve, duration));
 
 function Choice({ active, icon, title, text, onPress, disabled = false }) {
   return (
@@ -54,6 +69,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
   const [camera, setCamera] = useState('back');
   const [muted, setMuted] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [connected, setConnected] = useState(false);
   const [sessionId, setSessionId] = useState('');
@@ -64,7 +80,45 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
   const [error, setError] = useState('');
   const [controlsVisible, setControlsVisible] = useState(true);
   const controlsTimerRef = useRef(null);
-  const hasActiveNativeSession = Boolean(sessionId && (streaming || interrupted || (event?.isLive && event?.liveSource === 'native')));
+  const connectionTimerRef = useRef(null);
+  const streamAttemptRef = useRef(0);
+  const cameraMountedRef = useRef(false);
+  const nativeStreamStartedRef = useRef(false);
+  const connectionStateRef = useRef(false);
+  const pendingSessionRef = useRef(null);
+  const hasActiveNativeSession = Boolean(sessionId && (connecting || streaming || interrupted || (event?.isLive && event?.liveSource === 'native')));
+
+  const clearConnectionTimer = () => {
+    if (!connectionTimerRef.current) return;
+    clearTimeout(connectionTimerRef.current);
+    connectionTimerRef.current = null;
+  };
+
+  const stopNativeStreamOnce = reason => {
+    if (!nativeStreamStartedRef.current || !cameraMountedRef.current || !liveRef.current) return false;
+    nativeStreamStartedRef.current = false;
+    try {
+      liveRef.current.stopStreaming?.();
+      logDiagnostic('STREAM_NATIVE_STOP_ISSUED', { reason, platform: Platform.OS });
+      return true;
+    } catch (stopError) {
+      recordNonFatalError(stopError, { operation: 'native_stream_stop', reason, platform: Platform.OS });
+      return false;
+    }
+  };
+
+  const minimiseStream = async () => {
+    if (Platform.OS === 'android' && streaming && StreamingPip?.enterPictureInPicture) {
+      const entered = await StreamingPip.enterPictureInPicture().catch(() => false);
+      if (entered) return;
+    }
+    setMinimized(true);
+    if (streaming) setStatus('LIVE — the broadcast remains connected while you use the app.');
+  };
+
+  const restoreStream = () => {
+    setMinimized(false);
+  };
 
   const showControlsTemporarily = () => {
     setControlsVisible(true);
@@ -80,12 +134,16 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
 
   useEffect(() => {
     if (!visible || !event) return;
+    streamAttemptRef.current += 1;
+    if (connectionTimerRef.current) clearTimeout(connectionTimerRef.current);
     const existingExternal = event.isLive && event.liveSource === 'external-youtube';
     setStep(existingExternal ? 'external-live' : 'method');
     setPrivacyStatus(event.liveAppVisibility === 'private' ? 'unlisted' : 'public');
     setStreamOrientation('portrait');
     setYoutubeUrl('');
+    setConnecting(false);
     setStreaming(false);
+    StreamingPip?.setStreamingActive?.(false);
     setConnected(false);
     setSessionId(event.liveUrl || '');
     setWatchUrl(event.liveWatchUrl || '');
@@ -94,6 +152,9 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
     setControlsVisible(true);
     setStatus(event.isLive ? 'This event is currently live.' : '');
     setError('');
+    nativeStreamStartedRef.current = false;
+    connectionStateRef.current = false;
+    pendingSessionRef.current = null;
   }, [event?.id, visible]);
 
   useEffect(() => {
@@ -109,6 +170,11 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
 
   useEffect(() => {
     if (visible) return undefined;
+    streamAttemptRef.current += 1;
+    if (connectionTimerRef.current) {
+      clearTimeout(connectionTimerRef.current);
+      connectionTimerRef.current = null;
+    }
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
     return undefined;
   }, [visible]);
@@ -124,22 +190,29 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
   useEffect(() => {
     if (!visible) return undefined;
     const subscription = AppState.addEventListener('change', nextState => {
-      if (nextState !== 'active' && streaming) {
-        setStreaming(false);
-        setConnected(false);
-        setInterrupted(true);
-        setStatus('Camera capture paused. The same YouTube live session is being held until you return and resume it.');
+      if (nextState !== 'active' && (streaming || connecting) && Platform.OS !== 'android') {
+        // The native iOS view owns RTMP and starts system PiP as the app moves
+        // out of the foreground. JS must not mark that native owner stopped;
+        // doing so previously caused duplicate starts against one YouTube live
+        // session when the user returned.
+        setStatus('LIVE — the same broadcast remains active in Picture in Picture.');
+        logDiagnostic('STREAM_IOS_BACKGROUND_CONTINUING', { hadConnection: connected, orientation: streamOrientation });
+      } else if (nextState === 'active' && nativeStreamStartedRef.current && Platform.OS === 'ios') {
+        setStatus(connectionStateRef.current
+          ? 'LIVE — YouTube is receiving the stream.'
+          : 'The camera remains on while YouTube reconnects automatically.');
+        logDiagnostic('STREAM_IOS_FOREGROUND_RESTORED', { connected: connectionStateRef.current, orientation: streamOrientation });
       }
     });
     return () => subscription.remove();
-  }, [streaming, visible]);
+  }, [connected, connecting, streamOrientation, streaming, visible]);
 
   useEffect(() => {
     if (!visible) return undefined;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (minimized) return false;
       if (streaming) {
-        setMinimized(true);
+        minimiseStream();
         return true;
       }
       closeSafely();
@@ -159,13 +232,21 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
     setBusy(true);
     setError('');
     try {
-      const orientationLock = streamOrientation === 'landscape'
+      // Build 44's stable sequence locked a concrete orientation and let the
+      // native camera settle before mounting. The later generic LANDSCAPE ->
+      // immediate orientation read was racing stale iOS status-bar state and
+      // could rotate the UI independently of the encoder.
+      const requestedLock = streamOrientation === 'landscape'
         ? ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT
         : ScreenOrientation.OrientationLock.PORTRAIT_UP;
-      await ScreenOrientation.lockAsync(orientationLock);
-      // Mount the camera after the requested rotation has settled so the
-      // preview, encoder and camera sensor all start in the same orientation.
-      await new Promise(resolve => setTimeout(resolve, 350));
+      await ScreenOrientation.lockAsync(requestedLock);
+      await wait(CAMERA_SETTLE_MS);
+      const resolvedOrientation = await ScreenOrientation.getOrientationAsync();
+      logDiagnostic('STREAM_CAMERA_ORIENTATION_READY', {
+        requested: streamOrientation,
+        resolved: String(resolvedOrientation),
+        platform: Platform.OS,
+      });
       setStep('phone');
     } catch {
       setError('The selected camera orientation could not be locked. Please try again.');
@@ -189,7 +270,28 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
           : 'Return to the camera to resume the same YouTube stream, or end it explicitly.',
         [
           { text: 'Keep Open', style: 'cancel' },
-          { text: streaming ? 'Minimise' : 'Return to Stream', onPress: () => setMinimized(streaming) },
+          { text: streaming ? 'Minimise' : 'Return to Stream', onPress: streaming ? minimiseStream : restoreStream },
+          { text: 'End Stream & Close', style: 'destructive', onPress: finishStream },
+        ]
+      );
+      return;
+    }
+    if (busy && step === 'phone') {
+      Alert.alert(
+        'Cancel stream setup?',
+        'YouTube setup is still in progress.',
+        [
+          { text: 'Keep Open', style: 'cancel' },
+          {
+            text: 'Cancel & Close',
+            style: 'destructive',
+            onPress: async () => {
+              streamAttemptRef.current += 1;
+              setBusy(false);
+              await restorePortraitOrientation().catch(() => {});
+              onClose?.();
+            },
+          },
         ]
       );
       return;
@@ -199,7 +301,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
   };
 
   const startPhoneStream = async () => {
-    if (busy || streaming) return;
+    if (busy || connecting || streaming) return;
     setBusy(true);
     setError('');
     const resumeExistingSession = Boolean(sessionId && (event.isLive || interrupted));
@@ -207,38 +309,96 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
       ? { ...event, isLive: true, liveUrl: sessionId, liveSource: 'native' }
       : event;
     setStatus(resumeExistingSession ? 'Reconnecting to the existing YouTube stream…' : 'Creating the YouTube stream…');
+    const attemptId = ++streamAttemptRef.current;
     let createdSessionId = sessionId || event.liveUrl || '';
     try {
       const result = await startNativeEventStream(streamRequestEvent, privacyStatus);
+      if (attemptId !== streamAttemptRef.current) {
+        if (result?.sessionId && !resumeExistingSession) {
+          endEventStream({ ...event, liveSource: 'native' }, result.sessionId).catch(() => {});
+        }
+        return;
+      }
       createdSessionId = result.sessionId;
       setSessionId(result.sessionId);
       setWatchUrl(result.watchUrl || '');
+      pendingSessionRef.current = {
+        id: result.sessionId,
+        watchUrl: result.watchUrl || '',
+        privacyStatus,
+        resumeExistingSession,
+        announced: false,
+      };
       setStatus('Connecting this phone’s camera to YouTube…');
       const destination = splitRtmpDestination(result.rtmpUrl);
-      const started = await liveRef.current?.startStreaming(destination.streamKey, destination.url);
-      if (!started) throw new Error('The phone camera could not start the YouTube stream.');
-      setStreaming(true);
-      setInterrupted(false);
-      setStatus('LIVE — your camera is streaming to YouTube.');
-      if (!resumeExistingSession) {
-        notifyEventLive(event).catch(() => {});
-        if (privacyStatus === 'unlisted') sendPrivateStreamLink(result.sessionId).catch(() => {});
-      }
-      onStreamChanged?.({
-        ...event,
-        isLive: true,
-        liveUrl: result.sessionId,
-        liveWatchUrl: privacyStatus === 'public' ? result.watchUrl || null : null,
-        liveSource: 'native',
-        liveAppVisibility: privacyStatus === 'unlisted' ? 'private' : 'public',
+      if (!cameraMountedRef.current || !liveRef.current) throw new Error('The camera preview is still loading. Wait a moment and try again.');
+      await wait(250);
+      setConnecting(true);
+      nativeStreamStartedRef.current = true;
+      connectionStateRef.current = false;
+      logDiagnostic('STREAM_NATIVE_START_ISSUED', {
+        platform: Platform.OS,
+        orientation: streamOrientation,
+        resume: resumeExistingSession,
+        protocol: destination.url.startsWith('rtmps://') ? 'rtmps' : 'rtmp',
       });
+      const startCommand = liveRef.current.startStreaming(destination.streamKey, destination.url);
+      if (attemptId !== streamAttemptRef.current) return;
+      setInterrupted(false);
+      setStatus('Connecting this phone’s camera to YouTube…');
+      Promise.resolve(startCommand).then(started => {
+        if (attemptId !== streamAttemptRef.current) return;
+        logDiagnostic('STREAM_NATIVE_START_ACKNOWLEDGED', { platform: Platform.OS, started: started !== false });
+        if (started !== false || connectionStateRef.current) return;
+        clearConnectionTimer();
+        stopNativeStreamOnce('native_start_rejected');
+        StreamingPip?.setStreamingActive?.(false);
+        setConnecting(false);
+        setStreaming(false);
+        setConnected(false);
+        setInterrupted(true);
+        setStatus('');
+        setError('The phone camera could not start the YouTube stream. Tap Resume to try the same live session again.');
+      }).catch(commandError => {
+        if (attemptId !== streamAttemptRef.current || connectionStateRef.current) return;
+        clearConnectionTimer();
+        stopNativeStreamOnce('native_start_error');
+        StreamingPip?.setStreamingActive?.(false);
+        setConnecting(false);
+        setStreaming(false);
+        setConnected(false);
+        setInterrupted(true);
+        setStatus('');
+        setError(String(commandError?.message || commandError || 'The phone camera could not start the YouTube stream.'));
+        recordNonFatalError(commandError, { operation: 'native_stream_start', platform: Platform.OS, orientation: streamOrientation });
+      });
+      // Once native capture has been accepted, the session remains user-owned.
+      // A slow YouTube acknowledgement must not stop the camera or RTMP owner.
+      setStreaming(true);
+      StreamingPip?.setStreamingActive?.(true);
+      clearConnectionTimer();
+      connectionTimerRef.current = setTimeout(() => {
+        if (attemptId !== streamAttemptRef.current || connectionStateRef.current) return;
+        clearConnectionTimer();
+        setConnecting(true);
+        setStreaming(true);
+        setConnected(false);
+        setInterrupted(true);
+        setStatus('The camera remains on while YouTube reconnects automatically.');
+        setError('YouTube has not acknowledged the camera yet. Keep this stream open; it will continue retrying until you end it.');
+        logDiagnostic('STREAM_CONNECTION_TIMEOUT', { platform: Platform.OS, orientation: streamOrientation });
+      }, 30000);
     } catch (streamError) {
-      liveRef.current?.stopStreaming?.();
+      setConnecting(false);
+      StreamingPip?.setStreamingActive?.(false);
+      stopNativeStreamOnce('setup_error');
       if (createdSessionId && !resumeExistingSession && !event.isLive) {
         endEventStream({ ...event, liveSource: 'native' }, createdSessionId).catch(() => {});
+        setSessionId('');
       }
       setError(streamError?.message || String(streamError) || 'The stream could not be started.');
       setStatus('');
+      recordNonFatalError(streamError, { operation: 'stream_setup', platform: Platform.OS, orientation: streamOrientation });
     } finally {
       setBusy(false);
     }
@@ -283,12 +443,25 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
   };
 
   const finishStream = async () => {
-    if (busy) return;
+    streamAttemptRef.current += 1;
+    if (connectionTimerRef.current) {
+      clearTimeout(connectionTimerRef.current);
+      connectionTimerRef.current = null;
+    }
     setBusy(true);
     setError('');
     setStatus('Ending the stream safely…');
     try {
-      liveRef.current?.stopStreaming?.();
+      setConnecting(false);
+      connectionStateRef.current = false;
+      stopNativeStreamOnce('user_end');
+      StreamingPip?.setStreamingActive?.(false);
+      // The iOS SDK tears down RTMP and AVCapture asynchronously. Keep the
+      // native view mounted for one short settling interval before unmounting
+      // it or changing orientation, preventing stop/remove/rotate races.
+      await wait(NATIVE_STOP_SETTLE_MS);
+      if (step === 'phone') setStep('method');
+      await restorePortraitOrientation().catch(() => {});
       const sourceEvent = step === 'external-live'
         ? { ...event, liveSource: 'external-youtube' }
         : { ...event, liveSource: 'native' };
@@ -296,7 +469,10 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
       setStreaming(false);
       setInterrupted(false);
       setConnected(false);
+      setSessionId('');
+      setWatchUrl('');
       setStatus('Stream ended.');
+      pendingSessionRef.current = null;
       onStreamChanged?.({
         ...event,
         isLive: false,
@@ -305,11 +481,12 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
         liveSource: null,
         liveAppVisibility: null,
       });
-      await restorePortraitOrientation().catch(() => {});
+      logDiagnostic('STREAM_ENDED', { platform: Platform.OS });
       onClose?.();
     } catch (streamError) {
       setError(streamError?.message || 'The stream could not be ended.');
       setStatus('');
+      recordNonFatalError(streamError, { operation: 'stream_end', platform: Platform.OS });
     } finally {
       setBusy(false);
     }
@@ -342,8 +519,8 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
             <Text style={styles.eyebrow}>{event.isLive || streaming || step === 'external-live' ? 'LIVE EVENT' : 'EVENT STREAMING'}</Text>
             <Text numberOfLines={2} style={styles.title}>{getEventTitle(event)}</Text>
           </View>
-          {streaming ? (
-            <Pressable accessibilityLabel="Minimise streaming" onPress={() => setMinimized(true)} style={({ pressed }) => [styles.minimizeButton, pressed && styles.pressed]}>
+          {hasActiveNativeSession ? (
+            <Pressable accessibilityLabel="Minimise streaming" onPress={minimiseStream} style={({ pressed }) => [styles.minimizeButton, pressed && styles.pressed]}>
               <Text style={styles.minimizeText}>−</Text>
             </Pressable>
           ) : null}
@@ -354,34 +531,72 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
 
         {step === 'phone' ? (
           <View onTouchStart={() => { if (!minimized) showControlsTemporarily(); }} style={styles.cameraStage}>
-            <ApiVideoLiveStreamView
-              ref={liveRef}
+            <PhoneLiveStreamView
+              ref={node => { liveRef.current = node; cameraMountedRef.current = Boolean(node); }}
               style={styles.camera}
               camera={camera}
+              orientation={streamOrientation}
               enablePinchedZoom
               isMuted={muted}
               video={{ fps: 30, resolution: '720p', bitrate: 2000000, gopDuration: 1 }}
               audio={{ bitrate: 128000, sampleRate: 44100, isStereo: true }}
               onConnectionSuccess={() => {
+                clearConnectionTimer();
+                connectionStateRef.current = true;
                 setConnected(true);
+                setConnecting(false);
+                setStreaming(true);
+                StreamingPip?.setStreamingActive?.(true);
                 setInterrupted(false);
                 setStatus('LIVE — YouTube is receiving the stream.');
-              }}
-              onConnectionFailed={code => {
-                setConnected(false);
-                setStreaming(false);
-                setInterrupted(true);
-                setError(`The live connection failed (${code || 'unknown error'}).`);
-              }}
-              onDisconnect={() => {
-                setConnected(false);
-                if (streaming) {
-                  setStreaming(false);
-                  setInterrupted(true);
-                  setStatus('The camera connection was interrupted. Return to the stream screen and tap Resume Stream.');
+                logDiagnostic('STREAM_CONNECTION_SUCCESS', { platform: Platform.OS, orientation: streamOrientation });
+                const pending = pendingSessionRef.current;
+                if (pending && !pending.announced) {
+                  pending.announced = true;
+                  if (!pending.resumeExistingSession) {
+                    notifyEventLive(event).catch(() => {});
+                    if (pending.privacyStatus === 'unlisted') sendPrivateStreamLink(pending.id).catch(() => {});
+                  }
+                  onStreamChanged?.({
+                    ...event,
+                    isLive: true,
+                    liveUrl: pending.id,
+                    liveWatchUrl: pending.privacyStatus === 'public' ? pending.watchUrl || null : null,
+                    liveSource: 'native',
+                    liveAppVisibility: pending.privacyStatus === 'unlisted' ? 'private' : 'public',
+                  });
                 }
               }}
-              onPermissionsDenied={() => setError('Camera and microphone access are required to stream from this phone.')}
+              onConnectionFailed={code => {
+                clearConnectionTimer();
+                connectionStateRef.current = false;
+                StreamingPip?.setStreamingActive?.(true);
+                setConnected(false);
+                setConnecting(true);
+                setStreaming(true);
+                setInterrupted(true);
+                setStatus('The camera remains on while YouTube reconnects automatically.');
+                setError(`The live connection was interrupted (${code || 'unknown error'}). No action is required unless you want to end the stream.`);
+                logDiagnostic('STREAM_CONNECTION_FAILED', { code: code || 'unknown', platform: Platform.OS, orientation: streamOrientation });
+              }}
+              onDisconnect={() => {
+                clearConnectionTimer();
+                connectionStateRef.current = false;
+                setConnected(false);
+                if (streaming || connecting) {
+                  StreamingPip?.setStreamingActive?.(true);
+                  setConnecting(true);
+                  setStreaming(true);
+                  setInterrupted(true);
+                  setStatus('The camera remains on while YouTube reconnects automatically.');
+                }
+                logDiagnostic('STREAM_DISCONNECTED', { platform: Platform.OS, orientation: streamOrientation });
+              }}
+              onPermissionsDenied={() => {
+                setConnecting(false);
+                setError('Camera and microphone access are required to stream from this phone.');
+                logDiagnostic('STREAM_PERMISSIONS_DENIED', { platform: Platform.OS });
+              }}
             />
             {!minimized && !controlsVisible ? <Pressable
               accessibilityRole="button"
@@ -391,7 +606,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
             /> : null}
             <View style={[styles.liveBadge, minimized && styles.liveBadgeMinimized]}>
               <View style={[styles.liveDot, connected && styles.liveDotConnected]} />
-              <Text style={styles.liveBadgeText}>{streaming ? (connected ? 'LIVE' : 'CONNECTING') : 'PREVIEW'}</Text>
+              <Text style={styles.liveBadgeText}>{connected ? 'LIVE' : connecting ? 'CONNECTING' : 'PREVIEW'}</Text>
             </View>
             {!minimized && controlsVisible ? <View style={styles.orientationBadge}>
               <Text style={styles.orientationBadgeText}>{streamOrientation.toUpperCase()} LOCKED</Text>
@@ -407,7 +622,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
 
             {!minimized && controlsVisible ? <>
               <View style={styles.streamTopActions}>
-                {streaming ? <Pressable accessibilityLabel="Minimise streaming" onPress={() => setMinimized(true)} style={[styles.roundControl, styles.minimiseControl]}>
+                {hasActiveNativeSession ? <Pressable accessibilityLabel="Minimise streaming" onPress={minimiseStream} style={[styles.roundControl, styles.minimiseControl]}>
                   <MaterialCommunityIcons color="#fff" name="arrow-collapse-down" size={22} />
                 </Pressable> : null}
                 <Pressable accessibilityLabel="Close streaming" onPress={closeSafely} style={[styles.roundControl, styles.closeStreamControl]}>
@@ -424,19 +639,23 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
                   <View style={[styles.roundControl, muted ? styles.mutedControl : styles.microphoneControl]}><MaterialCommunityIcons color="#fff" name={muted ? 'microphone-off' : 'microphone'} size={23} /></View>
                   <Text style={styles.streamControlLabel}>{muted ? 'Unmute' : 'Mute'}</Text>
                 </Pressable>
-                {!streaming ? <Pressable disabled={busy} accessibilityLabel={hasActiveNativeSession ? 'Resume same stream' : 'Start streaming'} onPress={startPhoneStream} style={[styles.streamControlItem, busy && styles.disabled]}>
+                {!streaming && !connecting ? <Pressable disabled={busy} accessibilityLabel={hasActiveNativeSession ? 'Resume same stream' : 'Start streaming'} onPress={startPhoneStream} style={[styles.streamControlItem, busy && styles.disabled]}>
                   <View style={[styles.roundControl, styles.goLiveControl]}><MaterialCommunityIcons color="#fff" name="broadcast" size={25} /></View>
                   <Text style={styles.streamControlLabel}>{busy ? 'Preparing' : hasActiveNativeSession ? 'Resume' : 'Go Live'}</Text>
                 </Pressable> : null}
-                {(streaming || hasActiveNativeSession) ? <Pressable disabled={busy} accessibilityLabel="End live stream" onPress={confirmEndStream} style={[styles.streamControlItem, busy && styles.disabled]}>
+                {(connecting || streaming || hasActiveNativeSession) ? <Pressable disabled={busy} accessibilityLabel="End live stream" onPress={confirmEndStream} style={[styles.streamControlItem, busy && styles.disabled]}>
                   <View style={[styles.roundControl, styles.endStreamControl]}><MaterialCommunityIcons color="#fff" name="stop-circle-outline" size={25} /></View>
                   <Text style={styles.streamControlLabel}>End</Text>
                 </Pressable> : null}
-                {!streaming && !hasActiveNativeSession ? <Pressable accessibilityLabel="Back" onPress={leavePhoneCamera} style={styles.streamControlItem}>
-                  <View style={[styles.roundControl, styles.backStreamControl]}><MaterialCommunityIcons color="#fff" name="arrow-left" size={23} /></View>
-                  <Text style={styles.streamControlLabel}>Back</Text>
-                </Pressable> : null}
               </View>
+
+              {!streaming && !hasActiveNativeSession ? (
+                <NativeBackButton
+                  color="#fff"
+                  onPress={leavePhoneCamera}
+                  style={styles.cameraBackButton}
+                />
+              ) : null}
 
               {(status || error) ? <View style={styles.streamStatusOverlay}>
                 {status ? <Text numberOfLines={2} style={styles.streamStatusText}>{status}</Text> : null}
@@ -444,7 +663,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
               </View> : null}
             </> : null}
 
-            {minimized ? <Pressable accessibilityLabel="Return to live stream" onPress={() => setMinimized(false)} style={styles.minimizedTapTarget}>
+            {minimized ? <Pressable accessibilityLabel="Return to live stream" onPress={restoreStream} style={styles.minimizedTapTarget}>
               <MaterialCommunityIcons color="#fff" name="arrow-expand-all" size={23} />
               <Text style={styles.minimizedTapText}>{connected ? 'LIVE' : interrupted ? 'PAUSED' : 'CONNECTING'}</Text>
             </Pressable> : null}
@@ -460,7 +679,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
                   <Choice active={privacyStatus === 'unlisted'} icon="🔒" title="Private" text="Only people with the link can watch" onPress={() => setPrivacyStatus('unlisted')} />
                 </View>
                 <Text style={styles.inputLabel}>CAMERA ORIENTATION</Text>
-                <Text style={styles.orientationHelp}>Choose before opening the camera. The app keeps this orientation locked for the complete YouTube stream.</Text>
+                <Text style={styles.orientationHelp}>Choose before opening the camera. For landscape, turn the phone to the side you want to use first. The app then keeps that orientation for the complete YouTube stream.</Text>
                 <View style={styles.orientationRow}>
                   <Pressable
                     onPress={() => setStreamOrientation('portrait')}
@@ -506,9 +725,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
                 <Pressable disabled={!youtubeUrl.trim() || busy} onPress={startExternalStream} style={({ pressed }) => [styles.primaryButton, (!youtubeUrl.trim() || busy) && styles.disabled, pressed && styles.pressed]}>
                   <Text style={styles.primaryButtonText}>{busy ? 'Checking YouTube…' : 'Mark Event Live'}</Text>
                 </Pressable>
-                <Pressable disabled={busy} onPress={() => setStep('method')} style={styles.secondaryButton}>
-                  <Text style={styles.secondaryButtonText}>Back</Text>
-                </Pressable>
+                <NativeBackButton onPress={() => setStep('method')} />
               </>
             ) : null}
 
@@ -548,35 +765,35 @@ const styles = StyleSheet.create({
   minimizedRootLandscape: { width: 248, height: 146 },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
   headerCopy: { flex: 1 },
-  eyebrow: { color: colors.danger, fontSize: 11, fontWeight: '900', letterSpacing: 1.2 },
-  title: { color: colors.navy, fontSize: 18, lineHeight: 23, fontWeight: '900', marginTop: 2 },
+  eyebrow: { color: colors.danger, fontSize: 11, fontWeight: '700', letterSpacing: 1.2 },
+  title: { color: colors.navy, fontSize: 18, lineHeight: 23, fontWeight: '700', marginTop: 2 },
   minimizeButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: '#fee2e2' },
-  minimizeText: { color: '#b91c1c', fontSize: 28, lineHeight: 30, fontWeight: '900' },
+  minimizeText: { color: '#b91c1c', fontSize: 28, lineHeight: 30, fontWeight: '700' },
   closeButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: colors.tealSoft },
-  closeText: { color: colors.tealDark, fontSize: 29, lineHeight: 31, fontWeight: '800' },
+  closeText: { color: colors.tealDark, fontSize: 29, lineHeight: 31, fontWeight: '600' },
   content: { padding: spacing.lg, paddingBottom: 56, gap: spacing.md },
-  sectionTitle: { color: colors.navy, fontSize: 25, lineHeight: 31, fontWeight: '900' },
+  sectionTitle: { color: colors.navy, fontSize: 25, lineHeight: 31, fontWeight: '700' },
   sectionText: { color: colors.muted, fontSize: 14, lineHeight: 21, marginBottom: spacing.sm },
   visibilityRow: { gap: spacing.sm, marginBottom: spacing.sm },
   choice: { minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   choiceActive: { borderWidth: 2, borderColor: colors.teal, backgroundColor: '#edf9f7' },
   choiceIcon: { width: 34, fontSize: 27, textAlign: 'center' },
   choiceCopy: { flex: 1 },
-  choiceTitle: { color: colors.navy, fontSize: 16, fontWeight: '900' },
+  choiceTitle: { color: colors.navy, fontSize: 16, fontWeight: '700' },
   choiceText: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 3 },
-  inputLabel: { color: colors.navy, fontSize: 12, fontWeight: '900', marginTop: spacing.md },
+  inputLabel: { color: colors.navy, fontSize: 12, fontWeight: '700', marginTop: spacing.md },
   orientationHelp: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: -6 },
   orientationRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   orientationChoice: { flex: 1, minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   orientationChoiceActive: { borderWidth: 2, borderColor: colors.teal, backgroundColor: colors.tealSoft },
-  orientationIcon: { color: colors.tealDark, fontSize: 25, fontWeight: '900' },
-  orientationText: { color: colors.muted, fontSize: 13, fontWeight: '900' },
+  orientationIcon: { color: colors.tealDark, fontSize: 25, fontWeight: '700' },
+  orientationText: { color: colors.muted, fontSize: 13, fontWeight: '700' },
   orientationTextActive: { color: colors.tealDark },
   input: { minHeight: 52, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, color: colors.text, backgroundColor: colors.surface, fontSize: 14 },
   primaryButton: { minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.teal },
-  primaryButtonText: { color: colors.surface, fontSize: 15, fontWeight: '900' },
+  primaryButtonText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
   secondaryButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  secondaryButtonText: { color: colors.tealDark, fontSize: 14, fontWeight: '900' },
+  secondaryButtonText: { color: colors.tealDark, fontSize: 14, fontWeight: '700' },
   cameraStage: { flex: 1, backgroundColor: '#050b12' },
   camera: { flex: 1, alignSelf: 'stretch', backgroundColor: '#050b12' },
   controlsWakeLayer: { ...StyleSheet.absoluteFillObject, zIndex: 2 },
@@ -584,9 +801,9 @@ const styles = StyleSheet.create({
   liveBadgeMinimized: { top: 7, left: 7, paddingHorizontal: 7, paddingVertical: 5 },
   liveDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#94a3b8' },
   liveDotConnected: { backgroundColor: '#ef4444' },
-  liveBadgeText: { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 0.7 },
+  liveBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.7 },
   orientationBadge: { position: 'absolute', top: spacing.md, right: spacing.md, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 99, backgroundColor: 'rgba(5,11,18,0.72)' },
-  orientationBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 0.6 },
+  orientationBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.6 },
   streamTopActions: { position: 'absolute', top: 48, right: spacing.md, flexDirection: 'row', gap: 9 },
   streamControlDock: { position: 'absolute', left: 14, right: 14, bottom: 18, minHeight: 74, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: 14, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', borderRadius: 24, backgroundColor: 'rgba(5,11,18,0.82)' },
   streamControlItem: { width: 54, alignItems: 'center' },
@@ -598,28 +815,28 @@ const styles = StyleSheet.create({
   mutedControl: { backgroundColor: '#64748b' },
   goLiveControl: { backgroundColor: '#dc2626' },
   endStreamControl: { backgroundColor: '#b91c1c' },
-  backStreamControl: { backgroundColor: '#334155' },
-  streamControlLabel: { color: '#fff', fontSize: 9, lineHeight: 12, fontWeight: '900', textAlign: 'center', marginTop: 4 },
+  cameraBackButton: { position: 'absolute', top: 48, left: spacing.md, zIndex: 4, alignItems: 'center', borderRadius: 22, backgroundColor: 'rgba(5,11,18,0.72)' },
+  streamControlLabel: { color: '#fff', fontSize: 9, lineHeight: 12, fontWeight: '700', textAlign: 'center', marginTop: 4 },
   streamStatusOverlay: { position: 'absolute', left: 52, right: 52, bottom: 106, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(5,11,18,0.78)' },
-  streamStatusText: { color: '#d1fae5', fontSize: 11, lineHeight: 15, fontWeight: '800', textAlign: 'center' },
-  streamErrorText: { color: '#fecaca', fontSize: 11, lineHeight: 15, fontWeight: '800', textAlign: 'center' },
+  streamStatusText: { color: '#d1fae5', fontSize: 11, lineHeight: 15, fontWeight: '600', textAlign: 'center' },
+  streamErrorText: { color: '#fecaca', fontSize: 11, lineHeight: 15, fontWeight: '600', textAlign: 'center' },
   micMeter: { position: 'absolute', top: '27%', right: 13, width: 34, height: 158, alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', borderRadius: 17, backgroundColor: 'rgba(5,11,18,0.76)' },
   micMeterTrack: { width: 8, height: 96, justifyContent: 'flex-end', overflow: 'hidden', borderRadius: 5, backgroundColor: '#374151' },
   micMeterFill: { width: '100%', borderRadius: 5, backgroundColor: '#ff4d5e' },
-  micMeterLabel: { color: '#d1fae5', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
+  micMeterLabel: { color: '#d1fae5', fontSize: 8, fontWeight: '700', letterSpacing: 0.5 },
   minimizedTapTarget: { position: 'absolute', right: 6, bottom: 6, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 99, backgroundColor: 'rgba(5,11,18,0.78)' },
-  minimizedTapText: { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  minimizedTapText: { color: '#fff', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
   dangerButton: { minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, borderWidth: 1, borderColor: '#fecaca', backgroundColor: '#fee2e2' },
-  dangerButtonText: { color: '#b91c1c', fontSize: 15, fontWeight: '900' },
+  dangerButtonText: { color: '#b91c1c', fontSize: 15, fontWeight: '700' },
   liveCard: { alignItems: 'center', padding: spacing.xl, borderWidth: 1, borderColor: '#fecaca', borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   liveCardIcon: { fontSize: 42 },
-  liveCardTitle: { color: colors.navy, fontSize: 23, fontWeight: '900', marginTop: spacing.sm },
+  liveCardTitle: { color: colors.navy, fontSize: 23, fontWeight: '700', marginTop: spacing.sm },
   liveCardText: { color: colors.muted, fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: spacing.xs, marginBottom: spacing.lg },
   youtubeButton: { width: '100%', minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: '#ff0000', marginBottom: spacing.sm },
-  youtubeButtonText: { color: '#fff', fontSize: 15, fontWeight: '900' },
+  youtubeButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   messageBar: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
-  statusText: { color: colors.tealDark, fontSize: 12, lineHeight: 18, fontWeight: '800', textAlign: 'center' },
-  errorText: { color: colors.danger, fontSize: 12, lineHeight: 18, fontWeight: '800', textAlign: 'center' },
+  statusText: { color: colors.tealDark, fontSize: 12, lineHeight: 18, fontWeight: '600', textAlign: 'center' },
+  errorText: { color: colors.danger, fontSize: 12, lineHeight: 18, fontWeight: '600', textAlign: 'center' },
   disabled: { opacity: 0.48 },
   pressed: { opacity: 0.8 },
 });

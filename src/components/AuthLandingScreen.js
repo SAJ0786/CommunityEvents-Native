@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +11,9 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, shadow, spacing } from '../theme';
+import { LEGAL_URLS } from '../config/legal';
+import { openExternalUrl } from '../utils/openExternalUrl';
+import NativeBackButton from './NativeBackButton';
 
 export default function AuthLandingScreen({
   logoSource,
@@ -67,9 +69,7 @@ export default function AuthLandingScreen({
   return (
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       {onBack ? (
-        <Pressable accessibilityLabel="Change selected module" onPress={onBack} style={styles.backButton}>
-          <Text maxFontSizeMultiplier={1.1} style={styles.backText}>{'\u2039'} Change module</Text>
-        </Pressable>
+        <NativeBackButton accessibilityLabel="Change selected module" onPress={onBack} style={styles.backButton} />
       ) : null}
       <View style={styles.brand}>
         <Image source={logoSource} resizeMode="contain" style={styles.logo} />
@@ -129,10 +129,10 @@ export default function AuthLandingScreen({
                 trackColor={{ false: colors.border, true: colors.teal }}
               />
               <View style={styles.consentCopy}>
-                <Text style={styles.consentText}>I agree to the Privacy Policy and Terms of Use.</Text>
+                <Text style={styles.consentText}>I agree to the Community Connect Australia Privacy Policy and Terms of Use.</Text>
                 <View style={styles.legalLinks}>
-                  <Pressable onPress={() => Linking.openURL('https://communityevents.siza.info/privacy.html')}><Text style={styles.legalLink}>Privacy Policy</Text></Pressable>
-                  <Pressable onPress={() => Linking.openURL('https://communityevents.siza.info/terms.html')}><Text style={styles.legalLink}>Terms of Use</Text></Pressable>
+                  <Pressable onPress={() => openExternalUrl(LEGAL_URLS.privacy)}><Text style={styles.legalLink}>Privacy Policy</Text></Pressable>
+                  <Pressable onPress={() => openExternalUrl(LEGAL_URLS.terms)}><Text style={styles.legalLink}>Terms of Use</Text></Pressable>
                 </View>
               </View>
             </View>
@@ -197,25 +197,25 @@ export default function AuthLandingScreen({
 const styles = StyleSheet.create({
   content: { flexGrow: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxl, backgroundColor: colors.background },
   backButton: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', marginBottom: spacing.sm },
-  backText: { color: colors.tealDark, fontSize: 12, lineHeight: 17, fontWeight: '900' },
+  backText: { color: colors.tealDark, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   brand: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginBottom: spacing.lg },
-  logo: { width: 62, height: 62 }, brandCopy: { minWidth: 0 }, brandLine: { color: colors.navy, fontSize: 25, lineHeight: 27, fontWeight: '900' },
-  welcome: { alignItems: 'center', marginBottom: spacing.lg }, eyebrow: { color: colors.tealDark, fontSize: 10, letterSpacing: 1.6, fontWeight: '900' },
-  title: { marginTop: 5, color: colors.navy, fontSize: 25, lineHeight: 30, fontWeight: '900', textAlign: 'center' },
+  logo: { width: 54, height: 54 }, brandCopy: { minWidth: 0 }, brandLine: { color: colors.navy, fontSize: 20, lineHeight: 24, fontWeight: '700' },
+  welcome: { alignItems: 'center', marginBottom: spacing.lg }, eyebrow: { color: colors.tealDark, fontSize: 10, letterSpacing: 1.5, fontWeight: '700' },
+  title: { marginTop: 5, color: colors.navy, fontSize: 22, lineHeight: 27, fontWeight: '700', textAlign: 'center' },
   subtitle: { maxWidth: 420, marginTop: 8, color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center' },
-  moduleCard: { marginBottom: spacing.md }, fieldLabel: { marginBottom: 7, color: colors.navy, fontSize: 10, letterSpacing: 0.7, fontWeight: '900' },
+  moduleCard: { marginBottom: spacing.md }, fieldLabel: { marginBottom: 7, color: colors.navy, fontSize: 10, letterSpacing: 0.7, fontWeight: '700' },
   moduleChoice: { flexDirection: 'row', gap: spacing.sm }, moduleButton: { flex: 1, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
-  moduleButtonActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft }, moduleIcon: { fontSize: 17 }, moduleText: { color: colors.muted, fontSize: 11, fontWeight: '800' }, moduleTextActive: { color: colors.tealDark, fontWeight: '900' },
+  moduleButtonActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft }, moduleIcon: { fontSize: 17 }, moduleText: { color: colors.muted, fontSize: 11, fontWeight: '600' }, moduleTextActive: { color: colors.tealDark, fontWeight: '700' },
   card: { padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.xl, backgroundColor: colors.surface, ...shadow },
   cardHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg }, phoneIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.tealSoft }, phoneIconText: { fontSize: 23 },
-  cardHeadingCopy: { flex: 1 }, cardTitle: { color: colors.navy, fontSize: 20, fontWeight: '900' }, cardSubtitle: { marginTop: 2, color: colors.muted, fontSize: 11, fontWeight: '700' },
+  cardHeadingCopy: { flex: 1 }, cardTitle: { color: colors.navy, fontSize: 17, fontWeight: '700' }, cardSubtitle: { marginTop: 2, color: colors.muted, fontSize: 11, fontWeight: '600' },
   consentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  consentCopy: { flex: 1 }, consentText: { color: colors.navy, fontSize: 11, lineHeight: 16, fontWeight: '800' }, legalLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: 5 }, legalLink: { color: colors.tealDark, fontSize: 10, fontWeight: '900', textDecorationLine: 'underline' },
-  input: { minHeight: 52, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: '#ffffff', color: colors.navy, fontSize: 17 }, otpInput: { letterSpacing: 8, textAlign: 'center', fontWeight: '900' },
-  error: { marginTop: spacing.sm, color: colors.danger, fontSize: 11, lineHeight: 16, fontWeight: '800' },
-  primary: { minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg, borderRadius: radius.md, backgroundColor: colors.teal }, primaryText: { color: '#ffffff', fontSize: 14, fontWeight: '900' },
-  otpActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md }, textAction: { color: colors.tealDark, fontSize: 11, fontWeight: '900' },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginVertical: spacing.lg }, divider: { flex: 1, height: 1, backgroundColor: colors.border }, or: { color: colors.muted, fontSize: 9, fontWeight: '900' },
-  guestButton: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface }, guestIcon: { fontSize: 24 }, guestCopy: { flex: 1 }, guestTitle: { color: colors.navy, fontSize: 14, fontWeight: '900' }, guestText: { marginTop: 2, color: colors.muted, fontSize: 10, lineHeight: 14 }, chevron: { color: colors.tealDark, fontSize: 28, lineHeight: 30 },
+  consentCopy: { flex: 1 }, consentText: { color: colors.navy, fontSize: 11, lineHeight: 16, fontWeight: '600' }, legalLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: 5 }, legalLink: { color: colors.tealDark, fontSize: 10, fontWeight: '700', textDecorationLine: 'underline' },
+  input: { minHeight: 52, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: '#ffffff', color: colors.navy, fontSize: 17 }, otpInput: { letterSpacing: 8, textAlign: 'center', fontWeight: '700' },
+  error: { marginTop: spacing.sm, color: colors.danger, fontSize: 11, lineHeight: 16, fontWeight: '600' },
+  primary: { minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg, borderRadius: radius.md, backgroundColor: colors.teal }, primaryText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  otpActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md }, textAction: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginVertical: spacing.lg }, divider: { flex: 1, height: 1, backgroundColor: colors.border }, or: { color: colors.muted, fontSize: 9, fontWeight: '700' },
+  guestButton: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface }, guestIcon: { fontSize: 24 }, guestCopy: { flex: 1 }, guestTitle: { color: colors.navy, fontSize: 14, fontWeight: '700' }, guestText: { marginTop: 2, color: colors.muted, fontSize: 10, lineHeight: 14 }, chevron: { color: colors.tealDark, fontSize: 28, lineHeight: 30 },
   pressed: { opacity: 0.76 }, disabled: { opacity: 0.5 },
 });

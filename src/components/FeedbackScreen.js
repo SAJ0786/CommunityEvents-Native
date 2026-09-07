@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { CITY_OPTIONS, DEFAULT_CITY, cityLabel, normalizeCity } from '../utils/cities';
 import { colors, radius, shadow, spacing } from '../theme';
+import NativeBackButton from './NativeBackButton';
 import {
   isAdminRole,
   isSuperAdminRole,
@@ -139,9 +140,7 @@ export default function FeedbackScreen({ user, profile, selectedCity, onBack }) 
             <Text style={styles.title}>Feedback</Text>
             <Text style={styles.subtitle}>Send one-way app feedback to city admins or super admins. Feedback is reviewed, but replies are not sent from this page.</Text>
           </View>
-          <Pressable onPress={onBack} style={({ pressed }) => [styles.lightButton, pressed && styles.pressed]}>
-            <Text style={styles.lightButtonText}>Back</Text>
-          </Pressable>
+          <NativeBackButton onPress={onBack} />
         </View>
       </View>
 
@@ -270,45 +269,45 @@ const styles = StyleSheet.create({
   card: { padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   headerCopy: { flex: 1 },
-  title: { color: colors.navy, fontSize: 28, fontWeight: '900' },
+  title: { color: colors.navy, fontSize: 28, fontWeight: '700' },
   subtitle: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: spacing.xs },
-  sectionTitle: { color: colors.navy, fontSize: 18, fontWeight: '900', marginBottom: spacing.sm },
-  label: { color: colors.muted, fontSize: 11, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 },
+  sectionTitle: { color: colors.navy, fontSize: 18, fontWeight: '700', marginBottom: spacing.sm },
+  label: { color: colors.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', marginBottom: 6 },
   labelSpaced: { marginTop: spacing.md },
   pillRow: { gap: spacing.sm },
   pill: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, paddingVertical: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.surface },
   pillActive: { borderColor: colors.teal, backgroundColor: colors.teal },
-  pillText: { color: colors.text, fontSize: 11, fontWeight: '800' },
+  pillText: { color: colors.text, fontSize: 11, fontWeight: '600' },
   pillTextActive: { color: colors.surface },
   textarea: { minHeight: 120, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, color: colors.text, backgroundColor: colors.surface, fontSize: 15 },
   primaryButton: { minHeight: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.teal, paddingHorizontal: spacing.lg, marginTop: spacing.md },
-  primaryButtonText: { color: colors.surface, fontSize: 15, fontWeight: '900' },
+  primaryButtonText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
   lightButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  lightButtonText: { color: colors.tealDark, fontSize: 13, fontWeight: '900' },
-  statusText: { color: colors.tealDark, fontSize: 13, fontWeight: '800', marginTop: spacing.md },
+  lightButtonText: { color: colors.tealDark, fontSize: 13, fontWeight: '700' },
+  statusText: { color: colors.tealDark, fontSize: 13, fontWeight: '600', marginTop: spacing.md },
   disabled: { opacity: 0.5 },
   threadCard: { padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, marginTop: spacing.sm },
   threadCardActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
   threadHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  threadTitle: { color: colors.text, fontSize: 15, fontWeight: '900', flex: 1 },
+  threadTitle: { color: colors.text, fontSize: 15, fontWeight: '700', flex: 1 },
   unreadBadge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center' },
-  unreadBadgeText: { color: colors.surface, fontSize: 11, fontWeight: '900' },
+  unreadBadgeText: { color: colors.surface, fontSize: 11, fontWeight: '700' },
   threadMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 4 },
   threadMeta: { color: colors.muted, fontSize: 12, lineHeight: 16 },
-  guestBadge: { color: '#92400e', backgroundColor: '#fff7ed', borderColor: '#fed7aa', borderWidth: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, fontSize: 11, fontWeight: '900' },
+  guestBadge: { color: '#92400e', backgroundColor: '#fff7ed', borderColor: '#fed7aa', borderWidth: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, fontSize: 11, fontWeight: '700' },
   threadPreview: { color: colors.text, fontSize: 13, lineHeight: 18, fontWeight: '700', marginTop: 6 },
   selectedMeta: { color: colors.muted, fontSize: 13, lineHeight: 18, marginBottom: spacing.md },
   messageList: { gap: spacing.sm, marginBottom: spacing.md },
   messageBubble: { maxWidth: '86%', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 14 },
   messageBubbleMine: { alignSelf: 'flex-end', backgroundColor: colors.teal },
   messageBubbleOther: { alignSelf: 'flex-start', backgroundColor: '#f3f7f6' },
-  messageSender: { color: colors.text, fontSize: 12, fontWeight: '900', marginBottom: 4 },
+  messageSender: { color: colors.text, fontSize: 12, fontWeight: '700', marginBottom: 4 },
   messageSenderMine: { color: colors.surface },
   messageText: { color: colors.text, fontSize: 14, lineHeight: 20 },
   messageTextMine: { color: colors.surface },
   messageTime: { color: colors.muted, fontSize: 11, marginTop: 6 },
   messageTimeMine: { color: 'rgba(255,255,255,0.72)' },
   oneWayNotice: { padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  oneWayNoticeText: { color: colors.tealDark, fontSize: 12, lineHeight: 18, fontWeight: '800' },
+  oneWayNoticeText: { color: colors.tealDark, fontSize: 12, lineHeight: 18, fontWeight: '600' },
   pressed: { opacity: 0.78 },
 });

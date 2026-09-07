@@ -93,7 +93,7 @@ android {
         applicationId 'info.siza.communityevents.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 44
+        versionCode 48
         versionName "1.0.0"
         manifestPlaceholders = [GOOGLE_MAPS_API_KEY: googleMapsApiKey]
 
@@ -157,6 +157,12 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    // Android streaming deliberately uses the same RootEncoder camera/RTMP
+    // pipeline as the last stable native wrapper. iOS continues to use the
+    // api.video implementation through the platform-specific JS adapter.
+    // 2.5.9 preserves the wrapper's RtmpCamera2 API while remaining binary-compatible
+    // with Expo/RN's Kotlin 2.1 compiler. RootEncoder 2.7.5 is built with Kotlin 2.3.
+    implementation 'com.github.pedroSG94.RootEncoder:library:2.5.9'
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";

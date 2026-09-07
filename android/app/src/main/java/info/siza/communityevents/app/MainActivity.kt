@@ -2,8 +2,10 @@ package info.siza.communityevents.app
 
 import android.os.Build
 import android.os.Bundle
+import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.res.Configuration
+import android.util.Rational
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -13,6 +15,10 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 import expo.modules.ReactActivityDelegateWrapper
 
 class MainActivity : ReactActivity() {
+  companion object {
+    @JvmStatic var streamingPipActive: Boolean = false
+  }
+
   override fun attachBaseContext(newBase: Context) {
     val configuration = Configuration(newBase.resources.configuration)
     // Respect accessibility text sizing while preventing extreme system scaling from
@@ -27,6 +33,37 @@ class MainActivity : ReactActivity() {
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
     super.onCreate(null)
+    streamingPipActive = false
+    getSharedPreferences("community_connect_streaming", 0)
+      .edit().putBoolean("pip_stream_active", false).apply()
+  }
+
+  private fun currentPipParams(autoEnter: Boolean): PictureInPictureParams {
+    val aspectRatio = if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+      Rational(16, 9)
+    } else {
+      Rational(9, 16)
+    }
+    val builder = PictureInPictureParams.Builder().setAspectRatio(aspectRatio)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      builder.setAutoEnterEnabled(autoEnter)
+      builder.setSeamlessResizeEnabled(true)
+    }
+    return builder.build()
+  }
+
+  override fun onUserLeaveHint() {
+    if (Build.VERSION.SDK_INT in Build.VERSION_CODES.O until Build.VERSION_CODES.S && streamingPipActive && !isInPictureInPictureMode) {
+      enterPictureInPictureMode(currentPipParams(false))
+    }
+    super.onUserLeaveHint()
+  }
+
+  override fun onConfigurationChanged(newConfig: Configuration) {
+    super.onConfigurationChanged(newConfig)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && streamingPipActive) {
+      setPictureInPictureParams(currentPipParams(true))
+    }
   }
 
   /**

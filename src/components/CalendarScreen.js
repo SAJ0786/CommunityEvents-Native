@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import EventCard from './EventCard';
 import { compareEventsByDateTime } from '../services/events';
 import { buildFeedUrl, calendarInstructions, copyCalendarFeed, openLiveCalendarSubscription } from '../services/calendar';
 import { getHijriParts, HIJRI_MONTHS } from '../services/hijri';
 import { getHijriSettings } from '../services/settings';
 import { colors, radius, shadow, spacing } from '../theme';
+import NativeBackButton from './NativeBackButton';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
@@ -24,10 +26,10 @@ function audienceColor(value = '') {
   return '#16a34a';
 }
 
-function NavButton({ label, onPress }) {
+function NavButton({ direction = 'left', onPress, accessibilityLabel }) {
   return (
-    <Pressable onPress={onPress} style={styles.navButton}>
-      <Text style={styles.navButtonText}>{label}</Text>
+    <Pressable accessibilityLabel={accessibilityLabel || (direction === 'left' ? 'Previous' : 'Next')} onPress={onPress} style={({ pressed }) => [styles.navButton, pressed && styles.pressed]}>
+      <MaterialCommunityIcons color={colors.blue} name={direction === 'left' ? 'chevron-left' : 'chevron-right'} size={27} />
     </Pressable>
   );
 }
@@ -49,7 +51,7 @@ function CalendarSync({ user, onBack }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.screenHeader}>
-        <NavButton label="<" onPress={onBack} />
+        <NativeBackButton accessibilityLabel="Back to calendar" onPress={onBack} />
         <Text style={styles.screenTitle}>Sync Calendar</Text>
       </View>
 
@@ -184,7 +186,7 @@ export default function CalendarScreen({
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.screenHeader}>
-        <NavButton label="<" onPress={onBack} />
+        <NativeBackButton accessibilityLabel="Back to events" onPress={onBack} />
         <Text style={styles.screenTitle}>Calendar</Text>
       </View>
 
@@ -215,7 +217,7 @@ export default function CalendarScreen({
           <View style={styles.calendarCard}>
             <View style={styles.monthHeader}>
               <Text style={styles.monthTitle}>{MONTHS[cursor.getMonth()]} {cursor.getFullYear()}</Text>
-              <View style={styles.monthNav}><NavButton label="<" onPress={() => stepMonth(-1)} /><NavButton label=">" onPress={() => stepMonth(1)} /></View>
+              <View style={styles.monthNav}><NavButton direction="left" accessibilityLabel="Previous month" onPress={() => stepMonth(-1)} /><NavButton direction="right" accessibilityLabel="Next month" onPress={() => stepMonth(1)} /></View>
             </View>
             <View style={styles.grid}>
               {DAYS.map((day, index) => <Text key={`${day}-${index}`} style={styles.dayName}>{day}</Text>)}
@@ -244,9 +246,9 @@ export default function CalendarScreen({
       ) : (
         <>
           <View style={styles.weekHeader}>
-            <NavButton label="<" onPress={() => stepWeek(-1)} />
+            <NavButton direction="left" accessibilityLabel="Previous week" onPress={() => stepWeek(-1)} />
             <Text style={styles.weekTitle}>{weekDays[0].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} - {weekDays[6].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</Text>
-            <NavButton label=">" onPress={() => stepWeek(1)} />
+            <NavButton direction="right" accessibilityLabel="Next week" onPress={() => stepWeek(1)} />
           </View>
           {weekDays.map(date => {
             const key = ymd(date);
@@ -266,55 +268,55 @@ export default function CalendarScreen({
 
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: 120 },
-  screenHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
-  screenTitle: { color: colors.navy, fontSize: 24, fontWeight: '900' },
-  navButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center' },
-  navButtonText: { color: colors.surface, fontSize: 27, fontWeight: '900', lineHeight: 31 },
-  syncButton: { minHeight: 50, backgroundColor: colors.tealDark, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md, ...shadow },
-  syncButtonText: { color: colors.surface, fontSize: 15, fontWeight: '900' },
+  screenHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md, padding: spacing.sm, borderWidth: 1, borderColor: '#cbdcff', borderRadius: radius.lg, backgroundColor: '#f2f5ff' },
+  screenTitle: { color: colors.navy, fontSize: 20, fontWeight: '700', letterSpacing: -0.25 },
+  navButton: { width: 40, height: 40, borderRadius: 14, borderWidth: 1, borderColor: '#cbdcff', backgroundColor: colors.blueSoft, alignItems: 'center', justifyContent: 'center' },
+  syncButton: { minHeight: 52, backgroundColor: colors.blue, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md, ...shadow },
+  syncButtonText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
   disabledButton: { backgroundColor: '#eef4f3', shadowOpacity: 0 },
   disabledText: { color: colors.muted },
   guestText: { color: colors.muted, fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 18, marginTop: -5, marginBottom: spacing.md },
   toggleRow: { flexDirection: 'row', gap: 6, padding: 3, borderRadius: 11, backgroundColor: '#edf2f1', marginBottom: spacing.md },
   toggle: { flex: 1, minHeight: 39, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   toggleActive: { backgroundColor: colors.surface, ...shadow },
-  toggleText: { color: colors.muted, fontSize: 13, fontWeight: '800' },
+  toggleText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
   toggleTextActive: { color: colors.tealDark },
   hijriSwitch: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 14, marginBottom: spacing.md },
-  hijriSwitchText: { color: colors.text, fontSize: 13, fontWeight: '900' },
+  hijriSwitchText: { color: colors.text, fontSize: 13, fontWeight: '700' },
   calendarCard: { padding: 10, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   monthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
-  monthTitle: { color: colors.navy, fontSize: 15, fontWeight: '900' },
+  monthTitle: { color: colors.navy, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
   monthNav: { flexDirection: 'row', gap: 6 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  dayName: { width: '14.2857%', color: colors.muted, fontSize: 11, fontWeight: '900', textAlign: 'center', paddingVertical: 6 },
+  dayName: { width: '14.2857%', color: colors.muted, fontSize: 11, fontWeight: '700', textAlign: 'center', paddingVertical: 6 },
   dayCell: { width: '14.2857%', height: 54, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 1 },
   dayCellActive: { backgroundColor: colors.teal },
   todayCell: { backgroundColor: colors.tealSoft },
-  dayNumber: { color: colors.text, fontSize: 14, fontWeight: '900' },
+  dayNumber: { color: colors.text, fontSize: 14, fontWeight: '700' },
   dayNumberActive: { color: colors.surface },
-  hijriDate: { color: colors.tealDark, fontSize: 8, fontWeight: '800', maxWidth: '96%' },
+  hijriDate: { color: colors.tealDark, fontSize: 8, fontWeight: '600', maxWidth: '96%' },
   hijriDateActive: { color: colors.surface },
   dots: { flexDirection: 'row', gap: 2, height: 5, marginTop: 2 },
   dot: { width: 4, height: 4, borderRadius: 2 },
-  selectedTitle: { color: colors.muted, fontSize: 11, fontWeight: '900', marginTop: spacing.lg, marginBottom: spacing.sm },
+  selectedTitle: { color: colors.muted, fontSize: 11, fontWeight: '700', marginTop: spacing.lg, marginBottom: spacing.sm },
   noEvents: { color: colors.muted, fontSize: 13, paddingVertical: spacing.md },
   weekHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
-  weekTitle: { color: colors.navy, fontSize: 14, fontWeight: '900' },
-  weekDay: { color: colors.text, fontSize: 12, fontWeight: '900', marginTop: spacing.md, marginBottom: 6 },
+  weekTitle: { color: colors.navy, fontSize: 14, fontWeight: '700' },
+  weekDay: { color: colors.text, fontSize: 12, fontWeight: '700', marginTop: spacing.md, marginBottom: 6 },
   syncHero: { padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.tealDark, marginBottom: spacing.md },
-  syncHeroTitle: { color: colors.surface, fontSize: 23, fontWeight: '900' },
+  syncHeroTitle: { color: colors.surface, fontSize: 23, fontWeight: '700' },
   syncHeroText: { color: 'rgba(255,255,255,0.88)', fontSize: 14, lineHeight: 20, marginTop: 5 },
   card: { padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, marginBottom: spacing.md, ...shadow },
-  cardTitle: { color: colors.navy, fontSize: 19, fontWeight: '900', marginBottom: 5 },
+  cardTitle: { color: colors.navy, fontSize: 19, fontWeight: '700', marginBottom: 5 },
   cardText: { color: colors.muted, fontSize: 13, lineHeight: 19, marginBottom: spacing.md },
   primaryButton: { minHeight: 48, borderRadius: 13, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center' },
-  primaryText: { color: colors.surface, fontSize: 14, fontWeight: '900' },
+  primaryText: { color: colors.surface, fontSize: 14, fontWeight: '700' },
   secondaryButton: { minHeight: 43, borderRadius: 11, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginTop: 7 },
-  secondaryText: { color: colors.muted, fontSize: 13, fontWeight: '800' },
+  secondaryText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
   notice: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: spacing.md },
   feedUrl: { color: colors.tealDark, fontSize: 12, lineHeight: 18, padding: spacing.md, backgroundColor: colors.background, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md },
   instruction: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
-  instructionNumber: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.tealSoft, color: colors.tealDark, textAlign: 'center', lineHeight: 24, fontSize: 12, fontWeight: '900' },
+  instructionNumber: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.tealSoft, color: colors.tealDark, textAlign: 'center', lineHeight: 24, fontSize: 12, fontWeight: '700' },
   instructionText: { flex: 1, color: colors.text, fontSize: 13, lineHeight: 20 },
+  pressed: { opacity: 0.72 },
 });

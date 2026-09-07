@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@react-native-firebase/firestore';
+import { addDoc, collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@react-native-firebase/firestore';
 import { httpsCallable } from '@react-native-firebase/functions';
 import { auth, db, ensureFirebaseSession, functions } from '../firebase/firebase';
 import { getEventMetroArea } from '../utils/cities';
@@ -314,7 +314,8 @@ export async function deleteEventSubmission(eventId) {
   if (!eventId) return null;
   const user = auth.currentUser;
   if (!user || user.isAnonymous) throw new Error('Sign in to delete this event.');
-  await deleteDoc(doc(db, 'events', eventId));
+  const archiveEvents = httpsCallable(functions, 'archiveEventRecords');
+  await archiveEvents({ eventId });
   return eventId;
 }
 
@@ -441,22 +442,9 @@ export async function deleteEventSeries(sourceEvent) {
   const { seriesId, ref } = seriesQueryForEvent(sourceEvent);
   const snapshot = await getDocs(ref);
   if (snapshot.empty) throw new Error('No matching series events were found.');
-
-  for (let offset = 0; offset < snapshot.docs.length; offset += 450) {
-    const batch = writeBatch(db);
-    snapshot.docs.slice(offset, offset + 450).forEach(item => {
-      batch.delete(item.ref);
-    });
-    await batch.commit();
-  }
-
-  try {
-    await deleteDoc(doc(db, 'recurringEventSeries', seriesId));
-  } catch (metadataError) {
-    if (!String(metadataError?.code || '').includes('permission-denied')) throw metadataError;
-  }
-
-  return snapshot.docs.length;
+  const archiveEvents = httpsCallable(functions, 'archiveEventRecords');
+  const result = await archiveEvents({ seriesId });
+  return Number(result.data?.archived || snapshot.docs.length);
 }
 
 function buildRecalculatedEventData(event = {}, overrides = []) {

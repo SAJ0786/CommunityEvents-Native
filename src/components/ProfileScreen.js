@@ -3,7 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   Image,
-  Linking,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -14,11 +14,12 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, shadow, spacing } from '../theme';
+import { LEGAL_DOCUMENT_VERSION, LEGAL_URLS, SIZA_WEBSITE_URL, SUPPORT_EMAIL } from '../config/legal';
 import { cityLabel, DEFAULT_CITY, normalizeCity } from '../utils/cities';
 import CitySelector from './CitySelector';
-import { STORE_SHARE_LINES } from '../utils/storeLinks';
+import { APP_OPEN_LINK, STORE_SHARE_LINES } from '../utils/storeLinks';
 import * as Clipboard from 'expo-clipboard';
-import { getDiagnosticSessionId } from '../services/diagnostics';
+import { getDiagnosticIdentity, getDiagnosticSessionId } from '../services/diagnostics';
 import {
   ensureDeviceNotificationsEnabled,
   getDeviceNotificationPermission,
@@ -26,6 +27,7 @@ import {
   setPrayerRemindersEnabled,
 } from '../services/reminders';
 import { getPrayerLocation } from '../utils/prayerLocations';
+import { openExternalUrl } from '../utils/openExternalUrl';
 
 const sizaLogo = require('../../assets/siza-apps.jpg');
 
@@ -86,6 +88,15 @@ export default function ProfileScreen({
   const [businessNotifications, setBusinessNotifications] = useState(profile?.businessNotificationsEnabled !== false);
   const [prayerReminders, setPrayerReminders] = useState(profile?.prayerRemindersEnabled !== false);
   const [deviceNotificationsAllowed, setDeviceNotificationsAllowed] = useState(null);
+  const [diagnosticIdentity, setDiagnosticIdentity] = useState({ sessionId: getDiagnosticSessionId(), installationId: 'Initialising…' });
+
+  useEffect(() => {
+    let active = true;
+    getDiagnosticIdentity().then(identity => {
+      if (active) setDiagnosticIdentity(identity);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
   const isGuest = !user || user.isAnonymous;
 
   useEffect(() => {
@@ -167,7 +178,10 @@ export default function ProfileScreen({
       email,
       defaultCity,
       privacyAccepted: true,
+      privacyPolicyVersion: LEGAL_DOCUMENT_VERSION,
       termsAccepted: true,
+      termsVersion: LEGAL_DOCUMENT_VERSION,
+      legalAcceptedAtClient: new Date().toISOString(),
     });
     if (saved !== false) {
       setEditingProfile(false);
@@ -195,7 +209,11 @@ export default function ProfileScreen({
       '_Download Community Connect Australia to stay connected with your community_',
     ].join('\n');
     try {
-      await Share.share({ title: 'Share the App', message });
+      await Share.share({
+        title: 'Share the App',
+        message,
+        ...(Platform.OS === 'ios' ? { url: APP_OPEN_LINK } : {}),
+      });
     } catch {
       setProfileValidation('Could not open sharing on this device.');
     }
@@ -279,12 +297,12 @@ export default function ProfileScreen({
                   trackColor={{ false: colors.border, true: colors.teal }}
                 />
                 <View style={styles.consentCopy}>
-                  <Text style={styles.consentText}>I agree to the Privacy Policy and Terms of Use.</Text>
+                  <Text style={styles.consentText}>I agree to the Community Connect Australia Privacy Policy and Terms of Use.</Text>
                   <View style={styles.legalLinks}>
-                    <Pressable onPress={() => Linking.openURL('https://communityevents.siza.info/privacy.html')}>
+                    <Pressable onPress={() => openExternalUrl(LEGAL_URLS.privacy)}>
                       <Text style={styles.legalLink}>Privacy Policy</Text>
                     </Pressable>
-                    <Pressable onPress={() => Linking.openURL('https://communityevents.siza.info/terms.html')}>
+                    <Pressable onPress={() => openExternalUrl(LEGAL_URLS.terms)}>
                       <Text style={styles.legalLink}>Terms of Use</Text>
                     </Pressable>
                   </View>
@@ -461,7 +479,7 @@ export default function ProfileScreen({
 
             <View style={styles.deleteWrap}>
               <Text style={styles.deleteHeading}>Delete profile</Text>
-              <Text style={styles.deleteBody}>This permanently removes your account. Your events can either stay active until expiry or be made inactive now.</Text>
+              <Text style={styles.deleteBody}>This disables your login and archives your profile. Records are retained for safety, audit and possible Super Admin restoration. Your events can either stay active until expiry or be archived now.</Text>
 
               {deleteStep === null ? (
                 <Pressable onPress={() => setDeleteStep('askEvents')} style={({ pressed }) => [styles.dangerButton, pressed && styles.buttonPressed]}>
@@ -486,9 +504,9 @@ export default function ProfileScreen({
 
               {deleteStep === 'confirm' ? (
                 <View style={styles.deletePanel}>
-                  <Text style={styles.deleteTitle}>This cannot be undone</Text>
+                  <Text style={styles.deleteTitle}>Confirm account closure</Text>
                   <Text style={styles.deleteBody}>
-                    Your account will be permanently deleted. {archiveEventsNow
+                    Your login will be disabled and your profile retained in the secure archive. {archiveEventsNow
                       ? 'Active events will be moved to inactive archive now.'
                       : 'Your events will remain active until their normal expiry date.'}
                   </Text>
@@ -552,20 +570,31 @@ export default function ProfileScreen({
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Help &amp; Policies</Text>
             <View style={styles.diagnosticCard}>
-              <View style={styles.diagnosticCopy}><Text style={styles.diagnosticLabel}>DIAGNOSTIC SESSION ID</Text><Text selectable style={styles.diagnosticValue}>{getDiagnosticSessionId()}</Text></View>
-              <Pressable onPress={() => Clipboard.setStringAsync(getDiagnosticSessionId())} style={styles.copyButton}><Text style={styles.copyButtonText}>Copy</Text></Pressable>
+              <View style={styles.diagnosticCopy}>
+                <Text style={styles.diagnosticLabel}>INSTALLATION ID</Text>
+                <Text selectable style={styles.diagnosticValue}>{diagnosticIdentity.installationId}</Text>
+                <Text style={[styles.diagnosticLabel, styles.diagnosticSessionLabel]}>CURRENT SESSION ID</Text>
+                <Text selectable style={styles.diagnosticValue}>{diagnosticIdentity.sessionId}</Text>
+              </View>
+              <Pressable
+                onPress={() => Clipboard.setStringAsync(`Installation: ${diagnosticIdentity.installationId}\nSession: ${diagnosticIdentity.sessionId}`)}
+                style={styles.copyButton}
+              >
+                <Text style={styles.copyButtonText}>Copy IDs</Text>
+              </Pressable>
             </View>
             {[
-              ['Shia Majlis and Muharram programs across Australia', 'https://communityevents.siza.info/shia-events-australia.html'],
-              ['User Guide', 'https://communityevents.siza.info/docs/user-guide.html'],
-              ['Privacy Policy', 'https://communityevents.siza.info/privacy.html'],
-              ['Terms of Use', 'https://communityevents.siza.info/terms.html'],
-              ['Support & Contact', 'https://communityevents.siza.info/support.html'],
-              ['Account Deletion Policy', 'https://communityevents.siza.info/delete-account.html'],
+              ['SIZA Website', SIZA_WEBSITE_URL],
+              ['User Guide', LEGAL_URLS.userGuide],
+              ['Privacy Policy', LEGAL_URLS.privacy],
+              ['Terms of Use', LEGAL_URLS.terms],
+              [`Email Support — ${SUPPORT_EMAIL}`, `mailto:${SUPPORT_EMAIL}`],
+              ['Support & Contact', LEGAL_URLS.support],
+              ['Account Deletion Policy', LEGAL_URLS.accountDeletion],
             ].map(([label, url]) => (
               <Pressable
                 key={url}
-                onPress={() => Linking.openURL(url).catch(() => setProfileValidation('Could not open this link.'))}
+                onPress={() => openExternalUrl(url).catch(() => setProfileValidation('Could not open this link.'))}
                 style={({ pressed }) => [styles.policyLink, pressed && styles.buttonPressed]}
               >
                 <Text style={styles.policyText}>{label}</Text>
@@ -594,7 +623,7 @@ export default function ProfileScreen({
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, padding: spacing.lg, paddingBottom: 48, gap: spacing.md },
-  title: { color: colors.navy, fontSize: 28, fontWeight: '900' },
+  title: { color: colors.navy, fontSize: 28, fontWeight: '700' },
   subtitle: { color: colors.muted, fontSize: 14, fontWeight: '700', marginTop: -spacing.sm, marginBottom: spacing.xs },
   card: {
     width: '100%',
@@ -608,8 +637,8 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   statusPill: { alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.tealSoft },
-  statusText: { color: colors.tealDark, fontSize: 11, fontWeight: '900' },
-  cardTitle: { color: colors.navy, fontSize: 22, fontWeight: '900', marginTop: spacing.md },
+  statusText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
+  cardTitle: { color: colors.navy, fontSize: 22, fontWeight: '700', marginTop: spacing.md },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -618,20 +647,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   sectionHeaderCopy: { flex: 1 },
-  sectionTitle: { color: colors.navy, fontSize: 20, fontWeight: '900' },
+  sectionTitle: { color: colors.navy, fontSize: 20, fontWeight: '700' },
   sectionHint: { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 4 },
   body: { color: colors.text, fontSize: 15, lineHeight: 22, marginTop: spacing.sm },
   bodySmall: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: spacing.xs, marginBottom: spacing.md },
   loadingText: { color: colors.muted, fontSize: 14, fontWeight: '700', marginTop: spacing.md, textAlign: 'center' },
   inputGroup: { marginTop: spacing.md },
-  inputLabel: { color: colors.navy, fontSize: 12, fontWeight: '900', marginBottom: 6, textTransform: 'uppercase' },
+  inputLabel: { color: colors.navy, fontSize: 12, fontWeight: '700', marginBottom: 6, textTransform: 'uppercase' },
   moduleChoice: { flexDirection: 'row', padding: 3, marginBottom: spacing.md, borderRadius: radius.md, backgroundColor: '#edf2f1' },
   moduleChoiceButton: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 7, borderRadius: 11 },
   moduleChoiceButtonActive: { backgroundColor: colors.surface, ...shadow },
-  moduleChoiceText: { color: colors.muted, fontSize: 11, fontWeight: '800', textAlign: 'center' },
-  moduleChoiceTextActive: { color: colors.tealDark, fontWeight: '900' },
+  moduleChoiceText: { color: colors.muted, fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  moduleChoiceTextActive: { color: colors.tealDark, fontWeight: '700' },
   preferenceRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
-  preferenceLabel: { flex: 1, color: colors.text, fontSize: 13, fontWeight: '800' },
+  preferenceLabel: { flex: 1, color: colors.text, fontSize: 13, fontWeight: '600' },
   notificationWarning: {
     marginTop: spacing.md,
     padding: spacing.md,
@@ -640,7 +669,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: '#fff4f2',
   },
-  notificationWarningText: { color: colors.danger, fontSize: 12, lineHeight: 18, fontWeight: '800' },
+  notificationWarningText: { color: colors.danger, fontSize: 12, lineHeight: 18, fontWeight: '600' },
   notificationSettingsButton: {
     minHeight: 42,
     alignItems: 'center',
@@ -649,7 +678,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: colors.danger,
   },
-  notificationSettingsButtonText: { color: colors.surface, fontSize: 13, fontWeight: '900' },
+  notificationSettingsButtonText: { color: colors.surface, fontSize: 13, fontWeight: '700' },
   input: {
     minHeight: 48,
     borderWidth: 1,
@@ -661,12 +690,12 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 15,
   },
-  otpInput: { fontSize: 22, fontWeight: '900', letterSpacing: 8, textAlign: 'center' },
+  otpInput: { fontSize: 22, fontWeight: '700', letterSpacing: 8, textAlign: 'center' },
   consentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   consentCopy: { flex: 1 },
   consentText: { color: colors.text, fontSize: 13, lineHeight: 19, fontWeight: '700' },
   legalLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.xs },
-  legalLink: { color: colors.tealDark, fontSize: 12, fontWeight: '900', textDecorationLine: 'underline' },
+  legalLink: { color: colors.tealDark, fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
   buttonRow: { gap: spacing.sm, marginTop: spacing.lg },
   primaryButton: {
     minHeight: 48,
@@ -676,7 +705,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.teal,
     paddingHorizontal: spacing.lg,
   },
-  primaryButtonText: { color: colors.surface, fontSize: 15, fontWeight: '900' },
+  primaryButtonText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
   secondaryButton: {
     minHeight: 48,
     borderRadius: radius.md,
@@ -685,7 +714,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tealSoft,
     paddingHorizontal: spacing.lg,
   },
-  secondaryButtonText: { color: colors.tealDark, fontSize: 15, fontWeight: '900' },
+  secondaryButtonText: { color: colors.tealDark, fontSize: 15, fontWeight: '700' },
   dangerButton: {
     minHeight: 48,
     alignItems: 'center',
@@ -695,9 +724,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.danger,
   },
-  dangerButtonText: { color: colors.surface, fontSize: 15, fontWeight: '900' },
+  dangerButtonText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
   linkButton: { minHeight: 40, alignItems: 'center', justifyContent: 'center' },
-  linkText: { color: colors.tealDark, fontSize: 13, fontWeight: '800' },
+  linkText: { color: colors.tealDark, fontSize: 13, fontWeight: '600' },
   inlineAction: {
     minHeight: 42,
     minWidth: 72,
@@ -710,30 +739,31 @@ const styles = StyleSheet.create({
   inlineActionPrimary: {
     backgroundColor: colors.teal,
   },
-  inlineActionText: { color: colors.tealDark, fontSize: 14, fontWeight: '900' },
+  inlineActionText: { color: colors.tealDark, fontSize: 14, fontWeight: '700' },
   inlineActionTextPrimary: { color: colors.surface },
   editActions: { marginTop: spacing.md },
   buttonPressed: { opacity: 0.8 },
   buttonDisabled: { opacity: 0.5 },
   row: { paddingVertical: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
-  rowLabel: { color: colors.muted, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
+  rowLabel: { color: colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   rowValue: { color: colors.text, fontSize: 16, fontWeight: '700', marginTop: spacing.xs },
   rowValueSubtle: { color: colors.muted },
   policyLink: { minHeight: 44, justifyContent: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
-  policyText: { color: colors.tealDark, fontSize: 14, fontWeight: '800', textDecorationLine: 'underline' },
+  policyText: { color: colors.tealDark, fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
   diagnosticCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md, marginBottom: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   diagnosticCopy: { flex: 1 },
-  diagnosticLabel: { color: colors.muted, fontSize: 9, fontWeight: '900' },
-  diagnosticValue: { marginTop: 3, color: colors.tealDark, fontSize: 12, fontWeight: '900' },
+  diagnosticLabel: { color: colors.muted, fontSize: 9, fontWeight: '700' },
+  diagnosticValue: { marginTop: 3, color: colors.tealDark, fontSize: 12, fontWeight: '700' },
+  diagnosticSessionLabel: { marginTop: spacing.sm },
   copyButton: { minHeight: 38, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: 10, backgroundColor: colors.surface },
-  copyButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '900' },
+  copyButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
   deleteWrap: {
     marginTop: spacing.lg,
     paddingTop: spacing.lg,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  deleteHeading: { color: colors.navy, fontSize: 17, fontWeight: '900' },
+  deleteHeading: { color: colors.navy, fontSize: 17, fontWeight: '700' },
   deletePanel: {
     marginTop: spacing.md,
     padding: spacing.md,
@@ -742,15 +772,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#fecaca',
   },
-  deleteTitle: { color: colors.navy, fontSize: 15, fontWeight: '900' },
+  deleteTitle: { color: colors.navy, fontSize: 15, fontWeight: '700' },
   deleteBody: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: spacing.xs },
-  aboutBrand: { color: colors.tealDark, fontSize: 13, fontWeight: '900', marginTop: spacing.sm },
+  aboutBrand: { color: colors.tealDark, fontSize: 13, fontWeight: '700', marginTop: spacing.sm },
   sizaLogo: { width: '100%', height: 110, marginTop: spacing.md, borderRadius: radius.md },
-  aboutTagline: { color: colors.muted, fontSize: 12, fontWeight: '900', marginTop: 4 },
-  aboutTitle: { color: colors.navy, fontSize: 22, fontWeight: '900', marginTop: spacing.md },
+  aboutTagline: { color: colors.muted, fontSize: 12, fontWeight: '700', marginTop: 4 },
+  aboutTitle: { color: colors.navy, fontSize: 22, fontWeight: '700', marginTop: spacing.md },
   aboutBody: { color: colors.text, fontSize: 14, lineHeight: 21, marginTop: spacing.sm },
-  buildText: { color: colors.muted, fontSize: 12, fontWeight: '800', marginTop: spacing.md },
-  inlineError: { color: colors.danger, fontSize: 13, fontWeight: '800', marginTop: spacing.md },
-  error: { width: '100%', maxWidth: 620, alignSelf: 'center', color: colors.danger, fontSize: 13, fontWeight: '800' },
-  success: { width: '100%', maxWidth: 620, alignSelf: 'center', color: colors.tealDark, fontSize: 13, fontWeight: '800' },
+  buildText: { color: colors.muted, fontSize: 12, fontWeight: '600', marginTop: spacing.md },
+  inlineError: { color: colors.danger, fontSize: 13, fontWeight: '600', marginTop: spacing.md },
+  error: { width: '100%', maxWidth: 620, alignSelf: 'center', color: colors.danger, fontSize: 13, fontWeight: '600' },
+  success: { width: '100%', maxWidth: 620, alignSelf: 'center', color: colors.tealDark, fontSize: 13, fontWeight: '600' },
 });

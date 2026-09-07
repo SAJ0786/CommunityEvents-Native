@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "source": "functions-lifecycle",
+    "codebase": "default",
+    "runtime": "nodejs22"
+  }
+}

@@ -58,7 +58,11 @@ import {
   updateEventSubmission,
 } from '../services/events';
 import {
+  archiveOrBanUser,
   listUsers,
+  listActiveBans,
+  restoreArchivedUser,
+  unbanUser,
   updateUserContactProfile,
   updateUserRole,
 } from '../services/users';
@@ -77,6 +81,8 @@ import CompactSelect from './CompactSelect';
 import { CITY_OPTIONS, DEFAULT_CITY, cityCode, cityLabel, getEventMetroArea, normalizeCity } from '../utils/cities';
 import { listenAdminFeedbackThreads } from '../services/messaging';
 import { addDynamicEventOption } from '../services/eventOptionsAdmin';
+import NativeBackButton from './NativeBackButton';
+import DiagnosticRegisterPanel from './DiagnosticRegisterPanel';
 
 const HIJRI_OBSERVANCE_CATEGORIES = ['Wiladat', 'Shahadat', 'Wafat', 'Eid', 'Ayyam-e-Aza', 'Amaal', 'Season', 'Event'];
 const BULK_IMPORT_TEMPLATE_URL = 'https://communityevents.siza.info/Community_Events_Import_Template.xlsx';
@@ -145,7 +151,7 @@ const LIVE_ACTIONS = [
     key: 'messaging', title: 'Community Messaging', description: 'Community Update and Email Reminders.', local: true,
   },
   {
-    key: 'troubleshooting', title: 'Troubleshooting Management', description: 'Diagnostics, crash monitoring and support tools.', local: true,
+    key: 'troubleshooting', title: 'Diagnostics Register', description: 'Search device installations, app sessions, crashes and safe event timelines.', local: true,
   },
   {
     key: 'import', title: 'Event Import & Export', description: 'Import PWA event spreadsheets and export upcoming-event reports.', local: true,
@@ -344,12 +350,95 @@ function isActiveUserProfile(userRecord = {}) {
   return userRecord.isActive !== false && !isOldMigratedProfile(userRecord);
 }
 
-function StatCard({ label, value, tone = 'neutral' }) {
+function isCalendarSyncedProfile(userRecord = {}) {
+  return userRecord.calendarSynced === true || userRecord.calendarSyncEnabled === true;
+}
+
+function isNotMigratedProfile(userRecord = {}) {
+  const status = String(userRecord.migrationStatus || userRecord.accountMigrationStatus || '').trim().toLowerCase();
+  if (['not migrated', 'not_migrated', 'not-migrated', 'pending', 'required'].includes(status)) return true;
+  if (
+    userRecord.notMigrated === true
+    || userRecord.needsMigration === true
+    || userRecord.migrationRequired === true
+    || userRecord.isMigrated === false
+    || userRecord.migrated === false
+  ) return true;
+  const legacySource = String(userRecord.accountSource || userRecord.source || '').trim().toLowerCase() === 'legacy'
+    || !!userRecord.legacyUid
+    || !!userRecord.legacyUserId;
+  return legacySource && !userRecord.migratedToUid;
+}
+
+function needsEmailReview(userRecord = {}) {
+  const status = String(
+    userRecord.emailStatus
+    || userRecord.emailVerificationStatus
+    || userRecord.emailDeliveryStatus
+    || ''
+  ).trim().toLowerCase();
+  if (['review', 'needs_review', 'needs-review', 'invalid'].includes(status)) return true;
+  if (
+    userRecord.emailReview === true
+    || userRecord.emailReviewRequired === true
+    || userRecord.needsEmailReview === true
+  ) return true;
+  const email = String(userRecord.email || '').trim();
+  return !!email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function hasBouncedEmail(userRecord = {}) {
+  const status = String(userRecord.emailStatus || userRecord.emailDeliveryStatus || '').trim().toLowerCase();
+  return status === 'bounced'
+    || userRecord.emailBounced === true
+    || userRecord.bouncedEmail === true
+    || Number(userRecord.emailBounceCount || userRecord.bounceCount || 0) > 0;
+}
+
+function hasComplaint(userRecord = {}) {
+  const status = String(userRecord.emailStatus || userRecord.emailDeliveryStatus || '').trim().toLowerCase();
+  return status === 'complaint'
+    || status === 'complained'
+    || userRecord.hasComplaint === true
+    || userRecord.emailComplaint === true
+    || Number(userRecord.complaintCount || userRecord.complaintsCount || userRecord.emailComplaintCount || 0) > 0;
+}
+
+function normalizedUserEmail(userRecord = {}) {
+  return String(userRecord.emailLower || userRecord.email || '').trim().toLowerCase();
+}
+
+function userMatchesSummaryFilter(userRecord, filter, duplicateEmails) {
+  if (filter === 'active') return isActiveUserProfile(userRecord);
+  if (filter === 'inactive') return isInactiveUserProfile(userRecord);
+  if (filter === 'superAdmins') return userRecord.role === 'superAdmin';
+  if (filter === 'admins') return userRecord.role === 'admin';
+  if (filter === 'notMigrated') return isNotMigratedProfile(userRecord);
+  if (filter === 'duplicateEmail') return duplicateEmails.has(normalizedUserEmail(userRecord));
+  if (filter === 'oldMigrated') return isOldMigratedProfile(userRecord);
+  if (filter === 'emailReview') return needsEmailReview(userRecord);
+  if (filter === 'bounced') return hasBouncedEmail(userRecord);
+  if (filter === 'complaints') return hasComplaint(userRecord);
+  if (filter === 'calendarSyncs') return isCalendarSyncedProfile(userRecord);
+  return true;
+}
+
+function StatCard({ label, value, active = false, onPress }) {
   return (
-    <View style={[styles.statCard, tone === 'teal' && styles.statCardTeal]}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value}. Filter user list.`}
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.statCard,
+        active && styles.statCardActive,
+        pressed && styles.statCardPressed,
+      ]}
+    >
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -398,6 +487,7 @@ export default function AdminDashboardScreen({
   const [adminEventType, setAdminEventType] = useState('all');
   const [adminSeriesFilter, setAdminSeriesFilter] = useState('all');
   const [adminStatusFilter, setAdminStatusFilter] = useState('all');
+  const [adminEventFiltersOpen, setAdminEventFiltersOpen] = useState(false);
   const [adminOwnerFilterUid, setAdminOwnerFilterUid] = useState('');
   const [adminOwnerFilterName, setAdminOwnerFilterName] = useState('');
   const [adminVisibilityBusyId, setAdminVisibilityBusyId] = useState('');
@@ -423,12 +513,14 @@ export default function AdminDashboardScreen({
   const [userCityFilter, setUserCityFilter] = useState('all');
   const [userRoleFilter, setUserRoleFilter] = useState('all');
   const [userCalendarSyncedOnly, setUserCalendarSyncedOnly] = useState(false);
+  const [userSummaryFilter, setUserSummaryFilter] = useState('all');
   const [editingUserId, setEditingUserId] = useState('');
   const [editUserName, setEditUserName] = useState('');
   const [editUserEmail, setEditUserEmail] = useState('');
   const [editUserCity, setEditUserCity] = useState(DEFAULT_CITY);
   const [savingUserEdit, setSavingUserEdit] = useState(false);
   const [savingUserRoleId, setSavingUserRoleId] = useState('');
+  const [userLifecycleBusyId, setUserLifecycleBusyId] = useState('');
   const [orgsLoading, setOrgsLoading] = useState(false);
   const [orgsError, setOrgsError] = useState('');
   const [orgsList, setOrgsList] = useState([]);
@@ -533,6 +625,28 @@ export default function AdminDashboardScreen({
     () => usersList.filter(userRecord => canAdminAccessUser(profile, userRecord)),
     [profile, usersList]
   );
+  const duplicateUserEmails = useMemo(() => {
+    const counts = new Map();
+    scopedUsers.forEach(userRecord => {
+      const email = normalizedUserEmail(userRecord);
+      if (email) counts.set(email, (counts.get(email) || 0) + 1);
+    });
+    return new Set([...counts.entries()].filter(([, count]) => count > 1).map(([email]) => email));
+  }, [scopedUsers]);
+  const userStatistics = useMemo(() => ({
+    all: scopedUsers.length,
+    active: scopedUsers.filter(isActiveUserProfile).length,
+    inactive: scopedUsers.filter(isInactiveUserProfile).length,
+    superAdmins: scopedUsers.filter(item => item.role === 'superAdmin').length,
+    admins: scopedUsers.filter(item => item.role === 'admin').length,
+    notMigrated: scopedUsers.filter(isNotMigratedProfile).length,
+    duplicateEmail: scopedUsers.filter(item => duplicateUserEmails.has(normalizedUserEmail(item))).length,
+    oldMigrated: scopedUsers.filter(isOldMigratedProfile).length,
+    emailReview: scopedUsers.filter(needsEmailReview).length,
+    bounced: scopedUsers.filter(hasBouncedEmail).length,
+    complaints: scopedUsers.filter(hasComplaint).length,
+    calendarSyncs: scopedUsers.filter(isCalendarSyncedProfile).length,
+  }), [duplicateUserEmails, scopedUsers]);
   const usersById = useMemo(
     () => new Map(usersList.map(userRecord => [userRecord.id, userRecord])),
     [usersList]
@@ -548,13 +662,14 @@ export default function AdminDashboardScreen({
   const filteredUsers = useMemo(() => {
     return scopedUsers
       .filter(userRecord => userMatchesSearch(userRecord, userQuery))
+      .filter(userRecord => userMatchesSummaryFilter(userRecord, userSummaryFilter, duplicateUserEmails))
       .filter(userRecord => userRoleFilter === 'all' || userRecord.role === userRoleFilter)
-      .filter(userRecord => !userCalendarSyncedOnly || userRecord.calendarSynced === true || userRecord.calendarSyncEnabled === true)
+      .filter(userRecord => !userCalendarSyncedOnly || isCalendarSyncedProfile(userRecord))
       .filter(userRecord => {
         const city = normalizeCity(userRecord.defaultCity || DEFAULT_CITY);
         return userCityFilter === 'all' || city === userCityFilter;
       });
-  }, [scopedUsers, userCalendarSyncedOnly, userCityFilter, userQuery, userRoleFilter]);
+  }, [duplicateUserEmails, scopedUsers, userCalendarSyncedOnly, userCityFilter, userQuery, userRoleFilter, userSummaryFilter]);
   const sortedFilteredUsers = useMemo(
     () => filteredUsers.slice().sort((a, b) => {
       const left = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || Date.parse(a.createdAt || a.joinedAt || '') || 0;
@@ -1016,6 +1131,56 @@ export default function AdminDashboardScreen({
       setUsersError(error.message || 'Could not update user role.');
     } finally {
       setSavingUserRoleId('');
+    }
+  };
+
+  const applyUserLifecycle = (target, ban) => {
+    Alert.alert(
+      ban ? 'Ban user?' : 'Archive user account?',
+      ban
+        ? 'The account will be disabled and its records permanently retained. A Super Admin can review and unban it later.'
+        : 'The account will be disabled and archived. No user or event history will be erased.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: ban ? 'Ban User' : 'Archive Account',
+          style: 'destructive',
+          onPress: async () => {
+            setUserLifecycleBusyId(target.id);
+            setUsersError('');
+            try {
+              await archiveOrBanUser(target.id, { ban });
+              await loadUsers();
+              setStatus({ message: ban ? 'User banned and archived.' : 'User account archived.', error: false });
+            } catch (error) {
+              setUsersError(error.message || 'Could not update this user account.');
+            } finally {
+              setUserLifecycleBusyId('');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const restoreUserAccess = async target => {
+    setUserLifecycleBusyId(target.id);
+    setUsersError('');
+    try {
+      if (target.accountStatus === 'banned') {
+        const bans = await listActiveBans();
+        const banRecord = bans.find(item => item.uid === target.id);
+        if (!banRecord) throw new Error('The active ban record could not be found.');
+        await unbanUser(banRecord);
+      } else {
+        await restoreArchivedUser(target.id);
+      }
+      await loadUsers();
+      setStatus({ message: target.accountStatus === 'banned' ? 'User unbanned and access restored.' : 'Archived user access restored.', error: false });
+    } catch (error) {
+      setUsersError(error.message || 'Could not restore this user.');
+    } finally {
+      setUserLifecycleBusyId('');
     }
   };
 
@@ -1660,34 +1825,13 @@ export default function AdminDashboardScreen({
       {panel === 'overview' ? (
         <>
           <View style={styles.dashboardProfileCard}>
-            <View style={styles.dashboardGlowLarge} />
-            <View style={styles.dashboardGlowSmall} />
-            <View style={styles.dashboardProfileTop}>
-              <View style={styles.dashboardAvatar}>
-                <Text style={styles.dashboardAvatarText}>{getInitials(adminDisplayName)}</Text>
-              </View>
-              <View style={styles.dashboardIdentity}>
-                <Text style={styles.dashboardEyebrow}>WELCOME BACK</Text>
-                <Text style={styles.dashboardName} numberOfLines={1}>{adminDisplayName}</Text>
-                <View style={styles.dashboardRolePill}>
-                  <Text style={styles.dashboardRoleIcon}>◆</Text>
-                  <Text style={styles.dashboardRoleText}>{roleLabel}</Text>
-                </View>
-              </View>
+            <View style={styles.dashboardAvatar}>
+              <Text style={styles.dashboardAvatarText}>{getInitials(adminDisplayName)}</Text>
             </View>
-            <View style={styles.dashboardScopePill}>
-              <Text style={styles.dashboardScopeIcon}>⌖</Text>
-              <View style={styles.dashboardScopeTextWrap}>
-                <Text style={styles.dashboardScopeLabel}>ADMIN SCOPE</Text>
-                <Text style={styles.dashboardScopeValue}>{adminScopeLabel}</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.dashboardIntroRow}>
-            <View>
-              <Text style={styles.dashboardTitle}>Admin Dashboard</Text>
-              <Text style={styles.dashboardSubtitle}>Community overview and management</Text>
+            <View style={styles.dashboardIdentity}>
+              <Text style={styles.dashboardPanelTitle}>Admin Dashboard</Text>
+              <Text style={styles.dashboardName} numberOfLines={1}>{adminDisplayName}</Text>
+              <Text style={styles.dashboardIdentityMeta}>{roleLabel} · {adminScopeLabel}</Text>
             </View>
             <View style={styles.dashboardLivePill}>
               <View style={styles.dashboardLiveDot} />
@@ -1795,9 +1939,7 @@ export default function AdminDashboardScreen({
               <Text style={styles.sectionMeta}>User management and contact updates</Text>
             </View>
             <View style={styles.rowWrap}>
-              <Pressable onPress={() => setPanel('overview')} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>{'\u00AB'} Back</Text>
-              </Pressable>
+              <NativeBackButton onPress={() => setPanel('overview')} />
               <Pressable onPress={loadUsers} style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>Refresh</Text>
               </Pressable>
@@ -1807,33 +1949,41 @@ export default function AdminDashboardScreen({
             </View>
           </View>
 
-          {false ? <><View style={styles.eventMetricGrid}>
-            {[
-              ['Active', adminEvents.length, () => { setAdminEventView('active'); setAdminStatusFilter('all'); setAdminSeriesFilter('all'); }],
-              ['Archived', archivedAdminEvents.length, () => { setAdminEventView('archived'); setAdminStatusFilter('all'); }],
-              ['Visible', adminEvents.filter(item => !item.hidden).length, () => { setAdminEventView('active'); setAdminStatusFilter('visible'); }],
-              ['Hidden', adminEvents.filter(item => item.hidden).length, () => { setAdminEventView('active'); setAdminStatusFilter('hidden'); }],
-              ['Live', adminEvents.filter(item => item.isLive).length, () => { setAdminEventView('active'); setAdminStatusFilter('live'); }],
-              ['Recurring', adminEvents.filter(item => item.isRecurring || item.recurringSeriesId).length, () => { setAdminEventView('active'); setAdminSeriesFilter('recurring'); }],
-              ['Single', adminEvents.filter(item => !item.isRecurring && !item.recurringSeriesId && !item.seriesId).length, () => { setAdminEventView('active'); setAdminSeriesFilter('single'); }],
-              ['Old Series', adminEvents.filter(item => item.seriesId && !item.recurringSeriesId).length, () => { setAdminEventView('active'); setAdminSeriesFilter('legacySeries'); }],
-            ].map(([label, value, action]) => <Pressable key={label} onPress={action} style={styles.eventMetric}><Text style={styles.eventMetricValue}>{value}</Text><Text style={styles.eventMetricLabel}>{label}</Text></Pressable>)}
-          </View>
-
-          {transferEvent ? <View style={styles.actionCard}>
-            <Text style={styles.cardTitle}>Transfer Event</Text>
-            <Text style={styles.cardDescription}>Search for the new owner. Confirm Transfer stays disabled until a user is selected.</Text>
-            <TextInput value={transferQuery} onChangeText={value => { setTransferQuery(value); setTransferUser(null); }} placeholder="Search user name, email or phone" placeholderTextColor={colors.muted} style={styles.input} />
-            <View style={styles.stack}>{transferCandidates.map(item => { const selected = transferUser?.id === item.id; return <Pressable key={item.id} onPress={() => setTransferUser(item)} style={[styles.listRow, selected && styles.chipActive]}><View style={styles.listTextWrap}><Text style={[styles.listTitle, selected && styles.chipTextActive]}>{item.fullName || item.email || 'Unnamed user'}</Text><Text style={[styles.listMeta, selected && styles.chipTextActive]}>{item.email || item.phone || item.phoneNumber || cityLabel(normalizeCity(item.defaultCity || DEFAULT_CITY))}</Text></View>{selected ? <Text style={styles.chipTextActive}>✓</Text> : null}</Pressable>; })}</View>
-            <View style={styles.rowWrap}><Pressable disabled={!transferUser || transferBusy} onPress={confirmTransfer} style={[styles.primaryButton, styles.rowButton, (!transferUser || transferBusy) && styles.disabledButton]}><Text style={styles.primaryButtonText}>{transferBusy ? 'Transferring…' : 'Confirm Transfer'}</Text></Pressable><Pressable onPress={() => { setTransferEvent(null); setTransferUser(null); }} style={[styles.secondaryButton, styles.rowButton]}><Text style={styles.secondaryButtonText}>Cancel</Text></Pressable></View>
-          </View> : null}</> : null}
-
-          <View style={styles.actionCard}>
+          <View style={styles.statisticsCard}>
+            <View style={styles.statisticsHead}>
+              <View>
+                <Text style={styles.statisticsTitle}>User statistics</Text>
+                <Text style={styles.statisticsMeta}>Tap any item to filter User Management</Text>
+              </View>
+              <Text style={styles.statisticsShowing}>Showing {sortedFilteredUsers.length}</Text>
+            </View>
             <View style={styles.statsRow}>
-              <StatCard label="Total Users" value={scopedUsers.length} tone="teal" />
-              <StatCard label="Showing" value={sortedFilteredUsers.length} />
-              <StatCard label="Admins" value={scopedUsers.filter(item => item.role === 'admin').length} />
-              <StatCard label="Super Admins" value={scopedUsers.filter(item => item.role === 'superAdmin').length} />
+              {[
+                ['all', 'Total Users'],
+                ['active', 'Active Users'],
+                ['inactive', 'Inactive Users'],
+                ['superAdmins', 'Super Admins'],
+                ['admins', 'Admins'],
+                ['notMigrated', 'Not Migrated'],
+                ['duplicateEmail', 'Duplicate Email'],
+                ['oldMigrated', 'Old Migrated'],
+                ['emailReview', 'Email Review'],
+                ['bounced', 'Bounced Emails'],
+                ['complaints', 'Complaints'],
+                ['calendarSyncs', 'Calendar Syncs'],
+              ].map(([key, label]) => (
+                <StatCard
+                  key={key}
+                  label={label}
+                  value={userStatistics[key]}
+                  active={userSummaryFilter === key}
+                  onPress={() => {
+                    setUserSummaryFilter(key);
+                    setUserRoleFilter('all');
+                    setUserCalendarSyncedOnly(false);
+                  }}
+                />
+              ))}
             </View>
           </View>
 
@@ -1846,14 +1996,23 @@ export default function AdminDashboardScreen({
               style={styles.input}
             />
 
-            <Text style={styles.inputLabel}>Role filter</Text>
+            <Text style={styles.inputLabel}>Quick Filter</Text>
             <View style={styles.rowWrap}>
-              {[{ value: 'all', label: 'All' }, ...ROLE_OPTIONS].map(option => {
-                const active = userRoleFilter === option.value;
+              {[{ value: 'all', label: 'All' }, ...ROLE_OPTIONS, { value: 'calendarSync', label: `Calendar Sync (${userStatistics.calendarSyncs})` }].map(option => {
+                const active = option.value === 'calendarSync' ? userCalendarSyncedOnly : userRoleFilter === option.value && !userCalendarSyncedOnly;
                 return (
                   <Pressable
                     key={option.value}
-                    onPress={() => setUserRoleFilter(option.value)}
+                    onPress={() => {
+                      if (option.value === 'calendarSync') {
+                        setUserRoleFilter('all');
+                        setUserCalendarSyncedOnly(true);
+                      } else {
+                        setUserRoleFilter(option.value);
+                        setUserCalendarSyncedOnly(false);
+                      }
+                      setUserSummaryFilter('all');
+                    }}
                     style={[styles.chip, active && styles.chipActive]}
                   >
                     <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
@@ -1869,30 +2028,6 @@ export default function AdminDashboardScreen({
               options={(profile?.role === 'superAdmin' ? [{ value: 'all', label: 'All locations' }, ...CITY_OPTIONS] : CITY_OPTIONS.filter(city => city.value === getAdminCity(profile))).map(city => ({ value: city.value, label: city.value === 'all' ? city.label : `${cityCode(city.value)} - ${city.label.replace(', Australia', '')}` }))}
             />
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: userCalendarSyncedOnly }}
-              accessibilityLabel="Filter users who synced the calendar"
-              onPress={() => setUserCalendarSyncedOnly(current => !current)}
-              style={({ pressed }) => [
-                styles.calendarSyncFilter,
-                userCalendarSyncedOnly && styles.calendarSyncFilterActive,
-                pressed && styles.pressed,
-              ]}
-            >
-              <View style={[styles.calendarSyncFilterIcon, userCalendarSyncedOnly && styles.calendarSyncFilterIconActive]}>
-                <Text style={styles.calendarSyncFilterIconText}>{'\uD83D\uDCC5'}</Text>
-              </View>
-              <View style={styles.listTextWrap}>
-                <Text style={[styles.calendarSyncFilterTitle, userCalendarSyncedOnly && styles.calendarSyncFilterTitleActive]}>
-                  {userCalendarSyncedOnly ? 'Showing Synced Users' : `Calendar Sync (${scopedUsers.filter(item => item.calendarSynced === true || item.calendarSyncEnabled === true).length})`}
-                </Text>
-                <Text style={[styles.calendarSyncFilterMeta, userCalendarSyncedOnly && styles.calendarSyncFilterMetaActive]}>
-                  {userCalendarSyncedOnly ? 'Tap to show all users' : 'Tap to filter synced users'}
-                </Text>
-              </View>
-              <Text style={[styles.calendarSyncFilterArrow, userCalendarSyncedOnly && styles.calendarSyncFilterTitleActive]}>{'\u203A'}</Text>
-            </Pressable>
           </View>
 
           {usersError ? (
@@ -1936,7 +2071,7 @@ export default function AdminDashboardScreen({
                         </View>
                         {isInactiveUserProfile(userRecord) ? (
                           <View style={styles.statusPill}>
-                            <Text style={styles.statusPillText}>Inactive</Text>
+                            <Text style={styles.statusPillText}>{userRecord.accountStatus === 'banned' ? 'Banned' : 'Archived'}</Text>
                           </View>
                         ) : null}
                         {isOldMigratedProfile(userRecord) ? (
@@ -1973,6 +2108,19 @@ export default function AdminDashboardScreen({
                               </Text>
                             </Pressable>
                           ))
+                        ) : null}
+                        {profile?.role === 'superAdmin' && !isCurrentUser && !isInactiveUserProfile(userRecord) ? <>
+                          <Pressable disabled={userLifecycleBusyId === userRecord.id} onPress={() => applyUserLifecycle(userRecord, false)} style={styles.secondaryButton}>
+                            <Text style={styles.secondaryButtonText}>Archive Account</Text>
+                          </Pressable>
+                          <Pressable disabled={userLifecycleBusyId === userRecord.id} onPress={() => applyUserLifecycle(userRecord, true)} style={styles.dangerButton}>
+                            <Text style={styles.dangerButtonText}>Ban User</Text>
+                          </Pressable>
+                        </> : null}
+                        {profile?.role === 'superAdmin' && !isCurrentUser && isInactiveUserProfile(userRecord) ? (
+                          <Pressable disabled={userLifecycleBusyId === userRecord.id} onPress={() => restoreUserAccess(userRecord)} style={styles.primaryButton}>
+                            <Text style={styles.primaryButtonText}>{userRecord.accountStatus === 'banned' ? 'Unban & Restore' : 'Restore Account'}</Text>
+                          </Pressable>
                         ) : null}
                       </View>
                     ) : (
@@ -2051,7 +2199,7 @@ export default function AdminDashboardScreen({
         </View>
       ) : panel === 'businesses' ? (
         <View style={styles.section}>
-          <BusinessApprovalPanel onBack={() => setPanel('overview')} />
+          <BusinessApprovalPanel profile={profile} onBack={() => setPanel('overview')} />
         </View>
       ) : panel === 'import' ? (
         <View style={styles.section}>
@@ -2060,9 +2208,7 @@ export default function AdminDashboardScreen({
               <Text style={styles.sectionTitle}>Import & Export</Text>
               <Text style={styles.sectionMeta}>Bulk event spreadsheets and upcoming-event reports</Text>
             </View>
-            <Pressable onPress={() => setPanel('overview')} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>{'\u00AB'} Back</Text>
-            </Pressable>
+            <NativeBackButton onPress={() => setPanel('overview')} />
           </View>
 
           <View style={styles.actionCard}>
@@ -2204,26 +2350,81 @@ export default function AdminDashboardScreen({
               <Text style={styles.sectionMeta}>Admin event management</Text>
             </View>
             <View style={styles.rowWrap}>
-              <Pressable onPress={() => setPanel('overview')} style={styles.secondaryButton}>
-                  <Text style={styles.secondaryButtonText}>{'\u00AB'} Back</Text>
-              </Pressable>
+              <NativeBackButton onPress={() => setPanel('overview')} />
               <Pressable onPress={() => loadAdminEvents(adminEventView)} style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>Refresh</Text>
               </Pressable>
             </View>
           </View>
 
-          <View style={styles.eventMetricGrid}>
-            {[
-              ['Active', adminEvents.length, () => { setAdminEventView('active'); setAdminStatusFilter('all'); setAdminSeriesFilter('all'); }],
-              ['Archived', archivedAdminEvents.length, () => { setAdminEventView('archived'); setAdminStatusFilter('all'); }],
-              ['Visible', adminEvents.filter(item => !item.hidden).length, () => { setAdminEventView('active'); setAdminStatusFilter('visible'); }],
-              ['Hidden', adminEvents.filter(item => item.hidden).length, () => { setAdminEventView('active'); setAdminStatusFilter('hidden'); }],
-              ['Live', adminEvents.filter(item => item.isLive).length, () => { setAdminEventView('active'); setAdminStatusFilter('live'); }],
-              ['Recurring', adminEvents.filter(item => item.isRecurring || item.recurringSeriesId).length, () => { setAdminEventView('active'); setAdminSeriesFilter('recurring'); }],
-              ['Single', adminEvents.filter(item => !item.isRecurring && !item.recurringSeriesId && !item.seriesId).length, () => { setAdminEventView('active'); setAdminSeriesFilter('single'); }],
-              ['Old Series', adminEvents.filter(item => item.seriesId && !item.recurringSeriesId).length, () => { setAdminEventView('active'); setAdminSeriesFilter('legacySeries'); }],
-            ].map(([label, value, action]) => <Pressable key={label} onPress={action} style={styles.eventMetric}><Text style={styles.eventMetricValue}>{value}</Text><Text style={styles.eventMetricLabel}>{label}</Text></Pressable>)}
+          <View style={styles.statisticsCard}>
+            <View style={styles.statisticsHead}>
+              <View>
+                <Text style={styles.statisticsTitle}>Event statistics</Text>
+                <Text style={styles.statisticsMeta}>Tap any item to filter Event Management</Text>
+              </View>
+              <Text style={styles.statisticsShowing}>Showing {displayedAdminEvents.length}</Text>
+            </View>
+            <View style={styles.eventMetricGrid}>
+              {[
+                {
+                  key: 'active', label: 'Active Events', value: adminEvents.length,
+                  active: adminEventView === 'active' && adminStatusFilter === 'all' && adminSeriesFilter === 'all' && adminEventType === 'all',
+                  action: () => { setAdminEventView('active'); setAdminStatusFilter('all'); setAdminSeriesFilter('all'); setAdminEventType('all'); },
+                },
+                {
+                  key: 'archived', label: 'Archived Events', value: archivedAdminEvents.length,
+                  active: adminEventView === 'archived' && adminStatusFilter === 'all' && adminSeriesFilter === 'all' && adminEventType === 'all',
+                  action: () => { setAdminEventView('archived'); setAdminStatusFilter('all'); setAdminSeriesFilter('all'); setAdminEventType('all'); },
+                },
+                {
+                  key: 'live', label: 'Live Events', value: adminEvents.filter(item => item.isLive).length,
+                  active: adminEventView === 'active' && adminStatusFilter === 'live',
+                  action: () => { setAdminEventView('active'); setAdminStatusFilter('live'); setAdminSeriesFilter('all'); setAdminEventType('all'); },
+                },
+                {
+                  key: 'single', label: 'Single Events', value: adminEvents.filter(item => !item.isSeries && !item.isRecurring && !item.seriesId && !item.recurringSeriesId).length,
+                  active: adminEventView === 'active' && adminSeriesFilter === 'single',
+                  action: () => { setAdminEventView('active'); setAdminStatusFilter('all'); setAdminSeriesFilter('single'); setAdminEventType('all'); },
+                },
+                {
+                  key: 'recurring', label: 'Recurring', value: adminEvents.filter(item => item.isRecurring || item.recurringSeriesId).length,
+                  active: adminEventView === 'active' && adminSeriesFilter === 'recurring',
+                  action: () => { setAdminEventView('active'); setAdminStatusFilter('all'); setAdminSeriesFilter('recurring'); setAdminEventType('all'); },
+                },
+                {
+                  key: 'oldSeries', label: 'Old Series', value: adminEvents.filter(item => (item.isSeries || item.seriesId || item.recurringSeriesId) && !(item.isRecurring || item.recurringSeriesId)).length,
+                  active: adminEventView === 'active' && adminSeriesFilter === 'legacySeries',
+                  action: () => { setAdminEventView('active'); setAdminStatusFilter('all'); setAdminSeriesFilter('legacySeries'); setAdminEventType('all'); },
+                },
+                {
+                  key: 'centre', label: 'Centre Events', value: adminEvents.filter(item => (item.organiserType || item.organisationType) !== 'private').length,
+                  active: adminEventView === 'active' && adminEventType === 'centre',
+                  action: () => { setAdminEventView('active'); setAdminStatusFilter('all'); setAdminSeriesFilter('all'); setAdminEventType('centre'); },
+                },
+                {
+                  key: 'private', label: 'Private Events', value: adminEvents.filter(item => (item.organiserType || item.organisationType) === 'private').length,
+                  active: adminEventView === 'active' && adminEventType === 'private',
+                  action: () => { setAdminEventView('active'); setAdminStatusFilter('all'); setAdminSeriesFilter('all'); setAdminEventType('private'); },
+                },
+              ].map(metric => (
+                <Pressable
+                  key={metric.key}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${metric.label}: ${metric.value}. Filter event list.`}
+                  accessibilityState={{ selected: metric.active }}
+                  onPress={metric.action}
+                  style={({ pressed }) => [
+                    styles.eventMetric,
+                    metric.active && styles.eventMetricActive,
+                    pressed && styles.eventMetricPressed,
+                  ]}
+                >
+                  <Text style={styles.eventMetricValue}>{metric.value}</Text>
+                  <Text style={styles.eventMetricLabel}>{metric.label}</Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
 
           {adminOwnerFilterUid ? (
@@ -2239,35 +2440,46 @@ export default function AdminDashboardScreen({
           ) : null}
 
           <View style={styles.actionCard}>
-            <View style={styles.rowWrap}>
+            <View style={styles.adminEventSearchRow}>
+              <TextInput
+                value={adminEventQuery}
+                onChangeText={setAdminEventQuery}
+                placeholder="Search events, hosts, suburbs..."
+                placeholderTextColor={colors.muted}
+                style={[styles.input, styles.adminEventSearchInput]}
+              />
               <Pressable
-                onPress={() => setAdminEventView('active')}
-                style={[styles.secondaryButton, adminEventView === 'active' && styles.secondaryButtonActive]}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: adminEventFiltersOpen }}
+                onPress={() => setAdminEventFiltersOpen(value => !value)}
+                style={[styles.adminEventFilterButton, adminEventFiltersOpen && styles.adminEventFilterButtonActive]}
               >
-                <Text style={[styles.secondaryButtonText, adminEventView === 'active' && styles.secondaryButtonTextActive]}>
-                  Active Events ({adminEvents.length})
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setAdminEventView('archived')}
-                style={[styles.secondaryButton, adminEventView === 'archived' && styles.secondaryButtonActive]}
-              >
-                <Text style={[styles.secondaryButtonText, adminEventView === 'archived' && styles.secondaryButtonTextActive]}>
-                  Archived Events ({archivedAdminEvents.length})
-                </Text>
+                <Text style={[styles.adminEventFilterButtonText, adminEventFiltersOpen && styles.adminEventFilterButtonTextActive]}>Filter</Text>
               </Pressable>
             </View>
 
-            <TextInput
-              value={adminEventQuery}
-              onChangeText={setAdminEventQuery}
-              placeholder="Search events, hosts, suburbs..."
-              placeholderTextColor={colors.muted}
-              style={styles.input}
-            />
+            {adminEventFiltersOpen ? <View style={styles.adminEventFiltersPanel}>
+              <View style={styles.rowWrap}>
+                <Pressable
+                  onPress={() => setAdminEventView('active')}
+                  style={[styles.secondaryButton, adminEventView === 'active' && styles.secondaryButtonActive]}
+                >
+                  <Text style={[styles.secondaryButtonText, adminEventView === 'active' && styles.secondaryButtonTextActive]}>
+                    Active ({adminEvents.length})
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setAdminEventView('archived')}
+                  style={[styles.secondaryButton, adminEventView === 'archived' && styles.secondaryButtonActive]}
+                >
+                  <Text style={[styles.secondaryButtonText, adminEventView === 'archived' && styles.secondaryButtonTextActive]}>
+                    Archived ({archivedAdminEvents.length})
+                  </Text>
+                </Pressable>
+              </View>
 
-            <Text style={styles.inputLabel}>Organiser type</Text>
-            <CompactSelect value={adminEventType} onChange={setAdminEventType} options={[{ value: 'all', label: 'All organisers' }, { value: 'centre', label: 'Centre / Organisation' }, { value: 'private', label: 'Private host' }]} />
+              <Text style={styles.inputLabel}>Organiser type</Text>
+              <CompactSelect value={adminEventType} onChange={setAdminEventType} options={[{ value: 'all', label: 'All organisers' }, { value: 'centre', label: 'Centre / Organisation' }, { value: 'private', label: 'Private host' }]} />
             {false ? <View style={styles.rowWrap}>
               {[
                 ['all', 'All'],
@@ -2287,8 +2499,8 @@ export default function AdminDashboardScreen({
               })}
             </View> : null}
 
-            <Text style={styles.inputLabel}>Event set type</Text>
-            <CompactSelect value={adminSeriesFilter} onChange={setAdminSeriesFilter} options={[{ value: 'all', label: 'All event sets' }, { value: 'single', label: 'Single events' }, { value: 'recurring', label: 'Recurring events' }, { value: 'legacySeries', label: 'Old series' }]} />
+              <Text style={styles.inputLabel}>Event set type</Text>
+              <CompactSelect value={adminSeriesFilter} onChange={setAdminSeriesFilter} options={[{ value: 'all', label: 'All event sets' }, { value: 'single', label: 'Single events' }, { value: 'recurring', label: 'Recurring events' }, { value: 'legacySeries', label: 'Old series' }]} />
             {false ? <View style={styles.rowWrap}>
               {[
                 ['all', 'All'],
@@ -2307,6 +2519,7 @@ export default function AdminDashboardScreen({
                   </Pressable>
                 );
               })}
+              </View> : null}
             </View> : null}
           </View>
 
@@ -2464,9 +2677,7 @@ export default function AdminDashboardScreen({
               <Text style={styles.sectionMeta}>Super-admin repair for Hijri-entered events</Text>
             </View>
             <View style={styles.rowWrap}>
-              <Pressable onPress={() => setPanel('overview')} style={styles.secondaryButton}>
-                  <Text style={styles.secondaryButtonText}>{'\u00AB'} Back</Text>
-              </Pressable>
+              <NativeBackButton onPress={() => setPanel('overview')} />
               <Pressable onPress={loadRepairEvents} style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>Refresh</Text>
               </Pressable>
@@ -2583,9 +2794,7 @@ export default function AdminDashboardScreen({
               <Text style={styles.sectionMeta}>Organisation names, IDs, locations, and types</Text>
             </View>
             <View style={styles.rowWrap}>
-              <Pressable onPress={() => setPanel('overview')} style={styles.secondaryButton}>
-                  <Text style={styles.secondaryButtonText}>{'\u00AB'} Back</Text>
-              </Pressable>
+              <NativeBackButton onPress={() => setPanel('overview')} />
               <Pressable onPress={loadOrganisations} style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>Refresh</Text>
               </Pressable>
@@ -2816,12 +3025,10 @@ export default function AdminDashboardScreen({
         <View style={styles.section}>
           <View style={styles.sectionHead}>
             <View>
-              <Text style={styles.sectionTitle}>{panel === 'settings' ? 'Calendar Settings' : panel === 'messaging' ? 'Community Messaging' : panel === 'troubleshooting' ? 'Troubleshooting Management' : 'Tools'}</Text>
-              <Text style={styles.sectionMeta}>{panel === 'settings' ? 'Hijri calendar adjustment only' : panel === 'messaging' ? 'Community updates and email reminders' : panel === 'troubleshooting' ? 'Diagnostics and tester support' : 'Live connections and utilities'}</Text>
+              <Text style={styles.sectionTitle}>{panel === 'settings' ? 'Calendar Settings' : panel === 'messaging' ? 'Community Messaging' : panel === 'troubleshooting' ? 'Diagnostics Register' : 'Tools'}</Text>
+              <Text style={styles.sectionMeta}>{panel === 'settings' ? 'Hijri calendar adjustment only' : panel === 'messaging' ? 'Community updates and email reminders' : panel === 'troubleshooting' ? 'Installation, session and crash investigation' : 'Live connections and utilities'}</Text>
             </View>
-            <Pressable onPress={() => setPanel('overview')} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>{'\u00AB'} Back</Text>
-            </Pressable>
+            <NativeBackButton onPress={() => setPanel('overview')} />
           </View>
 
           {status.message ? (
@@ -2830,11 +3037,7 @@ export default function AdminDashboardScreen({
             </View>
           ) : null}
 
-          {panel === 'troubleshooting' ? <View style={styles.actionCard}>
-            <Text style={styles.cardTitle}>Crash diagnostics</Text>
-            <Text style={styles.cardDescription}>Production crash monitoring records the app version, screen context and anonymous diagnostic session. Typed messages, ABNs, phone numbers, email addresses and exact addresses are excluded.</Text>
-            <Pressable onPress={() => Alert.alert('Report a Problem', 'Open Profile > Help & Policies, copy the Diagnostic Session ID, and include it with the steps that caused the problem.')} style={styles.primaryButton}><Text style={styles.primaryButtonText}>How to report a problem</Text></Pressable>
-          </View> : null}
+          {panel === 'troubleshooting' ? <DiagnosticRegisterPanel user={user} profile={profile} /> : null}
 
           {panel === 'messaging' ? <View style={[styles.actionCard, styles.messagingEmailCard]}>
             <Text style={styles.cardTitle}>Email Reminders</Text>
@@ -3276,22 +3479,35 @@ const styles = StyleSheet.create({
   },
   messagingUpdateCard: { order: 1 },
   messagingEmailCard: { order: 2 },
-  eventMetricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  eventMetric: { width: '22%', minWidth: 72, flexGrow: 1, minHeight: 66, alignItems: 'center', justifyContent: 'center', padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
-  eventMetricValue: { color: colors.tealDark, fontSize: 20, fontWeight: '900' },
-  eventMetricLabel: { marginTop: 3, color: colors.muted, fontSize: 9, fontWeight: '900', textAlign: 'center' },
-  dashboardProfileCard: {
-    position: 'relative',
-    overflow: 'hidden',
+  statisticsCard: {
+    gap: spacing.md,
     padding: spacing.md,
-    borderRadius: 20,
-    backgroundColor: '#08786c',
-    gap: spacing.sm,
-    shadowColor: '#064b44',
-    shadowOpacity: 0.2,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 5,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    ...shadow,
+  },
+  statisticsHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
+  statisticsTitle: { color: colors.navy, fontSize: 17, lineHeight: 22, fontWeight: '700' },
+  statisticsMeta: { marginTop: 2, color: colors.muted, fontSize: 10, lineHeight: 14, fontWeight: '700' },
+  statisticsShowing: { color: colors.blue || '#3478f6', fontSize: 10, lineHeight: 16, fontWeight: '700' },
+  eventMetricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  eventMetric: { flexBasis: '30%', flexGrow: 1, minWidth: 0, minHeight: 66, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, paddingVertical: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  eventMetricActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
+  eventMetricPressed: { opacity: 0.76, transform: [{ scale: 0.985 }] },
+  eventMetricValue: { color: colors.tealDark, fontSize: 22, lineHeight: 26, fontWeight: '700' },
+  eventMetricLabel: { marginTop: 3, color: colors.muted, fontSize: 9.5, lineHeight: 12, fontWeight: '600', textAlign: 'center' },
+  dashboardProfileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: '#d8e2ff',
+    backgroundColor: '#f2f4ff',
+    gap: spacing.md,
+    ...shadow,
   },
   dashboardGlowLarge: {
     position: 'absolute',
@@ -3317,37 +3533,37 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   dashboardAvatar: {
-    width: 66,
-    height: 66,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.65)',
-    backgroundColor: 'rgba(255,255,255,0.20)',
+    width: 50,
+    height: 50,
+    borderRadius: 17,
+    backgroundColor: colors.purple,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dashboardAvatarText: {
     color: '#ffffff',
-    fontSize: 23,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    fontSize: 15,
+    fontWeight: '700',
   },
   dashboardIdentity: {
     flex: 1,
-    gap: 3,
+    minWidth: 0,
   },
+  dashboardPanelTitle: { color: colors.navy, fontSize: 17, lineHeight: 22, fontWeight: '700' },
   dashboardEyebrow: {
     color: 'rgba(255,255,255,0.72)',
     fontSize: 10,
-    fontWeight: '900',
+    fontWeight: '700',
     letterSpacing: 1.4,
   },
   dashboardName: {
-    color: '#ffffff',
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '900',
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+    marginTop: 2,
   },
+  dashboardIdentityMeta: { color: colors.muted, fontSize: 10.5, lineHeight: 15, marginTop: 1 },
   dashboardRolePill: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -3366,7 +3582,7 @@ const styles = StyleSheet.create({
   dashboardRoleText: {
     color: '#ffffff',
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   dashboardScopePill: {
     flexDirection: 'row',
@@ -3382,7 +3598,7 @@ const styles = StyleSheet.create({
   dashboardScopeIcon: {
     color: '#ffffff',
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   dashboardScopeTextWrap: {
     flex: 1,
@@ -3391,13 +3607,13 @@ const styles = StyleSheet.create({
   dashboardScopeLabel: {
     color: 'rgba(255,255,255,0.62)',
     fontSize: 9,
-    fontWeight: '900',
+    fontWeight: '700',
     letterSpacing: 1.2,
   },
   dashboardScopeValue: {
     color: '#ffffff',
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   dashboardIntroRow: {
     flexDirection: 'row',
@@ -3409,7 +3625,7 @@ const styles = StyleSheet.create({
     color: colors.navy,
     fontSize: 25,
     lineHeight: 30,
-    fontWeight: '900',
+    fontWeight: '700',
     letterSpacing: -0.5,
   },
   dashboardSubtitle: {
@@ -3423,8 +3639,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     borderRadius: 999,
     backgroundColor: colors.tealSoft,
   },
@@ -3437,7 +3653,7 @@ const styles = StyleSheet.create({
   dashboardLiveText: {
     color: colors.tealDark,
     fontSize: 10,
-    fontWeight: '900',
+    fontWeight: '700',
     letterSpacing: 0.8,
   },
   dashboardMetricsCard: {
@@ -3449,14 +3665,17 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   dashboardMetricsRow: {
-    minHeight: 96,
+    minHeight: 116,
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
+    alignContent: 'center',
     paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
   },
   dashboardMetric: {
-    width: '32%',
+    width: '33.333%',
+    minHeight: 54,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xs,
@@ -3470,14 +3689,23 @@ const styles = StyleSheet.create({
     color: colors.navy,
     fontSize: 18,
     lineHeight: 21,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   dashboardMetricLabel: {
     color: colors.muted,
-    fontSize: 8.5,
-    fontWeight: '800',
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '600',
+    textAlign: 'center',
     marginTop: 2,
   },
+  adminEventSearchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  adminEventSearchInput: { flex: 1, marginTop: 0 },
+  adminEventFilterButton: { minWidth: 72, minHeight: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.blueSoft },
+  adminEventFilterButtonActive: { backgroundColor: colors.blue },
+  adminEventFilterButtonText: { color: colors.blue, fontSize: 12, fontWeight: '700' },
+  adminEventFilterButtonTextActive: { color: colors.surface },
+  adminEventFiltersPanel: { gap: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
   dashboardStatusRow: {
     minHeight: 42,
     flexDirection: 'row',
@@ -3504,7 +3732,7 @@ const styles = StyleSheet.create({
   dashboardStatusText: {
     color: colors.text,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   dashboardStatusMeta: {
     color: colors.muted,
@@ -3520,12 +3748,12 @@ const styles = StyleSheet.create({
   dashboardToolsTitle: {
     color: colors.navy,
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   dashboardToolsMeta: {
     color: colors.muted,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   dashboardGroup: {
     gap: spacing.sm,
@@ -3533,7 +3761,7 @@ const styles = StyleSheet.create({
   dashboardGroupTitle: {
     color: colors.muted,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
     letterSpacing: 1.1,
     textTransform: 'uppercase',
     paddingLeft: 2,
@@ -3573,7 +3801,7 @@ const styles = StyleSheet.create({
     color: colors.tealDark,
     fontSize: 21,
     lineHeight: 26,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   dashboardActionCopy: {
     flex: 1,
@@ -3583,7 +3811,7 @@ const styles = StyleSheet.create({
     color: colors.navy,
     fontSize: 15,
     lineHeight: 20,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   dashboardActionDescription: {
     color: colors.muted,
@@ -3604,7 +3832,7 @@ const styles = StyleSheet.create({
     color: colors.navy,
     fontSize: 34,
     lineHeight: 38,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   subtitle: {
     color: colors.muted,
@@ -3625,7 +3853,7 @@ const styles = StyleSheet.create({
   identityName: {
     color: colors.navy,
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   rolePill: {
     alignSelf: 'flex-start',
@@ -3639,7 +3867,7 @@ const styles = StyleSheet.create({
   rolePillText: {
     color: colors.tealDark,
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   statsRow: {
     flexDirection: 'row',
@@ -3647,29 +3875,33 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   statCard: {
-    minWidth: '22%',
+    flexBasis: '30%',
     flexGrow: 1,
-    padding: spacing.md,
-    borderRadius: radius.lg,
+    minWidth: 0,
+    minHeight: 64,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 7,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    ...shadow,
   },
-  statCardTeal: {
-    backgroundColor: colors.tealSoft,
-    borderColor: '#b7e8d7',
-  },
+  statCardActive: { backgroundColor: colors.tealSoft, borderColor: colors.teal },
+  statCardPressed: { opacity: 0.76, transform: [{ scale: 0.985 }] },
   statValue: {
-    color: colors.navy,
+    color: colors.tealDark,
     fontSize: 22,
-    fontWeight: '900',
+    lineHeight: 26,
+    fontWeight: '700',
   },
   statLabel: {
+    marginTop: 3,
     color: colors.muted,
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: spacing.xs,
+    fontSize: 9.5,
+    lineHeight: 12,
+    fontWeight: '700',
   },
   section: {
     gap: spacing.md,
@@ -3684,37 +3916,37 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: colors.navy,
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   sectionMeta: {
     color: colors.muted,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   cardList: {
     gap: spacing.md,
   },
   submissionAttribution: { marginTop: -4, paddingHorizontal: 2, color: colors.muted, fontSize: 11, lineHeight: 16, fontStyle: 'italic', fontWeight: '700' },
   ownerFilterBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  ownerFilterTitle: { color: colors.tealDark, fontSize: 14, lineHeight: 19, fontWeight: '900' },
+  ownerFilterTitle: { color: colors.tealDark, fontSize: 14, lineHeight: 19, fontWeight: '700' },
   ownerFilterMeta: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   ownerFilterClear: { minHeight: 38, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: colors.surface },
-  ownerFilterClearText: { color: colors.tealDark, fontSize: 11, fontWeight: '900' },
+  ownerFilterClearText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
   userEventsLink: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  userEventsLinkText: { color: colors.tealDark, fontSize: 12, fontWeight: '900' },
-  userEventsLinkArrow: { color: colors.tealDark, fontSize: 20, lineHeight: 22, fontWeight: '900' },
+  userEventsLinkText: { color: colors.tealDark, fontSize: 12, fontWeight: '700' },
+  userEventsLinkArrow: { color: colors.tealDark, fontSize: 20, lineHeight: 22, fontWeight: '700' },
   inlineTransferPanel: { gap: spacing.sm, marginTop: spacing.xs, padding: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: '#f2fbf9' },
-  inlineTransferTitle: { color: colors.navy, fontSize: 16, fontWeight: '900' },
+  inlineTransferTitle: { color: colors.navy, fontSize: 16, fontWeight: '700' },
   inlineTransferMeta: { color: colors.muted, fontSize: 11, lineHeight: 16, fontWeight: '700' },
   inlineTransferHint: { paddingVertical: spacing.sm, color: colors.muted, fontSize: 11, fontStyle: 'italic', textAlign: 'center' },
   inlineTransferLoading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   transferDropdown: { overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   transferResult: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   transferResultSelected: { backgroundColor: colors.teal },
-  transferResultName: { color: colors.navy, fontSize: 13, fontWeight: '900' },
+  transferResultName: { color: colors.navy, fontSize: 13, fontWeight: '700' },
   transferResultMeta: { color: colors.muted, fontSize: 10, lineHeight: 14, fontWeight: '700' },
   transferResultTextSelected: { color: colors.surface },
-  transferResultCheck: { color: colors.surface, fontSize: 18, fontWeight: '900' },
+  transferResultCheck: { color: colors.surface, fontSize: 18, fontWeight: '700' },
   actionCard: {
     padding: spacing.lg,
     borderRadius: radius.lg,
@@ -3751,7 +3983,7 @@ const styles = StyleSheet.create({
   importStepBadgeText: {
     color: colors.surface,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   importStepBody: {
     flex: 1,
@@ -3779,7 +4011,7 @@ const styles = StyleSheet.create({
   readOnlyFieldText: {
     color: colors.text,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   logoPickerBox: {
     minHeight: 96,
@@ -3796,7 +4028,7 @@ const styles = StyleSheet.create({
   logoPickerTitle: {
     color: colors.tealDark,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   logoPickerText: {
     color: colors.muted,
@@ -3849,14 +4081,14 @@ const styles = StyleSheet.create({
   orgLogoFallback: {
     color: colors.muted,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   cardTitle: {
     flex: 1,
     color: colors.navy,
     fontSize: 16,
     lineHeight: 22,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   cardDescription: {
     color: colors.muted,
@@ -3879,7 +4111,7 @@ const styles = StyleSheet.create({
   statusPillText: {
     color: colors.tealDark,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   calendarSyncFilter: {
     minHeight: 64,
@@ -3915,7 +4147,7 @@ const styles = StyleSheet.create({
   calendarSyncFilterTitle: {
     color: colors.navy,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   calendarSyncFilterTitleActive: {
     color: colors.tealDark,
@@ -3932,7 +4164,7 @@ const styles = StyleSheet.create({
   calendarSyncFilterArrow: {
     color: colors.muted,
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   primaryButton: {
     minHeight: 50,
@@ -3945,7 +4177,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: colors.surface,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   secondaryButton: {
     minHeight: 42,
@@ -3964,7 +4196,22 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: colors.text,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
+  },
+  dangerButton: {
+    minHeight: 42,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#e2b5b5',
+    backgroundColor: '#fff1f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  dangerButtonText: {
+    color: colors.danger,
+    fontSize: 13,
+    fontWeight: '600',
   },
   secondaryButtonTextActive: {
     color: colors.tealDark,
@@ -4002,12 +4249,12 @@ const styles = StyleSheet.create({
   noticeInlineText: {
     color: colors.tealDark,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   inputLabel: {
     color: colors.muted,
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
@@ -4045,7 +4292,7 @@ const styles = StyleSheet.create({
   chipText: {
     color: colors.text,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   chipTextActive: {
     color: colors.surface,
@@ -4056,7 +4303,7 @@ const styles = StyleSheet.create({
   subsectionTitle: {
     color: colors.navy,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   listRow: {
     flexDirection: 'row',
@@ -4085,7 +4332,7 @@ const styles = StyleSheet.create({
     color: colors.navy,
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   listMeta: {
     color: colors.text,
@@ -4112,7 +4359,7 @@ const styles = StyleSheet.create({
   ghostButtonText: {
     color: colors.tealDark,
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   ghostButtonDanger: {
     minHeight: 38,
@@ -4127,7 +4374,7 @@ const styles = StyleSheet.create({
   ghostButtonDangerText: {
     color: colors.danger,
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   formCard: {
     marginTop: spacing.sm,
@@ -4174,7 +4421,7 @@ const styles = StyleSheet.create({
   toggleBoxText: {
     color: colors.text,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   toggleBoxTextActive: {
     color: colors.tealDark,
@@ -4189,7 +4436,7 @@ const styles = StyleSheet.create({
   lockedTitle: {
     color: colors.navy,
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   lockedText: {
     color: colors.muted,

@@ -16,7 +16,9 @@ const SMTP_PORT = defineSecret('SMTP_PORT');
 const SMTP_USER = defineSecret('SMTP_USER');
 const SMTP_PASS = defineSecret('SMTP_PASS');
 const EMAIL_SECRETS = [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS];
-const BUSINESS_FROM_ADDRESS = 'bussiness.support@siza.info';
+const GOOGLE_PLACES_SERVER_API_KEY = defineSecret('GOOGLE_PLACES_SERVER_API_KEY');
+const SUPPORT_EMAIL = 'support@siza.info';
+const BUSINESS_FROM_ADDRESS = SUPPORT_EMAIL;
 const BUSINESS_FROM_NAME = 'Community Businesses Australia';
 const PROFILE_FIELDS = [
   'fullName', 'email', 'phone', 'defaultCity', 'defaultModule',
@@ -31,6 +33,30 @@ const BUSINESS_ANALYTICS_ACTIONS = new Set([
 
 function clean(value) {
   return String(value || '').trim();
+}
+
+function safePlacesSessionToken(value) {
+  const token = clean(value);
+  return /^[a-zA-Z0-9_-]{8,64}$/.test(token) ? token : '';
+}
+
+async function readPlacesResponse(response) {
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    logger.error('Google Places request failed', {
+      status: response.status,
+      code: payload?.error?.status || '',
+      message: payload?.error?.message || '',
+    });
+    throw new HttpsError('unavailable', 'Address search is temporarily unavailable. Please try again.');
+  }
+  return payload;
+}
+
+function placeComponent(components, type, short = false) {
+  const component = (Array.isArray(components) ? components : [])
+    .find(item => Array.isArray(item?.types) && item.types.includes(type));
+  return clean(short ? component?.shortText : component?.longText);
 }
 
 function normalizeCity(value) {
@@ -70,7 +96,7 @@ function sender() {
   return { name: BUSINESS_FROM_NAME, address: BUSINESS_FROM_ADDRESS };
 }
 
-const EMAIL_REPLY_TO = 'communityeventssydney@gmail.com';
+const EMAIL_REPLY_TO = SUPPORT_EMAIL;
 
 async function getAdminRecipients(cities, actorUid = '') {
   const citySet = new Set((Array.isArray(cities) ? cities : [cities]).filter(Boolean).map(normalizeCity));
@@ -180,8 +206,8 @@ async function deliver(recipients, notification) {
     replyTo: EMAIL_REPLY_TO,
     to: clean(recipient.email),
     subject: notification.title,
-    text: `${notification.title}\n\n${notification.body}\n\nCommunity Businesses Australia\nThis is an automated directory update. Replies are sent to Community Events Sydney until siza.info mailbox hosting is activated.`,
-    html: `<div style="margin:0;padding:24px;background:#f3f7f6;font-family:Arial,sans-serif;line-height:1.55;color:#10172f"><div style="max-width:620px;margin:0 auto;overflow:hidden;border:1px solid #d7e4e1;border-radius:14px;background:#ffffff"><div style="padding:22px 24px;background:#138477;color:#ffffff"><div style="font-size:12px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;opacity:.86">Community Businesses Australia</div><h1 style="margin:7px 0 0;font-size:25px;line-height:1.25;color:#ffffff">${html(notification.title)}</h1></div><div style="padding:24px"><p style="margin:0;font-size:16px;line-height:1.65">${html(notification.body)}</p><div style="margin-top:22px;padding-top:16px;border-top:1px solid #e3ecea;color:#64727c;font-size:12px">This is an automated Business Directory update from Community Connect Australia. Replies are currently directed to Community Events Sydney.</div></div></div></div>`,
+    text: `${notification.title}\n\n${notification.body}\n\nCommunity Businesses Australia\nThis is an automated directory update from Community Connect Australia. Replies are sent to ${SUPPORT_EMAIL}.`,
+    html: `<div style="margin:0;padding:24px;background:#f3f7f6;font-family:Arial,sans-serif;line-height:1.55;color:#10172f"><div style="max-width:620px;margin:0 auto;overflow:hidden;border:1px solid #d7e4e1;border-radius:14px;background:#ffffff"><div style="padding:22px 24px;background:#138477;color:#ffffff"><div style="font-size:12px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;opacity:.86">Community Businesses Australia</div><h1 style="margin:7px 0 0;font-size:25px;line-height:1.25;color:#ffffff">${html(notification.title)}</h1></div><div style="padding:24px"><p style="margin:0;font-size:16px;line-height:1.65">${html(notification.body)}</p><div style="margin-top:22px;padding-top:16px;border-top:1px solid #e3ecea;color:#64727c;font-size:12px">This is an automated Business Directory update from Community Connect Australia. Replies are sent to ${SUPPORT_EMAIL}.</div></div></div></div>`,
   })));
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
@@ -353,6 +379,76 @@ exports.nativeBusinessProfileUpdated = onDocumentUpdated(
   }
 );
 
+exports.sendBusinessEnquiry = onCall(
+  { region: REGION, enforceAppCheck: false },
+  async request => {
+    if (!request.auth || request.auth.token?.firebase?.sign_in_provider === 'anonymous') {
+      throw new HttpsError('unauthenticated', 'Sign in is required to contact a business.');
+    }
+    const businessId = clean(request.data?.businessId);
+    const text = clean(request.data?.text);
+    const senderName = clean(request.data?.senderName) || 'Community member';
+    if (!businessId || businessId.length > 160) throw new HttpsError('invalid-argument', 'Business reference is invalid.');
+    if (!text || text.length > 2000) throw new HttpsError('invalid-argument', 'Enter a message of up to 2000 characters.');
+
+    const [businessSnapshot, publicSnapshot] = await Promise.all([
+      db.collection('businesses').doc(businessId).get(),
+      db.collection('publicBusinesses').doc(businessId).get(),
+    ]);
+    if (!businessSnapshot.exists || !publicSnapshot.exists) throw new HttpsError('not-found', 'This public business could not be found.');
+    const business = businessSnapshot.data() || {};
+    const ownerUid = clean(business.ownerId);
+    if (!ownerUid || business.hidden === true || (business.status !== 'approved' && business.hasPublishedVersion !== true)) {
+      throw new HttpsError('failed-precondition', 'This business does not have an active in-app contact inbox.');
+    }
+    if (ownerUid === request.auth.uid) throw new HttpsError('failed-precondition', 'This business listing is already managed by you.');
+
+    const senderUid = request.auth.uid;
+    const threadId = `${businessId}_${senderUid}_${ownerUid}`;
+    const threadReference = db.collection('businessMessageThreads').doc(threadId);
+    const messageReference = threadReference.collection('messages').doc();
+    const isNew = await db.runTransaction(async transaction => {
+      const threadSnapshot = await transaction.get(threadReference);
+      const existingThread = threadSnapshot.data() || {};
+      if (existingThread.adminBlocked === true || Object.values(existingThread.blockedBy || {}).some(Boolean)) {
+        throw new HttpsError('failed-precondition', 'This conversation is blocked.');
+      }
+      transaction.set(threadReference, {
+        type: 'business',
+        businessId,
+        businessName: clean(publicSnapshot.data()?.name || business.name) || 'Community Business',
+        ownerUid,
+        senderUid,
+        senderName,
+        participantUids: [senderUid, ownerUid],
+        ...(threadSnapshot.exists ? {} : { createdAt: admin.firestore.FieldValue.serverTimestamp() }),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastMessage: text,
+        lastSenderUid: senderUid,
+        unreadBy: {
+          [ownerUid]: admin.firestore.FieldValue.increment(1),
+          [senderUid]: 0,
+        },
+      }, { merge: true });
+      transaction.set(messageReference, {
+        senderUid,
+        senderName,
+        text,
+        kind: 'text',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      transaction.set(db.collection('businessContactRoutes').doc(businessId), {
+        businessId,
+        ownerUid,
+        active: true,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return !threadSnapshot.exists;
+    });
+    return { threadId, isNew };
+  }
+);
+
 exports.recordBusinessInteraction = onCall(
   { region: REGION, enforceAppCheck: false },
   async request => {
@@ -413,5 +509,82 @@ exports.recordBusinessInteraction = onCall(
       return true;
     });
     return { counted };
+  }
+);
+
+exports.autocompleteAustralianAddresses = onCall(
+  { region: REGION, enforceAppCheck: false, secrets: [GOOGLE_PLACES_SERVER_API_KEY] },
+  async request => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Open an app session before searching for an address.');
+    const input = clean(request.data?.input);
+    if (input.length < 3) return { suggestions: [] };
+    if (input.length > 180) throw new HttpsError('invalid-argument', 'Address search is too long.');
+    const apiKey = clean(GOOGLE_PLACES_SERVER_API_KEY.value());
+    if (!apiKey) throw new HttpsError('failed-precondition', 'Address search is not configured.');
+
+    const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey },
+      body: JSON.stringify({
+        input,
+        includedRegionCodes: ['au'],
+        regionCode: 'au',
+        languageCode: 'en-AU',
+        sessionToken: safePlacesSessionToken(request.data?.sessionToken) || undefined,
+      }),
+    });
+    const payload = await readPlacesResponse(response);
+    const suggestions = (payload.suggestions || [])
+      .map(item => item?.placePrediction)
+      .filter(Boolean)
+      .slice(0, 8)
+      .map(prediction => ({
+        placeId: clean(prediction.placeId),
+        fullText: clean(prediction.text?.text),
+        primaryText: clean(prediction.structuredFormat?.mainText?.text || prediction.text?.text),
+        secondaryText: clean(prediction.structuredFormat?.secondaryText?.text),
+      }))
+      .filter(item => item.placeId && item.fullText);
+    return { suggestions };
+  }
+);
+
+exports.getAustralianAddressDetails = onCall(
+  { region: REGION, enforceAppCheck: false, secrets: [GOOGLE_PLACES_SERVER_API_KEY] },
+  async request => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Open an app session before selecting an address.');
+    const placeId = clean(request.data?.placeId);
+    if (!placeId || placeId.length > 300) throw new HttpsError('invalid-argument', 'Select an address from the suggestions.');
+    const apiKey = clean(GOOGLE_PLACES_SERVER_API_KEY.value());
+    if (!apiKey) throw new HttpsError('failed-precondition', 'Address search is not configured.');
+    const params = new URLSearchParams({ languageCode: 'en-AU', regionCode: 'au' });
+    const sessionToken = safePlacesSessionToken(request.data?.sessionToken);
+    if (sessionToken) params.set('sessionToken', sessionToken);
+    const response = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?${params}`, {
+      headers: {
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'id,formattedAddress,addressComponents,location',
+      },
+    });
+    const place = await readPlacesResponse(response);
+    const components = Array.isArray(place.addressComponents) ? place.addressComponents : [];
+    const country = placeComponent(components, 'country', true);
+    if (country && country !== 'AU') throw new HttpsError('invalid-argument', 'Please select an Australian address.');
+    const streetNumber = placeComponent(components, 'street_number');
+    const route = placeComponent(components, 'route');
+    return {
+      address: {
+        placeId: clean(place.id || placeId),
+        fullAddress: clean(place.formattedAddress),
+        street: [streetNumber, route].filter(Boolean).join(' '),
+        suburb: placeComponent(components, 'locality')
+          || placeComponent(components, 'postal_town')
+          || placeComponent(components, 'administrative_area_level_2'),
+        state: placeComponent(components, 'administrative_area_level_1', true),
+        postcode: placeComponent(components, 'postal_code'),
+        latitude: Number(place.location?.latitude),
+        longitude: Number(place.location?.longitude),
+      },
+    };
   }
 );
