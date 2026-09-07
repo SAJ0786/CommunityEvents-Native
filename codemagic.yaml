@@ -17,7 +17,9 @@ workflows:
         APP_RELEASE_MODE: tester
         IOS_BUNDLE_IDENTIFIER: info.siza.communityconnect.personaltest
         IOS_GOOGLE_SERVICES_FILE: ./GoogleService-Info.personal-test.plist
-        GOOGLE_MAPS_API_KEY: Encrypted(MAPS_KEY)
+
+      groups:
+        - ios_config
 
       xcode: 26.0
       cocoapods: default
