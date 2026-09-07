@@ -244,7 +244,7 @@ index 5b23bc9..2cd42e1 100644
      @objc public func setZoomRatio(zoomRatio: CGFloat) {
          liveStream.zoomRatio = zoomRatio
      }
-@@ -203,8 +283,61 @@ public class RNLiveStreamViewImpl: UIView {
+@@ -203,8 +283,58 @@ public class RNLiveStreamViewImpl: UIView {
      @objc public var onStartStreaming: (_ dictionnary: [String: Any]) -> Void = { _ in }
      
      @objc override public func removeFromSuperview() {
