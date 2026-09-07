@@ -88,10 +88,14 @@ index 6cf2bbd..f8f4a2a 100644
    private val result: Boolean,
    private val error: String? = null
 diff --git a/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamView.mm b/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamView.mm
-index 0f6553c..fab8f51 100644
+index 0f6553c..7acfe19 100644
 --- a/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamView.mm
 +++ b/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamView.mm
-@@ -13,7 +13,9 @@
+@@ -10,10 +10,13 @@
+ #import <React/RCTAssert.h>
+ #import <React/RCTConversions.h>
+ #import <React/RCTFabricComponentsPlugins.h>
++#import <AVKit/AVKit.h>
  
  
  // MARK: Swift classes in ObjC++
@@ -103,7 +107,7 @@ index 0f6553c..fab8f51 100644
  #else
  #import "react_native_livestream-Swift.h"
 diff --git a/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamViewImpl.swift b/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamViewImpl.swift
-index 5b23bc9..2cd42e1 100644
+index 5b23bc9..b9b45b2 100644
 --- a/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamViewImpl.swift
 +++ b/node_modules/@api.video/react-native-livestream/ios/RNLiveStreamViewImpl.swift
 @@ -5,8 +5,12 @@
@@ -304,7 +308,7 @@ index 5b23bc9..2cd42e1 100644
      }
  }
  
-@@ -216,13 +349,13 @@ extension RNLiveStreamViewImpl: ApiVideoLiveStreamDelegate {
+@@ -216,13 +346,13 @@ extension RNLiveStreamViewImpl: ApiVideoLiveStreamDelegate {
  
      /// Called when the connection to the rtmp server failed
      public func connectionFailed(_ code: String) {
