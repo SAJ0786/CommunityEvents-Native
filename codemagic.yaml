@@ -42,8 +42,20 @@ workflows:
 
       - name: Increment build number
         script: |
-          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" || echo 0)
+          set -e
+
+          LATEST_BUILD_NUMBER="$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID")"
+
+          if ! printf '%s' "$LATEST_BUILD_NUMBER" | grep -Eq '^[0-9]+$'; then
+            echo "Could not retrieve the latest iOS build number: $LATEST_BUILD_NUMBER"
+            exit 1
+          fi
+
           NEXT_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+
+          echo "Latest iOS build: $LATEST_BUILD_NUMBER"
+          echo "Next iOS build: $NEXT_BUILD_NUMBER"
+
           cd ios
           agvtool new-version -all "$NEXT_BUILD_NUMBER"
 
