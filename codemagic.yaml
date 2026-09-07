@@ -1,0 +1,58 @@
+workflows:
+  ios-personal-testflight:
+    name: Community Connect iOS TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+   integrations:
+  app_store_connect: Codemagic Community Connect
+
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: info.siza.communityconnect.personaltest
+
+      vars:
+        APP_STORE_APPLE_ID: "6807323350"
+        APP_RELEASE_MODE: tester
+        IOS_BUNDLE_IDENTIFIER: info.siza.communityconnect.personaltest
+        IOS_GOOGLE_SERVICES_FILE: ./GoogleService-Info.personal-test.plist
+        GOOGLE_MAPS_API_KEY: Encrypted(MAPS_KEY)
+
+      xcode: 26.0
+      cocoapods: default
+      node: 22.14.0
+
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+
+      - name: Generate iOS project
+        script: npx expo prebuild --platform ios
+
+      - name: Install CocoaPods
+        script: cd ios && pod install
+
+      - name: Configure signing
+        script: xcode-project use-profiles
+
+      - name: Increment build number
+        script: |
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" || echo 0)
+          NEXT_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+          cd ios
+          agvtool new-version -all "$NEXT_BUILD_NUMBER"
+
+      - name: Build IPA
+        script: |
+          WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" | head -n 1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          xcode-project build-ipa --workspace "$WORKSPACE" --scheme "$SCHEME"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
