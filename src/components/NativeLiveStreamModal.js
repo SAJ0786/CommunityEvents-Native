@@ -3,6 +3,8 @@ import {
   Alert,
   AppState,
   BackHandler,
+  DeviceEventEmitter,
+  ActivityIndicator,
   Linking,
   NativeModules,
   Platform,
@@ -79,6 +81,11 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [systemPip, setSystemPip] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const systemPipRef = useRef(false);
+  const endingRef = useRef(false);
+  const endingSourceRef = useRef(null);
   const controlsTimerRef = useRef(null);
   const connectionTimerRef = useRef(null);
   const streamAttemptRef = useRef(0);
@@ -112,11 +119,13 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
   };
 
   const minimiseStream = async () => {
-    if (!nativeStreamStartedRef.current) return;
+    if (!nativeStreamStartedRef.current || endingRef.current) return;
     if (Platform.OS === 'android' && streaming && StreamingPip?.enterPictureInPicture) {
       const entered = await StreamingPip.enterPictureInPicture().catch(() => false);
       if (entered) return;
     }
+    // A pending system PiP request must not minimise a stream already ended.
+    if (!nativeStreamStartedRef.current || endingRef.current) return;
     setMinimized(true);
     if (streaming) setStatus(connectionStateRef.current
       ? 'LIVE — the broadcast remains connected while you use the app.'
@@ -125,19 +134,49 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
 
   const restoreStream = () => {
     setMinimized(false);
+    showControlsTemporarily();
   };
 
   const showControlsTemporarily = () => {
     setControlsVisible(true);
     if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
     controlsTimerRef.current = null;
-    if (streaming && !minimized) {
+    if (streaming && !minimized && !systemPipRef.current && !endingRef.current) {
       controlsTimerRef.current = setTimeout(() => {
         setControlsVisible(false);
         controlsTimerRef.current = null;
       }, 4200);
     }
   };
+
+  const handleSystemPipChange = inPip => {
+    systemPipRef.current = Boolean(inPip);
+    setSystemPip(Boolean(inPip));
+    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    controlsTimerRef.current = null;
+    // A hide timer from the small window must never outlive expansion.
+    // Keep controls visible until the next user interaction starts a new timer.
+    setControlsVisible(!inPip);
+    logDiagnostic('STREAM_ANDROID_PIP_UI_CHANGED', { entered: Boolean(inPip) });
+  };
+
+  useEffect(() => {
+    if (!visible || Platform.OS !== 'android') return undefined;
+    let disposed = false;
+    let modeRevision = 0;
+    const subscription = DeviceEventEmitter.addListener('STREAM_PIP_MODE_CHANGED', inPip => {
+      modeRevision += 1;
+      handleSystemPipChange(inPip);
+    });
+    const syncMode = async () => {
+      const revision = ++modeRevision;
+      const inPip = await StreamingPip?.getPictureInPictureState?.().catch(() => undefined);
+      if (!disposed && revision === modeRevision && typeof inPip === 'boolean') handleSystemPipChange(inPip);
+    };
+    const focus = AppState.addEventListener('focus', syncMode);
+    syncMode();
+    return () => { disposed = true; subscription.remove(); focus.remove(); };
+  }, [visible]);
 
   useEffect(() => {
     if (!visible || !event) return;
@@ -165,7 +204,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
   }, [event?.id, visible]);
 
   useEffect(() => {
-    if (step === 'phone' && visible && !minimized) showControlsTemporarily();
+    if (step === 'phone' && visible && !minimized && !systemPipRef.current) showControlsTemporarily();
     else if (controlsTimerRef.current) {
       clearTimeout(controlsTimerRef.current);
       controlsTimerRef.current = null;
@@ -185,6 +224,12 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
     return undefined;
   }, [visible]);
+
+  useEffect(() => () => {
+    streamAttemptRef.current += 1;
+    if (connectionTimerRef.current) clearTimeout(connectionTimerRef.current);
+    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!visible || !streaming) return undefined;
@@ -217,6 +262,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
   useEffect(() => {
     if (!visible) return undefined;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (endingRef.current || step === 'end-error' || step === 'ending') return true;
       if (minimized) return false;
       if (streaming) {
         minimiseStream();
@@ -226,7 +272,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
       return true;
     });
     return () => subscription.remove();
-  }, [minimized, streaming, visible]);
+  }, [minimized, step, streaming, visible]);
 
   if (!event) return null;
 
@@ -269,6 +315,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
   };
 
   const closeSafely = async () => {
+    if (endingRef.current || step === 'ending') return;
     if (hasActiveNativeSession) {
       Alert.alert(
         streaming ? 'Stream is live' : 'Live session is being held',
@@ -460,6 +507,12 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
   };
 
   const finishStream = async () => {
+    if (endingRef.current) return;
+    endingRef.current = true;
+    setEnding(true);
+    endingSourceRef.current ||= step === 'external-live'
+      ? { ...event, liveSource: 'external-youtube' }
+      : { ...event, liveSource: 'native' };
     streamAttemptRef.current += 1;
     if (connectionTimerRef.current) {
       clearTimeout(connectionTimerRef.current);
@@ -482,12 +535,9 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
       // native view mounted for one short settling interval before unmounting
       // it or changing orientation, preventing stop/remove/rotate races.
       await wait(NATIVE_STOP_SETTLE_MS);
-      if (step === 'phone') setStep('method');
+      setStep('ending');
       await restorePortraitOrientation().catch(() => {});
-      const sourceEvent = step === 'external-live'
-        ? { ...event, liveSource: 'external-youtube' }
-        : { ...event, liveSource: 'native' };
-      await endEventStream(sourceEvent, sessionId);
+      await endEventStream(endingSourceRef.current, sessionId);
       setStreaming(false);
       setInterrupted(false);
       setConnected(false);
@@ -507,12 +557,15 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
       onClose?.();
     } catch (streamError) {
       setError(streamError?.message || 'The stream could not be ended.');
+      setStep('end-error');
       setStatus('');
       recordNonFatalError(streamError, { operation: 'stream_end', platform: Platform.OS });
     } finally {
       // Backend completion failure must not leave the stopped phone PiP-enabled.
       StreamingPip?.setStreamingActive?.(false);
       setBusy(false);
+      endingRef.current = false;
+      setEnding(false);
     }
   };
 
@@ -538,7 +591,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
           minimized && streamOrientation === 'landscape' && styles.minimizedRootLandscape,
         ]}
       >
-        {step !== 'phone' ? <View style={styles.header}>
+        {!ending && !['phone', 'ending', 'end-error'].includes(step) ? <View style={styles.header}>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>{event.isLive || streaming || step === 'external-live' ? 'LIVE EVENT' : 'EVENT STREAMING'}</Text>
             <Text numberOfLines={2} style={styles.title}>{getEventTitle(event)}</Text>
@@ -626,7 +679,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
                 logDiagnostic('STREAM_PERMISSIONS_DENIED', { platform: Platform.OS });
               }}
             />
-            {!minimized && !controlsVisible ? <Pressable
+            {!minimized && !systemPip && !ending && !controlsVisible ? <Pressable
               accessibilityRole="button"
               accessibilityLabel="Show streaming controls"
               onPress={showControlsTemporarily}
@@ -636,11 +689,11 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
               <View style={[styles.liveDot, connected && styles.liveDotConnected]} />
               <Text style={styles.liveBadgeText}>{connected ? 'LIVE' : connecting ? 'CONNECTING' : 'PREVIEW'}</Text>
             </View>
-            {!minimized && controlsVisible ? <View style={styles.orientationBadge}>
+            {!minimized && !systemPip && !ending && controlsVisible ? <View style={styles.orientationBadge}>
               <Text style={styles.orientationBadgeText}>{streamOrientation.toUpperCase()} LOCKED</Text>
             </View> : null}
 
-            {!minimized ? <View pointerEvents="none" style={styles.micMeter}>
+            {!minimized && !systemPip && !ending ? <View pointerEvents="none" style={styles.micMeter}>
               <MaterialCommunityIcons color={muted ? '#94a3b8' : '#d1fae5'} name={muted ? 'microphone-off' : 'microphone'} size={17} />
               <View style={styles.micMeterTrack}>
                 <View style={[styles.micMeterFill, { height: muted ? '0%' : '72%' }]} />
@@ -648,7 +701,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
               <Text style={styles.micMeterLabel}>{muted ? 'MUTE' : 'MIC'}</Text>
             </View> : null}
 
-            {!minimized && controlsVisible ? <>
+            {!minimized && !systemPip && !ending && controlsVisible ? <>
               <View style={styles.streamTopActions}>
                 {hasActiveNativeSession ? <Pressable accessibilityLabel="Minimise streaming" onPress={minimiseStream} style={[styles.roundControl, styles.minimiseControl]}>
                   <MaterialCommunityIcons color="#fff" name="arrow-collapse-down" size={22} />
@@ -775,10 +828,27 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
           </ScrollView>
         )}
 
-        {step !== 'phone' && (status || error) ? (
+        {!ending && !['phone', 'ending', 'end-error'].includes(step) && (status || error) ? (
           <View style={styles.messageBar}>
             {status ? <Text style={styles.statusText}>{status}</Text> : null}
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          </View>
+        ) : null}
+        {(ending || step === 'ending' || step === 'end-error') ? (
+          <View style={styles.endingOverlay} accessibilityViewIsModal>
+            {ending || step === 'ending' ? <ActivityIndicator size="large" color={colors.teal} /> : null}
+            <Text style={styles.sectionTitle}>{step === 'end-error' && !ending ? 'Could not confirm stream ended' : 'Ending stream…'}</Text>
+            <Text style={styles.sectionText}>{step === 'end-error' && !ending
+              ? (endingSourceRef.current?.liveSource === 'external-youtube'
+                ? 'Could not confirm the live event was closed. Retry to finish closing it.'
+                : 'The phone camera has stopped. Retry to finish closing the same YouTube session.')
+              : 'Closing the broadcast. You will return to the app when this finishes.'}</Text>
+            {step === 'end-error' && !ending ? <>
+              <Text style={styles.errorText}>{error}</Text>
+              <Pressable accessibilityRole="button" onPress={finishStream} style={styles.primaryButton}>
+                <Text style={styles.primaryButtonText}>Retry End Stream</Text>
+              </Pressable>
+            </> : null}
           </View>
         ) : null}
       </SafeAreaView>
@@ -789,6 +859,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
 const styles = StyleSheet.create({
   overlayLayer: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
   root: { flex: 1, backgroundColor: colors.background },
+  endingOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 20, elevation: 20, backgroundColor: colors.background, justifyContent: 'center', padding: spacing.lg, gap: spacing.md },
   minimizedRoot: { position: 'absolute', right: 12, bottom: 96, width: 168, height: 250, flex: 0, overflow: 'hidden', borderWidth: 2, borderColor: '#ef4444', borderRadius: radius.lg, backgroundColor: '#050b12', ...shadow },
   minimizedRootLandscape: { width: 248, height: 146 },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },

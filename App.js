@@ -1509,16 +1509,18 @@ function MainApp() {
           setStreamEvent(event);
         }}
         />
-        <NativeLiveStreamModal
+        {streamEvent ? <NativeLiveStreamModal
+          key={streamEvent.id}
           event={streamEvent}
           visible={Boolean(streamEvent)}
           onClose={() => setStreamEvent(null)}
           onStreamChanged={updatedEvent => {
-            setStreamEvent(updatedEvent);
+            // A delayed callback must not reopen a dismissed streaming surface.
+            setStreamEvent(current => current?.id === updatedEvent.id ? updatedEvent : current);
             setEvents(current => current.map(item => item.id === updatedEvent.id ? { ...item, ...updatedEvent } : item));
             setMyEvents(current => current.map(item => item.id === updatedEvent.id ? { ...item, ...updatedEvent } : item));
           }}
-        />
+        /> : null}
         <AzaanPlaybackController
           onOpenHijriCalendar={() => {
             setAppModule('events');

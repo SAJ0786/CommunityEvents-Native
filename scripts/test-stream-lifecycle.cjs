@@ -28,22 +28,39 @@ function load(file, mocks) {
 }
 async function testEnd(backendFailure) {
   const changes = [];
+  let releaseBackend;
+  let backendCalls = 0;
+  const backendGate = new Promise(resolve => { releaseBackend = resolve; });
   const context = {
+    endingRef: { current: false }, endingSourceRef: { current: null },
     nativeStreamStartedRef: { current: true }, cameraMountedRef: { current: true }, liveRef: { current: { stopStreaming() { changes.push('native-stop'); } } },
     StreamingPip: { setStreamingActive(value) { changes.push(value); } },
     connectionStateRef: { current: true }, pendingSessionRef: { current: {} }, streamAttemptRef: { current: 1 }, connectionTimerRef: { current: null },
     logDiagnostic() {}, recordNonFatalError() {}, clearConnectionTimer() {}, clearTimeout() {},
     wait: async () => {}, NATIVE_STOP_SETTLE_MS: 350, Platform: { OS: 'android' },
     restorePortraitOrientation: async () => {}, step: 'phone', event: { id: 'event' }, sessionId: 'session',
-    streaming: true, connecting: true, onClose() {}, onStreamChanged() {}, streamOrientation: 'landscape',
-    endEventStream: async () => { if (backendFailure) throw Error('offline'); },
+    streaming: true, connecting: true, onClose() { changes.push('closed'); }, onStreamChanged() {}, streamOrientation: 'landscape',
+    endEventStream: async () => { backendCalls++; await backendGate; if (backendFailure) throw Error('offline'); },
   };
-  for (const name of ['Busy','Error','Status','Connecting','Streaming','Connected','Interrupted','Minimized','Step','SessionId','WatchUrl']) {
+  for (const name of ['Ending','Busy','Error','Status','Connecting','Streaming','Connected','Interrupted','Minimized','Step','SessionId','WatchUrl']) {
     context['set'+name] = value => changes.push({name,value});
   }
   const run = name => vm.runInNewContext('(' + functions[name] + ')', context);
   context.stopNativeStreamOnce = run('stopNativeStreamOnce');
-  await run('finishStream')();
+  const finish = run('finishStream');
+  const pending = finish();
+  await finish(); // Double-tap End must not issue another native/backend stop.
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(backendCalls, 1);
+  assert.ok(changes.some(x=>x.name==='Step' && x.value==='ending'));
+  assert.ok(!changes.some(x=>x.name==='Step' && x.value==='method'), 'Never show setup while ending');
+  assert.ok(!changes.includes('closed'), 'Keep the opaque closing surface until completion');
+  releaseBackend();
+  await pending;
+  assert.equal(changes.filter(x=>x==='native-stop').length, 1);
+  assert.equal(changes.includes('closed'), !backendFailure);
+  assert.equal(changes.some(x=>x.name==='Step' && x.value==='end-error'), backendFailure);
+  assert.equal(context.endingRef.current, false, 'Allow retry after a backend error');
   assert.equal(context.nativeStreamStartedRef.current, false);
   assert.ok(changes.indexOf(false) < changes.indexOf('native-stop'), 'PiP off before native stop');
   assert.ok(changes.some(x=>x.name==='Streaming' && x.value===false));
@@ -53,6 +70,61 @@ async function testEnd(backendFailure) {
   run('onConnectionSuccess')(); run('onConnectionFailed')('disconnected'); run('onDisconnect')();
   assert.equal(changes.length, before);
   assert.equal(changes.includes(true), false);
+  if (backendFailure) {
+    context.step = 'end-error';
+    context.endEventStream = async (event, session) => {
+      assert.equal(event.liveSource, 'native');
+      assert.equal(session, 'session', 'Retry must target the same YouTube session');
+    };
+    await finish();
+    assert.equal(changes.filter(x=>x==='native-stop').length,1);
+    assert.ok(changes.includes('closed'));
+  }
+}
+
+async function testPipControls() {
+  const timers = new Map();
+  let timerId = 0;
+  const context = {
+    controlsTimerRef: {current:null}, systemPipRef:{current:false}, endingRef:{current:false},
+    nativeStreamStartedRef:{current:true}, streaming:true, minimized:false,
+    setControlsVisible: value=>{context.shown=value;}, setSystemPip:value=>{context.inPip=value;},
+    setTimeout: callback=>{timers.set(++timerId,callback);return timerId;}, clearTimeout:id=>timers.delete(id),
+    logDiagnostic(){}, Platform:{OS:'android'},
+  };
+  const run = name=>vm.runInNewContext('('+functions[name]+')',context);
+  const show = run('showControlsTemporarily');
+  const mode = run('handleSystemPipChange');
+  show(); assert.equal(timers.size,1);
+  for (let cycle=0;cycle<3;cycle++) {
+    mode(true); assert.equal(timers.size,0); assert.equal(context.shown,false);
+    mode(false); assert.equal(context.shown,true); assert.equal(timers.size,0);
+    show(); assert.equal(timers.size,1);
+  }
+  mode(true); show(); assert.equal(timers.size,0,'No timer inside system PiP');
+  mode(false); assert.equal(context.shown,true);
+  // End can happen while the native PiP permission/entry promise is outstanding.
+  let resolveEntry;
+  context.StreamingPip={enterPictureInPicture:()=>new Promise(resolve=>{resolveEntry=resolve;})};
+  context.setMinimized=()=>{throw Error('Ended stream must not minimise');};
+  const pending=run('minimiseStream')();
+  context.nativeStreamStartedRef.current=false;
+  resolveEntry(false);
+  await pending;
+}
+
+function testClosedParent() {
+  const appSource=read('App.js');
+  const appAst=babel.parseSync(appSource,{configFile:false,babelrc:false,parserOpts:{plugins:['jsx']}});
+  let handler;
+  traverse(appAst,{JSXAttribute(p){if(p.node.name.name==='onStreamChanged') handler=appSource.slice(p.node.value.expression.start,p.node.value.expression.end);}});
+  for (const initial of [null,{id:'different'},{id:'event'}]) {
+    let current=initial;
+    const update=vm.runInNewContext('('+handler+')',{setStreamEvent:fn=>{current=fn(current);},setEvents(){},setMyEvents(){}});
+    const value={id:'event',isLive:true}; update(value);
+    assert.equal(current,initial?.id==='event'?value:initial);
+  }
+  assert.match(appSource,/streamEvent \? <NativeLiveStreamModal/,'Dismissal unmounts native streaming surface');
 }
 async function testPermissionCancellation() {
   let handle;
@@ -88,6 +160,8 @@ function testNativeIntegration() {
   for (const required of ['RNLiveStreamView.mm','RNLiveStreamViewManager.swift','componentProvider','AutomaticallyFromInline = false']) assert.ok(patch.includes(required));
   const android = read('android/app/src/main/java/info/siza/communityevents/app/StreamingPipModule.kt');
   assert.match(android,/UiThreadUtil.runOnUiThread/);
+  assert.match(android,/STREAM_PIP_MODE_CHANGED/);
+  assert.match(read('android/app/src/main/java/info/siza/communityevents/app/MainActivity.kt'), /override fun onPictureInPictureModeChanged[\s\S]*StreamingPipModule.notifyModeChanged/);
   const owner = read('android/app/src/main/java/info/siza/communityevents/app/AndroidRootEncoderLiveStreamView.java');
   assert.match(owner,/stopStreamingExplicitly\(\) \{\s*stopping = true;\s*disablePictureInPicture\(\)/);
 }
@@ -117,6 +191,7 @@ function testPodHook() {
 }
 (async()=>{
   await testEnd(false); await testEnd(true);
+  await testPipControls(); testClosedParent();
   await testPermissionCancellation(); testNativeIntegration(); testMetadata(); testPodHook();
-  console.log('PASS stream lifecycle: confirmed End, backend failure, late callbacks, permission cancellation, iOS provider/PiP, native build metadata and redaction');
+  console.log('PASS stream lifecycle: repeated PiP return/control timers, duplicate End, backend retry, no reopening, late callbacks, permission cancellation, iOS provider/PiP, native build metadata and redaction');
 })().catch(e=>{console.error(e);process.exitCode=1;});

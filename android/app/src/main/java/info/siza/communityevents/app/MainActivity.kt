@@ -89,6 +89,11 @@ class MainActivity : ReactActivity() {
     updateStreamingPipState(streamingPipActive)
   }
 
+  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+    super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+    StreamingPipModule.notifyModeChanged(isInPictureInPictureMode)
+  }
+
   /**
    * Returns the name of the main component registered from JavaScript. This is used to schedule
    * rendering of the component.

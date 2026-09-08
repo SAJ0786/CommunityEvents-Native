@@ -9,9 +9,33 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.UiThreadUtil
+import com.facebook.react.modules.core.DeviceEventManagerModule
+import java.lang.ref.WeakReference
 
 class StreamingPipModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
+  companion object {
+    private var instance = WeakReference<StreamingPipModule>(null)
+
+    fun notifyModeChanged(inPip: Boolean) {
+      val context = instance.get()?.reactContext ?: return
+      if (context.hasActiveReactInstance()) {
+        context.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+          .emit("STREAM_PIP_MODE_CHANGED", inPip)
+      }
+    }
+  }
+
+  init { instance = WeakReference(this) }
+
   override fun getName() = "StreamingPip"
+
+  @ReactMethod
+  fun getPictureInPictureState(promise: Promise) {
+    UiThreadUtil.runOnUiThread {
+      promise.resolve(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+        reactContext.currentActivity?.isInPictureInPictureMode == true)
+    }
+  }
 
   private fun aspectRatioForCurrentOrientation(): Rational {
     return if (reactContext.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
