@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import EventDateTimePicker from './EventDateTimePicker';
 import CreateEventForm from './CreateEventForm';
 import CompactSelect from './CompactSelect';
 import { getHijriParts, HIJRI_MONTHS } from '../services/hijri';
@@ -253,7 +253,7 @@ export default function RecurringEventForm({
           </>
         )}
 
-        {datePicker ? <DateTimePicker value={parseLocalDate(datePicker === 'start' ? startDate : endDate) || new Date()} mode="date" minimumDate={new Date()} onChange={handleDatePicker} /> : null}
+        {datePicker ? <EventDateTimePicker key={datePicker} title={datePicker === 'start' ? 'First event date' : 'Last event date'} value={parseLocalDate(datePicker === 'start' ? startDate : endDate) || new Date()} mode="date" minimumDate={new Date()} onChange={handleDatePicker} onClose={() => setDatePicker('')} /> : null}
 
         <Text style={styles.sectionLabel}>Frequency *</Text>
         <ToggleRow options={FREQUENCIES} value={frequency} onChange={setFrequency} />

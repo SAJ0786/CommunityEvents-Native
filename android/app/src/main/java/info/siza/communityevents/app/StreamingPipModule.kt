@@ -8,6 +8,7 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.bridge.UiThreadUtil
 
 class StreamingPipModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
   override fun getName() = "StreamingPip"
@@ -32,21 +33,29 @@ class StreamingPipModule(private val reactContext: ReactApplicationContext) : Re
 
   @ReactMethod
   fun setStreamingActive(active: Boolean) {
-    MainActivity.streamingPipActive = active
-    reactContext.getSharedPreferences("community_connect_streaming", 0)
-      .edit().putBoolean("pip_stream_active", active).apply()
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      reactContext.currentActivity?.setPictureInPictureParams(pictureInPictureParams(active))
+    UiThreadUtil.runOnUiThread {
+      MainActivity.streamingPipActive = active
+      reactContext.getSharedPreferences("community_connect_streaming", 0)
+        .edit().putBoolean("pip_stream_active", active).apply()
+      (reactContext.currentActivity as? MainActivity)?.updateStreamingPipState(active)
     }
   }
 
   @ReactMethod
   fun enterPictureInPicture(promise: Promise) {
-    val activity = reactContext.currentActivity
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || activity == null || !MainActivity.streamingPipActive) {
-      promise.resolve(false)
-      return
+    UiThreadUtil.runOnUiThread {
+      val activity = reactContext.currentActivity
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || activity == null || !MainActivity.streamingPipActive) {
+        promise.resolve(false)
+        return@runOnUiThread
+      }
+      try {
+        promise.resolve(activity.enterPictureInPictureMode(pictureInPictureParams(true)))
+      } catch (error: IllegalStateException) {
+        promise.resolve(false)
+      } catch (error: SecurityException) {
+        promise.resolve(false)
+      }
     }
-    promise.resolve(activity.enterPictureInPictureMode(pictureInPictureParams(true)))
   }
 }

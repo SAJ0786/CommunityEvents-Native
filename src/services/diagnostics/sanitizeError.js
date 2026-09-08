@@ -1,4 +1,4 @@
-const SENSITIVE_KEY = /(password|passcode|token|secret|authorization|cookie|credential|private.?key|api.?key)/i;
+const SENSITIVE_KEY = /(password|passcode|token|secret|authorization|cookie|credential|private.?key|api.?key|stream.?key)/i;
 
 function redact(value, depth = 0) {
   if (depth > 3) return '[truncated]';
@@ -11,6 +11,7 @@ function redact(value, depth = 0) {
   }
   if (typeof value === 'string') {
     return value
+      .replace(/rtmps?:\/\/[^\s"'<>]+/gi, '[redacted-stream-url]')
       .replace(/([?&](?:key|token|secret|auth)=)[^&\s]+/gi, '$1[redacted]')
       .slice(0, 1000);
   }

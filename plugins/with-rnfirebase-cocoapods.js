@@ -2,7 +2,7 @@ const { withPodfile, withXcodeProject } = require('@expo/config-plugins');
 
 const DISABLE_SPM_LINE = '$RNFirebaseDisableSPM = true';
 const HAISHINKIT_WORKAROUND_MARKER = '# Community Connect: HaishinKit Xcode 26 workaround';
-const IOS_STREAM_LIFECYCLE_MARKER = '# Community Connect: preserve user-owned iOS livestreams';
+const IOS_STREAM_LIFECYCLE_MARKER = '# Community Connect: preserve user-owned iOS livestreams v2';
 const POST_INSTALL_LINE = 'post_install do |installer|';
 const OBJC_LINKER_FLAG = '"-ObjC"';
 const HAISHINKIT_WORKAROUND = `${POST_INSTALL_LINE}
@@ -38,8 +38,19 @@ const HAISHINKIT_WORKAROUND = `${POST_INSTALL_LINE}
           forced_background_stop,
           '        // Community Connect keeps the stream user-owned until confirmed End.'
         )
-        File.write(api_video_source, source)
       end
+      unless source.include?('Community Connect cancels reconnect on confirmed End')
+        replacements = {
+          "    public func stopStreaming() {" => "    public func stopStreaming() {\\n        // Community Connect cancels reconnect on confirmed End\\n        self.streamKey = \\\"\\\"\\n        self.url = \\\"\\\"",
+          "            self.rtmpConnection.connect(self.url)" => "            guard !self.streamKey.isEmpty, !self.url.isEmpty else { return }\\n            self.rtmpConnection.connect(self.url)",
+          "            self.rtmpStream.publish(self.streamKey)" => "            guard !self.streamKey.isEmpty else { return }\\n            self.rtmpStream.publish(self.streamKey)"
+        }
+        replacements.each do |before, after|
+          raise 'ApiVideoLiveStream explicit-stop implementation changed.' unless source.include?(before)
+          source = source.sub(before, after)
+        end
+      end
+      File.write(api_video_source, source)
     else
       raise 'ApiVideoLiveStream.swift was not found; the iOS stream lifecycle patch was not applied.'
     end`;

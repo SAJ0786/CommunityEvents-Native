@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import { appVersion, appBuild } from '../appVersion';
 import { AppState, Platform } from 'react-native';
 import {
   collection,
@@ -58,7 +58,7 @@ function registryMetadata(metadata = {}) {
   const safe = sanitizeDiagnosticMetadata(metadata);
   const allowed = new Set([
     'platform', 'orientation', 'module', 'screen', 'feature', 'operation', 'code',
-    'hadConnection', 'connected', 'started', 'resume', 'protocol', 'authentication_state',
+    'hadConnection', 'connected', 'started', 'resume', 'protocol', 'authentication_state', 'reason',
     'current_screen', 'state', 'entered', 'permission',
   ]);
   return Object.fromEntries(Object.entries(safe)
@@ -75,10 +75,12 @@ function persistRecentEvents() {
 }
 
 export function appendDiagnosticRegistryEvent(message, metadata = {}) {
+  const { code: nativeCode, ...details } = registryMetadata(metadata);
   const event = {
     at: new Date().toISOString(),
     code: String(message || 'DIAGNOSTIC_EVENT').replace(/[^a-zA-Z0-9_.:-]/g, '_').slice(0, 90),
-    ...registryMetadata(metadata),
+    ...details,
+    ...(nativeCode !== undefined ? { nativeCode } : {}),
   };
   recentEvents = [...recentEvents, event].slice(-EVENT_LIMIT);
   persistRecentEvents();
@@ -86,8 +88,8 @@ export function appendDiagnosticRegistryEvent(message, metadata = {}) {
 }
 
 function sessionSnapshot(firebaseUser, previous = null, previousCrashDetected = false) {
-  const version = Constants.nativeAppVersion || Constants.expoConfig?.version || 'unknown';
-  const buildNumber = String(Constants.nativeBuildVersion || Constants.expoConfig?.android?.versionCode || Constants.expoConfig?.ios?.buildNumber || 'unknown');
+  const version = appVersion;
+  const buildNumber = appBuild || 'unknown';
   return {
     sessionId: diagnosticSessionId,
     installationId,

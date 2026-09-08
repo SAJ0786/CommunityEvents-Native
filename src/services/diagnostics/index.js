@@ -1,4 +1,4 @@
-import Constants from 'expo-constants';
+import { appVersion, appBuild } from '../appVersion';
 import crashlytics from '@react-native-firebase/crashlytics';
 import { sanitizeDiagnosticError, sanitizeDiagnosticMetadata } from './sanitizeError';
 import {
@@ -43,8 +43,8 @@ export async function initializeDiagnostics() {
       previousCrashDetected = await reporter.didCrashOnPreviousExecution().catch(() => false);
     }
     const identity = await initializeDiagnosticRegistry(previousCrashDetected);
-    const version = Constants.nativeAppVersion || Constants.expoConfig?.version || 'unknown';
-    const buildNumber = String(Constants.nativeBuildVersion || Constants.expoConfig?.android?.versionCode || Constants.expoConfig?.ios?.buildNumber || 'unknown');
+    const version = appVersion;
+    const buildNumber = appBuild || 'unknown';
     currentContext = {
       app_version: version,
       build_number: buildNumber,

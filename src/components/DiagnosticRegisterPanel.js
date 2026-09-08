@@ -60,7 +60,7 @@ function matchesFilter(record, filter) {
 }
 
 function eventLine(event) {
-  const detail = [event.module, event.screen, event.orientation, event.operation]
+  const detail = [event.module, event.screen, event.orientation, event.operation, event.nativeCode, event.reason]
     .filter(Boolean)
     .join(' · ');
   return detail;

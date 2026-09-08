@@ -138,6 +138,7 @@ public final class AndroidRootEncoderLiveStreamView extends FrameLayout
 
     public void stopStreamingExplicitly() {
         stopping = true;
+        disablePictureInPicture();
         reconnectPending = false;
         reconnectAttempts = 0;
         lastRtmpUrl = "";
@@ -145,6 +146,13 @@ public final class AndroidRootEncoderLiveStreamView extends FrameLayout
         suppressDisconnectCallback = true;
         stopAllInternal();
         suppressDisconnectCallback = false;
+    }
+
+    private void disablePictureInPicture() {
+        MainActivity.streamingPipActive = false;
+        if (reactContext.getCurrentActivity() instanceof MainActivity) {
+            ((MainActivity) reactContext.getCurrentActivity()).updateStreamingPipState(false);
+        }
     }
 
     private void startPendingWhenSurfaceReady() {
@@ -357,6 +365,7 @@ public final class AndroidRootEncoderLiveStreamView extends FrameLayout
 
     @Override
     public void onConnectionSuccess() {
+        if (stopping || released) return;
         everConnected = true;
         reconnectPending = false;
         reconnectAttempts = 0;
@@ -365,6 +374,7 @@ public final class AndroidRootEncoderLiveStreamView extends FrameLayout
 
     @Override
     public void onConnectionFailed(String reason) {
+        if (stopping || released) return;
         reconnectPending = false;
         String failureReason = reason == null || reason.isEmpty() ? "Connection failed" : reason;
         sendConnectionFailed(failureReason);
@@ -389,6 +399,7 @@ public final class AndroidRootEncoderLiveStreamView extends FrameLayout
 
     @Override
     public void onAuthError() {
+        if (stopping || released) return;
         sendConnectionFailed("YouTube authentication failed.");
     }
 
@@ -434,6 +445,7 @@ public final class AndroidRootEncoderLiveStreamView extends FrameLayout
         if (released) return;
         released = true;
         stopping = true;
+        disablePictureInPicture();
         reconnectPending = false;
         cancelPendingStart("The streaming screen was closed.");
         suppressDisconnectCallback = true;

@@ -6,6 +6,7 @@ import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.res.Configuration
 import android.util.Rational
+import android.util.Log
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -36,6 +37,26 @@ class MainActivity : ReactActivity() {
     streamingPipActive = false
     getSharedPreferences("community_connect_streaming", 0)
       .edit().putBoolean("pip_stream_active", false).apply()
+    updateStreamingPipState(false)
+  }
+
+  // Called only on the UI thread by both the native stream owner and JS bridge.
+  fun updateStreamingPipState(active: Boolean) {
+    streamingPipActive = active
+    getSharedPreferences("community_connect_streaming", 0)
+      .edit().putBoolean("pip_stream_active", active).apply()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      try {
+        setPictureInPictureParams(currentPipParams(active))
+      } catch (error: IllegalStateException) {
+        Log.w("StreamingPip", "Activity cannot update PiP parameters", error)
+      }
+    }
+  }
+
+  override fun onResume() {
+    super.onResume()
+    updateStreamingPipState(streamingPipActive)
   }
 
   private fun currentPipParams(autoEnter: Boolean): PictureInPictureParams {
@@ -54,16 +75,18 @@ class MainActivity : ReactActivity() {
 
   override fun onUserLeaveHint() {
     if (Build.VERSION.SDK_INT in Build.VERSION_CODES.O until Build.VERSION_CODES.S && streamingPipActive && !isInPictureInPictureMode) {
-      enterPictureInPictureMode(currentPipParams(false))
+      try {
+        enterPictureInPictureMode(currentPipParams(false))
+      } catch (error: IllegalStateException) {
+        Log.w("StreamingPip", "PiP is unavailable", error)
+      }
     }
     super.onUserLeaveHint()
   }
 
   override fun onConfigurationChanged(newConfig: Configuration) {
     super.onConfigurationChanged(newConfig)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && streamingPipActive) {
-      setPictureInPictureParams(currentPipParams(true))
-    }
+    updateStreamingPipState(streamingPipActive)
   }
 
   /**

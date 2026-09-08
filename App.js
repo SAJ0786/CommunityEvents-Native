@@ -19,7 +19,7 @@ import {
   View,
 } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
-import Constants from 'expo-constants';
+import { appVersion, appBuild } from './src/services/appVersion';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Location from 'expo-location';
@@ -74,14 +74,6 @@ import {
 } from './src/services/diagnostics';
 
 const logo = require('./assets/logo.png');
-const configuredApp = require('./app.json').expo;
-const appVersion = Constants.nativeAppVersion || Constants.expoConfig?.version || configuredApp.version;
-const configuredBuild = Platform.OS === 'ios'
-  ? (Constants.expoConfig?.ios?.buildNumber || configuredApp.ios?.buildNumber)
-  : (Constants.expoConfig?.android?.versionCode || configuredApp.android?.versionCode);
-const appBuild = Platform.OS === 'web'
-  ? ''
-  : (Constants.nativeBuildVersion || (configuredBuild ? String(configuredBuild) : ''));
 const CITY_STORAGE_KEY = '@community-events/selected-city';
 const MODULE_STORAGE_KEY = '@community-connect/default-module';
 const AUTO_EVENT_REFRESH_MS = 60000;

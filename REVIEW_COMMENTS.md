@@ -817,3 +817,42 @@ Implementation status: source complete; Firestore rule deployment and build 44 e
 - Keep the approved Community Events and Business Directory module cards and their descriptions below this unified message.
 
 Implementation status: native source and approved browser prototype updated; wording and module-card text hierarchy visually verified on S22 in build 44.
+
+### 2026-09-08 — Add Event date/time picker accessibility
+
+- Present iOS date/time wheels in a visible modal sheet instead of below the long form, with staged selection and explicit Cancel/Done controls.
+- Apply the shared picker to event date, start/end time and recurring start/end dates; retain Android's native picker dialog.
+- Dismiss the keyboard when opening the picker.
+
+Implementation status: source complete. Automated component regression tests and source checks passed; physical iPhone/Android verification in the next build is still required.
+
+### 2026-09-08 — Business approval undefined-field failure
+
+- Preserve the native Firebase administrator's UID/email explicitly: spreading the User instance omits its prototype getters, leaving approval and audit actor IDs undefined.
+- Retain administrator role checks, referrer confirmation, ABN verification and prior archived/deleted-business review requirements. Do not suppress undefined values globally or discard audit identity.
+- Regression tests exercise new listings and pending updates with/without ABNs, historical deletion review and rejection of non-admin approval attempts, checking every batch field for undefined values.
+
+Implementation status: source complete. `node scripts/test-event-picker-business-approval.cjs` and `npm.cmd run check` passed. Tests mock native/Firestore boundaries and do not approve or change live records; live approval verification in the next build remains required.
+
+### 2026-09-08 — PiP remains enabled after End Stream
+
+- Read the reported Android installation's diagnostic session: RTMPS start was acknowledged and connection succeeded; a disconnect callback followed the explicit native stop. The old handler could re-enable PiP using stale React state.
+- Revoke native-session ownership before stopping; ignore late success/failure/disconnect callbacks after End. Clear streaming/minimised state immediately, including when backend completion fails.
+- Cancel an Android start still waiting for camera/microphone permissions when End is pressed. Update Android PiP parameters on the UI thread and disable PiP from the native owner's stop/release path as well as JS.
+- iOS automatic PiP starts disabled and is disabled again on End. Prevent the underlying SDK's queued error handler from reconnecting after explicit stop.
+
+Implementation status: source complete; mocked lifecycle regression tests passed for late callbacks, backend failure and permission cancellation. Real-device PiP/end/foreground verification remains required. No APK/IPA build or live broadcast was initiated during this correction.
+
+### 2026-09-08 — iPhone native start acknowledgement / YouTube connection
+
+- The supplied iPhone installation's streaming session records start issued, then timeout, without a native start acknowledgement or connection result. This does not establish an RTMPS credentials/encoder failure.
+- Make the iOS Fabric component-provider mapping explicit in the pinned livestream dependency patch, avoiding reliance on source-crawling registration. Generated provider mapping verified against React Native's generator.
+- Distinguish an unacknowledged native command from a transport timeout; do not describe an unacknowledged command as confirmed LIVE or guaranteed automatic reconnection. Do not change working Android encoding or orientation settings based on this record.
+
+Implementation status: compatibility hardening and diagnostic changes complete; iPhone end-to-end streaming is NOT yet verified or marked resolved. Requires a user-built binary, native start acknowledgement and successful YouTube ingest verification. The Android session inspected did connect; a more recent failing session would be needed to establish a separate Android connection cause.
+
+### 2026-09-08 — Accurate build identification and stream diagnostics
+
+- Read installed native version/build from expo-application for Profile About, diagnostic register and Crashlytics instead of falling back to stale cross-platform config (which reported Build 48 for these installations).
+- Preserve diagnostic event names separately from native error codes, display native codes/reasons in the admin timeline, and redact RTMP URLs/stream keys from reports.
+- Validation: `npm.cmd run check`, `npm.cmd run test:regressions`, dependency patch reverse-check, and whitespace checks passed. Native compilation and device tests are intentionally left to the user's builds.

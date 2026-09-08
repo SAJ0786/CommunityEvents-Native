@@ -475,7 +475,10 @@ async function requireAdminSession() {
   if (role !== 'admin' && role !== 'superAdmin') {
     throw new Error('Administrator access is required for this action.');
   }
-  return { ...user, role };
+  // Native Firebase User exposes uid/email through prototype getters.
+  // Spreading the instance drops them and produces undefined approval fields.
+  if (!user.uid) throw new Error('Your sign-in session is missing a user ID. Please sign in again.');
+  return { uid: user.uid, email: user.email || '', role };
 }
 
 async function requireSuperAdminSession() {

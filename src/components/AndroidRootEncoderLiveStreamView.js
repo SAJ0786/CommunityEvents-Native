@@ -23,6 +23,7 @@ const AndroidRootEncoderLiveStreamView = forwardRef(({
   const nativeRef = useRef(null);
   const nextRequestId = useRef(1);
   const requestMap = useRef(new Map());
+  const startGeneration = useRef(0);
 
   const dispatchCommand = (name, args = []) => {
     const node = findNodeHandle(nativeRef.current);
@@ -34,6 +35,7 @@ const AndroidRootEncoderLiveStreamView = forwardRef(({
 
   useImperativeHandle(forwardedRef, () => ({
     startStreaming: async (streamKey, url) => {
+      const generation = ++startGeneration.current;
       if (Platform.OS !== 'android') throw new Error('Android RootEncoder is only available on Android.');
       const permissions = await PermissionsAndroid.requestMultiple([
         PermissionsAndroid.PERMISSIONS.CAMERA,
@@ -42,6 +44,7 @@ const AndroidRootEncoderLiveStreamView = forwardRef(({
       const denied = Object.entries(permissions)
         .filter(([, result]) => result !== PermissionsAndroid.RESULTS.GRANTED)
         .map(([permission]) => permission);
+      if (generation !== startGeneration.current) throw new Error('Streaming was stopped.');
       if (denied.length) {
         onPermissionsDenied?.(denied);
         throw new Error('Camera and microphone permissions are required.');
@@ -60,6 +63,7 @@ const AndroidRootEncoderLiveStreamView = forwardRef(({
       return promise;
     },
     stopStreaming: () => {
+      startGeneration.current += 1;
       dispatchCommand('stopStreaming');
       for (const pending of requestMap.current.values()) {
         pending.reject(new Error('Streaming was stopped.'));

@@ -57,7 +57,11 @@ if (!moduleExperienceSource.includes('Community Events Australia') || !moduleExp
 if (!legalSource.includes("SUPPORT_EMAIL = 'support@siza.info'") || !legalSource.includes("SIZA_WEBSITE_URL = 'https://siza.info'")) {
   throw new Error('Shared legal/contact configuration is missing the production SIZA support details.');
 }
-if (!appSource.includes('Constants.nativeAppVersion') || !appSource.includes('Constants.nativeBuildVersion')) {
+const appVersionSource = fs.readFileSync(path.join(projectRoot, 'src', 'services', 'appVersion.js'), 'utf8');
+if (!appSource.includes("from './src/services/appVersion'") ||
+    !appVersionSource.includes('Application.nativeApplicationVersion') ||
+    !appVersionSource.includes('Application.nativeBuildVersion') ||
+    !appSource.includes('appBuild={appBuild}')) {
   throw new Error('The About section must receive the native platform version and build metadata.');
 }
 if (!externalLinkSource.includes("Platform.OS === 'web'") || !externalLinkSource.includes("window.open(url, '_blank'")) {

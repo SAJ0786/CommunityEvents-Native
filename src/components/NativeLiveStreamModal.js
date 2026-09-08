@@ -95,8 +95,12 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
   };
 
   const stopNativeStreamOnce = reason => {
-    if (!nativeStreamStartedRef.current || !cameraMountedRef.current || !liveRef.current) return false;
+    const wasStarted = nativeStreamStartedRef.current;
+    // Revoke ownership before dispatching stop: native disconnect callbacks can
+    // arrive synchronously or after React has already rendered the next screen.
     nativeStreamStartedRef.current = false;
+    StreamingPip?.setStreamingActive?.(false);
+    if (!wasStarted || !cameraMountedRef.current || !liveRef.current) return false;
     try {
       liveRef.current.stopStreaming?.();
       logDiagnostic('STREAM_NATIVE_STOP_ISSUED', { reason, platform: Platform.OS });
@@ -108,12 +112,15 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
   };
 
   const minimiseStream = async () => {
+    if (!nativeStreamStartedRef.current) return;
     if (Platform.OS === 'android' && streaming && StreamingPip?.enterPictureInPicture) {
       const entered = await StreamingPip.enterPictureInPicture().catch(() => false);
       if (entered) return;
     }
     setMinimized(true);
-    if (streaming) setStatus('LIVE — the broadcast remains connected while you use the app.');
+    if (streaming) setStatus(connectionStateRef.current
+      ? 'LIVE — the broadcast remains connected while you use the app.'
+      : 'Connecting to YouTube. Keep the stream open.');
   };
 
   const restoreStream = () => {
@@ -333,6 +340,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
       const destination = splitRtmpDestination(result.rtmpUrl);
       if (!cameraMountedRef.current || !liveRef.current) throw new Error('The camera preview is still loading. Wait a moment and try again.');
       await wait(250);
+      if (attemptId !== streamAttemptRef.current) return;
       setConnecting(true);
       nativeStreamStartedRef.current = true;
       connectionStateRef.current = false;
@@ -343,13 +351,18 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
         protocol: destination.url.startsWith('rtmps://') ? 'rtmps' : 'rtmp',
       });
       const startCommand = liveRef.current.startStreaming(destination.streamKey, destination.url);
+      let nativeStartAcknowledged = false;
       if (attemptId !== streamAttemptRef.current) return;
       setInterrupted(false);
       setStatus('Connecting this phone’s camera to YouTube…');
       Promise.resolve(startCommand).then(started => {
         if (attemptId !== streamAttemptRef.current) return;
+        nativeStartAcknowledged = true;
         logDiagnostic('STREAM_NATIVE_START_ACKNOWLEDGED', { platform: Platform.OS, started: started !== false });
-        if (started !== false || connectionStateRef.current) return;
+        if (started !== false || connectionStateRef.current) {
+          StreamingPip?.setStreamingActive?.(true);
+          return;
+        }
         clearConnectionTimer();
         stopNativeStreamOnce('native_start_rejected');
         StreamingPip?.setStreamingActive?.(false);
@@ -372,10 +385,9 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
         setError(String(commandError?.message || commandError || 'The phone camera could not start the YouTube stream.'));
         recordNonFatalError(commandError, { operation: 'native_stream_start', platform: Platform.OS, orientation: streamOrientation });
       });
-      // Once native capture has been accepted, the session remains user-owned.
-      // A slow YouTube acknowledgement must not stop the camera or RTMP owner.
+      // Keep ownership while start is pending, but enable system PiP only after
+      // native acceptance or a native connection callback, not just JS dispatch.
       setStreaming(true);
-      StreamingPip?.setStreamingActive?.(true);
       clearConnectionTimer();
       connectionTimerRef.current = setTimeout(() => {
         if (attemptId !== streamAttemptRef.current || connectionStateRef.current) return;
@@ -384,14 +396,19 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
         setStreaming(true);
         setConnected(false);
         setInterrupted(true);
-        setStatus('The camera remains on while YouTube reconnects automatically.');
-        setError('YouTube has not acknowledged the camera yet. Keep this stream open; it will continue retrying until you end it.');
-        logDiagnostic('STREAM_CONNECTION_TIMEOUT', { platform: Platform.OS, orientation: streamOrientation });
+        setStatus(nativeStartAcknowledged ? 'Waiting for the YouTube connection.' : 'The native streaming command has not responded.');
+        setError(nativeStartAcknowledged
+          ? 'YouTube has not acknowledged the connection. Keep this session open, or use End Stream to stop it.'
+          : 'The phone has not confirmed stream start. This is not a confirmed live broadcast. Use End Stream to cancel and report the diagnostic ID.');
+        logDiagnostic(nativeStartAcknowledged ? 'STREAM_CONNECTION_TIMEOUT' : 'STREAM_NATIVE_START_TIMEOUT', { platform: Platform.OS, orientation: streamOrientation });
       }, 30000);
     } catch (streamError) {
+      if (attemptId !== streamAttemptRef.current) return;
       setConnecting(false);
       StreamingPip?.setStreamingActive?.(false);
       stopNativeStreamOnce('setup_error');
+      setStreaming(false);
+      setConnected(false);
       if (createdSessionId && !resumeExistingSession && !event.isLive) {
         endEventStream({ ...event, liveSource: 'native' }, createdSessionId).catch(() => {});
         setSessionId('');
@@ -400,7 +417,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
       setStatus('');
       recordNonFatalError(streamError, { operation: 'stream_setup', platform: Platform.OS, orientation: streamOrientation });
     } finally {
-      setBusy(false);
+      if (attemptId === streamAttemptRef.current) setBusy(false);
     }
   };
 
@@ -455,6 +472,11 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
       setConnecting(false);
       connectionStateRef.current = false;
       stopNativeStreamOnce('user_end');
+      setStreaming(false);
+      setConnected(false);
+      setInterrupted(false);
+      setMinimized(false);
+      pendingSessionRef.current = null;
       StreamingPip?.setStreamingActive?.(false);
       // The iOS SDK tears down RTMP and AVCapture asynchronously. Keep the
       // native view mounted for one short settling interval before unmounting
@@ -488,6 +510,8 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
       setStatus('');
       recordNonFatalError(streamError, { operation: 'stream_end', platform: Platform.OS });
     } finally {
+      // Backend completion failure must not leave the stopped phone PiP-enabled.
+      StreamingPip?.setStreamingActive?.(false);
       setBusy(false);
     }
   };
@@ -541,6 +565,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
               video={{ fps: 30, resolution: '720p', bitrate: 2000000, gopDuration: 1 }}
               audio={{ bitrate: 128000, sampleRate: 44100, isStereo: true }}
               onConnectionSuccess={() => {
+                if (!nativeStreamStartedRef.current) return;
                 clearConnectionTimer();
                 connectionStateRef.current = true;
                 setConnected(true);
@@ -548,6 +573,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
                 setStreaming(true);
                 StreamingPip?.setStreamingActive?.(true);
                 setInterrupted(false);
+                setError('');
                 setStatus('LIVE — YouTube is receiving the stream.');
                 logDiagnostic('STREAM_CONNECTION_SUCCESS', { platform: Platform.OS, orientation: streamOrientation });
                 const pending = pendingSessionRef.current;
@@ -568,6 +594,7 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
                 }
               }}
               onConnectionFailed={code => {
+                if (!nativeStreamStartedRef.current) return;
                 clearConnectionTimer();
                 connectionStateRef.current = false;
                 StreamingPip?.setStreamingActive?.(true);
@@ -580,10 +607,11 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
                 logDiagnostic('STREAM_CONNECTION_FAILED', { code: code || 'unknown', platform: Platform.OS, orientation: streamOrientation });
               }}
               onDisconnect={() => {
+                if (!nativeStreamStartedRef.current) return;
                 clearConnectionTimer();
                 connectionStateRef.current = false;
                 setConnected(false);
-                if (streaming || connecting) {
+                if (nativeStreamStartedRef.current) {
                   StreamingPip?.setStreamingActive?.(true);
                   setConnecting(true);
                   setStreaming(true);
