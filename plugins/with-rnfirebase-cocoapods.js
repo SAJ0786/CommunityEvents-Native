@@ -28,6 +28,10 @@ const HAISHINKIT_WORKAROUND = `${POST_INSTALL_LINE}
       File.join(installer.sandbox.root.to_s, 'ApiVideoLiveStream', 'Sources', 'ApiVideoLiveStream', 'ApiVideoLiveStream.swift')
     ).first
     if api_video_source && File.exist?(api_video_source)
+      # CocoaPods CDN downloads can be read-only on hosted CI runners. Make
+      # this one vendored source owner-writable before applying the
+      # deterministic lifecycle patch below.
+      File.chmod(File.stat(api_video_source).mode | 0200, api_video_source)
       source = File.read(api_video_source)
       forced_background_stop = '        self.stopStreaming()'
       unless source.include?('Community Connect keeps the stream user-owned')

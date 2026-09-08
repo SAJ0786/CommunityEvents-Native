@@ -125,7 +125,8 @@ for (const requiredIosStreamingGuard of [
   }
 }
 if (!iosPodfilePlugin.includes('preserve user-owned iOS livestreams') ||
-    !iosPodfilePlugin.includes('Community Connect keeps the stream user-owned')) {
+    !iosPodfilePlugin.includes('Community Connect keeps the stream user-owned') ||
+    !iosPodfilePlugin.includes('File.chmod(File.stat(api_video_source).mode | 0200')) {
   throw new Error('The ApiVideo iOS forced-background-stop patch is missing.');
 }
 for (const backgroundMode of ['audio', 'voip']) {
