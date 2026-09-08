@@ -2569,6 +2569,22 @@ export default function AdminDashboardScreen({
                     {adminEventView !== 'archived' ? (
                       <View style={styles.rowWrap}>
                         <Pressable
+                          onPress={() => onEditEvent?.(event)}
+                          disabled={!onEditEvent}
+                          style={[styles.secondaryButton, !onEditEvent && styles.disabledButton]}
+                        >
+                          <Text style={styles.secondaryButtonText}>Edit</Text>
+                        </Pressable>
+                        {series ? (
+                          <Pressable
+                            onPress={() => onEditSeries?.(event)}
+                            disabled={!onEditSeries}
+                            style={[styles.secondaryButton, !onEditSeries && styles.disabledButton]}
+                          >
+                            <Text style={styles.secondaryButtonText}>Edit Series</Text>
+                          </Pressable>
+                        ) : null}
+                        <Pressable
                           onPress={() => handleToggleAdminVisibility(event)}
                           disabled={adminVisibilityBusyId === event.id}
                           style={[styles.secondaryButton, adminVisibilityBusyId === event.id && styles.disabledButton]}

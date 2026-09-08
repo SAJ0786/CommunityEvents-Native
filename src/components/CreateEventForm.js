@@ -283,6 +283,7 @@ export default function CreateEventForm({
   error = '',
   success = '',
   canSubmit = true,
+  allowUnchangedSubmit = false,
 }) {
   const defaults = useMemo(() => ({
     hostName: defaultHostName,
@@ -458,8 +459,8 @@ export default function CreateEventForm({
     [defaultCity, defaults, initialEvent]
   );
   const isDirty = Boolean(localImage) || normaliseForComparison(form) !== normaliseForComparison(baseline);
-  const canSend = Object.keys(validation).length === 0 && (!initialEvent?.id || isDirty);
-  const unchangedEdit = Boolean(initialEvent?.id && !isDirty);
+  const canSend = Object.keys(validation).length === 0 && (!initialEvent?.id || isDirty || allowUnchangedSubmit);
+  const unchangedEdit = Boolean(initialEvent?.id && !isDirty && !allowUnchangedSubmit);
   const getDynamicOrganisationById = id => dynamicOrganisations.find(item => item.id === id);
   const getDynamicOrganisationBySlug = slug => dynamicOrganisations.find(item => item.slug === slug);
 

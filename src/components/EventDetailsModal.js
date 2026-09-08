@@ -61,6 +61,9 @@ function DetailRow({ label, icon, value }) {
 function ActionButton({ label, icon, iconNode, variant = 'subtle', onPress, disabled = false, style }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -291,7 +294,11 @@ export default function EventDetailsModal({
   const hasUploadedPoster = Boolean(event.imageUrl || event.posterUrl || event.poster || event.image || event.flyerUrl || event.flyer || event.imagePath || event.posterPath);
   const canSharePoster = hasUploadedPoster && hasPoster;
   const hostUid = getEventHostUid(event);
-  const canConnectHost = !isGuest && user?.uid && (!hostUid || hostUid !== user.uid);
+  // The current owner is the contact target. Ownership transfers update
+  // createdByUserId, so the old owner can contact the new owner while the new
+  // owner sees the same action disabled.
+  const canConnectHost = Boolean(!isGuest && user?.uid && (!hostUid || hostUid !== user.uid));
+  const isSeriesEvent = Boolean(event.isSeries || event.isRecurring || event.seriesId || event.recurringSeriesId);
 
   const shareTextOnly = async () => {
     try {
@@ -480,7 +487,7 @@ export default function EventDetailsModal({
                   {onRemoveLiveStale ? <ActionButton icon="broadcast-off" label="Remove Live Stale" variant="danger" onPress={() => onRemoveLiveStale(event)} /> : null}
                   <ActionButton icon="share-variant-outline" label="Share" variant="share" onPress={() => setShareOpen(true)} />
                   <ActionButton icon="map-marker-path" label="Directions" variant="primary" onPress={openDirections} disabled={isGuest || !fullAddress} />
-                  {canConnectHost ? <ActionButton icon="email-outline" label="Contact Host" onPress={() => { setHostMessageStatus(''); setHostMessageOpen(true); }} /> : null}
+                  <ActionButton icon="email-outline" label="Contact Host" disabled={!canConnectHost} onPress={() => { setHostMessageStatus(''); setHostMessageOpen(true); }} />
                   {!isGuest && event.isLive && hasPlayableLiveUrl && event.liveAppVisibility !== 'private' && !(canManageStream && onManageStream) ? <ActionButton iconNode={<FontAwesome name="youtube-play" size={22} color="#dc2626" />} label="Watch on YouTube" variant="danger" onPress={openLiveVideo} /> : null}
                   {canManageStream && onManageStream ? (
                     <ActionButton
@@ -494,11 +501,11 @@ export default function EventDetailsModal({
                   <ActionButton icon={reminder ? 'bell-check-outline' : 'alarm'} label={reminder ? 'Reminder Set' : 'Reminder'} onPress={() => { setReminderError(''); setReminderOpen(true); }} disabled={isGuest} />
                   <ActionButton icon="calendar-sync-outline" label="Sync Calendar" variant="primary" onPress={addToCalendar} disabled={isGuest} />
                   {onNiazArrangement ? <ActionButton icon="bowl-mix-outline" label="Niaz Arrangement" variant="share" onPress={() => onNiazArrangement(event)} /> : null}
-                  {onEdit ? <ActionButton icon="pencil-outline" label="Edit" onPress={() => onEdit(event)} /> : null}
-                  {onEditSeries ? <ActionButton icon="folder-edit-outline" label="Edit Series" onPress={() => onEditSeries(event)} /> : null}
-                  {onCopy ? <ActionButton icon="content-copy" label="Copy" onPress={() => onCopy(event)} /> : null}
-                  {onDelete ? <ActionButton icon="trash-can-outline" label="Delete" variant="danger" onPress={() => onDelete(event)} /> : null}
-                  {onDeleteSeries ? <ActionButton icon="delete-sweep-outline" label="Delete Series" variant="danger" onPress={() => onDeleteSeries(event)} /> : null}
+                  <ActionButton icon="pencil-outline" label="Edit" disabled={!onEdit} onPress={() => onEdit?.(event)} />
+                  {isSeriesEvent ? <ActionButton icon="folder-edit-outline" label="Edit Series" disabled={!onEditSeries} onPress={() => onEditSeries?.(event)} /> : null}
+                  <ActionButton icon="content-copy" label="Copy" disabled={!onCopy} onPress={() => onCopy?.(event)} />
+                  <ActionButton icon="trash-can-outline" label="Delete" variant="danger" disabled={!onDelete} onPress={() => onDelete?.(event)} />
+                  {isSeriesEvent ? <ActionButton icon="delete-sweep-outline" label="Delete Series" variant="danger" disabled={!onDeleteSeries} onPress={() => onDeleteSeries?.(event)} /> : null}
                 </View>
 
                 <Text style={styles.date}>{formatEventDate(event.eventDate)}</Text>
@@ -536,11 +543,9 @@ export default function EventDetailsModal({
               </Text>
             </ScrollView>
           </Animated.View>
-        </SafeAreaView>
-      </Modal>
 
-      <Modal transparent visible={shareOpen} animationType="fade" onRequestClose={() => setShareOpen(false)}>
-        <View style={styles.overlayRoot}>
+          {shareOpen ? <View style={styles.inlineOverlayLayer}>
+            <View style={styles.overlayRoot}>
           <Pressable style={styles.overlayBackdrop} onPress={() => setShareOpen(false)} />
           <View style={styles.overlayCard}>
             <Text style={styles.overlayTitle}>Share Event</Text>
@@ -554,11 +559,11 @@ export default function EventDetailsModal({
               <Text style={styles.overlayCloseText}>Cancel</Text>
             </Pressable>
           </View>
-        </View>
-      </Modal>
+            </View>
+          </View> : null}
 
-      <Modal transparent visible={hostMessageOpen} animationType="fade" onRequestClose={() => setHostMessageOpen(false)}>
-        <View style={styles.overlayRoot}>
+          {hostMessageOpen ? <View style={styles.inlineOverlayLayer}>
+            <View style={styles.overlayRoot}>
           <Pressable style={styles.overlayBackdrop} onPress={() => setHostMessageOpen(false)} />
           <View style={styles.overlayCard}>
             <Text style={styles.overlayTitle}>Contact Host</Text>
@@ -588,11 +593,11 @@ export default function EventDetailsModal({
               <Text style={styles.overlayCloseText}>{hostMessageStatus.startsWith('Message sent') ? 'Done' : 'Cancel'}</Text>
             </Pressable>
           </View>
-        </View>
-      </Modal>
+            </View>
+          </View> : null}
 
-      <Modal transparent visible={reminderOpen} animationType="fade" onRequestClose={() => setReminderOpen(false)}>
-        <View style={styles.overlayRoot}>
+          {reminderOpen ? <View style={styles.inlineOverlayLayer}>
+            <View style={styles.overlayRoot}>
           <Pressable style={styles.overlayBackdrop} onPress={() => setReminderOpen(false)} />
           <View style={styles.overlayCard}>
             <Text style={styles.overlayTitle}>Event Reminder</Text>
@@ -624,16 +629,18 @@ export default function EventDetailsModal({
               <Text style={styles.overlayCloseText}>Cancel</Text>
             </Pressable>
           </View>
-        </View>
-      </Modal>
+            </View>
+          </View> : null}
 
-      <Modal transparent visible={posterOpen} animationType="fade" onRequestClose={() => setPosterOpen(false)}>
-        <View style={styles.posterModalRoot}>
+          {posterOpen ? <View style={styles.inlineOverlayLayer}>
+            <View style={styles.posterModalRoot}>
           <Pressable style={styles.posterBackdrop} onPress={() => setPosterOpen(false)} />
           <Pressable style={styles.posterModalContent} onPress={() => setPosterOpen(false)}>
             {canSharePoster ? <Image source={{ uri: posterUri }} style={styles.posterFullscreen} resizeMode="contain" /> : null}
           </Pressable>
-        </View>
+            </View>
+          </View> : null}
+        </SafeAreaView>
       </Modal>
     </>
   );
@@ -644,6 +651,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(15, 23, 42, 0.36)',
+  },
+  inlineOverlayLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
+    elevation: 1000,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,

@@ -372,7 +372,7 @@ function seriesQueryForEvent(event = {}) {
   };
 }
 
-export async function updateEventSeries(sourceEvent, payload = {}) {
+export async function updateEventSeries(sourceEvent, payload = {}, schedule = null) {
   const user = auth.currentUser;
   if (!user || user.isAnonymous) throw new Error('Sign in to update this recurring series.');
 
@@ -415,10 +415,61 @@ export async function updateEventSeries(sourceEvent, payload = {}) {
   const snapshot = await getDocs(ref);
   if (snapshot.empty) throw new Error('No matching series events were found.');
 
-  for (let offset = 0; offset < snapshot.docs.length; offset += 450) {
+  const existingDocs = [...snapshot.docs].sort((left, right) => {
+    const leftEvent = left.data();
+    const rightEvent = right.data();
+    const indexDifference = Number(leftEvent.recurrenceIndex || 0) - Number(rightEvent.recurrenceIndex || 0);
+    return indexDifference || compareEventsByDateTime(leftEvent, rightEvent);
+  });
+  const occurrences = Array.isArray(schedule?.occurrences) ? schedule.occurrences : null;
+  if (occurrences && occurrences.length !== existingDocs.length) {
+    throw new Error(`Keep this series at ${existingDocs.length} occurrences. You can change its dates and recurrence pattern without adding or removing events.`);
+  }
+  const recurrence = schedule?.recurrence || sourceEvent.recurrenceRuleSnapshot || {};
+  const recurrenceRuleSnapshot = occurrences ? {
+    calendarType: recurrence.calendarType || 'gregorian',
+    frequency: recurrence.frequency || 'week',
+    repeatEvery: Number(recurrence.repeatEvery || 1),
+    endMode: recurrence.endMode || 'count',
+    endDate: recurrence.endMode === 'date' && recurrence.calendarType !== 'hijri' ? recurrence.endDate || null : null,
+    endHijri: recurrence.endMode === 'date' && recurrence.calendarType === 'hijri' ? recurrence.endHijri || null : null,
+    occurrenceCount: recurrence.endMode === 'count' ? Number(recurrence.occurrenceCount || occurrences.length) : null,
+  } : sourceEvent.recurrenceRuleSnapshot || {};
+  const seriesStartDate = occurrences?.[0]?.eventDate || sourceEvent.seriesStartDate || sourceEvent.eventDate;
+  const seriesEndDate = occurrences?.[occurrences.length - 1]?.eventDate || sourceEvent.seriesEndDate || sourceEvent.eventDate;
+
+  for (let offset = 0; offset < existingDocs.length; offset += 450) {
     const batch = writeBatch(db);
-    snapshot.docs.slice(offset, offset + 450).forEach(item => {
-      batch.update(item.ref, { ...updates, updatedAt: serverTimestamp() });
+    existingDocs.slice(offset, offset + 450).forEach((item, indexInChunk) => {
+      const occurrence = occurrences?.[offset + indexInChunk];
+      const prayerTimes = occurrence && payload.timeMode === 'prayer'
+        ? calculatePrayerTimes(occurrence.eventDate, payload.address)
+        : null;
+      const prayerName = payload.prayerName || '';
+      const prayerOffsetMinutes = Number(payload.prayerOffsetMinutes || 0);
+      batch.update(item.ref, {
+        ...updates,
+        ...(occurrence ? {
+          eventDate: occurrence.eventDate,
+          startTime: prayerTimes?.[prayerName]
+            ? applyPrayerOffset(prayerTimes[prayerName], prayerOffsetMinutes)
+            : payload.startTime,
+          prayerLabel: prayerName ? prayerLabel(prayerName) : '',
+          prayerOffsetMinutes,
+          prayerTimeZone: prayerTimes?.timeZone || payload.prayerTimeZone || '',
+          hijriDate: occurrence.hijriDate || '',
+          hijriDay: occurrence.hijriDay || null,
+          hijriMonth: occurrence.hijriMonth || null,
+          hijriYear: occurrence.hijriYear || null,
+          enteredAsHijri: Boolean(occurrence.enteredAsHijri),
+          recurrenceIndex: offset + indexInChunk + 1,
+          recurrenceTotal: occurrences.length,
+          recurrenceRuleSnapshot,
+          seriesStartDate,
+          seriesEndDate,
+        } : {}),
+        updatedAt: serverTimestamp(),
+      });
     });
     await batch.commit();
   }
@@ -426,13 +477,17 @@ export async function updateEventSeries(sourceEvent, payload = {}) {
   try {
     await setDoc(doc(db, 'recurringEventSeries', seriesId), {
       title: `${payload.eventTypeDisplay || payload.eventType || 'Event'} - ${payload.hostName || ''}`.trim(),
+      startDate: seriesStartDate,
+      endDate: seriesEndDate,
+      totalEvents: existingDocs.length,
+      rule: recurrenceRuleSnapshot,
       updatedAt: serverTimestamp(),
     }, { merge: true });
   } catch (metadataError) {
     if (!String(metadataError?.code || '').includes('permission-denied')) throw metadataError;
   }
 
-  return snapshot.docs.length;
+  return { totalEvents: existingDocs.length };
 }
 
 export async function deleteEventSeries(sourceEvent) {

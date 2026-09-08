@@ -586,8 +586,13 @@ function MainApp() {
   );
 
   const selectedEventOwned = useMemo(() => (
-    Boolean(selectedEvent?.id && myEvents.some(event => event.id === selectedEvent.id))
-  ), [myEvents, selectedEvent?.id]);
+    Boolean(selectedEvent?.id && currentUser?.uid && (
+      selectedEvent.createdByUserId === currentUser.uid
+      || selectedEvent.ownerUid === currentUser.uid
+      || selectedEvent.createdBy === currentUser.uid
+      || myEvents.some(event => event.id === selectedEvent.id)
+    ))
+  ), [currentUser?.uid, myEvents, selectedEvent]);
   const adminCanManageSelected = useMemo(() => {
     if (!selectedEvent?.id) return false;
     if (profile?.role === 'superAdmin') return true;
@@ -793,8 +798,8 @@ function MainApp() {
       };
 
       if (editingEvent?.__editSeries) {
-        const updatedCount = await updateEventSeries(editingEvent, submissionPayload);
-        setCreateSuccess(`${updatedCount} events in the series updated successfully.`);
+        const result = await updateEventSeries(editingEvent, submissionPayload);
+        setCreateSuccess(`${result.totalEvents} events in the series updated successfully.`);
       } else if (editingEvent?.id) {
         await updateEventSubmission(editingEvent.id, submissionPayload);
         setCreateSuccess('Event updated.');
@@ -837,14 +842,20 @@ function MainApp() {
         submittedByName: profile?.fullName || currentUser?.displayName || currentUser?.email || '',
         submittedByRole: profile?.role || 'user',
       };
-      const result = await createRecurringEventSeries({
-        payload: submissionPayload,
-        occurrences: schedule.occurrences,
-        recurrence: schedule.recurrence,
-        profile,
-      });
-      setCreateSuccess(`${result.totalEvents} recurring event${result.totalEvents === 1 ? '' : 's'} added successfully.`);
+      if (editingEvent?.__editSeries) {
+        const result = await updateEventSeries(editingEvent, submissionPayload, schedule);
+        setCreateSuccess(`${result.totalEvents} events and the recurrence schedule were updated successfully.`);
+      } else {
+        const result = await createRecurringEventSeries({
+          payload: submissionPayload,
+          occurrences: schedule.occurrences,
+          recurrence: schedule.recurrence,
+          profile,
+        });
+        setCreateSuccess(`${result.totalEvents} recurring event${result.totalEvents === 1 ? '' : 's'} added successfully.`);
+      }
       await loadEvents({ refresh: true });
+      setEditingEvent(null);
       setCreateMode('');
       setActiveTab('my_events');
     } catch (err) {
@@ -852,7 +863,7 @@ function MainApp() {
     } finally {
       setCreateBusy(false);
     }
-  }, [currentUser?.displayName, currentUser?.email, currentUser?.phoneNumber, currentUser?.uid, loadEvents, profile]);
+  }, [currentUser?.displayName, currentUser?.email, currentUser?.phoneNumber, currentUser?.uid, editingEvent, loadEvents, profile]);
 
   const handleDeleteMyEvent = useCallback(async event => {
     if (!event?.id) return;
@@ -897,7 +908,7 @@ function MainApp() {
       return;
     }
     setEditingEvent({ ...event, __editSeries: true });
-    setCreateMode('single');
+    setCreateMode('recurring');
     setCreateError('');
     setCreateSuccess('');
     setActiveTab('create');
@@ -1352,7 +1363,7 @@ function MainApp() {
           onToggleVisibility={handleToggleVisibility}
           visibilityBusyId={visibilityBusyId}
           seriesCounts={myEventSeriesCounts}
-          onEditSeries={profile?.role === 'admin' || profile?.role === 'superAdmin' ? handleEditSeries : undefined}
+          onEditSeries={handleEditSeries}
           onDeleteSeries={profile?.role === 'admin' || profile?.role === 'superAdmin' ? handleDeleteSeries : undefined}
           deletingSeriesId={deleteSeriesBusyId}
         />
@@ -1405,17 +1416,20 @@ function MainApp() {
           canCreateRecurring={profile?.role === 'admin' || profile?.role === 'superAdmin'}
           onChoose={setCreateMode}
         />
-      ) : activeTab === 'create' && createMode === 'recurring' && !editingEvent ? (
+      ) : activeTab === 'create' && createMode === 'recurring' && (!editingEvent || editingEvent.__editSeries) ? (
         <RecurringEventForm
+          key={editingEvent?.seriesId || editingEvent?.recurringSeriesId || 'new-recurring-series'}
           defaultCity={selectedCity}
           defaultHostName={profile?.fullName || currentUser?.displayName || ''}
           defaultHostPhone={profile?.phone || currentUser?.phoneNumber || ''}
           existingEvents={events}
+          initialEvent={editingEvent?.__editSeries ? editingEvent : null}
+          editing={Boolean(editingEvent?.__editSeries)}
           submitting={createBusy}
           error={createError}
           success={createSuccess}
           onSubmit={handleCreateRecurringEvents}
-          onBackToChoice={() => setCreateMode('')}
+          onBackToChoice={editingEvent?.__editSeries ? handleCancelEdit : () => setCreateMode('')}
           onRequireSignIn={() => requestSignIn('Sign in to add recurring events.')}
         />
       ) : activeTab === 'create' ? (
@@ -1495,7 +1509,7 @@ function MainApp() {
           setSelectedEvent(null);
           handleCopyMyEvent(event);
         } : undefined}
-        onEditSeries={adminCanManageSelected && (selectedEvent?.seriesId || selectedEvent?.recurringSeriesId) ? event => {
+        onEditSeries={canManageSelectedEvent && (selectedEvent?.seriesId || selectedEvent?.recurringSeriesId) ? event => {
           setSelectedEvent(null);
           handleEditSeries(event);
         } : undefined}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import EventDateTimePicker from './EventDateTimePicker';
 import CreateEventForm from './CreateEventForm';
@@ -106,24 +106,37 @@ export default function RecurringEventForm({
   submitting,
   error,
   success,
+  initialEvent = null,
+  editing = false,
   onSubmit,
   onBackToChoice,
   onRequireSignIn,
 }) {
   const today = formatLocalDate(new Date());
+  const existingRule = initialEvent?.recurrenceRuleSnapshot || {};
+  const initialStartDate = initialEvent?.seriesStartDate || initialEvent?.eventDate || today;
   const [stage, setStage] = useState('schedule');
-  const [calendarType, setCalendarType] = useState('gregorian');
-  const [startDate, setStartDate] = useState(today);
-  const [frequency, setFrequency] = useState('week');
-  const [repeatEvery, setRepeatEvery] = useState('1');
-  const [endMode, setEndMode] = useState('count');
-  const [endDate, setEndDate] = useState(defaultEndDate('week', today));
-  const [occurrenceCount, setOccurrenceCount] = useState('4');
+  const [calendarType, setCalendarType] = useState(existingRule.calendarType || (initialEvent?.enteredAsHijri ? 'hijri' : 'gregorian'));
+  const [startDate, setStartDate] = useState(initialStartDate);
+  const [frequency, setFrequency] = useState(existingRule.frequency || 'week');
+  const [repeatEvery, setRepeatEvery] = useState(String(existingRule.repeatEvery || 1));
+  const [endMode, setEndMode] = useState(existingRule.endMode || 'count');
+  const [endDate, setEndDate] = useState(existingRule.endDate || initialEvent?.seriesEndDate || defaultEndDate(existingRule.frequency || 'week', initialStartDate));
+  const [occurrenceCount, setOccurrenceCount] = useState(String(existingRule.occurrenceCount || initialEvent?.recurrenceTotal || 4));
   const [overrides, setOverrides] = useState([]);
   const [settingsReady, setSettingsReady] = useState(false);
-  const [hijriStart, setHijriStart] = useState({ day: '', month: '', year: '' });
-  const [hijriEnd, setHijriEnd] = useState({ day: '', month: '', year: '' });
+  const [hijriStart, setHijriStart] = useState({
+    day: String(initialEvent?.hijriDay || ''),
+    month: String(initialEvent?.hijriMonth || ''),
+    year: String(initialEvent?.hijriYear || ''),
+  });
+  const [hijriEnd, setHijriEnd] = useState({
+    day: String(existingRule.endHijri?.day || ''),
+    month: String(existingRule.endHijri?.month || ''),
+    year: String(existingRule.endHijri?.year || ''),
+  });
   const [datePicker, setDatePicker] = useState('');
+  const scheduleReadyRef = useRef(false);
 
   const handleDatePicker = (event, value) => {
     const kind = datePicker;
@@ -137,13 +150,21 @@ export default function RecurringEventForm({
     getHijriSettings().then(settings => {
       const loaded = settings.overrides || [];
       setOverrides(loaded);
-      const current = getHijriParts(today, loaded);
-      setHijriStart({ day: String(current.day || 1), month: String(current.month || 1), year: String(current.year || 1448) });
-      setHijriEnd({ day: String(Math.min((current.day || 1) + 29, 30)), month: String(current.month || 1), year: String(current.year || 1448) });
+      const current = getHijriParts(initialStartDate, loaded);
+      if (!initialEvent?.hijriDay || !initialEvent?.hijriMonth || !initialEvent?.hijriYear) {
+        setHijriStart({ day: String(current.day || 1), month: String(current.month || 1), year: String(current.year || 1448) });
+      }
+      if (!existingRule.endHijri?.day || !existingRule.endHijri?.month || !existingRule.endHijri?.year) {
+        setHijriEnd({ day: String(Math.min((current.day || 1) + 29, 30)), month: String(current.month || 1), year: String(current.year || 1448) });
+      }
     }).finally(() => setSettingsReady(true));
-  }, [today]);
+  }, [existingRule.endHijri?.day, existingRule.endHijri?.month, existingRule.endHijri?.year, initialEvent?.hijriDay, initialEvent?.hijriMonth, initialEvent?.hijriYear, initialStartDate]);
 
   useEffect(() => {
+    if (!scheduleReadyRef.current) {
+      scheduleReadyRef.current = true;
+      return;
+    }
     setEndDate(defaultEndDate(frequency, startDate));
     if (frequency === 'year' && Number(occurrenceCount) > 5) setOccurrenceCount('5');
   }, [frequency, startDate]);
@@ -185,11 +206,16 @@ export default function RecurringEventForm({
     endHijri: hijriEnd,
     occurrenceCount: Number(occurrenceCount),
   }), [calendarType, endDate, endMode, frequency, hijriEnd, occurrenceCount, repeatEvery]);
+  const expectedOccurrenceCount = editing ? Number(initialEvent?.recurrenceTotal || 0) : 0;
+  const scheduleCountError = expectedOccurrenceCount && preview.occurrences.length !== expectedOccurrenceCount
+    ? `Keep this series at ${expectedOccurrenceCount} occurrences. Change the recurrence settings until the preview shows ${expectedOccurrenceCount} events.`
+    : '';
 
-  const initialEvent = useMemo(() => {
+  const detailsInitialEvent = useMemo(() => {
     const first = preview.occurrences[0];
     if (!first) return null;
     return {
+      ...(editing && initialEvent ? initialEvent : {}),
       metroArea: defaultCity,
       eventDate: first.eventDate,
       hijriDate: first.hijriDate,
@@ -198,23 +224,24 @@ export default function RecurringEventForm({
       hijriYear: first.hijriYear || null,
       enteredAsHijri: first.enteredAsHijri,
     };
-  }, [defaultCity, preview.occurrences]);
+  }, [defaultCity, editing, initialEvent, preview.occurrences]);
 
-  if (stage === 'details' && initialEvent) {
+  if (stage === 'details' && detailsInitialEvent) {
     return (
       <CreateEventForm
         defaultCity={defaultCity}
         defaultHostName={defaultHostName}
         defaultHostPhone={defaultHostPhone}
         existingEvents={existingEvents}
-        initialEvent={initialEvent}
-        title="Recurring Event"
+        initialEvent={detailsInitialEvent}
+        title={editing ? 'Edit Entire Series' : 'Recurring Event'}
         subtitle={`${recurrenceLabel(frequency, repeatEvery)} - ${preview.occurrences.length} event${preview.occurrences.length === 1 ? '' : 's'} - ${preview.occurrences[0].eventDate} to ${preview.occurrences[preview.occurrences.length - 1].eventDate}`}
-        submitLabel={`Create ${preview.occurrences.length} recurring event${preview.occurrences.length === 1 ? '' : 's'}`}
+        submitLabel={editing ? `Update ${preview.occurrences.length} series event${preview.occurrences.length === 1 ? '' : 's'}` : `Create ${preview.occurrences.length} recurring event${preview.occurrences.length === 1 ? '' : 's'}`}
         submitting={submitting}
         error={error}
         success={success}
         canSubmit
+        allowUnchangedSubmit={editing}
         hideDate
         onSubmit={payload => onSubmit(payload, { occurrences: preview.occurrences, recurrence })}
         onCancel={() => setStage('schedule')}
@@ -226,8 +253,8 @@ export default function RecurringEventForm({
   return (
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       <View style={styles.card}>
-        <Text style={styles.title}>Recurring Event</Text>
-        <Text style={styles.subtitle}>Create repeating events from one shared set of details. Dates are previewed before saving.</Text>
+        <Text style={styles.title}>{editing ? 'Edit Entire Series' : 'Recurring Event'}</Text>
+        <Text style={styles.subtitle}>{editing ? 'Update the recurrence schedule and shared event details. Review the regenerated dates before saving.' : 'Create repeating events from one shared set of details. Dates are previewed before saving.'}</Text>
 
         <ToggleRow
           options={[{ value: 'gregorian', label: 'Gregorian' }, { value: 'hijri', label: 'Hijri' }]}
@@ -253,7 +280,7 @@ export default function RecurringEventForm({
           </>
         )}
 
-        {datePicker ? <EventDateTimePicker key={datePicker} title={datePicker === 'start' ? 'First event date' : 'Last event date'} value={parseLocalDate(datePicker === 'start' ? startDate : endDate) || new Date()} mode="date" minimumDate={new Date()} onChange={handleDatePicker} onClose={() => setDatePicker('')} /> : null}
+        {datePicker ? <EventDateTimePicker key={datePicker} title={datePicker === 'start' ? 'First event date' : 'Last event date'} value={parseLocalDate(datePicker === 'start' ? startDate : endDate) || new Date()} mode="date" minimumDate={editing ? undefined : new Date()} onChange={handleDatePicker} onClose={() => setDatePicker('')} /> : null}
 
         <Text style={styles.sectionLabel}>Frequency *</Text>
         <ToggleRow options={FREQUENCIES} value={frequency} onChange={setFrequency} />
@@ -290,10 +317,10 @@ export default function RecurringEventForm({
           {recurrenceLabel(frequency, repeatEvery)}. Daily, weekly and monthly events are limited to one year. Yearly events are limited to 5 occurrences.
         </Text>
 
-        {preview.error ? <Text style={styles.error}>{preview.error}</Text> : null}
+        {preview.error || scheduleCountError ? <Text style={styles.error}>{preview.error || scheduleCountError}</Text> : null}
         {preview.occurrences.length ? (
           <View style={styles.preview}>
-            <Text style={styles.previewTitle}>Preview: {preview.occurrences.length} event{preview.occurrences.length === 1 ? '' : 's'} will be created</Text>
+            <Text style={styles.previewTitle}>Preview: {preview.occurrences.length} event{preview.occurrences.length === 1 ? '' : 's'} will be {editing ? 'kept in the updated series' : 'created'}</Text>
             <View style={styles.previewDates}>
               {preview.occurrences.slice(0, 10).map((item, index) => (
                 <View key={`${item.eventDate}-${index}`} style={styles.dateChip}>
@@ -306,11 +333,11 @@ export default function RecurringEventForm({
         ) : null}
 
         <Pressable
-          disabled={!preview.occurrences.length}
+          disabled={!preview.occurrences.length || Boolean(scheduleCountError)}
           onPress={() => setStage('details')}
-          style={[styles.primaryButton, !preview.occurrences.length && styles.disabledButton]}
+          style={[styles.primaryButton, (!preview.occurrences.length || scheduleCountError) && styles.disabledButton]}
         >
-          <Text style={styles.primaryText}>Continue to Event Details</Text>
+          <Text style={styles.primaryText}>{editing ? 'Continue to Shared Event Details' : 'Continue to Event Details'}</Text>
         </Pressable>
         <NativeBackButton onPress={onBackToChoice} style={styles.backButton} />
       </View>

@@ -68,21 +68,19 @@ export default function MyEventsScreen({
           <Pressable onPress={() => onEdit?.(event)} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}>
             <Text style={styles.editText}>Edit</Text>
           </Pressable>
-          {onEditSeries && (event.seriesId || event.recurringSeriesId) ? (
-            <Pressable onPress={() => onEditSeries(event)} style={({ pressed }) => [styles.seriesButton, pressed && styles.pressed]}>
+          {event.seriesId || event.recurringSeriesId ? (
+            <Pressable disabled={!onEditSeries} onPress={() => onEditSeries?.(event)} style={({ pressed }) => [styles.seriesButton, !onEditSeries && styles.disabled, pressed && onEditSeries && styles.pressed]}>
               <Text style={styles.seriesText}>Edit Entire Series</Text>
             </Pressable>
           ) : null}
-          {onCopy ? (
-            <Pressable onPress={() => onCopy(event)} style={({ pressed }) => [styles.copyButton, pressed && styles.pressed]}>
-              <Text style={styles.copyText}>Copy</Text>
-            </Pressable>
-          ) : null}
-          {onDeleteSeries && (event.seriesId || event.recurringSeriesId) ? (
+          <Pressable disabled={!onCopy} onPress={() => onCopy?.(event)} style={({ pressed }) => [styles.copyButton, !onCopy && styles.disabled, pressed && onCopy && styles.pressed]}>
+            <Text style={styles.copyText}>Copy</Text>
+          </Pressable>
+          {event.seriesId || event.recurringSeriesId ? (
             <Pressable
-              onPress={() => onDeleteSeries(event)}
-              disabled={deletingSeriesId === (event.seriesId || event.recurringSeriesId)}
-              style={({ pressed }) => [styles.deleteSeriesButton, pressed && styles.pressed, deletingSeriesId === (event.seriesId || event.recurringSeriesId) && styles.disabled]}
+              onPress={() => onDeleteSeries?.(event)}
+              disabled={!onDeleteSeries || deletingSeriesId === (event.seriesId || event.recurringSeriesId)}
+              style={({ pressed }) => [styles.deleteSeriesButton, pressed && onDeleteSeries && styles.pressed, (!onDeleteSeries || deletingSeriesId === (event.seriesId || event.recurringSeriesId)) && styles.disabled]}
             >
               {deletingSeriesId === (event.seriesId || event.recurringSeriesId) ? (
                 <ActivityIndicator color={colors.danger} size="small" />
