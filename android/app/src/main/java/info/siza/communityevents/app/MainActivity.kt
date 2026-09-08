@@ -18,6 +18,11 @@ import expo.modules.ReactActivityDelegateWrapper
 class MainActivity : ReactActivity() {
   companion object {
     @JvmStatic var streamingPipActive: Boolean = false
+
+    @JvmStatic
+    fun clearStreamingPipActive() {
+      streamingPipActive = false
+    }
   }
 
   override fun attachBaseContext(newBase: Context) {

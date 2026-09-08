@@ -149,7 +149,9 @@ public final class AndroidRootEncoderLiveStreamView extends FrameLayout
     }
 
     private void disablePictureInPicture() {
-        MainActivity.streamingPipActive = false;
+        // Kotlin properties expose Java accessors rather than a public backing
+        // field. Use the explicit bridge so this also compiles in release AABs.
+        MainActivity.clearStreamingPipActive();
         if (reactContext.getCurrentActivity() instanceof MainActivity) {
             ((MainActivity) reactContext.getCurrentActivity()).updateStreamingPipState(false);
         }

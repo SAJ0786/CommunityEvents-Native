@@ -161,9 +161,13 @@ function testNativeIntegration() {
   const android = read('android/app/src/main/java/info/siza/communityevents/app/StreamingPipModule.kt');
   assert.match(android,/UiThreadUtil.runOnUiThread/);
   assert.match(android,/STREAM_PIP_MODE_CHANGED/);
-  assert.match(read('android/app/src/main/java/info/siza/communityevents/app/MainActivity.kt'), /override fun onPictureInPictureModeChanged[\s\S]*StreamingPipModule.notifyModeChanged/);
+  const activity = read('android/app/src/main/java/info/siza/communityevents/app/MainActivity.kt');
+  assert.match(activity, /override fun onPictureInPictureModeChanged[\s\S]*StreamingPipModule.notifyModeChanged/);
+  assert.match(activity, /@JvmStatic\s+fun clearStreamingPipActive\(\)/);
   const owner = read('android/app/src/main/java/info/siza/communityevents/app/AndroidRootEncoderLiveStreamView.java');
   assert.match(owner,/stopStreamingExplicitly\(\) \{\s*stopping = true;\s*disablePictureInPicture\(\)/);
+  assert.match(owner, /MainActivity\.clearStreamingPipActive\(\)/);
+  assert.doesNotMatch(owner, /MainActivity\.streamingPipActive\s*=/);
 }
 function testMetadata() {
   for (const platform of ['ios','android']) {
