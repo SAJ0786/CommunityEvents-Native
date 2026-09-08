@@ -42,16 +42,17 @@ Use Community Businesses Australia to discover local services by city, category 
 
 You can browse as a guest or sign in with a verified Australian mobile number for account features. Events and business information is user-submitted. Always verify event details with the host and independently check a business's identity, ownership, licences, qualifications, insurance, service quality and legal compliance before engaging it. An ABN Verified badge confirms only the recorded ABN status/name check at the stated time; it is not an endorsement.
 
-## Public URLs — must be updated before submission
+## Public URLs
 
-- Privacy Policy: https://communityevents.siza.info/privacy.html
-- Terms of Use: https://communityevents.siza.info/terms.html
-- Support: https://communityevents.siza.info/support.html
-- Account deletion: https://communityevents.siza.info/delete-account.html
+- Privacy Policy: https://siza.info/privacy.html
+- Terms of Use: https://siza.info/terms.html
+- Support: https://siza.info/support.html
+- Account deletion: https://siza.info/delete-account.html
+- User Guide: https://siza.info/docs/user-guide.html
 - Main SIZA website: https://siza.info
 - Support email: support@siza.info
 
-The consolidated local drafts were refreshed on 6 September 2026, but the first two published pages still describe the Events product and must be replaced with legally reviewed consolidated Community Connect Australia versions before either store submission. The User Guide, Support and Account Deletion pages must also replace the legacy Gmail address with `support@siza.info`. Native-entry legal pages must not contain Home, Back to App or PWA navigation links.
+The consolidated Community Connect Australia drafts were refreshed on 8 September 2026 and are published under `siza.info` using the shared SIZA visual theme. Privacy and Terms remain drafts pending professional Australian legal review before either public store submission. Native-entry legal pages must not contain Home or Back to App controls; desktop PWA links open these pages separately so users do not lose their place in the app.
 
 ## Reviewer notes draft
 
