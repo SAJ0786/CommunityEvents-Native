@@ -23,6 +23,8 @@ Remove-Item Env:CCA_TEST_VERIFICATION_CODE
 
 Use a test timeout of at least five minutes. The script signs in, asserts that the authenticated Home tab is present, captures a screenshot, and then hands control back to the normal Robo crawler.
 
+The script waits up to 20 seconds for the verification-code field instead of relying on a fixed delay. This accommodates slower Firebase phone-auth transitions on newer physical and virtual Android devices.
+
 The APK must include the accessibility labels added with this script. Older APKs might not expose stable identifiers for the consent switch and phone fields.
 
 ## App Check for device-farm APKs

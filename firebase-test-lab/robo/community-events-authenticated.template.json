@@ -62,9 +62,14 @@
         "description": "Request the fixed Firebase test verification code"
       },
       {
-        "eventType": "WAIT",
-        "delayTime": 3000,
-        "description": "Wait for the verification form"
+        "eventType": "WAIT_FOR_ELEMENT",
+        "delayTime": 20000,
+        "elementDescriptors": [
+          {
+            "contentDescription": "Six digit verification code"
+          }
+        ],
+        "description": "Wait up to 20 seconds for the verification form"
       },
       {
         "eventType": "VIEW_TEXT_CHANGED",
