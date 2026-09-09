@@ -72,14 +72,23 @@
         "description": "Wait up to 20 seconds for the verification form"
       },
       {
-        "eventType": "VIEW_TEXT_CHANGED",
+        "eventType": "DISABLE_KEYBOARD",
+        "description": "Disable the soft keyboard before entering the verification code"
+      },
+      {
+        "eventType": "ENTER_TEXT",
         "replacementText": "__TEST_VERIFICATION_CODE__",
         "elementDescriptors": [
           {
             "contentDescription": "Six digit verification code"
           }
         ],
-        "description": "Enter the fixed Firebase test verification code"
+        "description": "Enter the fixed Firebase test verification code and finish text input"
+      },
+      {
+        "eventType": "WAIT",
+        "delayTime": 1000,
+        "description": "Allow the verification button state to update"
       },
       {
         "eventType": "VIEW_CLICKED",
