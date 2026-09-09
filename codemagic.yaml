@@ -15,6 +15,7 @@ workflows:
       vars:
         APP_STORE_APPLE_ID: "6807323350"
         APP_RELEASE_MODE: tester
+        APP_CHECK_PROVIDER: production
         IOS_BUNDLE_IDENTIFIER: info.siza.communityconnect.personaltest
         IOS_GOOGLE_SERVICES_FILE: ./GoogleService-Info.personal-test.plist
 
