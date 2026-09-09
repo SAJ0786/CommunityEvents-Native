@@ -9,7 +9,8 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "APP_RELEASE_MODE": "tester"
+        "APP_RELEASE_MODE": "tester",
+        "APP_CHECK_PROVIDER": "debug"
       }
     },
     "apk": {
@@ -20,14 +21,16 @@
       },
       "distribution": "internal",
       "env": {
-        "APP_RELEASE_MODE": "tester"
+        "APP_RELEASE_MODE": "tester",
+        "APP_CHECK_PROVIDER": "debug"
       }
     },
     "preview": {
       "environment": "preview",
       "distribution": "internal",
       "env": {
-        "APP_RELEASE_MODE": "tester"
+        "APP_RELEASE_MODE": "tester",
+        "APP_CHECK_PROVIDER": "debug"
       }
     },
     "ios-simulator": {
@@ -38,7 +41,8 @@
         "image": "macos-sequoia-15.6-xcode-26.0"
       },
       "env": {
-        "APP_RELEASE_MODE": "tester"
+        "APP_RELEASE_MODE": "tester",
+        "APP_CHECK_PROVIDER": "debug"
       }
     },
     "ios-personal-testflight": {
@@ -50,6 +54,7 @@
       },
       "env": {
         "APP_RELEASE_MODE": "tester",
+        "APP_CHECK_PROVIDER": "production",
         "IOS_BUNDLE_IDENTIFIER": "info.siza.communityconnect.personaltest",
         "IOS_GOOGLE_SERVICES_FILE": "./GoogleService-Info.personal-test.plist"
       }
@@ -61,7 +66,8 @@
         "image": "macos-sequoia-15.6-xcode-26.0"
       },
       "env": {
-        "APP_RELEASE_MODE": "production"
+        "APP_RELEASE_MODE": "production",
+        "APP_CHECK_PROVIDER": "production"
       }
     }
   },

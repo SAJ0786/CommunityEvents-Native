@@ -25,6 +25,29 @@ Use a test timeout of at least five minutes. The script signs in, asserts that t
 
 The APK must include the accessibility labels added with this script. Older APKs might not expose stable identifiers for the consent switch and phone fields.
 
+## App Check for device-farm APKs
+
+The `apk`, `preview` and `development` EAS profiles intentionally use Firebase
+App Check's debug provider because Play Integrity requires Play Store
+distribution. Before building a repeatable Firebase Test Lab or AWS Device Farm
+APK:
+
+1. In Firebase Console, open **App Check > Apps**.
+2. Open the menu for **Community Events Android Native** and select
+   **Manage debug tokens**.
+3. Generate one revocable token for device-farm testing.
+4. Save it in the EAS **preview** environment as the protected variable
+   `FIREBASE_APP_CHECK_DEBUG_TOKEN`.
+
+Do not paste the token into `eas.json`, a Robo script, test report or Git. The
+`ios-personal-testflight` and `production` profiles ignore debug mode and use
+App Attest with DeviceCheck fallback on Apple devices or Play Integrity on
+Android.
+
+Keep Firestore, Storage and Authentication enforcement in **Monitoring** until
+new builds show verified requests from every supported platform. Test failures
+must be fixed before enabling enforcement.
+
 ## iOS and guest test
 
 Upload `community-events-guest.json` for an iOS or Android guest crawl. It enters Community Events, verifies that the Home tab is present, captures a screenshot, and then lets Robo explore.

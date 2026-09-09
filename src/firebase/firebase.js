@@ -1,4 +1,5 @@
 import { getApp } from '@react-native-firebase/app';
+import { appCheck } from './appCheck';
 import {
   getAuth,
   signInAnonymously,
@@ -10,6 +11,7 @@ import { getFunctions } from '@react-native-firebase/functions';
 import { getStorage } from '@react-native-firebase/storage';
 
 export const app = getApp();
+export { appCheck };
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app, 'australia-southeast1');

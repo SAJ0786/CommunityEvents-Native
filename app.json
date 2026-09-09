@@ -21,6 +21,9 @@
       "supportsTablet": false,
       "icon": "./assets/icon-store-1024.png",
       "googleServicesFile": "./GoogleService-Info.plist",
+      "entitlements": {
+        "com.apple.developer.devicecheck.appattest-environment": "production"
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
@@ -93,6 +96,7 @@
       ],
       "./plugins/with-rnfirebase-cocoapods",
       "@react-native-firebase/app",
+      "@react-native-firebase/app-check",
       "@react-native-firebase/auth",
       "@react-native-firebase/crashlytics",
       [

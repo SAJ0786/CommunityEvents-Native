@@ -26,10 +26,14 @@ for (const file of files) {
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
 const appJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'app.json'), 'utf8')).expo;
+const easJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'eas.json'), 'utf8'));
+const appConfigSource = fs.readFileSync(path.join(projectRoot, 'app.config.js'), 'utf8');
 const moduleExperienceSource = fs.readFileSync(path.join(projectRoot, 'src', 'config', 'moduleExperience.js'), 'utf8');
 const legalSource = fs.readFileSync(path.join(projectRoot, 'src', 'config', 'legal.js'), 'utf8');
 const profileSource = fs.readFileSync(path.join(projectRoot, 'src', 'components', 'ProfileScreen.js'), 'utf8');
 const appSource = fs.readFileSync(path.join(projectRoot, 'App.js'), 'utf8');
+const firebaseSource = fs.readFileSync(path.join(projectRoot, 'src', 'firebase', 'firebase.js'), 'utf8');
+const appCheckSource = fs.readFileSync(path.join(projectRoot, 'src', 'firebase', 'appCheck.js'), 'utf8');
 const externalLinkSource = fs.readFileSync(path.join(projectRoot, 'src', 'utils', 'openExternalUrl.js'), 'utf8');
 const liveStreamSource = fs.readFileSync(path.join(projectRoot, 'src', 'components', 'NativeLiveStreamModal.js'), 'utf8');
 const androidStreamBridgeSource = fs.readFileSync(path.join(projectRoot, 'src', 'components', 'AndroidRootEncoderLiveStreamView.js'), 'utf8');
@@ -47,6 +51,38 @@ if (packageJson.dependencies.expo !== '~54.0.37') {
 }
 if (!appJson.android?.package || !appJson.ios?.bundleIdentifier) {
   throw new Error('Android package or iOS bundle identifier is missing from app.json.');
+}
+if (packageJson.dependencies['@react-native-firebase/app-check'] !== '^26.1.0' ||
+    !appJson.plugins?.includes('@react-native-firebase/app-check') ||
+    appJson.ios?.entitlements?.['com.apple.developer.devicecheck.appattest-environment'] !== 'production') {
+  throw new Error('Native Firebase App Check dependency, Expo plugin or App Attest entitlement is missing.');
+}
+for (const appCheckGuard of [
+  'ReactNativeFirebaseAppCheckProvider',
+  "provider: useDebugProvider ? 'debug' : 'playIntegrity'",
+  "provider: useDebugProvider ? 'debug' : 'appAttestWithDeviceCheckFallback'",
+  'isTokenAutoRefreshEnabled: true',
+]) {
+  if (!appCheckSource.includes(appCheckGuard)) {
+    throw new Error(`Firebase App Check initialization guard is missing: ${appCheckGuard}`);
+  }
+}
+if (!firebaseSource.includes("from './appCheck'") || firebaseSource.indexOf("from './appCheck'") > firebaseSource.indexOf('export const auth')) {
+  throw new Error('Firebase App Check must initialize before Firebase backend services are used.');
+}
+for (const profileName of ['development', 'apk', 'preview', 'ios-simulator']) {
+  if (easJson.build?.[profileName]?.env?.APP_CHECK_PROVIDER !== 'debug') {
+    throw new Error(`The ${profileName} EAS profile must use the App Check debug provider.`);
+  }
+}
+for (const profileName of ['ios-personal-testflight', 'production']) {
+  if (easJson.build?.[profileName]?.env?.APP_CHECK_PROVIDER !== 'production') {
+    throw new Error(`The ${profileName} EAS profile must use production App Check attestation.`);
+  }
+}
+if (!appConfigSource.includes('FIREBASE_APP_CHECK_DEBUG_TOKEN') ||
+    !appConfigSource.includes("appCheckProvider === 'debug'")) {
+  throw new Error('App Check debug tokens must be injected only into explicitly configured test builds.');
 }
 if (/from\s+['"]react-native['"]/.test(moduleExperienceSource)) {
   throw new Error('Module experience content must remain platform-neutral for native/PWA parity.');

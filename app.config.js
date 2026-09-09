@@ -4,6 +4,12 @@ const androidCertificateSha1 = process.env.ANDROID_CERT_SHA1
 const iosBundleIdentifier = process.env.IOS_BUNDLE_IDENTIFIER || '';
 const iosGoogleServicesFile = process.env.IOS_GOOGLE_SERVICES_FILE || '';
 const releaseMode = process.env.APP_RELEASE_MODE || '';
+const requestedAppCheckProvider = process.env.APP_CHECK_PROVIDER || '';
+const appCheckProvider = requestedAppCheckProvider
+  || (releaseMode === 'production' ? 'production' : 'debug');
+const appCheckDebugToken = appCheckProvider === 'debug'
+  ? (process.env.FIREBASE_APP_CHECK_DEBUG_TOKEN || '')
+  : '';
 const isBundledRelease = process.env.NODE_ENV === 'production';
 // EAS CLI resolves the config once locally before it loads the selected EAS
 // environment. Permit only that metadata pass; the cloud runner re-evaluates
@@ -15,6 +21,10 @@ if ((isBundledRelease || releaseMode === 'tester' || releaseMode === 'production
     && !mapsApiKey
     && !isEasLocalMetadataPass) {
   throw new Error('GOOGLE_MAPS_API_KEY is required for tester and production builds. Refusing to create an APK with broken native maps.');
+}
+
+if (!['debug', 'production'].includes(appCheckProvider)) {
+  throw new Error('APP_CHECK_PROVIDER must be either "debug" or "production".');
 }
 
 export default ({ config }) => ({
@@ -47,6 +57,8 @@ export default ({ config }) => ({
     ...(config.extra || {}),
     androidCertificateSha1,
     testBuild: releaseMode !== 'production',
+    appCheckProvider,
+    ...(appCheckDebugToken ? { appCheckDebugToken } : {}),
     eas: {
       projectId: 'b05d73eb-a069-4503-be44-ceb149f4a4fe',
     },
