@@ -1,0 +1,112 @@
+[
+  {
+    "id": 1200,
+    "description": "Sign in to Community Events with the Firebase test phone, then continue the Robo crawl",
+    "crawlStage": "crawl",
+    "priority": 100,
+    "maxNumberOfRuns": 1,
+    "contextDescriptor": {
+      "condition": "element_present",
+      "elementDescriptors": [
+        {
+          "contentDescription": "Continue to Community Events"
+        }
+      ]
+    },
+    "actions": [
+      {
+        "eventType": "WAIT",
+        "delayTime": 1500,
+        "description": "Allow the module selection screen to settle"
+      },
+      {
+        "eventType": "VIEW_CLICKED",
+        "elementDescriptors": [
+          {
+            "contentDescription": "Continue to Community Events"
+          }
+        ],
+        "description": "Open Community Events sign in"
+      },
+      {
+        "eventType": "WAIT",
+        "delayTime": 750,
+        "description": "Wait for the sign-in form"
+      },
+      {
+        "eventType": "VIEW_CLICKED",
+        "elementDescriptors": [
+          {
+            "contentDescription": "Accept Privacy Policy and Terms of Use"
+          }
+        ],
+        "description": "Accept the legal consent required for sign in"
+      },
+      {
+        "eventType": "VIEW_TEXT_CHANGED",
+        "replacementText": "__TEST_PHONE_NUMBER__",
+        "elementDescriptors": [
+          {
+            "contentDescription": "Australian mobile number"
+          }
+        ],
+        "description": "Enter the Firebase test phone number"
+      },
+      {
+        "eventType": "VIEW_CLICKED",
+        "elementDescriptors": [
+          {
+            "contentDescription": "Send verification code"
+          }
+        ],
+        "description": "Request the fixed Firebase test verification code"
+      },
+      {
+        "eventType": "WAIT",
+        "delayTime": 3000,
+        "description": "Wait for the verification form"
+      },
+      {
+        "eventType": "VIEW_TEXT_CHANGED",
+        "replacementText": "__TEST_VERIFICATION_CODE__",
+        "elementDescriptors": [
+          {
+            "contentDescription": "Six digit verification code"
+          }
+        ],
+        "description": "Enter the fixed Firebase test verification code"
+      },
+      {
+        "eventType": "VIEW_CLICKED",
+        "elementDescriptors": [
+          {
+            "contentDescription": "Verify and continue"
+          }
+        ],
+        "description": "Complete sign in"
+      },
+      {
+        "eventType": "WAIT",
+        "delayTime": 6000,
+        "description": "Allow the authenticated home screen to load"
+      },
+      {
+        "eventType": "ASSERTION",
+        "contextDescriptor": {
+          "condition": "element_present",
+          "elementDescriptors": [
+            {
+              "contentDescription": "Home"
+            }
+          ]
+        },
+        "description": "Confirm that authenticated navigation is available"
+      },
+      {
+        "eventType": "TAKE_SCREENSHOT",
+        "screenshotName": "community-events-authenticated-home",
+        "description": "Capture the signed-in home screen before Robo continues"
+      }
+    ]
+  }
+]

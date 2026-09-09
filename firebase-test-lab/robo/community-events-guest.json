@@ -1,0 +1,55 @@
+[
+  {
+    "id": 1201,
+    "description": "Open Community Events as a guest, then continue the Robo crawl",
+    "crawlStage": "crawl",
+    "priority": 100,
+    "maxNumberOfRuns": 1,
+    "contextDescriptor": {
+      "condition": "element_present",
+      "elementDescriptors": [
+        {
+          "text": "Browse Community Events as guest"
+        }
+      ]
+    },
+    "actions": [
+      {
+        "eventType": "WAIT",
+        "delayTime": 1500,
+        "description": "Allow the module selection screen to settle"
+      },
+      {
+        "eventType": "VIEW_CLICKED",
+        "elementDescriptors": [
+          {
+            "text": "Browse Community Events as guest"
+          }
+        ],
+        "description": "Enter Community Events as a guest"
+      },
+      {
+        "eventType": "WAIT",
+        "delayTime": 5000,
+        "description": "Allow public events to load"
+      },
+      {
+        "eventType": "ASSERTION",
+        "contextDescriptor": {
+          "condition": "element_present",
+          "elementDescriptors": [
+            {
+              "contentDescription": "Home"
+            }
+          ]
+        },
+        "description": "Confirm that the guest home screen is visible"
+      },
+      {
+        "eventType": "TAKE_SCREENSHOT",
+        "screenshotName": "community-events-guest-home",
+        "description": "Capture the guest home screen before Robo continues"
+      }
+    ]
+  }
+]

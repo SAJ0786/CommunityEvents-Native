@@ -95,10 +95,24 @@ export default function ModuleEntryScreen({
         })}
       </View>
 
-      <Pressable onPress={() => setStage('login')} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
+      <Pressable
+        accessibilityLabel={`Continue to ${experience.choiceTitle}`}
+        accessibilityRole="button"
+        testID="module-entry-continue"
+        onPress={() => setStage('login')}
+        style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
+      >
         <Text {...cappedText} style={styles.primaryText}>Continue to {experience.choiceTitle}</Text>
       </Pressable>
-      <Pressable disabled={busy} onPress={onContinueGuest} style={({ pressed }) => [styles.guest, pressed && styles.pressed, busy && styles.disabled]}>
+      <Pressable
+        accessibilityLabel={`Browse ${experience.choiceTitle} as guest`}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: busy }}
+        testID="module-entry-guest"
+        disabled={busy}
+        onPress={onContinueGuest}
+        style={({ pressed }) => [styles.guest, pressed && styles.pressed, busy && styles.disabled]}
+      >
         <Text {...cappedText} style={styles.guestText}>Browse {experience.choiceTitle} as guest</Text>
       </Pressable>
     </ScrollView>

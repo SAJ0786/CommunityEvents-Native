@@ -16,3 +16,4 @@ release-artifacts/
 .DS_Store
 .env
 .env.local
+firebase-test-lab/robo/*.generated.json

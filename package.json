@@ -11,6 +11,7 @@
     "check": "node scripts/verify-source.js",
     "test:regressions": "node scripts/test-event-picker-business-approval.cjs && node scripts/test-event-card-actions.cjs && node scripts/test-stream-lifecycle.cjs",
     "check:release": "node scripts/verify-release.js",
+    "testlab:robo-script": "node scripts/generate-robo-script.js",
     "postinstall": "patch-package"
   },
   "dependencies": {

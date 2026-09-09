@@ -121,6 +121,9 @@ export default function AuthLandingScreen({
           <>
             <View style={styles.consentRow}>
               <Switch
+                accessibilityLabel="Accept Privacy Policy and Terms of Use"
+                accessibilityRole="switch"
+                testID="auth-legal-consent"
                 value={accepted}
                 onValueChange={value => {
                   setAccepted(value);
@@ -138,6 +141,8 @@ export default function AuthLandingScreen({
             </View>
             <Text style={styles.fieldLabel}>MOBILE NUMBER</Text>
             <TextInput
+              accessibilityLabel="Australian mobile number"
+              testID="auth-phone-number"
               autoComplete="tel"
               keyboardType="phone-pad"
               placeholder="04XX XXX XXX"
@@ -151,6 +156,8 @@ export default function AuthLandingScreen({
           <>
             <Text style={styles.fieldLabel}>6-DIGIT CODE</Text>
             <TextInput
+              accessibilityLabel="Six digit verification code"
+              testID="auth-verification-code"
               autoComplete="sms-otp"
               keyboardType="number-pad"
               maxLength={6}
@@ -170,7 +177,15 @@ export default function AuthLandingScreen({
         {validation ? <Text accessibilityRole="alert" style={styles.error}>{validation}</Text> : null}
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
 
-        <Pressable disabled={busy} onPress={step === 'otp' ? verifyCode : sendCode} style={({ pressed }) => [styles.primary, pressed && styles.pressed, busy && styles.disabled]}>
+        <Pressable
+          accessibilityLabel={step === 'otp' ? 'Verify and continue' : 'Send verification code'}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busy }}
+          testID="auth-primary-action"
+          disabled={busy}
+          onPress={step === 'otp' ? verifyCode : sendCode}
+          style={({ pressed }) => [styles.primary, pressed && styles.pressed, busy && styles.disabled]}
+        >
           {busy ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.primaryText}>{step === 'otp' ? 'Verify and continue' : 'Send verification code'}</Text>}
         </Pressable>
         {step === 'otp' ? (
