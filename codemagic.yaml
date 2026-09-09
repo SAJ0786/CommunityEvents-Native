@@ -64,10 +64,19 @@ workflows:
         script: |
           WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" | head -n 1)
           SCHEME=$(basename "$WORKSPACE" .xcworkspace)
-          xcode-project build-ipa --workspace "$WORKSPACE" --scheme "$SCHEME"
+          # Keep the raw Xcode output available when archive fails. Xcode 26
+          # diagnostics can otherwise be reduced to the generic status 65 by
+          # xcpretty, which hides the actionable compiler/signing error.
+          xcode-project build-ipa \
+            --workspace "$WORKSPACE" \
+            --scheme "$SCHEME" \
+            --verbose \
+            --no-color \
+            --disable-xcpretty
 
     artifacts:
       - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
 
     publishing:
       app_store_connect:
