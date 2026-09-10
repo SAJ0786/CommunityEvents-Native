@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   listenBusinessSupportThreads,
   listenThreadMessages,
@@ -77,7 +77,7 @@ export default function BusinessSupportInboxScreen({ user, profile, onBack }) {
   );
 
   if (selected) return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.screen}>
       <View style={styles.header}>
         <NativeBackButton accessibilityLabel="Back to feedback" onPress={() => setSelected(null)} />
         <View style={styles.headerCopy}><Text style={styles.title}>{threadTitle(selected)}</Text><Text style={styles.subtitle}>{isBusinessSafetyThread(selected) ? 'Private safety case for directory administrators' : 'Directory support conversation'}</Text></View>
@@ -94,9 +94,9 @@ export default function BusinessSupportInboxScreen({ user, profile, onBack }) {
           <Pressable disabled={moderationBusy} onPress={() => decide('closed')} style={styles.reviewButton}><Text style={styles.reviewButtonText}>Close Review</Text></Pressable>
         </View>
       </View> : null}
-      <ScrollView contentContainerStyle={styles.messages}>{messages.map(message => { const mine = message.senderUid === user.uid; return <View key={message.id} style={[styles.bubble, mine && styles.bubbleMine]}><Text style={[styles.messageText, mine && styles.messageTextMine]}>{message.text}</Text><Text style={[styles.time, mine && styles.timeMine]}>{timeLabel(message.createdAt)}</Text></View>; })}</ScrollView>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.messages}>{messages.map(message => { const mine = message.senderUid === user.uid; return <View key={message.id} style={[styles.bubble, mine && styles.bubbleMine]}><Text style={[styles.messageText, mine && styles.messageTextMine]}>{message.text}</Text><Text style={[styles.time, mine && styles.timeMine]}>{timeLabel(message.createdAt)}</Text></View>; })}</ScrollView>
       <View style={styles.composer}><TextInput value={reply} onChangeText={setReply} multiline placeholder={isAdmin ? 'Write an administrator reply...' : 'Write a reply...'} placeholderTextColor={colors.muted} style={styles.input} /><Pressable disabled={!reply.trim()} onPress={send} style={[styles.send, !reply.trim() && styles.disabled]}><Text style={styles.sendText}>Send Reply</Text></Pressable>{status ? <Text style={styles.error}>{status}</Text> : null}</View>
-    </View>
+    </KeyboardAvoidingView>
   );
 
   return (

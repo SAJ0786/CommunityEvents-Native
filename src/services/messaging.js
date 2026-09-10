@@ -11,6 +11,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  writeBatch,
   where,
 } from '@react-native-firebase/firestore';
 import { httpsCallable } from '@react-native-firebase/functions';
@@ -70,7 +71,9 @@ export async function sendHostMessage({ event, user, profile, text }) {
   const eventTitle = `${event.eventTypeDisplay || event.eventType || 'Event'} - ${event.hostName || 'Host'}`;
   const city = normalizeCity(event.metroArea || DEFAULT_CITY);
 
-  await setDoc(threadRef, {
+  const messageRef = doc(collection(threadRef, 'messages'));
+  const batch = writeBatch(db);
+  batch.set(threadRef, {
     type: 'host',
     eventId: event.id,
     eventTitle,
@@ -83,22 +86,21 @@ export async function sendHostMessage({ event, user, profile, text }) {
     participantUids: compact([senderUid, hostUid]),
     createdAt: serverTimestamp(),
   }, { merge: true });
-
-  await addDoc(collection(threadRef, 'messages'), {
+  batch.set(messageRef, {
     senderUid,
     senderName,
     text: messageText,
     kind: 'text',
     createdAt: serverTimestamp(),
   });
-
-  await updateDoc(threadRef, {
+  batch.update(threadRef, {
     updatedAt: serverTimestamp(),
     lastMessage: messageText,
     lastSenderUid: senderUid,
     [`unreadBy.${hostUid}`]: increment(1),
     [`unreadBy.${senderUid}`]: 0,
   });
+  await batch.commit();
 }
 
 export async function sendHostReply({ thread, user, profile, text }) {
@@ -149,10 +151,14 @@ export async function sendBusinessMessage({ business, user, profile, text }) {
   }
 }
 
-export function listenBusinessThreads(uid, callback) {
+export function listenBusinessThreads(uid, callback, onError) {
   if (!uid) return () => callback([]);
   const q = query(collection(db, 'businessMessageThreads'), where('participantUids', 'array-contains', uid));
-  return onSnapshot(q, snap => callback(sortByUpdatedDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })))), () => callback([]));
+  return onSnapshot(q, snap => callback(sortByUpdatedDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })))), error => {
+    console.error('[listenBusinessThreads]', error);
+    onError?.(error);
+    callback([]);
+  });
 }
 
 export async function sendBusinessReply({ thread, user, profile, text }) {
@@ -173,13 +179,14 @@ export async function markBusinessThreadRead(threadId, uid) {
   if (threadId && uid) await updateDoc(doc(db, 'businessMessageThreads', threadId), { [`unreadBy.${uid}`]: 0 });
 }
 
-export function listenHostThreads(uid, callback) {
+export function listenHostThreads(uid, callback, onError) {
   if (!uid) return () => callback([]);
   const q = query(collection(db, 'hostMessageThreads'), where('participantUids', 'array-contains', uid));
   return onSnapshot(q, snap => {
     callback(sortByUpdatedDesc(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, error => {
     console.error('[listenHostThreads]', error);
+    onError?.(error);
     callback([]);
   });
 }

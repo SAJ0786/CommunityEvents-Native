@@ -52,6 +52,7 @@ import ProfileScreen from './src/components/ProfileScreen';
 import RecurringEventForm from './src/components/RecurringEventForm';
 import StreamedVideosScreen from './src/components/StreamedVideosScreen';
 import BusinessDirectoryModule from './src/business/BusinessDirectoryModule';
+import BusinessNotificationsScreen from './src/business/BusinessNotificationsScreen';
 import { auth, confirmPhoneVerification, ensureFirebaseSession, sendPhoneVerification, setNativeDisplayName } from './src/firebase/firebase';
 import { compareEventsByDateTime, createEventSubmission, createRecurringEventSeries, deleteEventSeries, deleteEventSubmission, getPublicEvents, getUserEventSubmissions, listenActiveEvents, prepareHomeEvents, setEventVisibility, updateEventSeries, updateEventSubmission } from './src/services/events';
 import { uploadEventPoster } from './src/services/images';
@@ -1342,7 +1343,10 @@ function MainApp() {
               onToggleSaved={isGuest ? undefined : () => handleToggleSaved(item)}
             />
           )}
-          ListHeaderComponent={renderHeader}
+          // Keep the header element type stable while search state changes.
+          // Passing the freshly-created renderHeader function makes FlatList
+          // remount the header (and its TextInput) after every keystroke.
+          ListHeaderComponent={renderHeader()}
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={[styles.listContent, compactEventsLayout && styles.listContentCompact]}
         />
@@ -1403,6 +1407,12 @@ function MainApp() {
           user={currentUser}
           profile={profile}
           onBack={() => setActiveTab('home')}
+        />
+      ) : activeTab === 'notifications' ? (
+        <BusinessNotificationsScreen
+          user={currentUser}
+          profile={profile}
+          onBack={() => { setActiveTab('home'); setAccountMenuOpen(true); }}
         />
       ) : activeTab === 'feedback' ? (
         <FeedbackScreen

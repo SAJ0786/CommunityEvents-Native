@@ -885,7 +885,7 @@ export default function BusinessDirectoryModule({
         ) : activeTab === 'feedback' ? (
           <BusinessSupportInboxScreen user={currentUser} profile={profile} onBack={() => changeTab('home')} />
         ) : activeTab === 'notifications' ? (
-          <BusinessNotificationsScreen user={currentUser} profile={profile} onBack={() => changeTab('profile')} />
+          <BusinessNotificationsScreen user={currentUser} profile={profile} onBack={() => { changeTab('home'); onOpenMenu?.(); }} />
         ) : activeTab === 'report' ? (
           <DirectorySupportScreen mode="report" businesses={directoryBusinesses} user={currentUser} profile={profile} city={selectedCity} onBack={() => changeTab('home')} />
         ) : activeTab === 'contact' ? (
