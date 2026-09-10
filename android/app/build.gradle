@@ -4,6 +4,14 @@ apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 def googleMapsApiKey = System.getenv("GOOGLE_MAPS_API_KEY") ?: findProperty("GOOGLE_MAPS_API_KEY") ?: ""
+def releaseStoreFile = System.getenv("ANDROID_RELEASE_STORE_FILE") ?: findProperty("ANDROID_RELEASE_STORE_FILE")
+def releaseStorePassword = System.getenv("ANDROID_RELEASE_STORE_PASSWORD") ?: findProperty("ANDROID_RELEASE_STORE_PASSWORD")
+def releaseKeyAlias = System.getenv("ANDROID_RELEASE_KEY_ALIAS") ?: findProperty("ANDROID_RELEASE_KEY_ALIAS")
+def releaseKeyPassword = System.getenv("ANDROID_RELEASE_KEY_PASSWORD") ?: findProperty("ANDROID_RELEASE_KEY_PASSWORD")
+def releaseBuildRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains("release") }
+if (releaseBuildRequested && [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword].any { !it }) {
+    throw new GradleException("Release signing is not configured. Set ANDROID_RELEASE_STORE_FILE, ANDROID_RELEASE_STORE_PASSWORD, ANDROID_RELEASE_KEY_ALIAS, and ANDROID_RELEASE_KEY_PASSWORD as Gradle properties or CI secrets.")
+}
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -106,15 +114,21 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (releaseStoreFile) {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

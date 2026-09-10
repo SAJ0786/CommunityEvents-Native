@@ -45,9 +45,22 @@ const iosPodfilePlugin = fs.readFileSync(path.join(projectRoot, 'plugins', 'with
 const diagnosticRegistrySource = fs.readFileSync(path.join(projectRoot, 'src', 'services', 'diagnostics', 'registry.js'), 'utf8');
 const diagnosticPanelSource = fs.readFileSync(path.join(projectRoot, 'src', 'components', 'DiagnosticRegisterPanel.js'), 'utf8');
 const firestoreRulesSource = fs.readFileSync(path.join(projectRoot, 'backend', 'firestore.rules'), 'utf8');
+const storageRulesSource = fs.readFileSync(path.join(projectRoot, 'backend', 'storage.rules'), 'utf8');
 
 if (packageJson.dependencies.expo !== '~54.0.37') {
   throw new Error(`Expected Expo SDK 54 dependency, found ${packageJson.dependencies.expo || 'missing'}.`);
+}
+if (!androidGradleSource.includes('signingConfig signingConfigs.release') ||
+    !androidGradleSource.includes('ANDROID_RELEASE_STORE_PASSWORD')) {
+  throw new Error('Android release builds must use production signing credentials from secure properties or environment variables.');
+}
+if (!firestoreRulesSource.includes("request.resource.data.role == 'user'") ||
+    !firestoreRulesSource.includes('cityAdminBusinessFieldsOnly()') ||
+    !firestoreRulesSource.includes('isCityAdminForBusiness(resource.data, request.resource.data)')) {
+  throw new Error('Firestore user creation and city-admin business update guards are missing.');
+}
+if (!storageRulesSource.includes('request.auth.uid == userId')) {
+  throw new Error('Event image writes must be restricted to the owning user.');
 }
 if (!appJson.android?.package || !appJson.ios?.bundleIdentifier) {
   throw new Error('Android package or iOS bundle identifier is missing from app.json.');
