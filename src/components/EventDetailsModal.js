@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   PanResponder,
@@ -563,7 +564,10 @@ export default function EventDetailsModal({
           </View> : null}
 
           {hostMessageOpen ? <View style={styles.inlineOverlayLayer}>
-            <View style={styles.overlayRoot}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.overlayRoot}
+            >
           <Pressable style={styles.overlayBackdrop} onPress={() => setHostMessageOpen(false)} />
           <View style={styles.overlayCard}>
             <Text style={styles.overlayTitle}>Contact Host</Text>
@@ -593,7 +597,7 @@ export default function EventDetailsModal({
               <Text style={styles.overlayCloseText}>{hostMessageStatus.startsWith('Message sent') ? 'Done' : 'Cancel'}</Text>
             </Pressable>
           </View>
-            </View>
+              </KeyboardAvoidingView>
           </View> : null}
 
           {reminderOpen ? <View style={styles.inlineOverlayLayer}>

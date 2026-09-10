@@ -466,7 +466,10 @@ service cloud.firestore {
       allow create: if isRegistered()
         && request.resource.data.type == 'host'
         && request.resource.data.participantUids is list
+        && request.resource.data.participantUids.size() == 2
         && request.resource.data.participantUids.hasAny([request.auth.uid])
+        && request.resource.data.participantUids.hasAny([request.resource.data.hostUid])
+        && request.resource.data.hostUid != request.auth.uid
         && request.resource.data.senderUid == request.auth.uid;
       allow update: if isHostThreadParticipant(resource.data);
       allow delete: if false;

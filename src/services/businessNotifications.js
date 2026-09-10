@@ -21,11 +21,12 @@ function timestampMillis(value) {
   return 0;
 }
 
-export function listenBusinessNotifications(uid, onNotifications, onError) {
+export function listenUserNotifications(uid, onNotifications, onError) {
   if (!uid) {
     onNotifications?.([]);
     return () => {};
   }
+
   return onSnapshot(
     query(collection(db, COLLECTION_NAME), where('recipientUid', '==', uid)),
     snapshot => onNotifications?.(
@@ -34,6 +35,8 @@ export function listenBusinessNotifications(uid, onNotifications, onError) {
     onError
   );
 }
+
+export const listenBusinessNotifications = listenUserNotifications;
 
 export async function markBusinessNotificationRead(notificationId) {
   if (!notificationId) return;

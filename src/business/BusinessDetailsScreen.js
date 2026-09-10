@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Image, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Animated, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { colors, radius, shadow, spacing } from '../theme';
 import NativeBackButton from '../components/NativeBackButton';
 import { sendBusinessMessage } from '../services/messaging';
+import { buildWhatsAppUrl } from '../utils/phone';
 
 const fallbackBusinessImage = require('../../assets/business-placeholder.png');
 
@@ -178,7 +179,7 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
       <View style={styles.actionGrid}>
         <DetailAction icon={'\u{1F4AC}'} label="Contact" onPress={() => { onTrackAction?.('contact'); isGuest ? onRequireSignIn?.() : setContactOpen(true); }} />
         {business.phone ? <DetailAction icon={'\u{1F4DE}'} label="Call" onPress={() => openTrackedExternal('call', `tel:${business.phone}`, 'Calling is not available on this device.')} /> : null}
-        {business.whatsapp ? <DetailAction icon={'\u{1F4F1}'} label="WhatsApp" onPress={() => openTrackedExternal('whatsapp', `https://wa.me/${business.whatsapp.replace(/\D/g, '')}`, 'WhatsApp is not installed or unavailable.')} /> : null}
+        {business.whatsapp && buildWhatsAppUrl(business.whatsapp) ? <DetailAction icon={'\u{1F4F1}'} label="WhatsApp" onPress={() => openTrackedExternal('whatsapp', buildWhatsAppUrl(business.whatsapp), 'WhatsApp is not installed or unavailable.')} /> : null}
         {business.address ? <DetailAction icon={'\u{1F5FA}\uFE0F'} label="Directions" onPress={() => openTrackedExternal('directions', `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address)}`, 'Maps could not open this address.')} /> : null}
         <DetailAction icon={'\u{1F4E4}'} label="Share" onPress={shareBusiness} />
       </View>
@@ -261,14 +262,17 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
       <Modal transparent visible={contactOpen} animationType="fade" onRequestClose={() => setContactOpen(false)}>
         <View style={styles.contactModal}>
           <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setContactOpen(false)} />
-          <View style={styles.contactCard}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.contactCard}
+          >
             <Text style={styles.contactTitle}>Contact {business.name}</Text>
             <Text style={styles.contactHelp}>Your message will be delivered through the app to the listing owner. Do not share passwords, verification codes, financial details or sensitive identity information.</Text>
             <TextInput value={contactText} onChangeText={setContactText} multiline maxLength={2000} placeholder="Write your message..." placeholderTextColor={colors.muted} style={styles.contactInput} />
             {contactStatus ? <Text style={styles.contactStatus}>{contactStatus}</Text> : null}
             <Pressable disabled={contactBusy || !contactText.trim()} onPress={contactBusiness} style={[styles.contactSend, (contactBusy || !contactText.trim()) && styles.disabled]}><Text style={styles.contactSendText}>{contactBusy ? 'Sending...' : 'Send Message'}</Text></Pressable>
             <Pressable onPress={() => setContactOpen(false)} style={styles.contactCancel}><Text style={styles.contactCancelText}>Close</Text></Pressable>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </ScrollView>

@@ -204,6 +204,10 @@ async function deliver(recipients, notification) {
   const results = await Promise.allSettled(emailRecipients.map(recipient => transporter.sendMail({
     from,
     replyTo: EMAIL_REPLY_TO,
+    headers: {
+      'Auto-Submitted': 'auto-generated',
+      'X-Auto-Response-Suppress': 'All',
+    },
     to: clean(recipient.email),
     subject: notification.title,
     text: `${notification.title}\n\n${notification.body}\n\nCommunity Businesses Australia\nThis is an automated directory update from Community Connect Australia. Replies are sent to ${SUPPORT_EMAIL}.`,
@@ -397,7 +401,11 @@ exports.sendBusinessEnquiry = onCall(
     ]);
     if (!businessSnapshot.exists || !publicSnapshot.exists) throw new HttpsError('not-found', 'This public business could not be found.');
     const business = businessSnapshot.data() || {};
-    const ownerUid = clean(business.ownerId);
+    let ownerUid = clean(business.ownerId);
+    if (!ownerUid) {
+      const routeSnapshot = await db.collection('businessContactRoutes').doc(businessId).get();
+      ownerUid = clean(routeSnapshot.data()?.ownerUid);
+    }
     if (!ownerUid || business.hidden === true || (business.status !== 'approved' && business.hasPublishedVersion !== true)) {
       throw new HttpsError('failed-precondition', 'This business does not have an active in-app contact inbox.');
     }

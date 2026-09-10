@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { listenBusinessNotifications, markBusinessNotificationRead } from '../services/businessNotifications';
+import { listenUserNotifications, markBusinessNotificationRead } from '../services/businessNotifications';
 import { sendFeedbackMessage } from '../services/messaging';
 import { listenBusinessModerationNotices, recordBusinessModerationAppeal } from '../services/businessSafety';
 import { friendlyError } from '../utils/errors';
@@ -24,10 +24,10 @@ export default function BusinessNotificationsScreen({ user, profile, onBack }) {
   const [appealBusy, setAppealBusy] = useState(false);
   const unreadCount = useMemo(() => rows.filter(item => item.read !== true).length, [rows]);
 
-  useEffect(() => listenBusinessNotifications(
+  useEffect(() => listenUserNotifications(
     user?.uid,
     notifications => { setRows(notifications); setLoading(false); setError(''); },
-    nextError => { setLoading(false); setError(friendlyError(nextError, 'Could not load Directory notifications.')); }
+    nextError => { setLoading(false); setError(friendlyError(nextError, 'Could not load notifications.')); }
   ), [user?.uid]);
 
   useEffect(() => listenBusinessModerationNotices(
@@ -73,7 +73,7 @@ export default function BusinessNotificationsScreen({ user, profile, onBack }) {
       <View style={styles.headerRow}>
         <NativeBackButton onPress={onBack} style={styles.backButton} />
         <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>BUSINESS DIRECTORY</Text>
+          <Text style={styles.eyebrow}>COMMUNITY CONNECT</Text>
           <Text style={styles.title}>Notifications</Text>
           <Text style={styles.subtitle}>{unreadCount ? `${unreadCount} unread update${unreadCount === 1 ? '' : 's'}` : 'You are up to date'}</Text>
         </View>
@@ -92,7 +92,7 @@ export default function BusinessNotificationsScreen({ user, profile, onBack }) {
         <View style={styles.emptyCard}>
           <MaterialCommunityIcons color={colors.teal} name="bell-check-outline" size={34} />
           <Text style={styles.emptyTitle}>No notifications yet</Text>
-          <Text style={styles.emptyText}>Business submissions, changes, promotions and approval updates will appear here.</Text>
+          <Text style={styles.emptyText}>Updates from Community Events and the Business Directory will appear here.</Text>
         </View>
       ) : null}
       {rows.map(item => (

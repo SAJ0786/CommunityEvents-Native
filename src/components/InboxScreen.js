@@ -39,12 +39,19 @@ export default function InboxScreen({ user, profile, onBack }) {
   const [reply, setReply] = useState('');
   const [status, setStatus] = useState('');
   const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (!user?.uid) return undefined;
     return listenHostThreads(user.uid, rows => {
       setThreads(rows);
+      setLoading(false);
+      setLoadError('');
       setSelectedId(current => current || rows[0]?.id || '');
+    }, error => {
+      setLoading(false);
+      setLoadError(error?.message || 'Could not load host messages.');
     });
   }, [user?.uid]);
 
@@ -100,7 +107,10 @@ export default function InboxScreen({ user, profile, onBack }) {
         </View>
       </View>
 
-      {threads.length === 0 ? (
+      {loadError ? <View style={styles.centerCard}><Text style={styles.emptyText}>{loadError}</Text></View> : null}
+      {loading ? (
+        <View style={styles.centerCard}><ActivityIndicator color={colors.teal} /></View>
+      ) : threads.length === 0 ? (
         <View style={styles.centerCard}>
           <Text style={styles.sectionTitle}>No messages yet</Text>
           <Text style={styles.emptyText}>Host messages sent from event cards will appear here.</Text>

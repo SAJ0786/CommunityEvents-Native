@@ -43,6 +43,16 @@ function testVisibleActionContract() {
   assert.match(details, /label="Copy" disabled=\{!onCopy\}/);
   assert.match(details, /label="Delete" variant="danger" disabled=\{!onDelete\}/);
   assert.match(app, /onEditSeries=\{canManageSelectedEvent && \(selectedEvent\?\.seriesId/);
+  assert.match(app, /ListHeaderComponent=\{renderHeader\(\)\}/);
+  assert.doesNotMatch(app, /ListHeaderComponent=\{renderHeader\}/);
+  const eventDetails = read('src/components/EventDetailsModal.js');
+  const businessDetails = read('src/business/BusinessDetailsScreen.js');
+  const businessInbox = read('src/business/BusinessInboxScreen.js');
+  const feedback = read('src/components/FeedbackScreen.js');
+  assert.match(eventDetails, /KeyboardAvoidingView[\s\S]*behavior=\{Platform\.OS === 'ios' \? 'padding' : 'height'\}/);
+  assert.match(businessDetails, /KeyboardAvoidingView[\s\S]*contactInput/);
+  assert.match(businessInbox, /KeyboardAvoidingView[\s\S]*keyboardShouldPersistTaps="handled"/);
+  assert.match(feedback, /KeyboardAvoidingView[\s\S]*keyboardShouldPersistTaps="handled"/);
   assert.match(app, /<MyEventsScreen[\s\S]*onEditSeries=\{handleEditSeries\}/);
   assert.match(app, /selectedEvent\.createdByUserId === currentUser\.uid/);
   assert.match(myEvents, /disabled=\{!onEditSeries\} onPress=\{\(\) => onEditSeries\?\.\(event\)\}/);

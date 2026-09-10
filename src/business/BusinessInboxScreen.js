@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { listenBusinessThreads, listenThreadMessages, markBusinessThreadRead, sendBusinessReply, sendFeedbackMessage } from '../services/messaging';
 import { setBusinessConversationBlocked } from '../services/businessSafety';
 import { colors, radius, shadow, spacing } from '../theme';
@@ -16,9 +16,13 @@ export default function BusinessInboxScreen({ user, profile, onBack }) {
   const [messages, setMessages] = useState([]);
   const [reply, setReply] = useState('');
   const [status, setStatus] = useState('');
+  const [loading, setLoading] = useState(true);
   const [reporting, setReporting] = useState(false);
   const [reportText, setReportText] = useState('');
-  useEffect(() => listenBusinessThreads(user?.uid, setThreads), [user?.uid]);
+  useEffect(() => listenBusinessThreads(user?.uid, rows => { setThreads(rows); setLoading(false); }, error => {
+    setLoading(false);
+    setStatus(error?.message || 'Could not load business messages.');
+  }), [user?.uid]);
   useEffect(() => {
     if (!selected?.id) return;
     const refreshed = threads.find(item => item.id === selected.id);
@@ -62,22 +66,24 @@ export default function BusinessInboxScreen({ user, profile, onBack }) {
     } catch (error) { setStatus(error?.message || 'Could not submit this report.'); }
   };
   if (selected) return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.screen}>
       <View style={styles.header}><NativeBackButton accessibilityLabel="Back to inbox" onPress={() => setSelected(null)} /><View style={styles.headerCopy}><Text style={styles.title}>{selected.businessName}</Text><Text style={styles.subtitle}>Private business conversation</Text></View></View>
       <View style={styles.safetyRow}>
         <Pressable onPress={toggleBlock} style={styles.safetyButton}><Text style={styles.safetyButtonText}>{blockedByMe ? 'Unblock' : 'Block'}</Text></Pressable>
         <Pressable onPress={() => setReporting(value => !value)} style={styles.safetyButton}><Text style={styles.safetyButtonText}>Report</Text></Pressable>
       </View>
       {reporting ? <View style={styles.reportCard}><Text style={styles.reportTitle}>Report this conversation</Text><Text style={styles.reportHelp}>Explain the safety, fraud or conduct concern. The report is private and retained for audit.</Text><TextInput value={reportText} onChangeText={setReportText} multiline maxLength={2500} placeholder="What should the directory team review?" placeholderTextColor={colors.muted} style={styles.input} /><Pressable onPress={submitReport} style={styles.reportSend}><Text style={styles.sendText}>Submit Report</Text></Pressable></View> : null}
-      <ScrollView contentContainerStyle={styles.messages}>{messages.map(message => { const mine = message.senderUid === user?.uid; return <View key={message.id} style={[styles.bubble, mine && styles.bubbleMine]}><Text style={[styles.messageText, mine && styles.messageTextMine]}>{message.text}</Text><Text style={[styles.time, mine && styles.timeMine]}>{timeLabel(message.createdAt)}</Text></View>; })}</ScrollView>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.messages}>{messages.map(message => { const mine = message.senderUid === user?.uid; return <View key={message.id} style={[styles.bubble, mine && styles.bubbleMine]}><Text style={[styles.messageText, mine && styles.messageTextMine]}>{message.text}</Text><Text style={[styles.time, mine && styles.timeMine]}>{timeLabel(message.createdAt)}</Text></View>; })}</ScrollView>
       <View style={styles.composer}>{blocked ? <Text style={styles.blockedText}>{selected.adminBlocked ? 'An administrator has blocked this conversation.' : 'This conversation is blocked.'}</Text> : <><TextInput value={reply} onChangeText={setReply} multiline placeholder="Write a reply..." placeholderTextColor={colors.muted} style={styles.input} /><Pressable disabled={!reply.trim()} onPress={send} style={[styles.send, !reply.trim() && styles.disabled]}><Text style={styles.sendText}>Send</Text></Pressable></>}{status ? <Text style={styles.error}>{status}</Text> : null}</View>
-    </View>
+    </KeyboardAvoidingView>
   );
   return (
     <ScrollView contentContainerStyle={styles.list}>
       <NativeBackButton accessibilityLabel="Back to directory" onPress={onBack} />
       <Text style={styles.eyebrow}>COMMUNITY BUSINESSES AUSTRALIA</Text><Text style={styles.pageTitle}>Business Inbox</Text><Text style={styles.pageText}>Messages sent through Contact Business are kept separate from Events Inbox.</Text>
-      {threads.length ? threads.map(thread => <Pressable key={thread.id} onPress={() => setSelected(thread)} style={styles.thread}><View style={styles.avatar}><Text style={styles.avatarText}>{String(thread.businessName || 'B')[0]}</Text></View><View style={styles.threadCopy}><Text style={styles.threadTitle}>{thread.businessName}</Text><Text numberOfLines={1} style={styles.threadText}>{thread.lastMessage}</Text><Text style={styles.time}>{timeLabel(thread.updatedAt)}</Text></View>{Number(thread.unreadBy?.[user?.uid] || 0) ? <View style={styles.unread}><Text style={styles.unreadText}>{thread.unreadBy[user.uid]}</Text></View> : null}</Pressable>) : <View style={styles.empty}><Text style={styles.emptyIcon}>{'\u{1F4E5}'}</Text><Text style={styles.threadTitle}>No business messages yet</Text><Text style={styles.pageText}>New owner and customer conversations will appear here.</Text></View>}
+      {loading ? <Text style={styles.pageText}>Loading business messages…</Text> : null}
+      {!loading && threads.length ? threads.map(thread => <Pressable key={thread.id} onPress={() => setSelected(thread)} style={styles.thread}><View style={styles.avatar}><Text style={styles.avatarText}>{String(thread.businessName || 'B')[0]}</Text></View><View style={styles.threadCopy}><Text style={styles.threadTitle}>{thread.businessName}</Text><Text numberOfLines={1} style={styles.threadText}>{thread.lastMessage}</Text><Text style={styles.time}>{timeLabel(thread.updatedAt)}</Text></View>{Number(thread.unreadBy?.[user?.uid] || 0) ? <View style={styles.unread}><Text style={styles.unreadText}>{thread.unreadBy[user.uid]}</Text></View> : null}</Pressable>) : null}
+      {!loading && !threads.length ? <View style={styles.empty}><Text style={styles.emptyIcon}>{'\u{1F4E5}'}</Text><Text style={styles.threadTitle}>No business messages yet</Text><Text style={styles.pageText}>New owner and customer conversations will appear here.</Text></View> : null}
     </ScrollView>
   );
 }
