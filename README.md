@@ -1,18 +1,30 @@
 ﻿# Community Events Australia Native
 
-React Native + Expo client for Community Events Australia.
+React Native + Expo client for Community Connect Australia, including the Community Events Australia and Community Businesses Australia modules.
 
-This app is intentionally separate from the existing PWA. It uses the same Firebase backend and starts with a read-only native Home screen so we can validate the mobile architecture before adding login, event creation, admin, push, and livestreaming.
+This repository is the native replacement for the existing store-distributed PWA wrapper. Production builds must retain the published store identities and use the shared Firebase project. See [the final launch checklist](docs/release/FINAL_LAUNCH_CHECKLIST.md) before creating or submitting an artifact.
 
 ## First Run
 
 ```powershell
-cd "C:\Users\sajja\OneDrive - SIZA Family\1. Professional\AI Apps\Community Event\2. Mobile App - React Native Expo"
-npm install
+npm ci
+npm run check
+npm run test:regressions
 npm run start
 ```
 
-Use Expo Go for the first read-only test. Later native features such as push notifications and livestreaming will require an Expo development build.
+Native Firebase, notifications, App Check and livestreaming require a development or store build; Expo Go does not represent the production application.
+
+## Release checks
+
+```powershell
+npm run check
+npm run test:regressions
+npm run check:release
+npx expo-doctor
+```
+
+Production signing credentials and secrets belong in EAS/Codemagic and the Deployers store accounts, never in this repository.
 
 ## Diagnostics
 

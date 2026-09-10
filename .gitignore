@@ -1,7 +1,7 @@
 ﻿node_modules/
 .expo/
 .expo-export-check-*/
-.tmp-*/
+.tmp-*
 .idea/
 .jdk17-build/
 .local-jdk17/
@@ -12,6 +12,13 @@ build/
 coverage/
 *.log
 *.apk
+*.aab
+*.ipa
+*.xcarchive
+*.mobileprovision
+*.p12
+*.jks
+*.keystore
 release-artifacts/
 .DS_Store
 .env

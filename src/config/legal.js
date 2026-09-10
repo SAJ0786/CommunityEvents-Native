@@ -1,4 +1,7 @@
-export const LEGAL_DOCUMENT_VERSION = 'draft-2026-09-08-community-connect';
+// This version matches the consolidated documents published on SIZA.info on
+// 8 September 2026. Change it whenever either policy changes so users are
+// prompted to accept the correct published version.
+export const LEGAL_DOCUMENT_VERSION = '2026-09-08-community-connect';
 export const SUPPORT_EMAIL = 'support@siza.info';
 export const SIZA_WEBSITE_URL = 'https://siza.info';
 

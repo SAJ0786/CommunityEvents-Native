@@ -13,10 +13,11 @@ import {
 } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, radius, shadow, spacing } from '../theme';
+import { cityLabel, normalizeCity } from '../utils/cities';
 
 const EVENT_ITEMS = [
   { key: 'profile', label: 'My Profile', icon: 'account-outline', tone: 'purple', authOnly: true },
-  { key: 'notifications', route: 'profile', label: 'Notifications', icon: 'bell-outline', tone: 'teal', authOnly: true },
+  { key: 'notifications', label: 'Notifications', icon: 'bell-outline', tone: 'teal', authOnly: true },
   { key: 'inbox', label: 'Inbox & Feedback', icon: 'inbox-outline', tone: 'purple', authOnly: true },
   { key: 'admin', label: 'Admin Dashboard', icon: 'shield-crown-outline', tone: 'blue', adminOnly: true },
   { key: 'help-policies', route: 'profile', label: 'Help & Policies', icon: 'help-circle-outline', tone: 'teal' },
@@ -59,6 +60,11 @@ export default function AccountMenuSheet({ visible, activeModule = 'events', isG
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superAdmin';
   const displayName = profile?.fullName || user?.displayName || user?.email || 'Community member';
   const role = profile?.role === 'superAdmin' ? 'Super Admin' : profile?.role === 'admin' ? 'Admin' : isGuest ? 'Guest access' : 'Member';
+  const roleScope = profile?.role === 'superAdmin'
+    ? 'All cities'
+    : profile?.role === 'admin'
+      ? cityLabel(normalizeCity(profile?.adminCity || profile?.defaultCity))
+      : '';
   const items = useMemo(() => (activeModule === 'directory' ? BUSINESS_ITEMS : EVENT_ITEMS)
     .filter(item => (!item.adminOnly || isAdmin) && (!item.authOnly || !isGuest)), [activeModule, isAdmin, isGuest]);
 
@@ -148,7 +154,7 @@ export default function AccountMenuSheet({ visible, activeModule = 'events', isG
         </View>
         <View style={styles.identity}>
           <View style={styles.initials}><Text style={styles.initialsText}>{isGuest ? 'G' : userInitials(user, profile)}</Text></View>
-          <View style={styles.identityCopy}><Text numberOfLines={1} style={styles.name}>{isGuest ? 'Guest User' : displayName}</Text><Text style={styles.role}>{role} · {activeModule === 'directory' ? 'Business Directory' : 'Community Events'}</Text></View>
+          <View style={styles.identityCopy}><Text numberOfLines={1} style={styles.name}>{isGuest ? 'Guest User' : displayName}</Text><Text style={styles.role}>{[role, roleScope].filter(Boolean).join(' · ')}</Text></View>
         </View>
         <ScrollView
           bounces={false}
