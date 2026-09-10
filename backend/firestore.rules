@@ -24,11 +24,23 @@ service cloud.firestore {
     function isCityAdminForEvent(data) {
       return isRegistered() && role() == 'admin' && eventCity(data) == adminCity();
     }
+    function businessCity(data) {
+      return data.location != null && data.location.city != null
+        ? data.location.city
+        : (data.metroArea != null ? data.metroArea : defaultCity());
+    }
+    function isCityAdminForBusiness(currentData, requestedData) {
+      return isRegistered()
+        && role() == 'admin'
+        && businessCity(currentData) == adminCity()
+        && businessCity(requestedData) == adminCity();
+    }
     function canUpdateOwnProfile(userId) {
       return request.auth.uid == userId
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
           'role', 'isActive', 'accountStatus', 'archivedAt', 'archivedBy',
-          'accountDeletedAt', 'bannedAt', 'bannedBy'
+          'accountDeletedAt', 'bannedAt', 'bannedBy',
+          'adminCity', 'permissions', 'security'
         ])
         && (
           role() != 'admin'
@@ -40,7 +52,26 @@ service cloud.firestore {
     // ── Users ──────────────────────────────────────────────────────────────────
     match /users/{userId} {
       allow read:   if isRegistered() && (request.auth.uid == userId || isAdmin());
-      allow create: if isRegistered() && request.auth.uid == userId;
+      allow create: if isRegistered()
+                   && request.auth.uid == userId
+                   && request.resource.data.keys().hasOnly([
+                     'role', 'savedEvents', 'savedBusinesses', 'isActive',
+                     'accountStatus', 'fullName', 'email',
+                     'emailLower', 'phone', 'phoneVerified', 'defaultCity',
+                     'defaultModule', 'pushNotificationsEnabled',
+                     'smsNotificationsEnabled', 'emailNotificationsEnabled',
+                     'eventNotificationsEnabled', 'businessNotificationsEnabled',
+                     'prayerRemindersEnabled', 'reminderEmailEnabled',
+                     'adminAlertEmailEnabled', 'privacyAccepted',
+                     'privacyPolicyVersion', 'termsAccepted', 'termsVersion',
+                     'legalAcceptedAtClient'
+                   ])
+                   && request.resource.data.role == 'user'
+                   && request.resource.data.isActive == true
+                   && request.resource.data.accountStatus == 'active'
+                   && request.resource.data.savedEvents is list
+                   && (!request.resource.data.keys().hasAny(['savedBusinesses'])
+                       || request.resource.data.savedBusinesses is list);
       allow update: if isRegistered() && (canUpdateOwnProfile(userId) || isSuperAdmin());
       allow delete: if false;
     }
@@ -116,6 +147,19 @@ service cloud.firestore {
       ]);
     }
 
+    function cityAdminBusinessFieldsOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'status', 'hidden', 'tier', 'abnVerified', 'identityVerified',
+        'verificationBadge', 'referrerReview', 'foundingMember',
+        'priorHistoryReview', 'rejectionReason', 'hasPublishedVersion',
+        'publishedSnapshot', 'reviewType', 'approvedBy', 'approvedAt',
+        'rejectedBy', 'rejectedAt', 'reviewedAt', 'updatedAt',
+        'previousStatus', 'lifecycleState', 'archiveReason', 'archivedAt',
+        'archivedBy', 'deletedAt', 'deletedBy', 'restoredAt', 'restoredBy',
+        'restorationReason', 'abnCheckedAt', 'abrVerification'
+      ]);
+    }
+
     match /businesses/{businessId} {
       allow read: if isBusinessOwner(resource.data)
                     || isAdmin();
@@ -131,9 +175,10 @@ service cloud.firestore {
       // City admins may archive an active record, but only Super Admins may
       // mark a record deleted or restore any historical record.
       allow update: if isSuperAdmin()
-                      || (isAdmin()
+                      || (isCityAdminForBusiness(resource.data, request.resource.data)
                           && !(resource.data.status in ['archived', 'deleted'])
-                          && request.resource.data.status != 'deleted')
+                          && request.resource.data.status != 'deleted'
+                          && cityAdminBusinessFieldsOnly())
                       || (isBusinessOwner(resource.data)
                           && !(resource.data.status in ['archived', 'deleted'])
                           && request.resource.data.ownerId == request.auth.uid

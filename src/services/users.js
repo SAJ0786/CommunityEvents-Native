@@ -31,10 +31,24 @@ export async function ensureUserProfile(uid, defaults = {}) {
   const ref = doc(db, 'users', uid);
   const snapshot = await getDoc(ref);
   if (!snapshot.exists()) {
+    const createDefaults = Object.fromEntries(
+      Object.entries(defaults).filter(([key]) => [
+        'savedEvents', 'savedBusinesses', 'fullName', 'email', 'emailLower', 'phone',
+        'phoneVerified', 'defaultCity', 'defaultModule',
+        'pushNotificationsEnabled', 'smsNotificationsEnabled',
+        'emailNotificationsEnabled', 'eventNotificationsEnabled',
+        'businessNotificationsEnabled', 'prayerRemindersEnabled',
+        'reminderEmailEnabled', 'adminAlertEmailEnabled', 'privacyAccepted',
+        'privacyPolicyVersion', 'termsAccepted', 'termsVersion',
+        'legalAcceptedAtClient',
+      ].includes(key))
+    );
     await setDoc(ref, {
       role: 'user',
       savedEvents: [],
-      ...defaults,
+      isActive: true,
+      accountStatus: 'active',
+      ...createDefaults,
     }, { merge: true });
   }
   const current = await getUserProfile(uid);

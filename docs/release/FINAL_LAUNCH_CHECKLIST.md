@@ -32,7 +32,7 @@ Do not use `info.siza.communityconnect.personaltest`, App Store app `6807323350`
 1. In Google Play Console, note the highest uploaded version code and confirm the final AAB will be higher than it. EAS currently has a checked-in baseline of `63`, but the generated AAB is authoritative.
 2. In App Store Connect, note the current marketing version, highest build number and numeric app ID for bundle `info.siza.communityevents`. Version `2.0.0` must be higher than the live wrapper version; the new build number must also be higher.
 3. Confirm the Deployers Apple team has App Attest enabled on `info.siza.communityevents`. Regenerate/fetch the App Store provisioning profile after enabling it and confirm the profile contains `com.apple.developer.devicecheck.appattest-environment`.
-4. Confirm the final Android builder uses the existing Play upload keystore. Never generate a replacement upload key during the build unless Google Play's formal upload-key reset process has been completed.
+4. Confirm the final Android builder uses the existing Play upload keystore. For local Gradle release builds, provide `ANDROID_RELEASE_STORE_FILE`, `ANDROID_RELEASE_STORE_PASSWORD`, `ANDROID_RELEASE_KEY_ALIAS` and `ANDROID_RELEASE_KEY_PASSWORD` through environment variables or uncommitted Gradle properties. Never generate a replacement upload key during the build unless Google Play's formal upload-key reset process has been completed.
 5. Confirm the production EAS environment contains `GOOGLE_MAPS_API_KEY`. Do not add the value to Git.
 6. Keep Firebase App Check APIs in **Monitoring** for launch. Enforce only after Play-installed and App Store/TestFlight production builds show verified traffic and legitimate requests are stable.
 7. Run:
