@@ -45,6 +45,32 @@ Do not use `info.siza.communityconnect.personaltest`, App Store app `6807323350`
    npx.cmd expo-doctor
    ```
 
+### Codemagic signed Android APK
+
+The `android-signed-release-apk` workflow in `codemagic.yaml` builds
+`android/app/build/outputs/apk/release/app-release.apk` with the checked-in
+production package and release signing configuration. It does not use the
+debug keystore. In Codemagic, create a protected, encrypted variable group
+named `android_release` and add these variables:
+
+| Variable | Value |
+| --- | --- |
+| `ANDROID_RELEASE_KEYSTORE_BASE64` | Base64 of the existing Google Play upload `.jks`/`.keystore` file |
+| `ANDROID_RELEASE_STORE_PASSWORD` | Keystore password |
+| `ANDROID_RELEASE_KEY_ALIAS` | Existing upload-key alias |
+| `ANDROID_RELEASE_KEY_PASSWORD` | Existing upload-key password |
+| `GOOGLE_MAPS_API_KEY` | Production Google Maps key |
+
+In **Codemagic > Teams > Environment variables**, create the group, mark each
+value secure, restrict the group to the repository/team as appropriate, and
+enable it for the workflow. On Windows, create the base64 value without
+committing the keystore with
+`[Convert]::ToBase64String([IO.File]::ReadAllBytes('upload-key.jks'))`.
+The workflow decodes it only in the ephemeral build directory, validates it
+with `keytool`, and fails before Gradle if any required value is missing or
+invalid. Do not paste the keystore, passwords, or Maps key into
+`codemagic.yaml`.
+
 ## Final build commands
 
 Run these from the repository root while signed into the Expo/Apple/Google credentials belonging to the Deployers production setup:
