@@ -20,9 +20,10 @@ def releaseKeyPassword = System.getenv("ANDROID_RELEASE_KEY_PASSWORD") ?:
     System.getenv("EAS_BUILD_ANDROID_KEY_PASSWORD") ?:
     findProperty("ANDROID_RELEASE_KEY_PASSWORD") ?:
     findProperty("releaseKeyPassword")
+def easManagedSigning = file("eas-build.gradle").exists() || System.getenv("EAS_BUILD") == "true"
 def releaseBuildRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains("release") }
-if (releaseBuildRequested && [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword].any { !it }) {
-    throw new GradleException("Release signing is not configured. Provide EAS_BUILD_ANDROID_* credentials, ANDROID_RELEASE_* credentials, or releaseStore* Gradle properties.")
+if (releaseBuildRequested && !easManagedSigning && [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword].any { !it }) {
+    throw new GradleException("Release signing is not configured. Provide ANDROID_RELEASE_* credentials or releaseStore* Gradle properties.")
 }
 
 /**
