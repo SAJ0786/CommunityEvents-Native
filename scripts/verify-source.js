@@ -56,6 +56,8 @@ if (!androidGradleSource.includes('signingConfig signingConfigs.release') ||
     !androidGradleSource.includes('EAS_BUILD_ANDROID_KEYSTORE_PASSWORD') ||
     !androidGradleSource.includes('EAS_BUILD_ANDROID_KEY_ALIAS') ||
     !androidGradleSource.includes('EAS_BUILD_ANDROID_KEY_PASSWORD') ||
+    !androidGradleSource.includes('file("eas-build.gradle").exists()') ||
+    !androidGradleSource.includes('!easManagedSigning') ||
     !androidGradleSource.includes('findProperty("releaseStoreFile")') ||
     !androidGradleSource.includes('findProperty("releaseStorePassword")') ||
     !androidGradleSource.includes('findProperty("releaseKeyAlias")') ||
