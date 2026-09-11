@@ -82,3 +82,86 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+
+  android-signed-release-apk:
+    name: Community Connect Android signed release APK
+    max_build_duration: 60
+    instance_type: linux_x2
+
+    environment:
+      vars:
+        APP_RELEASE_MODE: production
+        APP_CHECK_PROVIDER: production
+        ANDROID_PACKAGE_NAME: info.siza.communityevents.app
+      groups:
+        # Create this as a protected Codemagic variable group. All values in
+        # the group are encrypted and must be supplied for this workflow.
+        - android_release
+      node: 22.14.0
+      java: 17
+
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+
+      - name: Validate Android release secrets
+        script: |
+          set -euo pipefail
+
+          required_secrets=(
+            ANDROID_RELEASE_KEYSTORE_BASE64
+            ANDROID_RELEASE_STORE_PASSWORD
+            ANDROID_RELEASE_KEY_ALIAS
+            ANDROID_RELEASE_KEY_PASSWORD
+            GOOGLE_MAPS_API_KEY
+          )
+
+          for secret_name in "${required_secrets[@]}"; do
+            if [[ -z "${!secret_name:-}" ]]; then
+              echo "Missing required protected Codemagic variable: ${secret_name}" >&2
+              exit 1
+            fi
+          done
+
+          if ! printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > /dev/null 2>&1; then
+            echo "ANDROID_RELEASE_KEYSTORE_BASE64 is not valid base64." >&2
+            exit 1
+          fi
+
+      - name: Prepare production Android signing
+        script: |
+          set -euo pipefail
+          umask 077
+
+          export ANDROID_RELEASE_STORE_FILE="$CM_BUILD_DIR/.codemagic/android-upload-key.jks"
+          mkdir -p "$(dirname "$ANDROID_RELEASE_STORE_FILE")"
+          printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_RELEASE_STORE_FILE"
+
+          if ! keytool -list -keystore "$ANDROID_RELEASE_STORE_FILE" \
+              -storepass "$ANDROID_RELEASE_STORE_PASSWORD" > /dev/null 2>&1; then
+            echo "The Android keystore or ANDROID_RELEASE_STORE_PASSWORD is invalid." >&2
+            exit 1
+          fi
+
+          echo "ANDROID_RELEASE_STORE_FILE=$ANDROID_RELEASE_STORE_FILE" >> "$CM_ENV"
+
+      - name: Generate Android project
+        script: npx expo prebuild --platform android --non-interactive --no-install
+
+      - name: Run release checks
+        script: |
+          set -euo pipefail
+          npm run check:release
+
+      - name: Build signed release APK
+        script: |
+          set -euo pipefail
+          cd android
+          bash ./gradlew assembleRelease \
+            -PreleaseStoreFile="$ANDROID_RELEASE_STORE_FILE" \
+            -PreleaseStorePassword="$ANDROID_RELEASE_STORE_PASSWORD" \
+            -PreleaseKeyAlias="$ANDROID_RELEASE_KEY_ALIAS" \
+            -PreleaseKeyPassword="$ANDROID_RELEASE_KEY_PASSWORD"
+
+    artifacts:
+      - android/app/build/outputs/apk/release/app-release.apk
