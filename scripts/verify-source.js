@@ -51,7 +51,15 @@ if (packageJson.dependencies.expo !== '~54.0.37') {
   throw new Error(`Expected Expo SDK 54 dependency, found ${packageJson.dependencies.expo || 'missing'}.`);
 }
 if (!androidGradleSource.includes('signingConfig signingConfigs.release') ||
-    !androidGradleSource.includes('ANDROID_RELEASE_STORE_PASSWORD')) {
+    !androidGradleSource.includes('ANDROID_RELEASE_STORE_PASSWORD') ||
+    !androidGradleSource.includes('EAS_BUILD_ANDROID_KEYSTORE_PATH') ||
+    !androidGradleSource.includes('EAS_BUILD_ANDROID_KEYSTORE_PASSWORD') ||
+    !androidGradleSource.includes('EAS_BUILD_ANDROID_KEY_ALIAS') ||
+    !androidGradleSource.includes('EAS_BUILD_ANDROID_KEY_PASSWORD') ||
+    !androidGradleSource.includes('findProperty("releaseStoreFile")') ||
+    !androidGradleSource.includes('findProperty("releaseStorePassword")') ||
+    !androidGradleSource.includes('findProperty("releaseKeyAlias")') ||
+    !androidGradleSource.includes('findProperty("releaseKeyPassword")')) {
   throw new Error('Android release builds must use production signing credentials from secure properties or environment variables.');
 }
 if (!firestoreRulesSource.includes("request.resource.data.role == 'user'") ||
