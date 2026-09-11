@@ -4,13 +4,25 @@ apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 def googleMapsApiKey = System.getenv("GOOGLE_MAPS_API_KEY") ?: findProperty("GOOGLE_MAPS_API_KEY") ?: ""
-def releaseStoreFile = System.getenv("ANDROID_RELEASE_STORE_FILE") ?: findProperty("ANDROID_RELEASE_STORE_FILE")
-def releaseStorePassword = System.getenv("ANDROID_RELEASE_STORE_PASSWORD") ?: findProperty("ANDROID_RELEASE_STORE_PASSWORD")
-def releaseKeyAlias = System.getenv("ANDROID_RELEASE_KEY_ALIAS") ?: findProperty("ANDROID_RELEASE_KEY_ALIAS")
-def releaseKeyPassword = System.getenv("ANDROID_RELEASE_KEY_PASSWORD") ?: findProperty("ANDROID_RELEASE_KEY_PASSWORD")
+def releaseStoreFile = System.getenv("ANDROID_RELEASE_STORE_FILE") ?:
+    System.getenv("EAS_BUILD_ANDROID_KEYSTORE_PATH") ?:
+    findProperty("ANDROID_RELEASE_STORE_FILE") ?:
+    findProperty("releaseStoreFile")
+def releaseStorePassword = System.getenv("ANDROID_RELEASE_STORE_PASSWORD") ?:
+    System.getenv("EAS_BUILD_ANDROID_KEYSTORE_PASSWORD") ?:
+    findProperty("ANDROID_RELEASE_STORE_PASSWORD") ?:
+    findProperty("releaseStorePassword")
+def releaseKeyAlias = System.getenv("ANDROID_RELEASE_KEY_ALIAS") ?:
+    System.getenv("EAS_BUILD_ANDROID_KEY_ALIAS") ?:
+    findProperty("ANDROID_RELEASE_KEY_ALIAS") ?:
+    findProperty("releaseKeyAlias")
+def releaseKeyPassword = System.getenv("ANDROID_RELEASE_KEY_PASSWORD") ?:
+    System.getenv("EAS_BUILD_ANDROID_KEY_PASSWORD") ?:
+    findProperty("ANDROID_RELEASE_KEY_PASSWORD") ?:
+    findProperty("releaseKeyPassword")
 def releaseBuildRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains("release") }
 if (releaseBuildRequested && [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword].any { !it }) {
-    throw new GradleException("Release signing is not configured. Set ANDROID_RELEASE_STORE_FILE, ANDROID_RELEASE_STORE_PASSWORD, ANDROID_RELEASE_KEY_ALIAS, and ANDROID_RELEASE_KEY_PASSWORD as Gradle properties or CI secrets.")
+    throw new GradleException("Release signing is not configured. Provide EAS_BUILD_ANDROID_* credentials, ANDROID_RELEASE_* credentials, or releaseStore* Gradle properties.")
 }
 
 /**

@@ -47,6 +47,17 @@ if (!new RegExp(`versionCode\\s+${Number(app.android.versionCode)}\\b`).test(and
 }
 if (!/^android\.compileSdkVersion=36$/m.test(gradleProperties)) throw new Error('Android compile SDK 36 is not pinned.');
 if (!/^android\.targetSdkVersion=36$/m.test(gradleProperties)) throw new Error('Android target SDK 36 is not pinned.');
+if (!androidGradle.includes('EAS_BUILD_ANDROID_KEYSTORE_PATH') ||
+    !androidGradle.includes('EAS_BUILD_ANDROID_KEYSTORE_PASSWORD') ||
+    !androidGradle.includes('EAS_BUILD_ANDROID_KEY_ALIAS') ||
+    !androidGradle.includes('EAS_BUILD_ANDROID_KEY_PASSWORD') ||
+    !androidGradle.includes('findProperty("releaseStoreFile")') ||
+    !androidGradle.includes('findProperty("releaseStorePassword")') ||
+    !androidGradle.includes('findProperty("releaseKeyAlias")') ||
+    !androidGradle.includes('findProperty("releaseKeyPassword")') ||
+    !androidGradle.includes('signingConfig signingConfigs.release')) {
+  throw new Error('Android release signing must accept EAS-managed and Codemagic credentials without falling back to debug signing.');
+}
 if (!dynamicAppConfig.includes("process.env.EXPO_NO_DOTENV === '1'") ||
     !dynamicAppConfig.includes("process.env.EAS_BUILD !== 'true'")) {
   throw new Error('EAS local metadata evaluation must remain separate from the protected-key cloud build guard.');
@@ -59,6 +70,19 @@ if (!androidGradle.includes('com.github.pedroSG94.RootEncoder:library:2.5.9') ||
 }
 
 const production = eas.build?.production;
+const apk = eas.build?.apk;
+const preview = eas.build?.preview;
+if (apk?.environment !== 'preview' ||
+    apk?.distribution !== 'internal' ||
+    apk?.android?.buildType !== 'apk' ||
+    apk?.env?.APP_RELEASE_MODE !== 'tester' ||
+    apk?.env?.APP_CHECK_PROVIDER !== 'debug' ||
+    preview?.environment !== 'preview' ||
+    preview?.distribution !== 'internal' ||
+    preview?.env?.APP_RELEASE_MODE !== 'tester' ||
+    preview?.env?.APP_CHECK_PROVIDER !== 'debug') {
+  throw new Error('EAS apk and preview profiles must remain internal tester builds with debug App Check.');
+}
 if (production?.environment !== 'production' ||
     production?.env?.APP_RELEASE_MODE !== 'production' ||
     production?.env?.APP_CHECK_PROVIDER !== 'production') {
