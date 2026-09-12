@@ -395,17 +395,17 @@ exports.sendBusinessEnquiry = onCall(
     if (!businessId || businessId.length > 160) throw new HttpsError('invalid-argument', 'Business reference is invalid.');
     if (!text || text.length > 2000) throw new HttpsError('invalid-argument', 'Enter a message of up to 2000 characters.');
 
-    const [businessSnapshot, publicSnapshot] = await Promise.all([
+    const [businessSnapshot, publicSnapshot, routeSnapshot] = await Promise.all([
       db.collection('businesses').doc(businessId).get(),
       db.collection('publicBusinesses').doc(businessId).get(),
+      db.collection('businessContactRoutes').doc(businessId).get(),
     ]);
     if (!businessSnapshot.exists || !publicSnapshot.exists) throw new HttpsError('not-found', 'This public business could not be found.');
     const business = businessSnapshot.data() || {};
-    let ownerUid = clean(business.ownerId);
-    if (!ownerUid) {
-      const routeSnapshot = await db.collection('businessContactRoutes').doc(businessId).get();
-      ownerUid = clean(routeSnapshot.data()?.ownerUid);
-    }
+    // The route is the published contact target and may be newer than the
+    // private business record after an ownership transfer.
+    const route = routeSnapshot.data() || {};
+    let ownerUid = clean(route.active === true ? route.ownerUid : '') || clean(business.ownerId);
     if (!ownerUid || business.hidden === true || (business.status !== 'approved' && business.hasPublishedVersion !== true)) {
       throw new HttpsError('failed-precondition', 'This business does not have an active in-app contact inbox.');
     }

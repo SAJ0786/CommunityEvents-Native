@@ -53,6 +53,7 @@ import RecurringEventForm from './src/components/RecurringEventForm';
 import StreamedVideosScreen from './src/components/StreamedVideosScreen';
 import BusinessDirectoryModule from './src/business/BusinessDirectoryModule';
 import BusinessNotificationsScreen from './src/business/BusinessNotificationsScreen';
+import { listenUserNotifications } from './src/services/businessNotifications';
 import { auth, confirmPhoneVerification, ensureFirebaseSession, sendPhoneVerification, setNativeDisplayName } from './src/firebase/firebase';
 import { compareEventsByDateTime, createEventSubmission, createRecurringEventSeries, deleteEventSeries, deleteEventSubmission, getPublicEvents, getUserEventSubmissions, listenActiveEvents, prepareHomeEvents, setEventVisibility, updateEventSeries, updateEventSubmission } from './src/services/events';
 import { uploadEventPoster } from './src/services/images';
@@ -238,6 +239,7 @@ function MainApp() {
   const [selectedBusinessId, setSelectedBusinessId] = useState('');
   const [businessListingOpen, setBusinessListingOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [selectedCity, setSelectedCity] = useState(DEFAULT_CITY);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -275,6 +277,12 @@ function MainApp() {
   const livePulse = useRef(new Animated.Value(1)).current;
   const [createMode, setCreateMode] = useState('');
   const hasEventsRef = useRef(false);
+
+  useEffect(() => listenUserNotifications(
+    currentUser?.uid,
+    rows => setNotificationUnreadCount(rows.filter(item => item.read !== true).length),
+    () => setNotificationUnreadCount(0),
+  ), [currentUser?.uid]);
 
   const isGuest = !currentUser || currentUser.isAnonymous;
 
@@ -1015,6 +1023,7 @@ function MainApp() {
   }, [loadEvents]);
 
   const requestTabChange = useCallback(nextTab => {
+    setAccountMenuOpen(false);
     if (isGuest && nextTab === 'profile') {
       requestSignIn();
       return;
@@ -1058,6 +1067,10 @@ function MainApp() {
       setAccountMenuOpen(false);
       setSelectedEvent(null);
       setSelectedBusinessId('');
+      setActiveTab('home');
+      setDirectoryTab('home');
+      setDirectoryFilter(null);
+      setBusinessListingOpen(false);
       setAppModule(nextModule);
     };
 
@@ -1306,12 +1319,24 @@ function MainApp() {
         activeModule={appModule}
         logoSource={logo}
         onModuleChange={requestModuleChange}
+        notificationUnreadCount={notificationUnreadCount}
+        onOpenNotifications={() => {
+          setAccountMenuOpen(false);
+          if (appModule === 'directory') {
+            setDirectoryTab('notifications');
+          } else {
+            setActiveTab('notifications');
+          }
+        }}
       />
 
       {appModule === 'directory' ? (
         <BusinessDirectoryModule
           activeTab={directoryTab}
-          onTabChange={setDirectoryTab}
+          onTabChange={nextTab => {
+            setAccountMenuOpen(false);
+            setDirectoryTab(nextTab);
+          }}
           selectedBusinessId={selectedBusinessId}
           onSelectBusiness={setSelectedBusinessId}
           selectedCity={selectedCity}
@@ -1671,6 +1696,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     fontStyle: 'italic',
+    letterSpacing: 0,
     marginTop: spacing.sm,
   },
   noticeCompact: { fontSize: 11.5, lineHeight: 16, marginTop: spacing.sm },

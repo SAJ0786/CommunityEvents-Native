@@ -350,7 +350,7 @@ export default function HijriCalendarScreen({ profile, selectedCity }) {
                     {azaanAlarmBusy === key ? <ActivityIndicator color={colors.tealDark} size="small" /> : <Switch accessibilityLabel={`${label} Azaan alarm`} value={azaanAlarmKeys.includes(key)} onValueChange={() => toggleAzaanAlarm(key)} trackColor={{ false: colors.border, true: colors.teal }} />}
                   </View>
                 ))}
-                <Text style={styles.azaanPrivacy}>The selected Azaan recording is bundled in the app. Tap its notification to open playback, and use the visible Stop control whenever needed. Android may require Alarms &amp; reminders permission; the phone’s notification settings remain in control.</Text>
+                <Text style={styles.azaanPrivacy}>The selected Azaan recording is bundled in the app. It starts automatically when the alarm arrives while the app is open; when the app is backgrounded, the phone plays the configured notification sound and platform restrictions may require tapping the notification for full in-app playback. Android may require Alarms &amp; reminders permission; these alarms are separate from Profile prayer-time reminders.</Text>
               </View>
             </View>
           ) : null}

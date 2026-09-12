@@ -62,9 +62,15 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar }) {
       .catch(() => {});
 
     const subscription = Notifications.addNotificationResponseReceivedListener(playFromNotification);
+    const receivedSubscription = Notifications.addNotificationReceivedListener(notification => {
+      // When the app is active, Expo does not launch a notification response.
+      // Start the bundled recording from the alarm notification itself.
+      playFromNotification({ notification });
+    });
     return () => {
       mounted = false;
       subscription.remove();
+      receivedSubscription.remove();
     };
   }, [playFromNotification]);
 

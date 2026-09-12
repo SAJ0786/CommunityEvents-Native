@@ -57,6 +57,11 @@ export default function HomeFilters({
 
       {showFilters ? (
         <View style={styles.panel}>
+          {activeCount ? (
+            <Pressable accessibilityRole="button" onPress={onClear} style={styles.clearButton}>
+              <Text maxFontSizeMultiplier={1.08} style={styles.clearButtonText}>Clear Filters</Text>
+            </Pressable>
+          ) : null}
           <FilterChoices
             label="Time period"
             options={[
@@ -114,11 +119,6 @@ export default function HomeFilters({
               />
             </View>
           </View>
-          {activeCount ? (
-            <Pressable onPress={onClear} style={styles.clearButton}>
-              <Text maxFontSizeMultiplier={1.08} style={styles.clearButtonText}>Clear Filters</Text>
-            </Pressable>
-          ) : null}
         </View>
       ) : null}
     </View>
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   wrap: { marginTop: spacing.md, marginBottom: 0 },
   searchRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.82)' },
   searchIcon: { color: colors.muted, fontSize: 20, fontWeight: '700' },
-  searchInput: { flex: 1, minWidth: 0, minHeight: 49, color: colors.text, fontSize: 14, fontWeight: '500' },
+  searchInput: { flex: 1, minWidth: 0, minHeight: 49, color: colors.text, fontSize: 14, fontWeight: '500', letterSpacing: 0 },
   clearSearch: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: colors.border },
   clearSearchText: { color: colors.surface, fontSize: 20, lineHeight: 23, fontWeight: '700' },
   filterButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.blueSoft },

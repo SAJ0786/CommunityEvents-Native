@@ -4,6 +4,7 @@ import {
   onSnapshot,
   serverTimestamp,
   updateDoc,
+  writeBatch,
   where,
   query,
 } from '@react-native-firebase/firestore';
@@ -44,4 +45,15 @@ export async function markBusinessNotificationRead(notificationId) {
     read: true,
     readAt: serverTimestamp(),
   });
+}
+
+export async function clearUserNotifications(notifications = []) {
+  const pending = notifications.filter(item => item?.id && item.read !== true);
+  if (!pending.length) return;
+  const batch = writeBatch(db);
+  pending.forEach(item => batch.update(doc(db, COLLECTION_NAME, item.id), {
+    read: true,
+    readAt: serverTimestamp(),
+  }));
+  await batch.commit();
 }
