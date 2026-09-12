@@ -264,14 +264,23 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
           <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setContactOpen(false)} />
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.contactCard}
+            style={styles.contactKeyboard}
           >
+          <ScrollView
+            bounces={false}
+            contentContainerStyle={styles.contactScrollContent}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets
+          >
+          <View style={styles.contactCard}>
             <Text style={styles.contactTitle}>Contact {business.name}</Text>
             <Text style={styles.contactHelp}>Your message will be delivered through the app to the listing owner. Do not share passwords, verification codes, financial details or sensitive identity information.</Text>
             <TextInput value={contactText} onChangeText={setContactText} multiline maxLength={2000} placeholder="Write your message..." placeholderTextColor={colors.muted} style={styles.contactInput} />
             {contactStatus ? <Text style={styles.contactStatus}>{contactStatus}</Text> : null}
             <Pressable disabled={contactBusy || !contactText.trim()} onPress={contactBusiness} style={[styles.contactSend, (contactBusy || !contactText.trim()) && styles.disabled]}><Text style={styles.contactSendText}>{contactBusy ? 'Sending...' : 'Send Message'}</Text></Pressable>
             <Pressable onPress={() => setContactOpen(false)} style={styles.contactCancel}><Text style={styles.contactCancelText}>Close</Text></Pressable>
+          </View>
+          </ScrollView>
           </KeyboardAvoidingView>
         </View>
       </Modal>
@@ -362,7 +371,9 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.navy, fontSize: 18, fontWeight: '700' },
   emptyText: { marginTop: spacing.sm, color: colors.muted, fontSize: 13, fontWeight: '700', textAlign: 'center' },
   contactModal: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(15,23,42,0.46)' },
-  contactCard: { width: '100%', maxWidth: 440, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
+  contactKeyboard: { flex: 1, width: '100%' },
+  contactScrollContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.sm },
+  contactCard: { width: '100%', maxWidth: 440, maxHeight: '100%', padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   contactTitle: { color: colors.navy, fontSize: 20, fontWeight: '700' }, contactHelp: { marginTop: 4, color: colors.muted, fontSize: 12, lineHeight: 18 },
   contactInput: { minHeight: 130, marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, color: colors.text, textAlignVertical: 'top' },
   contactStatus: { marginTop: spacing.sm, color: colors.tealDark, fontSize: 12, fontWeight: '600' },
