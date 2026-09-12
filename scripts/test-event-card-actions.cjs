@@ -50,9 +50,13 @@ function testVisibleActionContract() {
   const businessInbox = read('src/business/BusinessInboxScreen.js');
   const feedback = read('src/components/FeedbackScreen.js');
   assert.match(eventDetails, /KeyboardAvoidingView[\s\S]*behavior=\{Platform\.OS === 'ios' \? 'padding' : 'height'\}/);
+  assert.match(eventDetails, /hostMessageOpen \?[\s\S]*ScrollView[\s\S]*keyboardShouldPersistTaps="handled"[\s\S]*automaticallyAdjustKeyboardInsets/);
   assert.match(businessDetails, /KeyboardAvoidingView[\s\S]*contactInput/);
+  assert.match(businessDetails, /contactKeyboard[\s\S]*contactScrollContent[\s\S]*keyboardShouldPersistTaps="handled"/);
   assert.match(businessInbox, /KeyboardAvoidingView[\s\S]*keyboardShouldPersistTaps="handled"/);
   assert.match(feedback, /KeyboardAvoidingView[\s\S]*keyboardShouldPersistTaps="handled"/);
+  const firestoreRules = read('backend/firestore.rules');
+  assert.match(firestoreRules, /match \/hostMessageThreads\/\{threadId\}[\s\S]*allow create: if isHostThreadParticipant\([\s\S]*getAfter\(\/databases\/\$\(database\)\/documents\/hostMessageThreads\/\$\(threadId\)\)\.data/);
   assert.match(app, /<MyEventsScreen[\s\S]*onEditSeries=\{handleEditSeries\}/);
   assert.match(app, /selectedEvent\.createdByUserId === currentUser\.uid/);
   assert.match(myEvents, /disabled=\{!onEditSeries\} onPress=\{\(\) => onEditSeries\?\.\(event\)\}/);

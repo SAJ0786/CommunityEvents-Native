@@ -569,6 +569,12 @@ export default function EventDetailsModal({
               style={styles.overlayRoot}
             >
           <Pressable style={styles.overlayBackdrop} onPress={() => setHostMessageOpen(false)} />
+          <ScrollView
+            bounces={false}
+            contentContainerStyle={styles.overlayScrollContent}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets
+          >
           <View style={styles.overlayCard}>
             <Text style={styles.overlayTitle}>Contact Host</Text>
             <Text style={styles.overlaySubtitle}>Message about {getEventTitle(event)}</Text>
@@ -597,6 +603,7 @@ export default function EventDetailsModal({
               <Text style={styles.overlayCloseText}>{hostMessageStatus.startsWith('Message sent') ? 'Done' : 'Cancel'}</Text>
             </Pressable>
           </View>
+          </ScrollView>
               </KeyboardAvoidingView>
           </View> : null}
 
@@ -865,10 +872,15 @@ const styles = StyleSheet.create({
   },
   overlayRoot: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: spacing.lg,
     backgroundColor: 'rgba(15, 23, 42, 0.46)',
+  },
+  overlayScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: spacing.sm,
   },
   overlayBackdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -876,6 +888,7 @@ const styles = StyleSheet.create({
   overlayCard: {
     width: '100%',
     maxWidth: 420,
+    maxHeight: '100%',
     padding: spacing.lg,
     borderRadius: radius.lg,
     borderWidth: 1,
