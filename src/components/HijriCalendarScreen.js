@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -11,6 +10,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import ScrollView from './KeyboardAwareScrollView';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, radius, shadow, spacing } from '../theme';
 import {
@@ -33,6 +33,7 @@ import { DEFAULT_CITY, cityLabel, normalizeCity } from '../utils/cities';
 import { getPrayerLocation } from '../utils/prayerLocations';
 import CompactSelect from './CompactSelect';
 import NativeDateTimeField from './NativeDateTimeField';
+import NativeBackButton from './NativeBackButton';
 
 const CATEGORIES = ['Wiladat', 'Shahadat', 'Wafat', 'Eid', 'Ayyam-e-Aza', 'Amaal', 'Season', 'Event'];
 const PRAYER_VISUALS = {
@@ -93,7 +94,7 @@ function getNextObservance(observances, overrides) {
   return candidates[0] || null;
 }
 
-export default function HijriCalendarScreen({ profile, selectedCity }) {
+export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
   const { width, fontScale } = useWindowDimensions();
   const compactLayout = width / Math.max(fontScale, 1) < 360;
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
@@ -235,6 +236,7 @@ export default function HijriCalendarScreen({ profile, selectedCity }) {
       contentContainerStyle={[styles.content, compactLayout && styles.contentCompact]}
       showsVerticalScrollIndicator={false}
     >
+      <NativeBackButton onPress={onBack} />
       <View style={styles.hero}>
         <View style={styles.heroGlowLarge} />
         <View style={styles.heroGlowSmall} />

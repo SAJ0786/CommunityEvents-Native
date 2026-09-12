@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import ScrollView from './KeyboardAwareScrollView';
 import EventDateTimePicker from './EventDateTimePicker';
 import CreateEventForm from './CreateEventForm';
 import CompactSelect from './CompactSelect';

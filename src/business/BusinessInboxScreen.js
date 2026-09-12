@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import ScrollView from '../components/KeyboardAwareScrollView';
 import { listenBusinessThreads, listenThreadMessages, markBusinessThreadRead, sendBusinessReply, sendFeedbackMessage } from '../services/messaging';
 import { setBusinessConversationBlocked } from '../services/businessSafety';
 import { colors, radius, shadow, spacing } from '../theme';
@@ -10,7 +11,7 @@ function timeLabel(value) {
   return millis ? new Date(millis).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
 }
 
-export default function BusinessInboxScreen({ user, profile, onBack }) {
+export default function BusinessInboxScreen({ user, profile, onBack, onOpenFeedback }) {
   const [threads, setThreads] = useState([]);
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -31,7 +32,7 @@ export default function BusinessInboxScreen({ user, profile, onBack }) {
   useEffect(() => {
     if (!selected?.id) { setMessages([]); return undefined; }
     markBusinessThreadRead(selected.id, user?.uid).catch(() => {});
-    return listenThreadMessages('businessMessageThreads', selected.id, setMessages);
+    return listenThreadMessages('businessMessageThreads', selected.id, setMessages, error => setStatus(error?.message || 'Could not load conversation.'));
   }, [selected?.id, user?.uid]);
   const send = async () => {
     try { await sendBusinessReply({ thread: selected, user, profile, text: reply }); setReply(''); setStatus(''); }
@@ -80,8 +81,10 @@ export default function BusinessInboxScreen({ user, profile, onBack }) {
   return (
     <ScrollView contentContainerStyle={styles.list}>
       <NativeBackButton accessibilityLabel="Back to directory" onPress={onBack} />
+      {onOpenFeedback ? <Pressable accessibilityRole="button" onPress={onOpenFeedback} style={styles.thread}><Text style={styles.threadTitle}>Directory support & feedback →</Text></Pressable> : null}
       <Text style={styles.eyebrow}>COMMUNITY BUSINESSES AUSTRALIA</Text><Text style={styles.pageTitle}>Business Inbox</Text><Text style={styles.pageText}>Messages sent through Contact Business are kept separate from Events Inbox.</Text>
       {loading ? <Text style={styles.pageText}>Loading business messages…</Text> : null}
+      {status ? <Text accessibilityRole="alert" style={styles.error}>{status}</Text> : null}
       {!loading && threads.length ? threads.map(thread => <Pressable key={thread.id} onPress={() => setSelected(thread)} style={styles.thread}><View style={styles.avatar}><Text style={styles.avatarText}>{String(thread.businessName || 'B')[0]}</Text></View><View style={styles.threadCopy}><Text style={styles.threadTitle}>{thread.businessName}</Text><Text numberOfLines={1} style={styles.threadText}>{thread.lastMessage}</Text><Text style={styles.time}>{timeLabel(thread.updatedAt)}</Text></View>{Number(thread.unreadBy?.[user?.uid] || 0) ? <View style={styles.unread}><Text style={styles.unreadText}>{thread.unreadBy[user.uid]}</Text></View> : null}</Pressable>) : null}
       {!loading && !threads.length ? <View style={styles.empty}><Text style={styles.emptyIcon}>{'\u{1F4E5}'}</Text><Text style={styles.threadTitle}>No business messages yet</Text><Text style={styles.pageText}>New owner and customer conversations will appear here.</Text></View> : null}
     </ScrollView>

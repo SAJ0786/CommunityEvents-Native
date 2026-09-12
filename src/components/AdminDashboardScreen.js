@@ -5,13 +5,14 @@ import {
   Image,
   Linking,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import ScrollView from './KeyboardAwareScrollView';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
@@ -1934,12 +1935,12 @@ export default function AdminDashboardScreen({
       ) : panel === 'users' ? (
         <View style={styles.section}>
           <View style={styles.sectionHead}>
+            <NativeBackButton onPress={() => setPanel('overview')} />
             <View>
               <Text style={styles.sectionTitle}>Users</Text>
               <Text style={styles.sectionMeta}>User management and contact updates</Text>
             </View>
             <View style={styles.rowWrap}>
-              <NativeBackButton onPress={() => setPanel('overview')} />
               <Pressable onPress={loadUsers} style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>Refresh</Text>
               </Pressable>
@@ -2049,7 +2050,7 @@ export default function AdminDashboardScreen({
                 const userCity = normalizeCity(userRecord.defaultCity || DEFAULT_CITY);
                 const ownedEventCount = activeEventCountByOwner.get(userRecord.id) || 0;
                 return (
-                  <View key={userRecord.id} style={styles.actionCard}>
+                  <View key={userRecord.id} style={[styles.actionCard, styles.compactUserCard]}>
                     <View style={styles.cardTop}>
                       <View style={styles.listTextWrap}>
                         <Text style={styles.cardTitle}>
@@ -2059,7 +2060,6 @@ export default function AdminDashboardScreen({
                         {userRecord.phone || userRecord.phoneNumber ? (
                           <Text style={styles.listMeta}>{userRecord.phone || userRecord.phoneNumber}</Text>
                         ) : null}
-                        <Text style={styles.listMeta}>{cityCode(userCity)} - {cityLabel(userCity).replace(', Australia', '')}</Text>
                         <View style={styles.rowWrap}>
                           <View style={styles.statusPill}><Text style={styles.statusPillText}>{cityCode(userCity)}</Text></View>
                           {userRecord.calendarSynced === true || userRecord.calendarSyncEnabled === true ? <View style={[styles.statusPill, styles.statusLive]}><Text style={styles.statusPillText}>Calendar Synced</Text></View> : null}
@@ -2084,12 +2084,12 @@ export default function AdminDashboardScreen({
 
                     {!isEditing ? (
                       <View style={styles.rowWrap}>
-                        <Pressable onPress={() => openUserEvents(userRecord)} style={styles.userEventsLink}>
-                          <Text style={styles.userEventsLinkText}>View Events ({ownedEventCount})</Text>
-                          <Text style={styles.userEventsLinkArrow}>{'\u203A'}</Text>
+                        <Pressable accessibilityRole="button" accessibilityLabel={`View events (${ownedEventCount})`} onPress={() => openUserEvents(userRecord)} style={styles.compactUserAction}>
+                          <MaterialCommunityIcons name="calendar-month-outline" size={21} color={colors.tealDark} />
+                          <Text style={styles.userEventsLinkText}>{ownedEventCount}</Text>
                         </Pressable>
-                        <Pressable onPress={() => openUserEditor(userRecord)} style={styles.secondaryButton}>
-                          <Text style={styles.secondaryButtonText}>Edit Details</Text>
+                        <Pressable accessibilityRole="button" accessibilityLabel="Edit user details" onPress={() => openUserEditor(userRecord)} style={styles.compactUserAction}>
+                          <MaterialCommunityIcons name="account-edit-outline" size={21} color={colors.tealDark} />
                         </Pressable>
                         {profile?.role === 'superAdmin' && !isCurrentUser ? (
                           ROLE_OPTIONS.map(option => (
@@ -2110,11 +2110,11 @@ export default function AdminDashboardScreen({
                           ))
                         ) : null}
                         {profile?.role === 'superAdmin' && !isCurrentUser && !isInactiveUserProfile(userRecord) ? <>
-                          <Pressable disabled={userLifecycleBusyId === userRecord.id} onPress={() => applyUserLifecycle(userRecord, false)} style={styles.secondaryButton}>
-                            <Text style={styles.secondaryButtonText}>Archive Account</Text>
+                          <Pressable accessibilityRole="button" accessibilityLabel="Archive account" disabled={userLifecycleBusyId === userRecord.id} onPress={() => applyUserLifecycle(userRecord, false)} style={styles.compactUserAction}>
+                            <MaterialCommunityIcons name="archive-outline" size={21} color={colors.tealDark} />
                           </Pressable>
-                          <Pressable disabled={userLifecycleBusyId === userRecord.id} onPress={() => applyUserLifecycle(userRecord, true)} style={styles.dangerButton}>
-                            <Text style={styles.dangerButtonText}>Ban User</Text>
+                          <Pressable accessibilityRole="button" accessibilityLabel="Ban user" disabled={userLifecycleBusyId === userRecord.id} onPress={() => applyUserLifecycle(userRecord, true)} style={styles.compactUserAction}>
+                            <MaterialCommunityIcons name="account-cancel-outline" size={21} color={colors.danger} />
                           </Pressable>
                         </> : null}
                         {profile?.role === 'superAdmin' && !isCurrentUser && isInactiveUserProfile(userRecord) ? (
@@ -2204,11 +2204,11 @@ export default function AdminDashboardScreen({
       ) : panel === 'import' ? (
         <View style={styles.section}>
           <View style={styles.sectionHead}>
+            <NativeBackButton onPress={() => setPanel('overview')} />
             <View>
               <Text style={styles.sectionTitle}>Import & Export</Text>
               <Text style={styles.sectionMeta}>Bulk event spreadsheets and upcoming-event reports</Text>
             </View>
-            <NativeBackButton onPress={() => setPanel('overview')} />
           </View>
 
           <View style={styles.actionCard}>
@@ -2345,12 +2345,12 @@ export default function AdminDashboardScreen({
       ) : panel === 'events' ? (
         <View style={styles.section}>
           <View style={styles.sectionHead}>
+            <NativeBackButton onPress={() => setPanel('overview')} />
             <View>
               <Text style={styles.sectionTitle}>Events</Text>
               <Text style={styles.sectionMeta}>Admin event management</Text>
             </View>
             <View style={styles.rowWrap}>
-              <NativeBackButton onPress={() => setPanel('overview')} />
               <Pressable onPress={() => loadAdminEvents(adminEventView)} style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>Refresh</Text>
               </Pressable>
@@ -2688,12 +2688,12 @@ export default function AdminDashboardScreen({
       ) : panel === 'repair' ? (
         <View style={styles.section}>
           <View style={styles.sectionHead}>
+            <NativeBackButton onPress={() => setPanel('overview')} />
             <View>
               <Text style={styles.sectionTitle}>Hijri Repair Tool</Text>
               <Text style={styles.sectionMeta}>Super-admin repair for Hijri-entered events</Text>
             </View>
             <View style={styles.rowWrap}>
-              <NativeBackButton onPress={() => setPanel('overview')} />
               <Pressable onPress={loadRepairEvents} style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>Refresh</Text>
               </Pressable>
@@ -2805,12 +2805,12 @@ export default function AdminDashboardScreen({
       ) : panel === 'orgs' ? (
         <View style={styles.section}>
           <View style={styles.sectionHead}>
+            <NativeBackButton onPress={() => setPanel('overview')} />
             <View>
               <Text style={styles.sectionTitle}>Organisation Management</Text>
               <Text style={styles.sectionMeta}>Organisation names, IDs, locations, and types</Text>
             </View>
             <View style={styles.rowWrap}>
-              <NativeBackButton onPress={() => setPanel('overview')} />
               <Pressable onPress={loadOrganisations} style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>Refresh</Text>
               </Pressable>
@@ -3040,11 +3040,11 @@ export default function AdminDashboardScreen({
       ) : (
         <View style={styles.section}>
           <View style={styles.sectionHead}>
+            <NativeBackButton onPress={() => setPanel('overview')} />
             <View>
               <Text style={styles.sectionTitle}>{panel === 'settings' ? 'Calendar Settings' : panel === 'messaging' ? 'Community Messaging' : panel === 'troubleshooting' ? 'Diagnostics Register' : 'Tools'}</Text>
               <Text style={styles.sectionMeta}>{panel === 'settings' ? 'Hijri calendar adjustment only' : panel === 'messaging' ? 'Community updates and email reminders' : panel === 'troubleshooting' ? 'Installation, session and crash investigation' : 'Live connections and utilities'}</Text>
             </View>
-            <NativeBackButton onPress={() => setPanel('overview')} />
           </View>
 
           {status.message ? (
@@ -3484,6 +3484,8 @@ export default function AdminDashboardScreen({
 }
 
 const styles = StyleSheet.create({
+  compactUserCard: { padding: 12, gap: 6 },
+  compactUserAction: { minWidth: 44, minHeight: 44, paddingHorizontal: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: colors.tealSoft },
   container: {
     flex: 1,
     backgroundColor: colors.background,

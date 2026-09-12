@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import ScrollView from '../components/KeyboardAwareScrollView';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { clearUserNotifications, listenUserNotifications, markBusinessNotificationRead } from '../services/businessNotifications';
 import { sendFeedbackMessage } from '../services/messaging';
@@ -70,8 +71,7 @@ export default function BusinessNotificationsScreen({ user, profile, onBack }) {
 
   const clearNotifications = async () => {
     try {
-      await clearUserNotifications(rows);
-      setRows(current => current.map(item => ({ ...item, read: true })));
+      await clearUserNotifications(rows, user?.uid);
     } catch (nextError) {
       setError(friendlyError(nextError, 'Could not clear notifications.'));
     }
@@ -85,7 +85,7 @@ export default function BusinessNotificationsScreen({ user, profile, onBack }) {
           <Text style={styles.eyebrow}>COMMUNITY CONNECT</Text>
           <Text style={styles.title}>Notifications</Text>
           <Text style={styles.subtitle}>{unreadCount ? `${unreadCount} unread update${unreadCount === 1 ? '' : 's'}` : 'You are up to date'}</Text>
-          {rows.length ? <Pressable accessibilityRole="button" onPress={clearNotifications} style={styles.clearButton}><Text style={styles.clearButtonText}>Clear notifications</Text></Pressable> : null}
+          {rows.length ? <Pressable accessibilityRole="button" accessibilityHint="Marks updates read and clears them from this device; moderation notices are retained." onPress={clearNotifications} style={styles.clearButton}><Text style={styles.clearButtonText}>Clear notifications on this device</Text></Pressable> : null}
         </View>
       </View>
 
@@ -121,10 +121,12 @@ export default function BusinessNotificationsScreen({ user, profile, onBack }) {
         </Pressable>
       ))}
       <Modal transparent visible={Boolean(appealNotice)} animationType="fade" onRequestClose={() => setAppealNotice(null)}>
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalBackdrop}>
           <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setAppealNotice(null)} />
+          <ScrollView automaticallyAdjustKeyboardInsets={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
           <View style={styles.appealCard}><Text style={styles.appealTitle}>Appeal moderation decision</Text><Text style={styles.emptyText}>Explain why the business should be eligible to remain listed. The original decision and this appeal are retained.</Text><TextInput value={appealText} onChangeText={setAppealText} multiline maxLength={2500} placeholder="Grounds for appeal…" placeholderTextColor={colors.muted} style={styles.appealInput} /><Pressable disabled={appealBusy || appealText.trim().length < 20} onPress={submitAppeal} style={[styles.appealSubmit, (appealBusy || appealText.trim().length < 20) && styles.disabled]}><Text style={styles.appealSubmitText}>{appealBusy ? 'Submitting…' : 'Submit Appeal'}</Text></Pressable><Pressable onPress={() => setAppealNotice(null)} style={styles.appealCancel}><Text style={styles.appealCancelText}>Cancel</Text></Pressable></View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </ScrollView>
   );

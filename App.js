@@ -32,6 +32,7 @@ import AppErrorBoundary from './src/components/AppErrorBoundary';
 import ModuleEntryScreen from './src/components/ModuleEntryScreen';
 import AdminDashboardScreen from './src/components/AdminDashboardScreen';
 import AzaanPlaybackController from './src/components/AzaanPlaybackController';
+import NotificationsDrawer from './src/components/NotificationsDrawer';
 import BottomNavigation from './src/components/BottomNavigation';
 import BulkShareScreen from './src/components/BulkShareScreen';
 import AddEventChoice from './src/components/AddEventChoice';
@@ -239,6 +240,7 @@ function MainApp() {
   const [selectedBusinessId, setSelectedBusinessId] = useState('');
   const [businessListingOpen, setBusinessListingOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [notificationsDrawerOpen, setNotificationsDrawerOpen] = useState(false);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [selectedCity, setSelectedCity] = useState(DEFAULT_CITY);
   const [events, setEvents] = useState([]);
@@ -1322,11 +1324,7 @@ function MainApp() {
         notificationUnreadCount={notificationUnreadCount}
         onOpenNotifications={() => {
           setAccountMenuOpen(false);
-          if (appModule === 'directory') {
-            setDirectoryTab('notifications');
-          } else {
-            setActiveTab('notifications');
-          }
+          setNotificationsDrawerOpen(true);
         }}
       />
 
@@ -1409,6 +1407,7 @@ function MainApp() {
         />
       ) : activeTab === 'hijri-calendar' ? (
         <HijriCalendarScreen
+          onBack={() => setActiveTab('home')}
           profile={profile}
           selectedCity={selectedCity}
         />
@@ -1431,6 +1430,7 @@ function MainApp() {
         <InboxScreen
           user={currentUser}
           profile={profile}
+          onOpenFeedback={() => setActiveTab('feedback')}
           onBack={() => setActiveTab('home')}
         />
       ) : activeTab === 'notifications' ? (
@@ -1587,6 +1587,7 @@ function MainApp() {
           onNavigate={handleHeaderNavigate}
           onSignOut={handleSignOut}
         />
+        <NotificationsDrawer visible={notificationsDrawerOpen} onClose={() => setNotificationsDrawerOpen(false)} user={currentUser} profile={profile} />
         {appModule === 'events' ? (
           <BottomNavigation
             activeTab={activeTab === 'bulk_share' || activeTab === 'admin' ? 'profile' : activeTab === 'calendar' || activeTab === 'hijri-calendar' || activeTab === 'streams' || activeTab === 'feedback' || activeTab === 'inbox' ? 'home' : activeTab}

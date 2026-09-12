@@ -5,7 +5,6 @@ import {
   Image,
   Platform,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Switch,
@@ -13,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import ScrollView from './KeyboardAwareScrollView';
 import { colors, radius, shadow, spacing } from '../theme';
 import { LEGAL_DOCUMENT_VERSION, LEGAL_URLS, SIZA_WEBSITE_URL, SUPPORT_EMAIL } from '../config/legal';
 import { cityLabel, DEFAULT_CITY, normalizeCity } from '../utils/cities';

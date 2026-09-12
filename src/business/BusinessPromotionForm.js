@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import ScrollView from '../components/KeyboardAwareScrollView';
 import * as ImagePicker from 'expo-image-picker';
 import CompactSelect from '../components/CompactSelect';
 import NativeDateTimeField from '../components/NativeDateTimeField';

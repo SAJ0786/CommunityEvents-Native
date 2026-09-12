@@ -4,12 +4,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import ScrollView from './KeyboardAwareScrollView';
 import { colors, radius, shadow, spacing } from '../theme';
 import NativeBackButton from './NativeBackButton';
 import {
@@ -34,7 +34,7 @@ const formatDateTime = value => {
   });
 };
 
-export default function InboxScreen({ user, profile, onBack }) {
+export default function InboxScreen({ user, profile, onBack, onOpenFeedback }) {
   const [threads, setThreads] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [messages, setMessages] = useState([]);
@@ -68,7 +68,7 @@ export default function InboxScreen({ user, profile, onBack }) {
       return undefined;
     }
     markHostThreadRead(selected.id, user?.uid).catch(() => {});
-    return listenThreadMessages('hostMessageThreads', selected.id, setMessages);
+    return listenThreadMessages('hostMessageThreads', selected.id, setMessages, error => setLoadError(error?.message || 'Could not load conversation.'));
   }, [selected?.id, user?.uid]);
 
   const handleReply = async () => {
@@ -103,18 +103,19 @@ export default function InboxScreen({ user, profile, onBack }) {
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.card}>
         <View style={styles.headerRow}>
+          <NativeBackButton onPress={onBack} />
           <View style={styles.headerCopy}>
             <Text style={styles.title}>Inbox</Text>
             <Text style={styles.subtitle}>Messages between event hosts and community members.</Text>
           </View>
-          <NativeBackButton onPress={onBack} />
         </View>
       </View>
 
+      {onOpenFeedback ? <Pressable accessibilityRole="button" onPress={onOpenFeedback} style={styles.card}><Text style={styles.sectionTitle}>Contact Events & Feedback →</Text><Text style={styles.emptyText}>View your conversations with the community team.</Text></Pressable> : null}
       {loadError ? <View style={styles.centerCard}><Text style={styles.emptyText}>{loadError}</Text></View> : null}
       {loading ? (
         <View style={styles.centerCard}><ActivityIndicator color={colors.teal} /></View>
-      ) : threads.length === 0 ? (
+      ) : threads.length === 0 && !loadError ? (
         <View style={styles.centerCard}>
           <Text style={styles.sectionTitle}>No messages yet</Text>
           <Text style={styles.emptyText}>Host messages sent from event cards will appear here.</Text>

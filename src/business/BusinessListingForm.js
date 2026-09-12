@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import ScrollView from '../components/KeyboardAwareScrollView';
 import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import AddressAutocomplete from '../components/AddressAutocomplete';

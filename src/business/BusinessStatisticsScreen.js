@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import ScrollView from '../components/KeyboardAwareScrollView';
 import CompactSelect from '../components/CompactSelect';
 import { BUSINESS_ACTION_LABELS, listenBusinessStatistics } from '../services/businessAnalytics';
 import { CITY_OPTIONS, cityLabel, normalizeCity } from '../utils/cities';

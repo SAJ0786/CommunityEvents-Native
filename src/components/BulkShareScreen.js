@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
-import { Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import ScrollView from './KeyboardAwareScrollView';
 import HomeFilters from './HomeFilters';
 import { colors, radius, shadow, spacing } from '../theme';
 import { DEFAULT_CITY, cityLabel, getEventMetroArea, normalizeCity } from '../utils/cities';

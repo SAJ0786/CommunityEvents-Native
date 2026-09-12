@@ -4,12 +4,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import ScrollView from './KeyboardAwareScrollView';
 import { CITY_OPTIONS, DEFAULT_CITY, cityLabel, normalizeCity } from '../utils/cities';
 import { colors, radius, shadow, spacing } from '../theme';
 import NativeBackButton from './NativeBackButton';
@@ -84,12 +84,12 @@ export default function FeedbackScreen({ user, profile, selectedCity, onBack }) 
 
   useEffect(() => {
     if (!isRegisteredUser) return undefined;
-    return listenOwnFeedbackThreads(user.uid, setOwnThreads);
+    return listenOwnFeedbackThreads(user.uid, setOwnThreads, error => setStatus(error?.message || 'Could not load your feedback.'));
   }, [isRegisteredUser, user?.uid]);
 
   useEffect(() => {
     if (!isAdminRole(profile?.role)) return undefined;
-    return listenAdminFeedbackThreads(profile, setAdminThreads);
+    return listenAdminFeedbackThreads(profile, setAdminThreads, error => setStatus(error?.message || 'Could not load team feedback.'));
   }, [profile]);
 
   const combinedThreads = useMemo(() => {
@@ -117,7 +117,7 @@ export default function FeedbackScreen({ user, profile, selectedCity, onBack }) 
       return undefined;
     }
     markFeedbackThreadRead(selected, user, profile).catch(() => {});
-    return listenThreadMessages('adminFeedbackThreads', selected.id, setMessages);
+    return listenThreadMessages('adminFeedbackThreads', selected.id, setMessages, error => setStatus(error?.message || 'Could not load conversation.'));
   }, [selected, user, profile]);
 
   const handleSend = async () => {
@@ -139,11 +139,11 @@ export default function FeedbackScreen({ user, profile, selectedCity, onBack }) 
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       <View style={styles.introCard}>
         <View style={styles.headerRow}>
+          <NativeBackButton onPress={onBack} />
           <View style={styles.headerCopy}>
             <Text style={styles.title}>Feedback</Text>
             <Text style={styles.subtitle}>Send one-way app feedback to city admins or super admins. Feedback is reviewed, but replies are not sent from this page.</Text>
           </View>
-          <NativeBackButton onPress={onBack} />
         </View>
       </View>
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import ScrollView from '../components/KeyboardAwareScrollView';
 import * as Location from 'expo-location';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import BusinessCard from './BusinessCard';
@@ -881,7 +882,7 @@ export default function BusinessDirectoryModule({
         ) : activeTab === 'admin' ? (
           <BusinessAdminDashboard user={currentUser} profile={profile} categories={businessCategories} />
         ) : activeTab === 'inbox' ? (
-          <BusinessInboxScreen user={currentUser} profile={profile} onBack={() => changeTab('home')} />
+          <BusinessInboxScreen user={currentUser} profile={profile} onBack={() => changeTab('home')} onOpenFeedback={() => changeTab('feedback')} />
         ) : activeTab === 'feedback' ? (
           <BusinessSupportInboxScreen user={currentUser} profile={profile} onBack={() => changeTab('home')} />
         ) : activeTab === 'notifications' ? (

@@ -6,13 +6,13 @@ import {
   Alert,
   Image,
   Pressable,
-  ScrollView,
   StyleSheet,
   Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import ScrollView from './KeyboardAwareScrollView';
 import { colors, radius, shadow, spacing } from '../theme';
 import {
   getHijriDisplay,

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import ScrollView from '../components/KeyboardAwareScrollView';
 import {
   listenBusinessSupportThreads,
   listenThreadMessages,
@@ -33,7 +34,7 @@ export default function BusinessSupportInboxScreen({ user, profile, onBack }) {
   const [moderationBusy, setModerationBusy] = useState(false);
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superAdmin';
 
-  useEffect(() => listenBusinessSupportThreads(user, profile, setThreads), [profile?.adminCity, profile?.defaultCity, profile?.role, user?.isAnonymous, user?.uid]);
+  useEffect(() => listenBusinessSupportThreads(user, profile, setThreads, error => setStatus(error?.message || 'Could not load support messages.')), [profile?.adminCity, profile?.defaultCity, profile?.role, user?.isAnonymous, user?.uid]);
   useEffect(() => {
     if (!selected?.id) return;
     const refreshed = threads.find(item => item.id === selected.id);
@@ -42,7 +43,7 @@ export default function BusinessSupportInboxScreen({ user, profile, onBack }) {
   useEffect(() => {
     if (!selected?.id) { setMessages([]); return undefined; }
     markFeedbackThreadRead(selected, user, profile).catch(() => {});
-    return listenThreadMessages('adminFeedbackThreads', selected.id, setMessages);
+    return listenThreadMessages('adminFeedbackThreads', selected.id, setMessages, error => setStatus(error?.message || 'Could not load conversation.'));
   }, [profile?.adminCity, profile?.defaultCity, profile?.role, selected, user?.uid]);
 
   const send = async () => {
@@ -72,6 +73,7 @@ export default function BusinessSupportInboxScreen({ user, profile, onBack }) {
     <ScrollView contentContainerStyle={styles.list}>
       <NativeBackButton accessibilityLabel="Back to directory" onPress={onBack} />
       <Text style={styles.pageTitle}>Business Feedback</Text>
+      {status ? <Text accessibilityRole="alert" style={styles.error}>{status}</Text> : null}
       <View style={styles.empty}><Text style={styles.emptyIcon}>🔒</Text><Text style={styles.threadTitle}>Sign in required</Text><Text style={styles.pageText}>Sign in to view reports and messages you have sent.</Text></View>
     </ScrollView>
   );

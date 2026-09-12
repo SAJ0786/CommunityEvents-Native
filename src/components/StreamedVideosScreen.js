@@ -62,6 +62,7 @@ export default function StreamedVideosScreen({ isGuest = false, onBack }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
+        <NativeBackButton onPress={onBack} />
         <View style={styles.headerCopy}>
           <Text style={styles.title}>Streamed Videos</Text>
           <Text style={styles.subtitle}>Community Events Australia live-stream archive</Text>
@@ -70,7 +71,6 @@ export default function StreamedVideosScreen({ isGuest = false, onBack }) {
           <Pressable onPress={loadVideos} style={({ pressed }) => [styles.lightButton, pressed && styles.pressed]}>
             <Text style={styles.lightButtonText}>{loading ? 'Loading...' : 'Refresh'}</Text>
           </Pressable>
-          <NativeBackButton onPress={onBack} />
         </View>
       </View>
 

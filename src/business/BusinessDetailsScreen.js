@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Animated, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import ScrollView from '../components/KeyboardAwareScrollView';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { colors, radius, shadow, spacing } from '../theme';
 import NativeBackButton from '../components/NativeBackButton';
@@ -270,7 +271,7 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
             bounces={false}
             contentContainerStyle={styles.contactScrollContent}
             keyboardShouldPersistTaps="handled"
-            automaticallyAdjustKeyboardInsets
+            automaticallyAdjustKeyboardInsets={false}
           >
           <View style={styles.contactCard}>
             <Text style={styles.contactTitle}>Contact {business.name}</Text>

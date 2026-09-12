@@ -10,12 +10,12 @@ import {
   Platform,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import ScrollView from './KeyboardAwareScrollView';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ApiVideoLiveStreamView } from '@api.video/react-native-livestream';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';

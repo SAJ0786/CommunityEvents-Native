@@ -28,7 +28,7 @@ export default function AppHeaderModern({ activeModule = 'events', logoSource, o
         <View style={styles.brandMark}><Image source={logoSource} style={styles.logo} resizeMode="contain" /></View>
         <View style={styles.brandCopy}>
           <Text numberOfLines={1} maxFontSizeMultiplier={1.08} style={styles.brand}>COMMUNITY CONNECT</Text>
-          <Text numberOfLines={1} maxFontSizeMultiplier={1.08} style={styles.moduleTitle}>{activeModule === 'directory' ? 'Community Businesses Australia' : 'Community Events Australia'}</Text>
+          <Text numberOfLines={1} maxFontSizeMultiplier={1.08} style={styles.moduleTitle}>{activeModule === 'directory' ? 'Business directory' : 'Events'}</Text>
         </View>
         <Pressable accessibilityLabel="Open notifications" accessibilityRole="button" onPress={onOpenNotifications} style={({ pressed }) => [styles.bellButton, pressed && styles.pressed]}>
           <MaterialCommunityIcons color={colors.blue} name={notificationUnreadCount ? 'bell' : 'bell-outline'} size={23} />

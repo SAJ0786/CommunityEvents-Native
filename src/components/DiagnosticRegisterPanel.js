@@ -4,12 +4,12 @@ import {
   Alert,
   Linking,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import ScrollView from './KeyboardAwareScrollView';
 import { colors, radius, shadow, spacing } from '../theme';
 import { listenDiagnosticSessions, updateDiagnosticAdminReview } from '../services/diagnostics';
 

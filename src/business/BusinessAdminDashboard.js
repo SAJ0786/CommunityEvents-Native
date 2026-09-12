@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import ScrollView from '../components/KeyboardAwareScrollView';
 import { formatAbn, isValidAbn, listenBusinessesForAdmin, listenBusinessPromotionsForAdmin } from '../services/businesses';
 import { getDiagnosticSessionId } from '../services/diagnostics';
 import { listUsers } from '../services/users';

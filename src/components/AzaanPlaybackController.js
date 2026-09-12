@@ -31,7 +31,7 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar }) {
     setVisible(true);
     try {
       await setAudioModeAsync({
-        playsInSilentMode: true,
+        playsInSilentMode: false,
         shouldPlayInBackground: false,
         interruptionMode: 'duckOthers',
       });
@@ -62,15 +62,11 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar }) {
       .catch(() => {});
 
     const subscription = Notifications.addNotificationResponseReceivedListener(playFromNotification);
-    const receivedSubscription = Notifications.addNotificationReceivedListener(notification => {
-      // When the app is active, Expo does not launch a notification response.
-      // Start the bundled recording from the alarm notification itself.
-      playFromNotification({ notification });
-    });
+    // The notification system plays the bundled alert in foreground and
+    // background. Only a deliberate tap opens the calendar and its player.
     return () => {
       mounted = false;
       subscription.remove();
-      receivedSubscription.remove();
     };
   }, [playFromNotification]);
 
@@ -100,10 +96,8 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar }) {
 
 const styles = StyleSheet.create({
   wrap: {
-    position: 'absolute',
-    left: spacing.md,
-    right: spacing.md,
-    bottom: 88,
+    marginHorizontal: spacing.md,
+    marginBottom: 24,
     zIndex: 50,
     minHeight: 64,
     flexDirection: 'row',

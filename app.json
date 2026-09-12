@@ -84,7 +84,8 @@
         {
           "defaultChannel": "business-alerts",
           "sounds": [
-            "./assets/sounds/azan_mashad.mp3"
+            "./assets/sounds/azan_mashad.mp3",
+            "./assets/sounds/azan_mashad.wav"
           ]
         }
       ],

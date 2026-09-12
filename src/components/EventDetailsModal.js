@@ -11,13 +11,13 @@ import {
   Platform,
   Pressable,
   SafeAreaView,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import ScrollView from './KeyboardAwareScrollView';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
@@ -247,8 +247,8 @@ export default function EventDetailsModal({
   }, [translateY]);
 
   const releaseDrag = useCallback(gesture => {
-    const projectedDistance = gesture.dy + Math.max(0, gesture.vy) * 70;
-    if (gesture.dy > 48 || gesture.vy > 0.42 || projectedDistance > 58) {
+    const projectedDistance = Math.max(0, gesture.dy) + Math.max(0, gesture.vy) * 120;
+    if (gesture.dy > 64 || gesture.vy > 0.5 || projectedDistance > 92) {
       animateClose();
       return;
     }
@@ -257,15 +257,9 @@ export default function EventDetailsModal({
 
   const sheetPanResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponderCapture: (_, gesture) => (
-      scrollOffsetRef.current <= 0
-      && gesture.dy > 3
-      && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.1
-    ),
     onMoveShouldSetPanResponder: (_, gesture) => (
-      scrollOffsetRef.current <= 0
-      && gesture.dy > 3
-      && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.1
+      gesture.dy > 3
+      && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.15
     ),
     onPanResponderGrant: () => translateY.stopAnimation(),
     onPanResponderMove: (_, gesture) => {
@@ -360,9 +354,11 @@ export default function EventDetailsModal({
     setHostMessageSending(true);
     setHostMessageStatus('');
     try {
-      await sendHostMessage({ event, user, profile, text: hostMessageText });
+      const delivery = await sendHostMessage({ event, user, profile, text: hostMessageText });
       setHostMessageText('');
-      setHostMessageStatus('Message sent to host. You can continue the conversation in Inbox.');
+      setHostMessageStatus(delivery?.routedTo === 'cityAdmins'
+        ? 'Message sent to the city admin team because this event has no assigned host account. Continue in Inbox → Contact Events & Feedback.'
+        : 'Message sent to host. You can continue the conversation in Inbox.');
     } catch (error) {
       setHostMessageStatus(error?.message || 'Could not send this message.');
     } finally {
@@ -455,8 +451,8 @@ export default function EventDetailsModal({
       <Modal transparent visible={visible} animationType="none" onRequestClose={animateClose}>
         <SafeAreaView style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={animateClose} />
-          <Animated.View {...sheetPanResponder.panHandlers} style={[styles.sheet, { transform: [{ translateY }] }]}>
-            <View style={styles.sheetHeader}>
+          <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+            <View style={styles.sheetHeader} {...sheetPanResponder.panHandlers}>
               <View style={styles.dragHandle} />
               <View style={styles.headerRow}>
                 <View style={styles.headerCopy}>
@@ -573,7 +569,7 @@ export default function EventDetailsModal({
             bounces={false}
             contentContainerStyle={styles.overlayScrollContent}
             keyboardShouldPersistTaps="handled"
-            automaticallyAdjustKeyboardInsets
+            automaticallyAdjustKeyboardInsets={false}
           >
           <View style={styles.overlayCard}>
             <Text style={styles.overlayTitle}>Contact Host</Text>

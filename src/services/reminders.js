@@ -10,9 +10,9 @@ const REMINDER_STORAGE_KEY = '@community-events/event-reminders';
 const REMINDER_CHANNEL_ID = 'event-reminders';
 const PRAYER_REMINDER_CHANNEL_ID = 'prayer-reminders';
 const PRAYER_REMINDER_STORAGE_KEY = '@community-events/prayer-reminders';
-const AZAAN_ALARM_CHANNEL_ID = 'azaan-alarms-v1';
+const AZAAN_ALARM_CHANNEL_ID = 'azaan-alarms-v2';
 const AZAAN_ALARM_STORAGE_KEY = '@community-events/azaan-alarms-v1';
-const AZAAN_SOUND_FILE = 'azan_mashad.mp3';
+const AZAAN_SOUND_FILE = Platform.OS === 'ios' ? 'azan_mashad.wav' : 'azan_mashad.mp3';
 export const DEFAULT_PRAYER_REMINDER_KEYS = ['fajr', 'zohrain', 'maghreb'];
 export const AZAAN_ALARM_KEYS = ['fajr', 'zohrain', 'maghreb'];
 
@@ -197,7 +197,7 @@ async function ensureAzaanNotificationPermission() {
       lightColor: '#129182',
       sound: AZAAN_SOUND_FILE,
       audioAttributes: {
-        usage: Notifications.AndroidAudioUsage.ALARM,
+        usage: Notifications.AndroidAudioUsage.NOTIFICATION,
         contentType: Notifications.AndroidAudioContentType.SONIFICATION,
       },
     });
