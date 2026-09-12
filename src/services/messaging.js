@@ -85,6 +85,11 @@ export async function sendHostMessage({ event, user, profile, text }) {
     senderName,
     participantUids: compact([senderUid, hostUid]),
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    lastMessage: messageText,
+    lastSenderUid: senderUid,
+    [`unreadBy.${hostUid}`]: increment(1),
+    [`unreadBy.${senderUid}`]: 0,
   }, { merge: true });
   batch.set(messageRef, {
     senderUid,
@@ -92,13 +97,6 @@ export async function sendHostMessage({ event, user, profile, text }) {
     text: messageText,
     kind: 'text',
     createdAt: serverTimestamp(),
-  });
-  batch.update(threadRef, {
-    updatedAt: serverTimestamp(),
-    lastMessage: messageText,
-    lastSenderUid: senderUid,
-    [`unreadBy.${hostUid}`]: increment(1),
-    [`unreadBy.${senderUid}`]: 0,
   });
   await batch.commit();
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { listenUserNotifications, markBusinessNotificationRead } from '../services/businessNotifications';
+import { clearUserNotifications, listenUserNotifications, markBusinessNotificationRead } from '../services/businessNotifications';
 import { sendFeedbackMessage } from '../services/messaging';
 import { listenBusinessModerationNotices, recordBusinessModerationAppeal } from '../services/businessSafety';
 import { friendlyError } from '../utils/errors';
@@ -68,6 +68,15 @@ export default function BusinessNotificationsScreen({ user, profile, onBack }) {
     finally { setAppealBusy(false); }
   };
 
+  const clearNotifications = async () => {
+    try {
+      await clearUserNotifications(rows);
+      setRows(current => current.map(item => ({ ...item, read: true })));
+    } catch (nextError) {
+      setError(friendlyError(nextError, 'Could not clear notifications.'));
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
@@ -76,6 +85,7 @@ export default function BusinessNotificationsScreen({ user, profile, onBack }) {
           <Text style={styles.eyebrow}>COMMUNITY CONNECT</Text>
           <Text style={styles.title}>Notifications</Text>
           <Text style={styles.subtitle}>{unreadCount ? `${unreadCount} unread update${unreadCount === 1 ? '' : 's'}` : 'You are up to date'}</Text>
+          {rows.length ? <Pressable accessibilityRole="button" onPress={clearNotifications} style={styles.clearButton}><Text style={styles.clearButtonText}>Clear notifications</Text></Pressable> : null}
         </View>
       </View>
 
@@ -102,7 +112,7 @@ export default function BusinessNotificationsScreen({ user, profile, onBack }) {
           </View>
           <View style={styles.copy}>
             <View style={styles.titleLine}>
-              <Text style={styles.cardTitle}>{item.title || 'Business update'}</Text>
+              <Text style={[styles.cardTitle, item.read !== true && styles.unreadTitle]}>{item.title || 'Business update'}</Text>
               {item.read !== true ? <View style={styles.unreadDot} /> : null}
             </View>
             <Text style={styles.cardBody}>{item.body || ''}</Text>
@@ -128,6 +138,8 @@ const styles = StyleSheet.create({
   eyebrow: { color: colors.tealDark, fontSize: 10, fontWeight: '700', letterSpacing: 1.1 },
   title: { marginTop: 4, color: colors.navy, fontSize: 25, fontWeight: '700' },
   subtitle: { marginTop: 4, color: colors.muted, fontSize: 12, fontWeight: '700' },
+  clearButton: { alignSelf: 'flex-start', marginTop: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  clearButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
   card: { flexDirection: 'row', gap: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   unreadCard: { borderColor: '#8bc9bf', backgroundColor: '#f2fbf9' },
   iconWrap: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.tealSoft },
@@ -135,6 +147,7 @@ const styles = StyleSheet.create({
   copy: { flex: 1, minWidth: 0 },
   titleLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   cardTitle: { flex: 1, color: colors.navy, fontSize: 14, fontWeight: '700' },
+  unreadTitle: { fontWeight: '800' },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.teal },
   cardBody: { marginTop: 5, color: colors.text, fontSize: 13, lineHeight: 19 },
   cardTime: { marginTop: 8, color: colors.muted, fontSize: 10, fontWeight: '600' },

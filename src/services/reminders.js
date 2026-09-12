@@ -334,7 +334,7 @@ async function schedulePrayerReminderKeys(keys, location, currentSettings) {
           title: `${prayerLabel(key)} prayer time`,
           body: `${scheduleLocation?.suburb || 'Your city'} · ${times[key]}`,
           sound: 'default',
-          data: { screen: 'hijri-calendar', prayer: key },
+          data: { screen: 'hijri-calendar', prayer: key, kind: 'prayer-reminder' },
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,

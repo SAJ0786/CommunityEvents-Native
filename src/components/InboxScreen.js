@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -85,13 +87,15 @@ export default function InboxScreen({ user, profile, onBack }) {
 
   if (!user?.uid || user?.isAnonymous) {
     return (
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.screen}>
+      <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.centerCard}>
           <Text style={styles.title}>Inbox</Text>
           <Text style={styles.emptyText}>Please sign in to use your inbox.</Text>
           <NativeBackButton onPress={onBack} />
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -188,7 +192,8 @@ export default function InboxScreen({ user, profile, onBack }) {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.lg, paddingBottom: 48, gap: spacing.md },
+  screen: { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing.lg, paddingBottom: 180, gap: spacing.md },
   card: { padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   centerCard: { padding: spacing.xl, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, alignItems: 'center', gap: spacing.md, ...shadow },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
