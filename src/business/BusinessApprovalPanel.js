@@ -15,7 +15,7 @@ import {
 } from '../services/businesses';
 import { friendlyError } from '../utils/errors';
 import { colors, radius, shadow, spacing } from '../theme';
-import NativeBackButton from '../components/NativeBackButton';
+import AdminPageHeader from '../components/AdminPageHeader';
 import BusinessPromotionApprovalPanel from './BusinessPromotionApprovalPanel';
 
 const FILTERS = [
@@ -437,18 +437,11 @@ export default function BusinessApprovalPanel({ mode = 'approvals', onBack, prof
 
   return (
     <View style={styles.panel}>
-      <View style={styles.panelHeader}>
-        <NativeBackButton onPress={onBack} style={styles.backButton} />
-        <View style={styles.panelTitleCopy}>
-          <Text style={styles.eyebrow}>BUSINESS DIRECTORY</Text>
-          <Text style={styles.panelTitle}>{isManagement ? 'Business Management' : 'Business Approvals'}</Text>
-          <Text style={styles.panelSubtitle}>{isManagement
+      <AdminPageHeader onBack={onBack} title={isManagement ? 'Business Management' : 'Business Approvals'} subtitle={isManagement
             ? 'Search and manage every business listing, including approved, draft, pending and rejected records.'
             : queueType === 'promotions'
               ? 'Review promotion content, dates and featured placement.'
-              : 'Review pending business details and ABNs before publishing listings.'}</Text>
-        </View>
-      </View>
+              : 'Review pending business details and ABNs before publishing listings.'} />
 
       {!isManagement ? <View style={styles.queueTabs}>
         <Pressable onPress={() => setQueueType('businesses')} style={[styles.queueTab, queueType === 'businesses' && styles.queueTabActive]}><Text style={[styles.queueTabText, queueType === 'businesses' && styles.queueTabTextActive]}>Business Listings</Text></Pressable>
@@ -520,7 +513,7 @@ const styles = StyleSheet.create({
   metrics: { flexDirection: 'row', gap: spacing.sm },
   metric: { flex: 1, minWidth: 0, alignItems: 'center', paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, ...shadow },
   metricActive: { borderColor: colors.teal, backgroundColor: colors.teal },
-  metricValue: { color: colors.navy, fontSize: 23, fontWeight: '700' },
+  metricValue: { color: colors.navy, fontSize: 18, fontWeight: '700' },
   metricValueActive: { color: colors.surface },
   metricLabel: { marginTop: 3, color: colors.muted, fontSize: 8.5, fontWeight: '700' },
   metricLabelActive: { color: colors.surface },
@@ -540,7 +533,7 @@ const styles = StyleSheet.create({
   logoFallback: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: colors.teal },
   logoText: { color: colors.surface, fontSize: 17, fontWeight: '700' },
   headerCopy: { flex: 1, minWidth: 0 },
-  businessName: { color: colors.navy, fontSize: 15, lineHeight: 19, fontWeight: '700' },
+  businessName: { color: colors.navy, fontSize: 14, lineHeight: 19, fontWeight: '700' },
   businessMeta: { marginTop: 3, color: colors.muted, fontSize: 10, fontWeight: '700' },
   statusBadge: { alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 99, backgroundColor: '#fff2d8' },
   statusApproved: { backgroundColor: '#e7f5ea' },

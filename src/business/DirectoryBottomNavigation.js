@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, shadow, spacing } from '../theme';
@@ -12,9 +12,10 @@ const TABS = [
   { key: 'profile', icon: 'account-circle', label: 'Menu', color: '#7357d9', soft: '#eef0ff' },
 ];
 
-export default function DirectoryBottomNavigation({ activeTab, onChange, onOpenMenu, user, profile, isGuest = false }) {
+export default function DirectoryBottomNavigation({ activeTab, onChange, onOpenMenu, user, profile, isGuest = false, onNavigationLayout }) {
+  const navigationRef = useRef(null);
   return (
-    <View accessibilityRole="tablist" style={styles.navigation}>
+    <View ref={navigationRef} onLayout={() => onNavigationLayout?.(navigationRef.current)} accessibilityRole="tablist" style={styles.navigation}>
       {TABS.map(tab => {
         const active = activeTab === tab.key;
         return (

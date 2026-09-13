@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Alert,
   Image,
   Linking,
@@ -81,7 +82,7 @@ import EventDetailsModal from './EventDetailsModal';
 import CompactSelect from './CompactSelect';
 import { CITY_OPTIONS, DEFAULT_CITY, cityCode, cityLabel, getEventMetroArea, normalizeCity } from '../utils/cities';
 import { addDynamicEventOption } from '../services/eventOptionsAdmin';
-import NativeBackButton from './NativeBackButton';
+import AdminPageHeader from './AdminPageHeader';
 import DiagnosticRegisterPanel from './DiagnosticRegisterPanel';
 
 const HIJRI_OBSERVANCE_CATEGORIES = ['Wiladat', 'Shahadat', 'Wafat', 'Eid', 'Ayyam-e-Aza', 'Amaal', 'Season', 'Event'];
@@ -905,20 +906,16 @@ export default function AdminDashboardScreen({
   };
 
   useEffect(() => {
-    if ((panel === 'overview' || panel === 'users') && !usersLoaded && !usersLoading) {
+    if (panel === 'overview' || panel === 'users') {
       loadUsers();
     }
-  }, [panel, usersLoaded, usersLoading]);
+  }, [panel]);
 
   useEffect(() => {
     if (panel !== 'events') return;
-    if (!adminEventLoadedViews.active && !adminEventLoadingViews.active) {
-      loadAdminEvents('active');
-    }
-    if (!adminEventLoadedViews.archived && !adminEventLoadingViews.archived) {
-      loadAdminEvents('archived');
-    }
-  }, [adminEventLoadedViews.active, adminEventLoadedViews.archived, adminEventLoadingViews.active, adminEventLoadingViews.archived, panel]);
+    loadAdminEvents('active');
+    loadAdminEvents('archived');
+  }, [panel]);
 
   useEffect(() => {
     if (panel === 'users' && !adminEventLoadedViews.active && !adminEventLoadingViews.active) {
@@ -999,14 +996,18 @@ export default function AdminDashboardScreen({
   };
 
   useEffect(() => {
-    if (panel === 'repair' && canManageHijriSettings && !repairEvents.length && !repairLoading) {
+    if (panel === 'repair' && canManageHijriSettings) {
       loadRepairEvents();
     }
-  }, [canManageHijriSettings, panel, repairEvents.length, repairLoading]);
+  }, [canManageHijriSettings, panel]);
 
   useEffect(() => {
-    if (panel !== 'settings') return;
+    if (panel !== 'tools') return;
     refreshYouTubeStatus();
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') refreshYouTubeStatus();
+    });
+    return () => subscription.remove();
   }, [panel]);
 
   const selectedRepairEvent = useMemo(
@@ -1115,6 +1116,7 @@ export default function AdminDashboardScreen({
   };
 
   const changeUserRole = async (target, role) => {
+    if (profile?.role !== 'superAdmin' || target.id === user?.uid || savingUserRoleId || target.role === role) return;
     setSavingUserRoleId(target.id);
     setUsersError('');
     try {
@@ -1192,10 +1194,10 @@ export default function AdminDashboardScreen({
   };
 
   useEffect(() => {
-    if ((panel === 'overview' || panel === 'orgs') && !orgsList.length && !orgsLoading) {
+    if (panel === 'overview' || panel === 'orgs') {
       loadOrganisations();
     }
-  }, [orgsList.length, orgsLoading, panel]);
+  }, [panel]);
 
   const startEditOrg = org => {
     setEditingOrgId(org.id);
@@ -1652,7 +1654,7 @@ export default function AdminDashboardScreen({
       const url = await getYouTubeOAuthUrl();
       if (!url) throw new Error('Could not generate the YouTube connection link.');
       await Linking.openURL(url);
-      setThumbnailResult('Browser opened for YouTube sign-in. After approval, return here and tap Refresh Connection.');
+      setThumbnailResult('Browser opened for YouTube sign-in. Connection status updates automatically when you return.');
       setYouTubeStatus('disconnected');
     } catch (error) {
       setThumbnailResult(error?.message || 'Could not open the YouTube connection flow.');
@@ -1925,21 +1927,9 @@ export default function AdminDashboardScreen({
         </>
       ) : panel === 'users' ? (
         <View style={styles.section}>
-          <View style={styles.sectionHead}>
-            <NativeBackButton onPress={() => setPanel('overview')} />
-            <View>
-              <Text style={styles.sectionTitle}>Users</Text>
-              <Text style={styles.sectionMeta}>User management and contact updates</Text>
-            </View>
-            <View style={styles.rowWrap}>
-              <Pressable onPress={loadUsers} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Refresh</Text>
-              </Pressable>
-              <Pressable onPress={exportUsersCsv} style={styles.primaryButton}>
-                <Text style={styles.primaryButtonText}>⇩ Export CSV</Text>
-              </Pressable>
-            </View>
-          </View>
+          <AdminPageHeader title={"Users"} subtitle={"User management and contact updates"} onBack={() => setPanel('overview')}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Export users as CSV" onPress={exportUsersCsv} style={styles.compactUserAction}><MaterialCommunityIcons name="download-outline" size={21} color={colors.tealDark} /></Pressable>
+          </AdminPageHeader>
 
           <View style={styles.statisticsCard}>
             <View style={styles.statisticsHead}>
@@ -2015,6 +2005,7 @@ export default function AdminDashboardScreen({
 
             <Text style={styles.inputLabel}>Location filter</Text>
             <CompactSelect
+              compact
               value={profile?.role === 'superAdmin' ? userCityFilter : getAdminCity(profile)}
               onChange={setUserCityFilter}
               options={(profile?.role === 'superAdmin' ? [{ value: 'all', label: 'All locations' }, ...CITY_OPTIONS] : CITY_OPTIONS.filter(city => city.value === getAdminCity(profile))).map(city => ({ value: city.value, label: city.value === 'all' ? city.label : `${cityCode(city.value)} - ${city.label.replace(', Australia', '')}` }))}
@@ -2044,21 +2035,20 @@ export default function AdminDashboardScreen({
                   <View key={userRecord.id} style={[styles.actionCard, styles.compactUserCard]}>
                     <View style={styles.cardTop}>
                       <View style={styles.listTextWrap}>
-                        <Text style={styles.cardTitle}>
+                        <Text style={styles.userName}>
                           {userRecord.fullName || userRecord.displayName || 'Unnamed user'}{isCurrentUser ? ' (you)' : ''}
                         </Text>
-                        <Text style={styles.cardDescription}>{userRecord.email || 'No email'}</Text>
+                        <Text style={styles.userContact}>{userRecord.email || 'No email'}</Text>
                         {userRecord.phone || userRecord.phoneNumber ? (
-                          <Text style={styles.listMeta}>{userRecord.phone || userRecord.phoneNumber}</Text>
+                          <Text style={styles.userContact}>{userRecord.phone || userRecord.phoneNumber}</Text>
                         ) : null}
                         <View style={styles.rowWrap}>
-                          <View style={styles.statusPill}><Text style={styles.statusPillText}>{cityCode(userCity)}</Text></View>
-                          {userRecord.calendarSynced === true || userRecord.calendarSyncEnabled === true ? <View style={[styles.statusPill, styles.statusLive]}><Text style={styles.statusPillText}>Calendar Synced</Text></View> : null}
+                          {userRecord.calendarSynced === true || userRecord.calendarSyncEnabled === true ? <Text style={styles.userSynced}>Calendar synced</Text> : null}
                         </View>
                       </View>
-                      <View style={styles.rowWrap}>
-                        <View style={[styles.statusPill, userRecord.role === 'superAdmin' ? styles.statusLive : undefined]}>
-                          <Text style={styles.statusPillText}>{ROLE_OPTIONS.find(item => item.value === userRecord.role)?.label || userRecord.role || 'User'}</Text>
+                      <View style={styles.userBadges}>
+                        <View accessibilityLabel={cityLabel(userCity)} style={styles.statusPill}>
+                          <Text style={styles.statusPillText}>{cityCode(userCity)}</Text>
                         </View>
                         {isInactiveUserProfile(userRecord) ? (
                           <View style={styles.statusPill}>
@@ -2074,7 +2064,18 @@ export default function AdminDashboardScreen({
                     </View>
 
                     {!isEditing ? (
-                      <View style={styles.rowWrap}>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.userActionRow}>
+                        <View style={styles.userRoleSelect}>
+                          <CompactSelect
+                            compact
+                            title="User role"
+                            accessibilityLabel={`Role for ${userRecord.fullName || 'user'}: ${userRecord.role || 'user'}`}
+                            options={ROLE_OPTIONS}
+                            value={userRecord.role || 'user'}
+                            disabled={profile?.role !== 'superAdmin' || isCurrentUser || Boolean(savingUserRoleId)}
+                            onChange={role => changeUserRole(userRecord, role)}
+                          />
+                        </View>
                         <Pressable accessibilityRole="button" accessibilityLabel={`View events (${ownedEventCount})`} onPress={() => openUserEvents(userRecord)} style={styles.compactUserAction}>
                           <MaterialCommunityIcons name="calendar-month-outline" size={21} color={colors.tealDark} />
                           <Text style={styles.userEventsLinkText}>{ownedEventCount}</Text>
@@ -2082,24 +2083,6 @@ export default function AdminDashboardScreen({
                         <Pressable accessibilityRole="button" accessibilityLabel="Edit user details" onPress={() => openUserEditor(userRecord)} style={styles.compactUserAction}>
                           <MaterialCommunityIcons name="account-edit-outline" size={21} color={colors.tealDark} />
                         </Pressable>
-                        {profile?.role === 'superAdmin' && !isCurrentUser ? (
-                          ROLE_OPTIONS.map(option => (
-                            <Pressable
-                              key={option.value}
-                              onPress={() => changeUserRole(userRecord, option.value)}
-                              disabled={savingUserRoleId === userRecord.id || userRecord.role === option.value}
-                              style={[
-                                styles.chip,
-                                userRecord.role === option.value && styles.chipActive,
-                                savingUserRoleId === userRecord.id && styles.disabledButton,
-                              ]}
-                            >
-                              <Text style={[styles.chipText, userRecord.role === option.value && styles.chipTextActive]}>
-                                {option.label}
-                              </Text>
-                            </Pressable>
-                          ))
-                        ) : null}
                         {profile?.role === 'superAdmin' && !isCurrentUser && !isInactiveUserProfile(userRecord) ? <>
                           <Pressable accessibilityRole="button" accessibilityLabel="Archive account" disabled={userLifecycleBusyId === userRecord.id} onPress={() => applyUserLifecycle(userRecord, false)} style={styles.compactUserAction}>
                             <MaterialCommunityIcons name="archive-outline" size={21} color={colors.tealDark} />
@@ -2109,11 +2092,11 @@ export default function AdminDashboardScreen({
                           </Pressable>
                         </> : null}
                         {profile?.role === 'superAdmin' && !isCurrentUser && isInactiveUserProfile(userRecord) ? (
-                          <Pressable disabled={userLifecycleBusyId === userRecord.id} onPress={() => restoreUserAccess(userRecord)} style={styles.primaryButton}>
-                            <Text style={styles.primaryButtonText}>{userRecord.accountStatus === 'banned' ? 'Unban & Restore' : 'Restore Account'}</Text>
+                          <Pressable accessibilityRole="button" accessibilityLabel={userRecord.accountStatus === 'banned' ? 'Unban and restore account' : 'Restore account'} disabled={userLifecycleBusyId === userRecord.id} onPress={() => restoreUserAccess(userRecord)} style={styles.compactUserAction}>
+                            <MaterialCommunityIcons name="account-reactivate-outline" size={21} color={colors.tealDark} />
                           </Pressable>
                         ) : null}
-                      </View>
+                      </ScrollView>
                     ) : (
                       <View style={styles.formCard}>
                         <Text style={styles.subsectionTitle}>Edit User</Text>
@@ -2194,13 +2177,7 @@ export default function AdminDashboardScreen({
         </View>
       ) : panel === 'import' ? (
         <View style={styles.section}>
-          <View style={styles.sectionHead}>
-            <NativeBackButton onPress={() => setPanel('overview')} />
-            <View>
-              <Text style={styles.sectionTitle}>Import & Export</Text>
-              <Text style={styles.sectionMeta}>Bulk event spreadsheets and upcoming-event reports</Text>
-            </View>
-          </View>
+          <AdminPageHeader title={"Import & Export"} subtitle={"Bulk event spreadsheets and upcoming-event reports"} onBack={() => setPanel('overview')} />
 
           <View style={styles.actionCard}>
             <Text style={styles.cardTitle}>Export Upcoming Events</Text>
@@ -2226,6 +2203,7 @@ export default function AdminDashboardScreen({
               <Text style={styles.inputLabel}>Location</Text>
               {profile?.role === 'superAdmin' ? (
                 <CompactSelect
+                  compact
                   title="Choose export location"
                   value={exportCity}
                   onChange={value => {
@@ -2335,18 +2313,7 @@ export default function AdminDashboardScreen({
         </View>
       ) : panel === 'events' ? (
         <View style={styles.section}>
-          <View style={styles.sectionHead}>
-            <NativeBackButton onPress={() => setPanel('overview')} />
-            <View>
-              <Text style={styles.sectionTitle}>Events</Text>
-              <Text style={styles.sectionMeta}>Admin event management</Text>
-            </View>
-            <View style={styles.rowWrap}>
-              <Pressable onPress={() => loadAdminEvents(adminEventView)} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Refresh</Text>
-              </Pressable>
-            </View>
-          </View>
+          <AdminPageHeader title={"Events"} subtitle={"Admin event management"} onBack={() => setPanel('overview')} />
 
           <View style={styles.statisticsCard}>
             <View style={styles.statisticsHead}>
@@ -2678,18 +2645,7 @@ export default function AdminDashboardScreen({
         </View>
       ) : panel === 'repair' ? (
         <View style={styles.section}>
-          <View style={styles.sectionHead}>
-            <NativeBackButton onPress={() => setPanel('overview')} />
-            <View>
-              <Text style={styles.sectionTitle}>Hijri Repair Tool</Text>
-              <Text style={styles.sectionMeta}>Super-admin repair for Hijri-entered events</Text>
-            </View>
-            <View style={styles.rowWrap}>
-              <Pressable onPress={loadRepairEvents} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Refresh</Text>
-              </Pressable>
-            </View>
-          </View>
+          <AdminPageHeader title={"Hijri Repair Tool"} subtitle={"Super-admin repair for Hijri-entered events"} onBack={() => setPanel('overview')} />
 
           {!canManageHijriSettings ? (
             <View style={styles.actionCard}>
@@ -2795,18 +2751,7 @@ export default function AdminDashboardScreen({
         </View>
       ) : panel === 'orgs' ? (
         <View style={styles.section}>
-          <View style={styles.sectionHead}>
-            <NativeBackButton onPress={() => setPanel('overview')} />
-            <View>
-              <Text style={styles.sectionTitle}>Organisation Management</Text>
-              <Text style={styles.sectionMeta}>Organisation names, IDs, locations, and types</Text>
-            </View>
-            <View style={styles.rowWrap}>
-              <Pressable onPress={loadOrganisations} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Refresh</Text>
-              </Pressable>
-            </View>
-          </View>
+          <AdminPageHeader title={"Organisation Management"} subtitle={"Organisation names, IDs, locations, and types"} onBack={() => setPanel('overview')} />
 
           <View style={styles.actionCard}>
             <Text style={styles.cardTitle}>Add Organisation</Text>
@@ -3030,13 +2975,7 @@ export default function AdminDashboardScreen({
         </View>
       ) : (
         <View style={styles.section}>
-          <View style={styles.sectionHead}>
-            <NativeBackButton onPress={() => setPanel('overview')} />
-            <View>
-              <Text style={styles.sectionTitle}>{panel === 'settings' ? 'Calendar Settings' : panel === 'messaging' ? 'Community Messaging' : panel === 'troubleshooting' ? 'Diagnostics Register' : 'Tools'}</Text>
-              <Text style={styles.sectionMeta}>{panel === 'settings' ? 'Hijri calendar adjustment only' : panel === 'messaging' ? 'Community updates and email reminders' : panel === 'troubleshooting' ? 'Installation, session and crash investigation' : 'Live connections and utilities'}</Text>
-            </View>
-          </View>
+          <AdminPageHeader title={panel === 'settings' ? 'Calendar Settings' : panel === 'messaging' ? 'Community Messaging' : panel === 'troubleshooting' ? 'Diagnostics Register' : 'Tools'} subtitle={panel === 'settings' ? 'Hijri calendar adjustment only' : panel === 'messaging' ? 'Community updates and email reminders' : panel === 'troubleshooting' ? 'Installation, session and crash investigation' : 'Live connections and utilities'} onBack={() => setPanel('overview')} />
 
           {status.message ? (
             <View style={[styles.noticeBox, status.error ? styles.noticeError : styles.noticeSuccess]}>
@@ -3188,15 +3127,6 @@ export default function AdminDashboardScreen({
                       : 'Disconnected'}
                 </Text>
               </View>
-              <Pressable
-                onPress={refreshYouTubeStatus}
-                disabled={youtubeBusy}
-                style={[styles.secondaryButton, youtubeBusy && styles.disabledButton]}
-              >
-                <Text style={styles.secondaryButtonText}>
-                  {youtubeBusy ? 'Checking...' : 'Refresh Connection'}
-                </Text>
-              </Pressable>
             </View>
 
             <Pressable
@@ -3210,7 +3140,7 @@ export default function AdminDashboardScreen({
             </Pressable>
 
             <Text style={styles.listSubtle}>
-              The sign-in opens in your browser. After approval, come back here and tap Refresh Connection.
+              The sign-in opens in your browser. Connection status updates automatically when you return.
             </Text>
 
             {profile?.role === 'superAdmin' ? (
@@ -3475,6 +3405,12 @@ export default function AdminDashboardScreen({
 }
 
 const styles = StyleSheet.create({
+  userActionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
+  userRoleSelect: { width: 108 },
+  userBadges: { alignItems: 'flex-end', gap: 4 },
+  userName: { color: colors.navy, fontSize: 14, lineHeight: 18, fontWeight: '700' },
+  userContact: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+  userSynced: { color: colors.tealDark, fontSize: 10, lineHeight: 14 },
   compactUserCard: { padding: 12, gap: 6 },
   compactUserAction: { minWidth: 44, minHeight: 44, paddingHorizontal: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: colors.tealSoft },
   container: {
@@ -3498,14 +3434,14 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   statisticsHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
-  statisticsTitle: { color: colors.navy, fontSize: 17, lineHeight: 22, fontWeight: '700' },
+  statisticsTitle: { color: colors.navy, fontSize: 14, lineHeight: 19, fontWeight: '700' },
   statisticsMeta: { marginTop: 2, color: colors.muted, fontSize: 10, lineHeight: 14, fontWeight: '700' },
   statisticsShowing: { color: colors.blue || '#3478f6', fontSize: 10, lineHeight: 16, fontWeight: '700' },
   eventMetricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  eventMetric: { flexBasis: '30%', flexGrow: 1, minWidth: 0, minHeight: 66, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, paddingVertical: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  eventMetric: { flexBasis: '30%', flexGrow: 1, minWidth: 0, minHeight: 56, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, paddingVertical: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   eventMetricActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
   eventMetricPressed: { opacity: 0.76, transform: [{ scale: 0.985 }] },
-  eventMetricValue: { color: colors.tealDark, fontSize: 22, lineHeight: 26, fontWeight: '700' },
+  eventMetricValue: { color: colors.tealDark, fontSize: 18, lineHeight: 22, fontWeight: '700' },
   eventMetricLabel: { marginTop: 3, color: colors.muted, fontSize: 9.5, lineHeight: 12, fontWeight: '600', textAlign: 'center' },
   dashboardProfileCard: {
     flexDirection: 'row',
@@ -3784,7 +3720,7 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   dashboardActionRow: {
-    minHeight: 82,
+    minHeight: 68,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
@@ -3818,8 +3754,8 @@ const styles = StyleSheet.create({
   },
   dashboardActionTitle: {
     color: colors.navy,
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '700',
   },
   dashboardActionDescription: {
@@ -3887,7 +3823,7 @@ const styles = StyleSheet.create({
     flexBasis: '30%',
     flexGrow: 1,
     minWidth: 0,
-    minHeight: 64,
+    minHeight: 56,
     alignItems: 'flex-start',
     justifyContent: 'center',
     paddingHorizontal: spacing.sm,
@@ -3901,15 +3837,15 @@ const styles = StyleSheet.create({
   statCardPressed: { opacity: 0.76, transform: [{ scale: 0.985 }] },
   statValue: {
     color: colors.tealDark,
-    fontSize: 22,
-    lineHeight: 26,
+    fontSize: 18,
+    lineHeight: 22,
     fontWeight: '700',
   },
   statLabel: {
     marginTop: 3,
     color: colors.muted,
-    fontSize: 9.5,
-    lineHeight: 12,
+    fontSize: 10,
+    lineHeight: 13,
     fontWeight: '700',
   },
   section: {
@@ -3924,7 +3860,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: colors.navy,
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '700',
   },
   sectionMeta: {
@@ -3942,7 +3878,7 @@ const styles = StyleSheet.create({
   ownerFilterClear: { minHeight: 38, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: colors.surface },
   ownerFilterClearText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
   userEventsLink: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  userEventsLinkText: { color: colors.tealDark, fontSize: 12, fontWeight: '700' },
+  userEventsLinkText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
   userEventsLinkArrow: { color: colors.tealDark, fontSize: 20, lineHeight: 22, fontWeight: '700' },
   inlineTransferPanel: { gap: spacing.sm, marginTop: spacing.xs, padding: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: '#f2fbf9' },
   inlineTransferTitle: { color: colors.navy, fontSize: 16, fontWeight: '700' },
@@ -4095,14 +4031,14 @@ const styles = StyleSheet.create({
   cardTitle: {
     flex: 1,
     color: colors.navy,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '700',
   },
   cardDescription: {
     color: colors.muted,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: '600',
   },
   statusPill: {
@@ -4176,7 +4112,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   primaryButton: {
-    minHeight: 50,
+    minHeight: 44,
     borderRadius: radius.md,
     backgroundColor: colors.teal,
     alignItems: 'center',
@@ -4185,7 +4121,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: colors.surface,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
   },
   secondaryButton: {
@@ -4204,7 +4140,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: colors.text,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
   dangerButton: {
@@ -4219,7 +4155,7 @@ const styles = StyleSheet.create({
   },
   dangerButtonText: {
     color: colors.danger,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
   secondaryButtonTextActive: {
@@ -4262,20 +4198,20 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     color: colors.muted,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
   input: {
-    minHeight: 50,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     backgroundColor: colors.surface,
     color: colors.text,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
   },
   multilineInput: {
@@ -4300,7 +4236,7 @@ const styles = StyleSheet.create({
   },
   chipText: {
     color: colors.text,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   chipTextActive: {
@@ -4311,7 +4247,7 @@ const styles = StyleSheet.create({
   },
   subsectionTitle: {
     color: colors.navy,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
   },
   listRow: {

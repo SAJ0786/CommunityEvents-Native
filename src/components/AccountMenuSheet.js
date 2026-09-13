@@ -48,7 +48,7 @@ export function userInitials(user, profile) {
   return phone ? phone.slice(-2) : 'U';
 }
 
-export default function AccountMenuSheet({ visible, activeModule = 'events', isGuest = false, user, profile, authBusy = false, onClose, onNavigate, onSignOut }) {
+export default function AccountMenuSheet({ visible, activeModule = 'events', isGuest = false, user, profile, authBusy = false, onClose, onNavigate, onSignOut, bottomInset = 120 }) {
   const { translateY, requestClose, panHandlers } = useMenuDrawerMotion({ visible, onClose });
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superAdmin';
   const displayName = profile?.fullName || user?.displayName || user?.email || 'Community member';
@@ -65,8 +65,8 @@ export default function AccountMenuSheet({ visible, activeModule = 'events', isG
   const navigate = key => requestClose(() => onNavigate?.(key));
 
   return (
-    <View pointerEvents="box-none" style={styles.layer}>
-      <Pressable accessibilityLabel="Close menu" onPress={() => requestClose()} style={styles.backdrop} />
+    <View pointerEvents="box-none" style={[styles.layer, { paddingBottom: bottomInset }]}>
+      <Pressable accessibilityLabel="Close menu" onPress={() => requestClose()} style={[styles.backdrop, { bottom: bottomInset }]} />
       <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
         <View style={styles.dragZone} {...panHandlers}>
           <View style={styles.handle} />
@@ -80,6 +80,7 @@ export default function AccountMenuSheet({ visible, activeModule = 'events', isG
           <View style={styles.identityCopy}><Text numberOfLines={1} style={styles.name}>{isGuest ? 'Guest User' : displayName}</Text><Text style={styles.role}>{[role, roleScope].filter(Boolean).join(' · ')}</Text></View>
         </View>
         <ScrollView
+          style={styles.scroll}
           bounces={false}
           contentContainerStyle={styles.list}
           directionalLockEnabled
@@ -110,8 +111,9 @@ export default function AccountMenuSheet({ visible, activeModule = 'events', isG
 }
 
 const styles = StyleSheet.create({
-  layer: { ...StyleSheet.absoluteFillObject, zIndex: 80, elevation: 80, justifyContent: 'flex-end', paddingBottom: 72 },
-  backdrop: { ...StyleSheet.absoluteFillObject, bottom: 72, backgroundColor: 'rgba(15,23,42,0.46)' },
+  layer: { ...StyleSheet.absoluteFillObject, zIndex: 80, elevation: 80, justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,23,42,0.46)' },
+  scroll: { flexShrink: 1 },
   sheet: { maxHeight: '72%', borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderWidth: 1, borderBottomWidth: 0, borderColor: colors.glassBorder, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, backgroundColor: 'rgba(250,252,252,0.97)', ...shadow },
   dragZone: { paddingTop: spacing.xs, paddingBottom: spacing.xs },
   handle: { alignSelf: 'center', width: 54, height: 5, borderRadius: 3, backgroundColor: '#d5dce6', marginBottom: spacing.sm },

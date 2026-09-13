@@ -27,6 +27,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onIdTokenChanged, signOut } from '@react-native-firebase/auth';
 import AppHeader from './src/components/AppHeaderModern';
 import AccountMenuSheet from './src/components/AccountMenuSheet';
+import useMenuNavigationInset from './src/components/useMenuNavigationInset';
 import { isPublicPlayableLiveEvent } from './src/utils/liveVideo';
 import AppErrorBoundary from './src/components/AppErrorBoundary';
 import ModuleEntryScreen from './src/components/ModuleEntryScreen';
@@ -231,6 +232,7 @@ function EmptyState({ title, text }) {
 }
 
 function MainApp() {
+  const menuLayout = useMenuNavigationInset();
   const { width: viewportWidth, fontScale } = useWindowDimensions();
   const compactEventsLayout = viewportWidth / Math.max(fontScale, 1) < 390;
   const [appModule, setAppModule] = useState('events');
@@ -1314,7 +1316,7 @@ function MainApp() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView ref={menuLayout.rootRef} onLayout={menuLayout.measure} style={styles.safeArea}>
       <ExpoStatusBar style="dark" />
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <AppHeader
@@ -1344,6 +1346,7 @@ function MainApp() {
           profile={profile}
           onOpenAccount={isGuest ? () => requestSignIn() : openEventsProfile}
           onOpenMenu={() => setAccountMenuOpen(true)}
+          onNavigationLayout={menuLayout.onNavigationLayout}
           onEditingStateChange={setBusinessListingOpen}
           initialFilter={directoryFilter}
           onInitialFilterConsumed={() => setDirectoryFilter(null)}
@@ -1578,6 +1581,7 @@ function MainApp() {
           }}
         />
         <AccountMenuSheet
+          bottomInset={menuLayout.bottomInset}
           visible={accountMenuOpen}
           activeModule={appModule}
           isGuest={isGuest}
@@ -1591,6 +1595,7 @@ function MainApp() {
         <NotificationsDrawer visible={notificationsDrawerOpen} onClose={() => setNotificationsDrawerOpen(false)} user={currentUser} profile={profile} />
         {appModule === 'events' ? (
           <BottomNavigation
+            onNavigationLayout={menuLayout.onNavigationLayout}
             activeTab={activeTab === 'bulk_share' || activeTab === 'admin' ? 'profile' : activeTab === 'calendar' || activeTab === 'hijri-calendar' || activeTab === 'streams' || activeTab === 'feedback' || activeTab === 'inbox' ? 'home' : activeTab}
             isGuest={isGuest}
             onChange={requestTabChange}

@@ -11,7 +11,7 @@ function normaliseOption(option) {
   };
 }
 
-export default function CompactSelect({ options = [], value, onChange, placeholder = 'Choose an option', title = 'Choose an option' }) {
+export default function CompactSelect({ options = [], value, onChange, placeholder = 'Choose an option', title = 'Choose an option', disabled = false, compact = false, accessibilityLabel }) {
   const [open, setOpen] = useState(false);
   const rows = useMemo(() => options.map(normaliseOption), [options]);
   const selected = rows.find(option => option.value === value);
@@ -20,11 +20,13 @@ export default function CompactSelect({ options = [], value, onChange, placehold
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
+        accessibilityLabel={accessibilityLabel || title}
+        accessibilityState={{ expanded: open, disabled }}
+        disabled={disabled}
         onPress={() => setOpen(true)}
-        style={({ pressed }) => [styles.trigger, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.trigger, compact && styles.compactTrigger, disabled && styles.disabled, pressed && styles.pressed]}
       >
-        <Text numberOfLines={1} style={[styles.triggerText, !selected && styles.placeholder]}>
+        <Text numberOfLines={1} style={[styles.triggerText, compact && styles.compactText, !selected && styles.placeholder]}>
           {selected?.label || placeholder}
         </Text>
         <Text style={styles.chevron}>{'\u25BE'}</Text>
@@ -51,8 +53,9 @@ export default function CompactSelect({ options = [], value, onChange, placehold
                     <Pressable
                       accessibilityRole="radio"
                       accessibilityState={{ checked: active }}
+                      disabled={disabled}
                       onPress={() => {
-                        onChange?.(option.value);
+                        if (!disabled && option.value !== value) onChange?.(option.value);
                         setOpen(false);
                       }}
                       style={({ pressed }) => [styles.option, active && styles.optionActive, pressed && styles.pressed]}
@@ -72,6 +75,9 @@ export default function CompactSelect({ options = [], value, onChange, placehold
 }
 
 const styles = StyleSheet.create({
+  compactTrigger: { minHeight: 44, paddingHorizontal: 8, gap: 4, backgroundColor: colors.tealSoft },
+  compactText: { fontSize: 11, fontWeight: '600' },
+  disabled: { opacity: 0.55 },
   trigger: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   triggerText: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '700' },
   placeholder: { color: colors.muted, fontWeight: '500' },

@@ -5,7 +5,7 @@ import CompactSelect from '../components/CompactSelect';
 import { BUSINESS_ACTION_LABELS, listenBusinessStatistics } from '../services/businessAnalytics';
 import { CITY_OPTIONS, cityLabel, normalizeCity } from '../utils/cities';
 import { colors, radius, shadow, spacing } from '../theme';
-import NativeBackButton from '../components/NativeBackButton';
+import AdminPageHeader from '../components/AdminPageHeader';
 
 const EMPTY_STATISTICS = { pageViews: 0, enquiries: 0, actions: {} };
 
@@ -86,12 +86,7 @@ export default function BusinessStatisticsScreen({ businesses = [], categories =
 
   return (
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <View style={styles.header}>
-        <NativeBackButton onPress={onBack} style={styles.back} />
-        <Text style={styles.eyebrow}>DIRECTORY ANALYTICS</Text>
-        <Text style={styles.title}>Business Statistics</Text>
-        <Text style={styles.subtitle}>Overall interaction status and individual-business performance. Counters measure actions, not completed sales or unique people.</Text>
-      </View>
+      <AdminPageHeader title="Business Statistics" subtitle="Overall interaction status and individual-business performance. Counters measure actions, not completed sales or unique people." onBack={onBack} />
 
       <View style={styles.filters}>
         <Text style={styles.filterLabel}>CITY</Text>
@@ -158,16 +153,16 @@ const styles = StyleSheet.create({
   categoryTextActive: { color: colors.surface },
   error: { marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: '#fff0f0' },
   errorText: { color: colors.danger, fontSize: 12, fontWeight: '600' },
-  scopeTitle: { marginTop: spacing.lg, color: colors.navy, fontSize: 20, fontWeight: '700' },
+  scopeTitle: { marginTop: spacing.lg, color: colors.navy, fontSize: 15, fontWeight: '700' },
   scopeText: { marginTop: 3, color: colors.muted, fontSize: 11, fontWeight: '700' },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   metric: { minWidth: 98, flex: 1, padding: spacing.md, borderWidth: 1, borderRadius: radius.md, backgroundColor: colors.surface },
   metricBlue: { borderColor: '#c8ddf5', backgroundColor: '#f3f8fe' },
   metricGreen: { borderColor: '#bde0d8', backgroundColor: '#f0faf7' },
   metricPink: { borderColor: '#efd1df', backgroundColor: '#fff5f9' },
-  metricValue: { color: colors.navy, fontSize: 24, fontWeight: '700' },
+  metricValue: { color: colors.navy, fontSize: 18, fontWeight: '700' },
   metricLabel: { marginTop: 3, color: colors.muted, fontSize: 8.5, lineHeight: 12, fontWeight: '700' },
-  sectionTitle: { marginTop: spacing.lg, marginBottom: spacing.sm, color: colors.navy, fontSize: 17, fontWeight: '700' },
+  sectionTitle: { marginTop: spacing.lg, marginBottom: spacing.sm, color: colors.navy, fontSize: 15, fontWeight: '700' },
   breakdown: { overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   breakdownRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   breakdownLabel: { flex: 1, color: colors.text, fontSize: 11, fontWeight: '700' },

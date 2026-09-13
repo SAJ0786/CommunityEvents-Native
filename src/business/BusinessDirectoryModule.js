@@ -469,6 +469,7 @@ export default function BusinessDirectoryModule({
   profile,
   onOpenAccount,
   onOpenMenu,
+  onNavigationLayout,
   onEditingStateChange,
   onCityChange,
   initialFilter,
@@ -879,7 +880,7 @@ export default function BusinessDirectoryModule({
           <DirectoryHome businesses={directoryBusinesses} categories={businessCategories} city={selectedCity} savedIds={savedIds} loading={publicLoading} error={publicError} initialFilter={initialFilter} onInitialFilterConsumed={onInitialFilterConsumed} onCityChange={city => { setUserLocation(null); onCityChange?.(city); }} onLocationResolved={setUserLocation} onOpenBusiness={openBusiness} onToggleSaved={toggleSaved} onQuickNavigate={changeTab} />
         )}
       </View>
-      {!listingFormOpen && !promotionFormOpen ? <DirectoryBottomNavigation activeTab={activeTab} onChange={changeTab} onOpenMenu={onOpenMenu} user={currentUser} profile={profile} isGuest={isGuest} /> : null}
+      {!listingFormOpen && !promotionFormOpen ? <DirectoryBottomNavigation activeTab={activeTab} onChange={changeTab} onOpenMenu={onOpenMenu} user={currentUser} profile={profile} isGuest={isGuest} onNavigationLayout={onNavigationLayout} /> : null}
     </View>
   );
 }
