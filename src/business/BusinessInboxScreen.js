@@ -11,19 +11,25 @@ function timeLabel(value) {
   return millis ? new Date(millis).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
 }
 
-export default function BusinessInboxScreen({ user, profile, onBack, onOpenFeedback }) {
+export default function BusinessInboxScreen({ user, profile, onBack }) {
   const [threads, setThreads] = useState([]);
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
   const [reply, setReply] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [retry, setRetry] = useState(0);
   const [reporting, setReporting] = useState(false);
   const [reportText, setReportText] = useState('');
-  useEffect(() => listenBusinessThreads(user?.uid, rows => { setThreads(rows); setLoading(false); }, error => {
-    setLoading(false);
-    setStatus(error?.message || 'Could not load business messages.');
-  }), [user?.uid]);
+  useEffect(() => {
+    setThreads([]); setSelected(null); setMessages([]); setLoading(true); setLoadError('');
+    if (!user?.uid || user.isAnonymous) { setLoading(false); setLoadError('Please sign in to open Business Inbox.'); return undefined; }
+    return listenBusinessThreads(user.uid, rows => { setThreads(rows); setLoading(false); setLoadError(''); }, error => {
+      setLoading(false);
+      setLoadError(error?.message || 'Could not load business messages.');
+    });
+  }, [user?.uid, user?.isAnonymous, retry]);
   useEffect(() => {
     if (!selected?.id) return;
     const refreshed = threads.find(item => item.id === selected.id);
@@ -81,12 +87,12 @@ export default function BusinessInboxScreen({ user, profile, onBack, onOpenFeedb
   return (
     <ScrollView contentContainerStyle={styles.list}>
       <NativeBackButton accessibilityLabel="Back to directory" onPress={onBack} />
-      {onOpenFeedback ? <Pressable accessibilityRole="button" onPress={onOpenFeedback} style={styles.thread}><Text style={styles.threadTitle}>Directory support & feedback →</Text></Pressable> : null}
       <Text style={styles.eyebrow}>COMMUNITY BUSINESSES AUSTRALIA</Text><Text style={styles.pageTitle}>Business Inbox</Text><Text style={styles.pageText}>Messages sent through Contact Business are kept separate from Events Inbox.</Text>
       {loading ? <Text style={styles.pageText}>Loading business messages…</Text> : null}
+      {loadError ? <View><Text accessibilityRole="alert" style={styles.error}>{loadError}</Text><Pressable onPress={() => setRetry(value => value + 1)} style={styles.safetyButton}><Text style={styles.safetyButtonText}>Retry loading inbox</Text></Pressable></View> : null}
       {status ? <Text accessibilityRole="alert" style={styles.error}>{status}</Text> : null}
       {!loading && threads.length ? threads.map(thread => <Pressable key={thread.id} onPress={() => setSelected(thread)} style={styles.thread}><View style={styles.avatar}><Text style={styles.avatarText}>{String(thread.businessName || 'B')[0]}</Text></View><View style={styles.threadCopy}><Text style={styles.threadTitle}>{thread.businessName}</Text><Text numberOfLines={1} style={styles.threadText}>{thread.lastMessage}</Text><Text style={styles.time}>{timeLabel(thread.updatedAt)}</Text></View>{Number(thread.unreadBy?.[user?.uid] || 0) ? <View style={styles.unread}><Text style={styles.unreadText}>{thread.unreadBy[user.uid]}</Text></View> : null}</Pressable>) : null}
-      {!loading && !threads.length ? <View style={styles.empty}><Text style={styles.emptyIcon}>{'\u{1F4E5}'}</Text><Text style={styles.threadTitle}>No business messages yet</Text><Text style={styles.pageText}>New owner and customer conversations will appear here.</Text></View> : null}
+      {!loading && !loadError && !threads.length ? <View style={styles.empty}><Text style={styles.emptyIcon}>{'\u{1F4E5}'}</Text><Text style={styles.threadTitle}>No business messages yet</Text><Text style={styles.pageText}>New owner and customer conversations will appear here.</Text></View> : null}
     </ScrollView>
   );
 }

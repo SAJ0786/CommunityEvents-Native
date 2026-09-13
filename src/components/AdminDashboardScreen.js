@@ -80,7 +80,6 @@ import EventCard from './EventCard';
 import EventDetailsModal from './EventDetailsModal';
 import CompactSelect from './CompactSelect';
 import { CITY_OPTIONS, DEFAULT_CITY, cityCode, cityLabel, getEventMetroArea, normalizeCity } from '../utils/cities';
-import { listenAdminFeedbackThreads } from '../services/messaging';
 import { addDynamicEventOption } from '../services/eventOptionsAdmin';
 import NativeBackButton from './NativeBackButton';
 import DiagnosticRegisterPanel from './DiagnosticRegisterPanel';
@@ -545,7 +544,6 @@ export default function AdminDashboardScreen({
   const [exportTo, setExportTo] = useState(dateAfterIso(30));
   const [exporting, setExporting] = useState(false);
   const [exportResult, setExportResult] = useState({ message: '', error: false });
-  const [feedbackThreads, setFeedbackThreads] = useState([]);
   const [newEventType, setNewEventType] = useState('');
   const [newReciterType, setNewReciterType] = useState('');
   const [optionStatus, setOptionStatus] = useState('');
@@ -578,11 +576,6 @@ export default function AdminDashboardScreen({
     const recurringEvents = events.filter(event => event.seriesId || event.recurringSeriesId).length;
     return { totalEvents, visibleEvents, hiddenEvents, recurringEvents };
   }, [events]);
-
-  useEffect(() => {
-    if (!canAccess) return undefined;
-    return listenAdminFeedbackThreads(profile, setFeedbackThreads);
-  }, [canAccess, profile]);
 
   useEffect(() => {
     if (!canManageHijriSettings) {
@@ -1846,8 +1839,6 @@ export default function AdminDashboardScreen({
                 { label: 'Users', value: usersLoading && !usersLoaded ? '…' : scopedUsers.length },
                 { label: 'Active Events', value: stats.visibleEvents },
                 { label: 'Organisations', value: orgsList.length },
-                { label: 'Pending Feedback', value: feedbackThreads.filter(item => item.status !== 'resolved').length },
-                { label: 'Inbox Items', value: feedbackThreads.length },
                 { label: 'Videos Streamed', value: events.filter(item => item.liveUrl || item.liveSource || item.youtubeVideoId).length },
               ].map((metric, index) => (
                 <React.Fragment key={metric.label}>

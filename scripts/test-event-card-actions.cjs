@@ -48,7 +48,7 @@ function testVisibleActionContract() {
   const eventDetails = read('src/components/EventDetailsModal.js');
   const businessDetails = read('src/business/BusinessDetailsScreen.js');
   const businessInbox = read('src/business/BusinessInboxScreen.js');
-  const feedback = read('src/components/FeedbackScreen.js');
+  const feedback = read('src/components/SupportForm.js');
   assert.match(eventDetails, /KeyboardAvoidingView[\s\S]*behavior=\{Platform\.OS === 'ios' \? 'padding' : 'height'\}/);
   assert.match(eventDetails, /hostMessageOpen \?[\s\S]*ScrollView[\s\S]*keyboardShouldPersistTaps="handled"[\s\S]*automaticallyAdjustKeyboardInsets/);
   assert.match(businessDetails, /KeyboardAvoidingView[\s\S]*contactInput/);

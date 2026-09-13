@@ -1428,9 +1428,9 @@ function MainApp() {
         />
       ) : activeTab === 'inbox' ? (
         <InboxScreen
+          key={currentUser?.uid || 'guest'}
           user={currentUser}
           profile={profile}
-          onOpenFeedback={() => setActiveTab('feedback')}
           onBack={() => setActiveTab('home')}
         />
       ) : activeTab === 'notifications' ? (
@@ -1441,6 +1441,7 @@ function MainApp() {
         />
       ) : activeTab === 'feedback' ? (
         <FeedbackScreen
+          key={currentUser?.uid || 'guest'}
           user={currentUser}
           profile={profile}
           selectedCity={selectedCity}

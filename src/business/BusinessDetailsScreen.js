@@ -4,6 +4,7 @@ import ScrollView from '../components/KeyboardAwareScrollView';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { colors, radius, shadow, spacing } from '../theme';
 import NativeBackButton from '../components/NativeBackButton';
+import { SupportModal } from '../components/SupportForm';
 import { sendBusinessMessage } from '../services/messaging';
 import { buildWhatsAppUrl } from '../utils/phone';
 
@@ -53,6 +54,7 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
   const [coverFailed, setCoverFailed] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [contactText, setContactText] = useState('');
   const [contactStatus, setContactStatus] = useState('');
   const [contactBusy, setContactBusy] = useState(false);
@@ -260,6 +262,8 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
         </View>
       ) : null}
 
+      <Pressable accessibilityRole="button" onPress={() => setReportOpen(true)} style={styles.infoRow}><Text style={styles.infoTitle}>Report a Problem</Text></Pressable>
+      <SupportModal visible={reportOpen} onClose={() => setReportOpen(false)} business={business} user={user} profile={profile} />
       <Modal transparent visible={contactOpen} animationType="fade" onRequestClose={() => setContactOpen(false)}>
         <View style={styles.contactModal}>
           <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setContactOpen(false)} />

@@ -1,16 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Easing,
-  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from 'react-native';
+import useMenuDrawerMotion from './useMenuDrawerMotion';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, radius, shadow, spacing } from '../theme';
 import { cityLabel, normalizeCity } from '../utils/cities';
@@ -18,7 +16,7 @@ import { cityLabel, normalizeCity } from '../utils/cities';
 const EVENT_ITEMS = [
   { key: 'profile', label: 'My Profile', icon: 'account-outline', tone: 'purple', authOnly: true },
   { key: 'notifications', label: 'Notifications', icon: 'bell-outline', tone: 'teal', authOnly: true },
-  { key: 'inbox', label: 'Inbox & Feedback', icon: 'inbox-outline', tone: 'purple', authOnly: true },
+  { key: 'inbox', label: 'Host Inbox', icon: 'inbox-outline', tone: 'purple', authOnly: true },
   { key: 'admin', label: 'Admin Dashboard', icon: 'shield-crown-outline', tone: 'blue', adminOnly: true },
   { key: 'help-policies', route: 'profile', label: 'Help & Policies', icon: 'help-circle-outline', tone: 'teal' },
   { key: 'share-app', label: 'Share App', icon: 'share-variant-outline', tone: 'amber' },
@@ -27,7 +25,7 @@ const EVENT_ITEMS = [
 const BUSINESS_ITEMS = [
   { key: 'profile', label: 'My Profile', icon: 'account-outline', tone: 'purple', authOnly: true },
   { key: 'business-notifications', label: 'Notifications', icon: 'bell-outline', tone: 'teal', authOnly: true },
-  { key: 'business-inbox', label: 'Inbox & Feedback', icon: 'inbox-outline', tone: 'purple', authOnly: true },
+  { key: 'business-inbox', label: 'Business Inbox', icon: 'inbox-outline', tone: 'purple', authOnly: true },
   { key: 'business-admin', label: 'Admin Dashboard', icon: 'shield-crown-outline', tone: 'blue', adminOnly: true },
   { key: 'help-policies', route: 'profile', label: 'Help & Policies', icon: 'help-circle-outline', tone: 'teal' },
   { key: 'share-app', label: 'Share App', icon: 'share-variant-outline', tone: 'amber' },
@@ -51,12 +49,7 @@ export function userInitials(user, profile) {
 }
 
 export default function AccountMenuSheet({ visible, activeModule = 'events', isGuest = false, user, profile, authBusy = false, onClose, onNavigate, onSignOut }) {
-  const { height: screenHeight } = useWindowDimensions();
-  const translateY = useRef(new Animated.Value(screenHeight)).current;
-  const closeRef = useRef(onClose);
-  const afterCloseRef = useRef(null);
-  const closingRef = useRef(false);
-  const scrollOffsetRef = useRef(0);
+  const { translateY, requestClose, panHandlers } = useMenuDrawerMotion({ visible, onClose });
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superAdmin';
   const displayName = profile?.fullName || user?.displayName || user?.email || 'Community member';
   const role = profile?.role === 'superAdmin' ? 'Super Admin' : profile?.role === 'admin' ? 'Admin' : isGuest ? 'Guest access' : 'Member';
@@ -68,76 +61,6 @@ export default function AccountMenuSheet({ visible, activeModule = 'events', isG
   const items = useMemo(() => (activeModule === 'directory' ? BUSINESS_ITEMS : EVENT_ITEMS)
     .filter(item => (!item.adminOnly || isAdmin) && (!item.authOnly || !isGuest)), [activeModule, isAdmin, isGuest]);
 
-  useEffect(() => {
-    closeRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!visible) return;
-    closingRef.current = false;
-    afterCloseRef.current = null;
-    scrollOffsetRef.current = 0;
-    translateY.setValue(Math.max(620, screenHeight));
-    Animated.spring(translateY, {
-      toValue: 0,
-      damping: 25,
-      stiffness: 230,
-      mass: 0.9,
-      useNativeDriver: true,
-    }).start();
-  }, [screenHeight, translateY, visible]);
-
-  const restoreSheet = useCallback(() => {
-    Animated.spring(translateY, {
-      toValue: 0,
-      damping: 26,
-      stiffness: 240,
-      mass: 0.85,
-      useNativeDriver: true,
-    }).start();
-  }, [translateY]);
-
-  const requestClose = useCallback(afterClose => {
-    if (closingRef.current) return;
-    closingRef.current = true;
-    afterCloseRef.current = typeof afterClose === 'function' ? afterClose : null;
-    Animated.timing(translateY, {
-      toValue: Math.max(700, screenHeight),
-      duration: 245,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      const callback = afterCloseRef.current;
-      afterCloseRef.current = null;
-      closeRef.current?.();
-      callback?.();
-    });
-  }, [screenHeight, translateY]);
-
-  const releaseDrag = useCallback(gesture => {
-    const projectedDistance = Math.max(0, gesture.dy) + Math.max(0, gesture.vy) * 120;
-    if (gesture.dy > 64 || gesture.vy > 0.5 || projectedDistance > 92) {
-      requestClose();
-      return;
-    }
-    restoreSheet();
-  }, [requestClose, restoreSheet]);
-
-  // Keep the drag recogniser on the sheet's dedicated header.  Competing with
-  // the ScrollView at the sheet root made a normal downward swipe unreliable.
-  const dragResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, gesture) => (
-      gesture.dy > 3
-      && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.15
-    ),
-    onPanResponderGrant: () => translateY.stopAnimation(),
-    onPanResponderMove: (_, gesture) => translateY.setValue(Math.max(0, gesture.dy)),
-    onPanResponderRelease: (_, gesture) => releaseDrag(gesture),
-    onPanResponderTerminate: restoreSheet,
-    onPanResponderTerminationRequest: () => false,
-  }), [releaseDrag, restoreSheet, translateY]);
-
   if (!visible) return null;
   const navigate = key => requestClose(() => onNavigate?.(key));
 
@@ -145,7 +68,7 @@ export default function AccountMenuSheet({ visible, activeModule = 'events', isG
     <View pointerEvents="box-none" style={styles.layer}>
       <Pressable accessibilityLabel="Close menu" onPress={() => requestClose()} style={styles.backdrop} />
       <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
-        <View style={styles.dragZone} {...dragResponder.panHandlers}>
+        <View style={styles.dragZone} {...panHandlers}>
           <View style={styles.handle} />
           <View style={styles.headingRow}>
           <View><Text style={styles.title}>Menu</Text><Text style={styles.subtitle}>Account, services and app settings</Text></View>
@@ -160,7 +83,6 @@ export default function AccountMenuSheet({ visible, activeModule = 'events', isG
           bounces={false}
           contentContainerStyle={styles.list}
           directionalLockEnabled
-          onScroll={event => { scrollOffsetRef.current = Math.max(0, event.nativeEvent.contentOffset.y); }}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
         >

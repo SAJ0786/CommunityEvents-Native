@@ -15,7 +15,7 @@ function createdLabel(value) {
   return date.toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 }
 
-export default function BusinessNotificationsScreen({ user, profile, onBack }) {
+export default function BusinessNotificationsScreen({ user, profile, onBack, renderHeader }) {
   const [rows, setRows] = useState([]);
   const [moderationRows, setModerationRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,18 +77,25 @@ export default function BusinessNotificationsScreen({ user, profile, onBack }) {
     }
   };
 
-  return (
-    <ScrollView contentContainerStyle={styles.content}>
+  const header = (
       <View style={styles.headerRow}>
-        <NativeBackButton onPress={onBack} style={styles.backButton} />
+        {!renderHeader ? <NativeBackButton onPress={onBack} style={styles.backButton} /> : null}
         <View style={styles.headerCopy}>
           <Text style={styles.eyebrow}>COMMUNITY CONNECT</Text>
           <Text style={styles.title}>Notifications</Text>
           <Text style={styles.subtitle}>{unreadCount ? `${unreadCount} unread update${unreadCount === 1 ? '' : 's'}` : 'You are up to date'}</Text>
           {rows.length ? <Pressable accessibilityRole="button" accessibilityHint="Marks updates read and clears them from this device; moderation notices are retained." onPress={clearNotifications} style={styles.clearButton}><Text style={styles.clearButtonText}>Clear notifications on this device</Text></Pressable> : null}
         </View>
+        {renderHeader ? <Pressable accessibilityRole="button" accessibilityLabel="Close notifications" onPress={onBack} style={styles.backButton}><MaterialCommunityIcons name="close" size={24} color={colors.navy} /></Pressable> : null}
       </View>
 
+  );
+
+  return (
+    <View style={{ flex: 1 }}>
+      {renderHeader ? renderHeader(header) : null}
+      <ScrollView bounces={false} directionalLockEnabled contentContainerStyle={styles.content}>
+      {!renderHeader ? header : null}
       {loading ? <ActivityIndicator color={colors.teal} size="large" /> : null}
       {error ? <View style={styles.errorCard}><Text style={styles.errorText}>{error}</Text></View> : null}
       {moderationRows.map(item => <View key={item.id} style={styles.moderationNotice}>
@@ -128,7 +135,8 @@ export default function BusinessNotificationsScreen({ user, profile, onBack }) {
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 

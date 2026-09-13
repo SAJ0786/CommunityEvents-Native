@@ -88,6 +88,8 @@ function buildTransporter() {
     host,
     port,
     secure: port === 465,
+    connectionTimeout: 15000,
+    socketTimeout: 30000,
     auth: { user, pass },
   });
 }
@@ -97,6 +99,10 @@ function sender() {
 }
 
 const EMAIL_REPLY_TO = SUPPORT_EMAIL;
+
+Object.assign(exports, require('./support-workflow').register({
+  admin, db, onCall, onDocumentCreated, HttpsError, REGION, EMAIL_SECRETS, buildTransporter, logger,
+}));
 
 async function getAdminRecipients(cities, actorUid = '') {
   const citySet = new Set((Array.isArray(cities) ? cities : [cities]).filter(Boolean).map(normalizeCity));

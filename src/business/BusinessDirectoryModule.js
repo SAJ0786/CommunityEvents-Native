@@ -11,7 +11,7 @@ import BusinessPromotionForm from './BusinessPromotionForm';
 import DirectoryBottomNavigation from './DirectoryBottomNavigation';
 import BusinessAdminDashboard from './BusinessAdminDashboard';
 import BusinessInboxScreen from './BusinessInboxScreen';
-import BusinessSupportInboxScreen from './BusinessSupportInboxScreen';
+import SupportForm from '../components/SupportForm';
 import BusinessNotificationsScreen from './BusinessNotificationsScreen';
 import {
   BUSINESS_CATEGORIES,
@@ -36,7 +36,6 @@ import { toggleSavedBusiness } from '../services/users';
 import { friendlyError } from '../utils/errors';
 import CitySelector from '../components/CitySelector';
 import CompactSelect from '../components/CompactSelect';
-import { sendFeedbackMessage } from '../services/messaging';
 import { listenBusinessCategories } from '../services/businessCategoryAdmin';
 import { trackBusinessInteraction } from '../services/businessAnalytics';
 import NativeBackButton from '../components/NativeBackButton';
@@ -447,83 +446,16 @@ function AddBusinessPreview({ onOpenAccount }) {
   );
 }
 
-function DirectorySupportScreen({ mode, onBack, businesses = [], user, profile, city }) {
-  const report = mode === 'report';
+function DirectorySupportScreen({ mode, onBack, businesses = [], user, profile }) {
   const [businessId, setBusinessId] = useState('');
-  const [topic, setTopic] = useState(report ? 'Incorrect information' : 'Directory support');
-  const [message, setMessage] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('');
-  const selectedBusiness = businesses.find(item => item.id === businessId);
-
-  const submit = async () => {
-    setStatus('');
-    if (report && !selectedBusiness) {
-      setStatus('Choose the business you are reporting.');
-      return;
-    }
-    if (message.trim().length < 10) {
-      setStatus('Add at least 10 characters explaining the issue.');
-      return;
-    }
-    setBusy(true);
-    try {
-      const heading = report
-        ? `BUSINESS REPORT\nBusiness: ${selectedBusiness.name}\nBusiness ID: ${selectedBusiness.id}\nReason: ${topic}`
-        : `BUSINESS DIRECTORY CONTACT\nTopic: ${topic}`;
-      await sendFeedbackMessage({
-        user,
-        profile,
-        city,
-        target: 'cityAdmins',
-        module: 'business',
-        category: report ? 'business-report' : 'directory-contact',
-        subject: report ? `${topic}: ${selectedBusiness.name}` : topic,
-        businessId: selectedBusiness?.id || '',
-        businessName: selectedBusiness?.name || '',
-        text: `${heading}\n\n${message.trim()}`,
-      });
-      setMessage('');
-      if (report) setBusinessId('');
-      setStatus(report ? 'Report submitted to the directory team.' : 'Message sent to the directory team.');
-    } catch (error) {
-      setStatus(friendlyError(error, 'Could not send this message.'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <ScrollView contentContainerStyle={styles.pageContent} keyboardShouldPersistTaps="handled">
-      <NativeBackButton accessibilityLabel="Back to directory" onPress={onBack} />
-      <Text style={styles.eyebrow}>COMMUNITY BUSINESSES AUSTRALIA</Text>
-      <Text style={styles.pageTitle}>{report ? 'Report a Business' : 'Contact Us'}</Text>
-      <Text style={styles.pageSubtitle}>{report
-        ? 'Report inaccurate, unsafe, unlawful or inappropriate business information to the directory team.'
-        : 'Contact the Community Businesses Australia team for directory assistance.'}</Text>
-      <View style={styles.supportCard}>
-        <Text style={styles.sectionIcon}>{report ? '\u{1F6A9}' : '\u{1F4AC}'}</Text>
-        {report ? <>
-          <Text style={styles.supportLabel}>BUSINESS</Text>
-          <CompactSelect options={businesses.map(item => ({ value: item.id, label: `${item.name} · ${item.suburb || item.location?.suburb || 'Australia'}` }))} value={businessId} onChange={setBusinessId} placeholder="Choose the business" />
-        </> : null}
-        <Text style={styles.supportLabel}>{report ? 'REPORT REASON' : 'TOPIC'}</Text>
-        <CompactSelect
-          options={(report
-            ? ['Incorrect information', 'Misleading or unsafe conduct', 'Suspected fraud or impersonation', 'Inappropriate content', 'Business closed', 'Other']
-            : ['Directory support', 'Business listing question', 'Privacy or legal question', 'Technical problem', 'Partnership enquiry', 'Other'])
-            .map(value => ({ value, label: value }))}
-          value={topic}
-          onChange={setTopic}
-        />
-        <Text style={styles.supportLabel}>DETAILS</Text>
-        <TextInput value={message} onChangeText={value => { setMessage(value); setStatus(''); }} multiline maxLength={2500} placeholder={report ? 'Explain what is wrong and include facts the directory team can check…' : 'How can we help?'} placeholderTextColor={colors.muted} style={styles.supportInput} textAlignVertical="top" />
-        <Text style={styles.supportSafety}>Do not include passwords, verification codes, bank details or identity documents. For immediate danger or suspected crime, contact the appropriate Australian authority.</Text>
-        {status ? <Text style={status.startsWith('Report submitted') || status.startsWith('Message sent') ? styles.supportSuccess : styles.supportError}>{status}</Text> : null}
-        <Pressable disabled={busy} onPress={submit} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, busy && styles.disabled]}><Text style={styles.primaryButtonText}>{busy ? 'Sending…' : report ? 'Submit Report' : 'Send Message'}</Text></Pressable>
-      </View>
-    </ScrollView>
-  );
+  const business = businesses.find(item => item.id === businessId);
+  if (mode !== 'report' || business) return <SupportForm key={businessId || 'app'} business={business} user={user} profile={profile} onBack={onBack} />;
+  return <ScrollView contentContainerStyle={styles.pageContent}>
+    <NativeBackButton onPress={onBack} />
+    <Text style={styles.pageTitle}>Report a Problem</Text>
+    <Text style={styles.pageSubtitle}>Choose a business. You can also report directly from its details page.</Text>
+    <CompactSelect options={businesses.map(item => ({ value: item.id, label: item.name }))} value={businessId} onChange={setBusinessId} placeholder="Choose the business" />
+  </ScrollView>;
 }
 
 export default function BusinessDirectoryModule({
@@ -882,9 +814,9 @@ export default function BusinessDirectoryModule({
         ) : activeTab === 'admin' ? (
           <BusinessAdminDashboard user={currentUser} profile={profile} categories={businessCategories} />
         ) : activeTab === 'inbox' ? (
-          <BusinessInboxScreen user={currentUser} profile={profile} onBack={() => changeTab('home')} onOpenFeedback={() => changeTab('feedback')} />
+          <BusinessInboxScreen key={currentUser?.uid || 'guest'} user={currentUser} profile={profile} onBack={() => changeTab('home')} />
         ) : activeTab === 'feedback' ? (
-          <BusinessSupportInboxScreen user={currentUser} profile={profile} onBack={() => changeTab('home')} />
+          <SupportForm user={currentUser} profile={profile} onBack={() => changeTab('home')} />
         ) : activeTab === 'notifications' ? (
           <BusinessNotificationsScreen user={currentUser} profile={profile} onBack={() => { changeTab('home'); onOpenMenu?.(); }} />
         ) : activeTab === 'report' ? (

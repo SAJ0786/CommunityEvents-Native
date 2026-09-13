@@ -17,6 +17,7 @@ import { colors, radius, shadow, spacing } from '../theme';
 import { LEGAL_DOCUMENT_VERSION, LEGAL_URLS, SIZA_WEBSITE_URL, SUPPORT_EMAIL } from '../config/legal';
 import { cityLabel, DEFAULT_CITY, normalizeCity } from '../utils/cities';
 import CitySelector from './CitySelector';
+import { SupportModal } from './SupportForm';
 import { APP_OPEN_LINK, STORE_SHARE_LINES } from '../utils/storeLinks';
 import * as Clipboard from 'expo-clipboard';
 import { getDiagnosticIdentity, getDiagnosticSessionId } from '../services/diagnostics';
@@ -69,6 +70,7 @@ export default function ProfileScreen({
   onPreferredModuleChange,
 }) {
   const [phone, setPhone] = useState('');
+  const [supportOpen, setSupportOpen] = useState(false);
   const [otp, setOtp] = useState('');
   const [confirmation, setConfirmation] = useState(null);
   const [authStep, setAuthStep] = useState('phone');
@@ -259,6 +261,11 @@ export default function ProfileScreen({
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       <Text maxFontSizeMultiplier={1.2} style={styles.title}>Profile &amp; Settings</Text>
       <Text maxFontSizeMultiplier={1.2} style={styles.subtitle}>Your account and app preferences</Text>
+      <Pressable accessibilityRole="button" onPress={() => setSupportOpen(true)} style={styles.card}>
+        <Text style={styles.cardTitle}>Feedback &amp; Report a Problem</Text>
+        <Text style={styles.body}>App feedback, technical issues, account help and other enquiries.</Text>
+      </Pressable>
+      <SupportModal visible={supportOpen} onClose={() => setSupportOpen(false)} user={user} profile={profile} />
 
       {loading ? (
         <View style={styles.card}>

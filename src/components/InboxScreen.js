@@ -34,7 +34,7 @@ const formatDateTime = value => {
   });
 };
 
-export default function InboxScreen({ user, profile, onBack, onOpenFeedback }) {
+export default function InboxScreen({ user, profile, onBack }) {
   const [threads, setThreads] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [messages, setMessages] = useState([]);
@@ -111,7 +111,6 @@ export default function InboxScreen({ user, profile, onBack, onOpenFeedback }) {
         </View>
       </View>
 
-      {onOpenFeedback ? <Pressable accessibilityRole="button" onPress={onOpenFeedback} style={styles.card}><Text style={styles.sectionTitle}>Contact Events & Feedback →</Text><Text style={styles.emptyText}>View your conversations with the community team.</Text></Pressable> : null}
       {loadError ? <View style={styles.centerCard}><Text style={styles.emptyText}>{loadError}</Text></View> : null}
       {loading ? (
         <View style={styles.centerCard}><ActivityIndicator color={colors.teal} /></View>

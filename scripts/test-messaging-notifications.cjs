@@ -45,6 +45,7 @@ async function main() {
     '@react-native-async-storage/async-storage': storage,
     '@react-native-firebase/functions': { httpsCallable: (_, name) => async data => { callableRequest = { name, data }; return { data: { threadId: 'server-thread' } }; } },
     '../firebase/firebase': { db: { path: 'db' }, functions: {} },
+    './support': { newSupportReference: () => 'support_test_reference', submitSupportRequest: async data => { callableRequest = { name: 'submitSupportRequest', data }; return { reference: 'test-ref' }; } },
     '../utils/cities': { DEFAULT_CITY: 'sydney', normalizeCity: value => value, cityLabel: value => value },
   };
   const messaging = load('src/services/messaging.js', mocks);
@@ -83,14 +84,13 @@ async function main() {
     assert.equal(called, false, 'listener errors must not erase inbox results');
     assert.equal(receivedError, error);
   }
-  missingDenied = true;
   await messaging.sendFeedbackMessage({ user, profile, text: 'First contact' });
-  assert.equal(writes.at(-1)[0], 'add');
-  missingDenied = false; documentExists = true; writes.length = 0;
-  await messaging.sendFeedbackMessage({ user, profile, text: 'Follow up' });
-  assert.equal(writes[0][2].createdAt, undefined, 'follow-up must not change protected metadata');
-  assert.equal(writes[0][2].senderUid, undefined);
-  assert.equal(writes[0][2].unreadBy.sender, 0);
+  assert.equal(callableRequest.name, 'submitSupportRequest');
+  assert.equal(callableRequest.data.kind, 'app-feedback');
+  assert.equal(writes.length, 0, 'feedback must not create a client-side inbox');
+  await messaging.sendFeedbackMessage({ user, profile, text: 'Business concern', businessId: 'business' });
+  assert.equal(callableRequest.data.kind, 'business-report');
+  await assert.rejects(() => messaging.sendHostMessage({ event: { id: 'unlinked' }, user, profile, text: 'Private hello' }), /no linked host/);
 
   const notifications = load('src/services/businessNotifications.js', mocks);
   let current = [];
@@ -108,11 +108,13 @@ async function main() {
   assert.equal(current[0].id, 'new');
 
   assert.match(read('backend/firestore.rules'), /getAfter\(\/databases\/\$\(database\)\/documents\/hostMessageThreads/);
-  assert.match(read('src/components/EventDetailsModal.js'), /styles.sheetHeader\} \{\.\.\.sheetPanResponder.panHandlers\}/);
+  assert.match(read('src/components/EventDetailsModal.js'), /styles.sheetHeader\} \{\.\.\.panHandlers\}/);
   assert.match(read('src/components/KeyboardAwareScrollView.js'), /input !== focused.current/);
   assert.match(read('src/components/NotificationsDrawer.js'), /BusinessNotificationsScreen.*user=\{user\}/);
-  assert.match(read('src/components/InboxScreen.js'), /onOpenFeedback/);
-  assert.match(read('src/business/BusinessInboxScreen.js'), /onOpenFeedback/);
+  assert.doesNotMatch(read('src/components/InboxScreen.js'), /onOpenFeedback/);
+  assert.doesNotMatch(read('src/business/BusinessInboxScreen.js'), /onOpenFeedback/);
+  assert.match(read('src/components/ProfileScreen.js'), /Feedback &amp; Report a Problem/);
+  assert.match(read('src/business/BusinessDetailsScreen.js'), /Report a Problem/);
   const audio = fs.readFileSync(path.join(root, 'assets/sounds/azan_mashad.wav'));
   assert.equal(audio.toString('ascii', 0, 4), 'RIFF');
   assert.equal(audio.toString('ascii', 8, 12), 'WAVE');

@@ -1,24 +1,20 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  addDoc,
   collection,
   doc,
-  getDoc,
   increment,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
-  setDoc,
   updateDoc,
   writeBatch,
   where,
 } from '@react-native-firebase/firestore';
 import { httpsCallable } from '@react-native-firebase/functions';
 import { db, functions } from '../firebase/firebase';
-import { DEFAULT_CITY, cityLabel, normalizeCity } from '../utils/cities';
+import { DEFAULT_CITY, normalizeCity } from '../utils/cities';
+import { newSupportReference, submitSupportRequest } from './support';
 
-const GUEST_ID_KEY = '@community-events/feedback-guest-id';
 
 const clean = value => String(value || '').trim();
 const compact = arr => [...new Set((arr || []).filter(Boolean))];
@@ -51,17 +47,7 @@ export async function sendHostMessage({ event, user, profile, text }) {
   if (!messageText) throw new Error('Please write a message first.');
   if (messageText.length > 2000) throw new Error('Please keep the message under 2000 characters.');
   if (!event?.id) throw new Error('This event does not have a host inbox.');
-  if (!hostUid) {
-    const fallbackTitle = `${event.eventTypeDisplay || event.eventType || 'Event'} - ${event.hostName || 'Host'}`;
-    await sendFeedbackMessage({
-      user,
-      profile,
-      city: normalizeCity(event.metroArea || DEFAULT_CITY),
-      target: 'cityAdmins',
-      text: `Host contact request for ${fallbackTitle}${event.eventDate ? ` on ${event.eventDate}` : ''}:\n\n${messageText}`,
-    });
-    return { routedTo: 'cityAdmins' };
-  }
+  if (!hostUid) throw new Error('This event has no linked host account. A private host message cannot be delivered.');
   if (hostUid === user.uid) throw new Error('This event is already managed by you.');
 
   const senderUid = user.uid;
@@ -196,183 +182,16 @@ export async function markHostThreadRead(threadId, uid) {
   await updateDoc(doc(db, 'hostMessageThreads', threadId), { [`unreadBy.${uid}`]: 0 });
 }
 
-async function guestId() {
-  try {
-    const existing = await AsyncStorage.getItem(GUEST_ID_KEY);
-    if (existing) return existing;
-    const value = `guest_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-    await AsyncStorage.setItem(GUEST_ID_KEY, value);
-    return value;
-  } catch {
-    return `guest_${Date.now()}`;
-  }
-}
-
-export async function sendFeedbackMessage({
-  user,
-  profile,
-  text,
-  city = DEFAULT_CITY,
-  target = 'cityAdmins',
-  module = 'events',
-  category = 'feedback',
-  subject = '',
-  businessId = '',
-  businessName = '',
-  reportedThreadId = '',
-}) {
-  const messageText = clean(text);
-  if (!messageText) throw new Error('Please write your message first.');
-  if (messageText.length > 2500) throw new Error('Please keep the message under 2500 characters.');
-
-  const safeTarget = target === 'superAdmins' ? 'superAdmins' : 'cityAdmins';
-  const safeCity = normalizeCity(city || profile?.defaultCity || DEFAULT_CITY);
-  const safeModule = module === 'business' ? 'business' : 'events';
-  const safeCategory = clean(category) || 'feedback';
-  const safetyReport = ['business-report', 'business-conversation-report', 'business-appeal'].includes(safeCategory);
-  const senderUid = user?.uid && !user?.isAnonymous ? user.uid : null;
-  const senderGuestId = senderUid ? null : await guestId();
-  const senderName = senderUid ? getSenderName(user, profile) : 'Guest user';
-  const routePrefix = safeModule === 'events' && safeCategory === 'feedback'
-    ? `${safeTarget}_${safeCity}`
-    : `${safeModule}_${safeCategory.replace(/[^a-z0-9_-]/gi, '-').toLowerCase()}_${safeTarget}_${safeCity}${safetyReport ? `_${clean(reportedThreadId || businessId).replace(/[^a-z0-9_-]/gi, '-').slice(0, 120)}` : ''}`;
-  const threadId = senderUid
-    ? `${routePrefix}_${senderUid}`
-    : `${routePrefix}_${senderGuestId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-  const threadRef = doc(db, 'adminFeedbackThreads', threadId);
-  const unreadField = safeTarget === 'superAdmins' ? 'unreadForSuperAdmins' : 'unreadForCityAdmins';
-  let existing = null;
-  if (senderUid) {
-    try { existing = await getDoc(threadRef); }
-    catch (error) {
-      // Rules cannot identify the sender of a document that does not exist.
-      // Creation still undergoes the normal sender/role checks on the server.
-      if (!String(error?.code || '').includes('permission-denied')) throw error;
-    }
-  }
-
-  const messageState = {
-    updatedAt: serverTimestamp(),
-    lastMessage: messageText,
-    lastSenderUid: senderUid || senderGuestId,
-    [unreadField]: increment(1),
-    ...(senderUid ? { unreadBy: { [senderUid]: 0 } } : {}),
-  };
-  if (existing?.exists()) {
-    // Preserve routing, identity and original creation time. The rules allow
-    // only message-state changes on an existing support conversation.
-    await setDoc(threadRef, messageState, { merge: true });
-  } else await setDoc(threadRef, {
-    type: 'feedback',
-    module: safeModule,
-    category: safeCategory,
-    subject: clean(subject),
-    businessId: clean(businessId),
-    businessName: clean(businessName),
-    reportedThreadId: clean(reportedThreadId),
-    ...(safetyReport ? { moderationStatus: existing?.data()?.moderationStatus || 'open' } : {}),
-    target: safeTarget,
-    city: safeCity,
-    cityLabel: cityLabel(safeCity),
-    senderUid,
-    senderGuestId,
-    senderName,
-    senderEmail: clean(user?.email || profile?.email || profile?.emailAddress),
-    createdAt: serverTimestamp(),
-    ...messageState,
-  }, { merge: true });
-
-  await addDoc(collection(threadRef, 'messages'), {
-    senderUid,
-    senderGuestId,
-    senderName,
-    text: messageText,
-    kind: 'text',
-    createdAt: serverTimestamp(),
+// Compatibility for older report/appeal entry points: email, never a feedback inbox.
+export async function sendFeedbackMessage({ user, profile, text, category = 'feedback', businessId = '', subject = '' }) {
+  return submitSupportRequest({
+    requestId: newSupportReference(),
+    kind: businessId && category !== 'business-appeal' ? 'business-report' : 'app-feedback',
+    businessId, category: 'Other',
+    senderName: getSenderName(user, profile),
+    senderEmail: clean(profile?.email || user?.email),
+    message: [subject, clean(text)].filter(Boolean).join('\n\n'),
   });
-}
-
-export async function sendFeedbackReply({ thread, user, profile, text }) {
-  const messageText = clean(text);
-  if (!user?.uid) throw new Error('Please sign in to reply.');
-  if (!thread?.id) throw new Error('Feedback thread not found.');
-  if (!messageText) throw new Error('Please write a reply first.');
-  const senderIsReplying = thread.senderUid === user.uid;
-  const adminIsReplying = isAdminRole(profile?.role) && (
-    isSuperAdminRole(profile?.role)
-    || (thread.target === 'cityAdmins' && thread.city === getAdminCity(profile))
-  );
-  if (!senderIsReplying && !adminIsReplying) throw new Error('You cannot reply to this conversation.');
-
-  const threadRef = doc(db, 'adminFeedbackThreads', thread.id);
-  const senderName = getSenderName(user, profile);
-
-  await addDoc(collection(threadRef, 'messages'), {
-    senderUid: user.uid,
-    senderName,
-    text: messageText,
-    kind: 'text',
-    createdAt: serverTimestamp(),
-  });
-
-  await updateDoc(threadRef, {
-    updatedAt: serverTimestamp(),
-    lastMessage: messageText,
-    lastSenderUid: user.uid,
-    [thread.target === 'superAdmins' ? 'unreadForSuperAdmins' : 'unreadForCityAdmins']: senderIsReplying ? increment(1) : 0,
-    ...(thread.senderUid ? { [`unreadBy.${thread.senderUid}`]: senderIsReplying ? 0 : increment(1) } : {}),
-  });
-}
-
-export async function sendFeedbackReaction({ thread, user, profile, reaction }) {
-  const safeReaction = clean(reaction);
-  if (!user?.uid) throw new Error('Please sign in to react.');
-  if (!thread?.id) throw new Error('Feedback thread not found.');
-  if (!['Like', 'Love', 'Unlike'].includes(safeReaction)) throw new Error('Reaction not available.');
-
-  const isAdminParticipant = isAdminRole(profile?.role) && (
-    isSuperAdminRole(profile?.role) ||
-    (thread.target === 'cityAdmins' && thread.city === getAdminCity(profile))
-  );
-  const isSenderParticipant = thread.senderUid === user.uid;
-  if (!isAdminParticipant && !isSenderParticipant) throw new Error('You cannot react to this feedback.');
-
-  const senderName = getSenderName(user, profile);
-  const text = safeReaction === 'Like'
-    ? 'Liked this message'
-    : safeReaction === 'Love'
-      ? 'Loved this message'
-      : 'Marked this message as not liked';
-  const unreadField = thread.target === 'superAdmins' ? 'unreadForSuperAdmins' : 'unreadForCityAdmins';
-  const adminIsReactingToOwnQueue = (thread.target === 'superAdmins' && isSuperAdminRole(profile?.role))
-    || (thread.target === 'cityAdmins' && profile?.role === 'admin');
-  const threadRef = doc(db, 'adminFeedbackThreads', thread.id);
-
-  await addDoc(collection(threadRef, 'messages'), {
-    senderUid: user.uid,
-    senderName,
-    text,
-    reaction: safeReaction,
-    kind: 'reaction',
-    createdAt: serverTimestamp(),
-  });
-
-  await updateDoc(threadRef, {
-    updatedAt: serverTimestamp(),
-    lastMessage: text,
-    lastSenderUid: user.uid,
-    [unreadField]: adminIsReactingToOwnQueue ? 0 : increment(1),
-    ...(thread.senderUid ? { [`unreadBy.${thread.senderUid}`]: isSenderParticipant ? 0 : increment(1) } : {}),
-  });
-}
-
-export async function markFeedbackThreadRead(thread, user, profile) {
-  if (!thread?.id) return;
-  const updates = {};
-  if (user?.uid && thread.senderUid === user.uid) updates[`unreadBy.${user.uid}`] = 0;
-  if (isSuperAdminRole(profile?.role) && thread.target === 'superAdmins') updates.unreadForSuperAdmins = 0;
-  if (profile?.role === 'admin' && thread.target === 'cityAdmins') updates.unreadForCityAdmins = 0;
-  if (Object.keys(updates).length) await updateDoc(doc(db, 'adminFeedbackThreads', thread.id), updates);
 }
 
 export function listenThreadMessages(collectionName, threadId, callback, onError) {
@@ -380,50 +199,6 @@ export function listenThreadMessages(collectionName, threadId, callback, onError
   const q = query(collection(db, collectionName, threadId, 'messages'), orderBy('createdAt', 'asc'));
   return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))), error => {
     console.error('[listenThreadMessages]', error);
-    onError?.(error);
-  });
-}
-
-export function listenAdminFeedbackThreads(profile, callback, onError) {
-  if (!isAdminRole(profile?.role)) return () => callback([]);
-  const base = collection(db, 'adminFeedbackThreads');
-  const q = isSuperAdminRole(profile?.role)
-    ? query(base)
-    : query(base, where('target', '==', 'cityAdmins'), where('city', '==', getAdminCity(profile)));
-  return onSnapshot(q, snap => callback(sortByUpdatedDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => !isBusinessSupportThread(item)))), error => {
-    console.error('[listenAdminFeedbackThreads]', error);
-    onError?.(error);
-  });
-}
-
-export function listenOwnFeedbackThreads(uid, callback, onError) {
-  if (!uid) return () => callback([]);
-  const q = query(collection(db, 'adminFeedbackThreads'), where('senderUid', '==', uid));
-  return onSnapshot(q, snap => callback(sortByUpdatedDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => !isBusinessSupportThread(item)))), error => {
-    console.error('[listenOwnFeedbackThreads]', error);
-    onError?.(error);
-  });
-}
-
-export function isBusinessSupportThread(thread = {}) {
-  const message = clean(thread.lastMessage).toUpperCase();
-  return thread.module === 'business'
-    || message.startsWith('BUSINESS REPORT')
-    || message.startsWith('BUSINESS DIRECTORY CONTACT');
-}
-
-export function listenBusinessSupportThreads(user, profile, callback, onError) {
-  if (!user?.uid || user.isAnonymous) return () => callback([]);
-  const base = collection(db, 'adminFeedbackThreads');
-  const q = isSuperAdminRole(profile?.role)
-    ? query(base)
-    : profile?.role === 'admin'
-      ? query(base, where('target', '==', 'cityAdmins'), where('city', '==', getAdminCity(profile)))
-      : query(base, where('senderUid', '==', user.uid));
-  return onSnapshot(q, snap => callback(sortByUpdatedDesc(
-    snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(isBusinessSupportThread)
-  )), error => {
-    console.error('[listenBusinessSupportThreads]', error);
     onError?.(error);
   });
 }

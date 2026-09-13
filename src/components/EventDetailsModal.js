@@ -1,13 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Animated,
-  Easing,
   Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
-  PanResponder,
   Platform,
   Pressable,
   SafeAreaView,
@@ -17,6 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import useMenuDrawerMotion from './useMenuDrawerMotion';
 import ScrollView from './KeyboardAwareScrollView';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -155,10 +154,7 @@ export default function EventDetailsModal({
   canManageStream = false,
   onManageStream,
 }) {
-  const translateY = useRef(new Animated.Value(0)).current;
-  const closeRef = useRef(onClose);
-  const closingRef = useRef(false);
-  const scrollOffsetRef = useRef(0);
+  const { translateY, requestClose: animateClose, panHandlers } = useMenuDrawerMotion({ visible, onClose });
   const [posterUri, setPosterUri] = useState('');
   const [posterOpen, setPosterOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -172,23 +168,6 @@ export default function EventDetailsModal({
   const [reminderBusy, setReminderBusy] = useState(false);
   const [reminderError, setReminderError] = useState('');
   const hasPlayableLiveUrl = isPlayableYouTubeUrl(event?.liveWatchUrl);
-
-  useEffect(() => {
-    closeRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!visible) return;
-    closingRef.current = false;
-    scrollOffsetRef.current = 0;
-    translateY.setValue(640);
-    Animated.timing(translateY, {
-      toValue: 0,
-      duration: 320,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [translateY, visible]);
 
   useEffect(() => {
     let alive = true;
@@ -223,52 +202,6 @@ export default function EventDetailsModal({
       alive = false;
     };
   }, [event]);
-
-  const animateClose = useCallback(() => {
-    if (closingRef.current) return;
-    closingRef.current = true;
-    Animated.timing(translateY, {
-      toValue: 900,
-      duration: 280,
-      easing: Easing.inOut(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      closeRef.current?.();
-    });
-  }, [translateY]);
-
-  const restoreSheet = useCallback(() => {
-    Animated.spring(translateY, {
-      toValue: 0,
-      damping: 24,
-      stiffness: 180,
-      useNativeDriver: true,
-    }).start();
-  }, [translateY]);
-
-  const releaseDrag = useCallback(gesture => {
-    const projectedDistance = Math.max(0, gesture.dy) + Math.max(0, gesture.vy) * 120;
-    if (gesture.dy > 64 || gesture.vy > 0.5 || projectedDistance > 92) {
-      animateClose();
-      return;
-    }
-    restoreSheet();
-  }, [animateClose, restoreSheet]);
-
-  const sheetPanResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, gesture) => (
-      gesture.dy > 3
-      && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.15
-    ),
-    onPanResponderGrant: () => translateY.stopAnimation(),
-    onPanResponderMove: (_, gesture) => {
-      translateY.setValue(Math.max(0, gesture.dy));
-    },
-    onPanResponderRelease: (_, gesture) => releaseDrag(gesture),
-    onPanResponderTerminate: restoreSheet,
-    onPanResponderTerminationRequest: () => false,
-  }), [releaseDrag, restoreSheet, translateY]);
 
   if (!event) return null;
 
@@ -354,11 +287,9 @@ export default function EventDetailsModal({
     setHostMessageSending(true);
     setHostMessageStatus('');
     try {
-      const delivery = await sendHostMessage({ event, user, profile, text: hostMessageText });
+      await sendHostMessage({ event, user, profile, text: hostMessageText });
       setHostMessageText('');
-      setHostMessageStatus(delivery?.routedTo === 'cityAdmins'
-        ? 'Message sent to the city admin team because this event has no assigned host account. Continue in Inbox → Contact Events & Feedback.'
-        : 'Message sent to host. You can continue the conversation in Inbox.');
+      setHostMessageStatus('Message sent to host. You can continue the private conversation in Host Inbox.');
     } catch (error) {
       setHostMessageStatus(error?.message || 'Could not send this message.');
     } finally {
@@ -452,7 +383,7 @@ export default function EventDetailsModal({
         <SafeAreaView style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={animateClose} />
           <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
-            <View style={styles.sheetHeader} {...sheetPanResponder.panHandlers}>
+            <View style={styles.sheetHeader} {...panHandlers}>
               <View style={styles.dragHandle} />
               <View style={styles.headerRow}>
                 <View style={styles.headerCopy}>
@@ -470,7 +401,6 @@ export default function EventDetailsModal({
               contentContainerStyle={styles.content}
               directionalLockEnabled
               keyboardShouldPersistTaps="handled"
-              onScroll={event => { scrollOffsetRef.current = Math.max(0, event.nativeEvent.contentOffset.y); }}
               scrollEventThrottle={16}
             >
               <View style={styles.card}>
