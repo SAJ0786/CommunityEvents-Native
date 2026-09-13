@@ -68,7 +68,7 @@ async function main() {
   assert.equal(records.get('supportSubmissions/' + app.reference).status, 'email-failed');
   records.set('businesses/biz', { ownerId: 'owner', contact: { email: 'official@example.test' }, location: { city: 'sydney' } });
   records.set('businessContactRoutes/biz', { active: true, ownerUid: 'owner' });
-  records.set('businessMessageThreads/thread', { ownerUid: 'owner', senderUid: 'customer', businessId: 'biz', businessName: 'Business' });
+  records.set('businessMessageThreads/thread', { ownerUid: 'owner', senderUid: 'customer', participantUids: ['owner', 'customer'], businessId: 'biz', businessName: 'Business' });
   const enquiry = async id => {
     const p = 'businessMessageThreads/thread/messages/' + id;
     records.set(p, { kind: 'text', senderUid: 'customer', text: 'Customer enquiry' });
@@ -76,12 +76,31 @@ async function main() {
     return [...records.entries()].filter(([k,v]) => k.startsWith('supportEmailOutbox/') && v.kind === 'business-enquiry').at(-1)[1];
   };
   assert.deepEqual((await enquiry('first')).recipients, ['official@example.test']);
+  const notices = () => [...records.entries()].filter(([k]) => k.startsWith('userNotifications/'));
+  assert.equal(notices().length, 1);
+  const [noticePath, notice] = notices()[0];
+  assert.equal(notice.recipientUid, 'owner', 'enquiry notification belongs only to the business owner');
+  assert.equal(notice.read, false);
+  assert.equal(notice.threadId, 'thread');
+  assert.equal(notice.businessId, 'biz');
+  assert.ok(!notice.body.includes('Customer enquiry'), 'do not copy private message text into the notification');
+  records.set(noticePath, { ...notice, read: true });
+  await enquiry('first');
+  assert.equal(notices().length, 1, 'trigger retries must not duplicate notifications');
+  assert.equal(records.get(noticePath).read, true, 'trigger retries must preserve read state');
   records.set('businesses/biz', { ownerId: 'owner', contact: {} });
   const skipped = await enquiry('missing-email');
   assert.equal(skipped.status, 'skipped');
   assert.deepEqual(skipped.recipients, [], 'no personal-email fallback');
+  assert.equal(notices().length, 2, 'owner still receives an in-app notification without business email');
   records.set('businessContactRoutes/biz', { active: true, ownerUid: 'replacement' });
   assert.equal((await enquiry('after-transfer')).skipReason, 'ownership-changed');
+  assert.equal(notices().length, 2, 'do not notify a replacement owner about an old private conversation');
+  const replyPath = 'businessMessageThreads/thread/messages/owner-reply';
+  records.set(replyPath, { kind: 'text', senderUid: 'owner', text: 'Private owner reply' });
+  await funcs.queueBusinessEnquiryEmail({ data: snapshot(ref(replyPath)), params: { threadId: 'thread', messageId: 'owner-reply' } });
+  assert.equal(notices().length, 2, 'owner replies are not new enquiries to the same owner');
+  assert.ok(notices().every(([, value]) => value.recipientUid === 'owner'), 'no admin or unrelated recipient copies');
   assert.equal([...records.keys()].some(k => k.startsWith('adminFeedbackThreads/')), false);
   console.log('PASS support: categories, validation, private routing, trusted city, idempotency, rate limit, escaped email, retries, exhausted delivery, official email only and transfer privacy.');
 }

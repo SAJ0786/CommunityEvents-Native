@@ -136,13 +136,29 @@ export async function sendBusinessMessage({ business, user, profile, text }) {
   }
 }
 
+// Receiving an enquiry as the business owner is different from contacting
+// somebody else's business. Roles never grant access to either folder.
+export function businessThreadFolder(thread, uid) {
+  if (!uid || !thread?.participantUids?.includes(uid)) return null;
+  if (thread.ownerUid === uid) return 'received';
+  if (thread.senderUid === uid) return 'sent';
+  return null;
+}
+
 export function listenBusinessThreads(uid, callback, onError) {
-  if (!uid) return () => callback([]);
+  if (!uid) { callback([]); return () => {}; }
+  let active = true;
   const q = query(collection(db, 'businessMessageThreads'), where('participantUids', 'array-contains', uid));
-  return onSnapshot(q, snap => callback(sortByUpdatedDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })))), error => {
+  const unsubscribe = onSnapshot(q, snap => {
+    if (!active) return;
+    callback(sortByUpdatedDesc(snap.docs.map(d => ({ ...d.data(), id: d.id }))
+      .filter(thread => businessThreadFolder(thread, uid))));
+  }, error => {
+    if (!active) return;
     console.error('[listenBusinessThreads]', error);
     onError?.(error);
   });
+  return () => { active = false; unsubscribe(); };
 }
 
 export async function sendBusinessReply({ thread, user, profile, text }) {

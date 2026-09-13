@@ -21,19 +21,30 @@ async function main() {
     await seed(type + 'MessageThreads/thread/messages/message', { senderUid: 'sender', text: 'Private synthetic test message' });
   }
   await seed('supportSubmissions/private', { senderUid: 'sender', message: 'Private report' });
-  for (const uid of ['sender', 'owner', 'outsider', 'anonymous']) {
+  await seed('userNotifications/enquiry', { recipientUid: 'owner', type: 'business-enquiry', read: false });
+  await seed('users/ordinary-outsider', { role: 'user', isActive: true });
+  for (const uid of ['sender', 'owner', 'outsider', 'ordinary-outsider', 'anonymous']) {
     const app = initializeApp({ projectId: project, apiKey: 'fake', appId: uid }, uid);
     const db = getFirestore(app);
     connectFirestoreEmulator(db, '127.0.0.1', 8089, { mockUserToken: { sub: uid, user_id: uid, firebase: { sign_in_provider: uid === 'anonymous' ? 'anonymous' : 'phone' } } });
     try {
+      const notification = doc(db, 'userNotifications', 'enquiry');
+      if (uid === 'owner') {
+        assert.ok((await getDoc(notification)).exists());
+        assert.equal((await getDocs(query(collection(db, 'userNotifications'), where('recipientUid', '==', uid)))).size, 1);
+      } else {
+        await assert.rejects(getDoc(notification), 'only the business owner can read their enquiry notification');
+      }
       for (const type of ['business', 'host']) {
         const name = type + 'MessageThreads';
         const listQuery = query(collection(db, name), where('participantUids', 'array-contains', uid));
         if (uid === 'anonymous') { await assert.rejects(getDocs(listQuery)); continue; }
         const rows = await getDocs(listQuery);
-        assert.equal(rows.size, uid === 'outsider' ? 0 : 1, uid + ' private query ' + type);
+        const outsider = uid === 'outsider' || uid === 'ordinary-outsider';
+        assert.equal(rows.size, outsider ? 0 : 1, uid + ' private query ' + type);
         const privateDoc = doc(db, name, 'thread');
-        if (uid === 'outsider') {
+        if (outsider) {
+          await assert.rejects(getDocs(collection(db, name)), 'unfiltered collection reads must be denied');
           await assert.rejects(getDoc(privateDoc));
           await assert.rejects(getDoc(doc(db, name, 'thread', 'messages', 'message')));
         } else {
@@ -47,6 +58,6 @@ async function main() {
       await assert.rejects(setDoc(doc(db, 'supportEmailOutbox', uid), { recipients: ['attacker@example.test'] }));
     } finally { await deleteApp(app); }
   }
-  console.log('PASS participant inbox queries, messages and read state; unrelated super admin cannot read private conversations.');
+  console.log('PASS participant inbox queries, messages, read state and owner-only notifications; unrelated normal users and super admins cannot read private conversations.');
 }
 main().catch(e => { console.error(e); process.exitCode = 1; });

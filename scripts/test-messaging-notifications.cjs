@@ -84,6 +84,69 @@ async function main() {
     assert.equal(called, false, 'listener errors must not erase inbox results');
     assert.equal(receivedError, error);
   }
+  const businessRows = [
+    { id: 'own-enquiry', businessId: 'own-business', ownerUid: 'tester', senderUid: 'customer', participantUids: ['tester', 'customer'] },
+    { id: 'sent-enquiry', businessId: 'other-business', ownerUid: 'other-owner', senderUid: 'tester', participantUids: ['tester', 'other-owner'] },
+    { id: 'unrelated-enquiry', businessId: 'other-business', ownerUid: 'other-owner', senderUid: 'someone-else', participantUids: ['other-owner', 'someone-else'] },
+    { id: 'invalid-participant', ownerUid: 'other-owner', senderUid: 'someone-else', participantUids: ['tester', 'other-owner'] },
+  ];
+  assert.equal(messaging.businessThreadFolder(businessRows[0], 'tester'), 'received');
+  assert.equal(messaging.businessThreadFolder(businessRows[1], 'tester'), 'sent');
+  assert.equal(messaging.businessThreadFolder(businessRows[2], 'tester'), null);
+  assert.equal(messaging.businessThreadFolder(businessRows[3], 'tester'), null);
+  assert.equal(messaging.businessThreadFolder(businessRows[0], 'unrelated-super-admin'), null);
+  assert.equal(messaging.businessThreadFolder(businessRows[0], ''), null);
+  let businessResult;
+  const stopBusiness = messaging.listenBusinessThreads('tester', rows => { businessResult = rows; });
+  const businessListener = listeners.at(-1);
+  assert.equal(JSON.stringify(businessListener.query[1]), JSON.stringify(['participantUids', 'array-contains', 'tester']));
+  businessListener.success({ docs: businessRows.map(row => ({ id: row.id, data: () => row })) });
+  assert.equal(JSON.stringify(businessResult.map(row => row.id)), JSON.stringify(['own-enquiry', 'sent-enquiry']));
+  stopBusiness();
+  businessResult = null;
+  businessListener.success({ docs: businessRows.map(row => ({ id: row.id, data: () => row })) });
+  assert.equal(businessResult, null, 'an old account listener must not populate the next account inbox');
+  messaging.listenBusinessThreads('', rows => { businessResult = rows; });
+  assert.equal(businessResult.length, 0, 'signed-out inbox clears immediately');
+
+  // Render the actual inbox with synthetic participant records. Received is
+  // the default and must not display messages the owner sent elsewhere.
+  let hookIndex = 0;
+  const state = [businessRows.slice(0, 2), 'received', null, [], '', '', false, '', 0, false, ''];
+  const react = {
+    createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat() }),
+    useState: initial => { const i = hookIndex++; if (state[i] === undefined) state[i] = initial; return [state[i], value => { state[i] = typeof value === 'function' ? value(state[i]) : value; }]; },
+    useEffect() {},
+  };
+  const { code: inboxCode } = babel.transformSync(read('src/business/BusinessInboxScreen.js'), { configFile: false, babelrc: false,
+    plugins: ['@babel/plugin-transform-react-jsx', '@babel/plugin-transform-modules-commonjs'] });
+  const inboxExports = {};
+  const inboxMocks = {
+    react,
+    'react-native': { KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: { OS: 'ios' }, Pressable: 'Pressable', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: value => value } },
+    '../components/KeyboardAwareScrollView': 'ScrollView', '../components/NativeBackButton': 'Back',
+    '../services/messaging': messaging, '../services/businessSafety': {},
+    '../theme': { colors: {}, radius: {}, shadow: {}, spacing: {} },
+  };
+  vm.runInNewContext(inboxCode, { exports: inboxExports, require: key => { assert.ok(key in inboxMocks, key); return inboxMocks[key]; } });
+  const flatten = node => node && typeof node === 'object' ? [node, ...(node.children || []).flatMap(flatten)] : [];
+  const renderInbox = () => { hookIndex = 0; return flatten(inboxExports.default({ user: { uid: 'tester' }, profile: { role: 'user' } })); };
+  let inboxTree = renderInbox();
+  assert.ok(inboxTree.some(node => node.children.includes('Business messaging')));
+  assert.ok(inboxTree.some(node => node.children.includes('Inbox')));
+  assert.ok(inboxTree.some(node => node.children.includes('Sent messages')));
+  assert.ok(inboxTree.some(node => node.props.key === 'own-enquiry'));
+  assert.ok(!inboxTree.some(node => node.props.key === 'sent-enquiry'));
+  assert.match(read('src/components/AccountMenuSheet.js'), /label: 'Business messaging'/);
+  inboxTree.find(node => node.props.key === 'sent').props.onPress();
+  inboxTree = renderInbox();
+  assert.ok(inboxTree.some(node => node.props.key === 'sent-enquiry'));
+  assert.ok(!inboxTree.some(node => node.props.key === 'own-enquiry'));
+  inboxTree.find(node => node.props.key === 'received').props.onPress();
+  state[0] = [businessRows[1]];
+  inboxTree = renderInbox();
+  assert.ok(inboxTree.some(node => node.children.includes('No enquiries received yet')));
+  assert.ok(!inboxTree.some(node => node.props.key === 'sent-enquiry'));
   await messaging.sendFeedbackMessage({ user, profile, text: 'First contact' });
   assert.equal(callableRequest.name, 'submitSupportRequest');
   assert.equal(callableRequest.data.kind, 'app-feedback');

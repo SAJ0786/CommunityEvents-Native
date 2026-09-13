@@ -25,7 +25,7 @@ const EVENT_ITEMS = [
 const BUSINESS_ITEMS = [
   { key: 'profile', label: 'My Profile', icon: 'account-outline', tone: 'purple', authOnly: true },
   { key: 'business-notifications', label: 'Notifications', icon: 'bell-outline', tone: 'teal', authOnly: true },
-  { key: 'business-inbox', label: 'Business Inbox', icon: 'inbox-outline', tone: 'purple', authOnly: true },
+  { key: 'business-inbox', label: 'Business messaging', icon: 'inbox-outline', tone: 'purple', authOnly: true },
   { key: 'business-admin', label: 'Admin Dashboard', icon: 'shield-crown-outline', tone: 'blue', adminOnly: true },
   { key: 'help-policies', route: 'profile', label: 'Help & Policies', icon: 'help-circle-outline', tone: 'teal' },
   { key: 'share-app', label: 'Share App', icon: 'share-variant-outline', tone: 'amber' },

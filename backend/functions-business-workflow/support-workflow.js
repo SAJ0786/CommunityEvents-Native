@@ -90,6 +90,24 @@ function register({ admin, db, onCall, onDocumentCreated, HttpsError, REGION, EM
     const ownerMatches = clean(route.active === true ? route.ownerUid : business.ownerId) === thread.ownerUid;
     const sender = (await db.collection('users').doc(message.senderUid).get()).data() || {};
     const reference = digest(`enquiry:${event.params.threadId}:${event.params.messageId}`);
+    // A notification is independent of email availability. Use the message's
+    // stable reference so trigger retries do not duplicate or reset read state.
+    // Never copy enquiries to admins or a replacement business owner.
+    if (ownerMatches && clean(thread.ownerUid) && thread.ownerUid !== message.senderUid
+      && thread.participantUids?.includes(thread.ownerUid)
+      && thread.participantUids?.includes(message.senderUid)) {
+      try {
+        await db.collection('userNotifications').doc(`business-enquiry-${reference}`).create({
+          recipientUid: thread.ownerUid,
+          type: 'business-enquiry', module: 'directory',
+          title: 'New business enquiry',
+          body: `${clean(sender.fullName || message.senderName) || 'A customer'} sent an enquiry about ${clean(thread.businessName) || 'your business'}. Open Business messaging → Inbox to read and reply.`,
+          icon: 'message-text-outline',
+          businessId: thread.businessId, threadId: event.params.threadId,
+          read: false, createdAt: timestamp(),
+        });
+      } catch (error) { if (error.code !== 6 && error.code !== 'already-exists') throw error; }
+    }
     try {
       await db.collection('supportEmailOutbox').doc(reference).create({
         kind: 'business-enquiry', category: 'Contact Business', businessId: thread.businessId, businessName: thread.businessName,

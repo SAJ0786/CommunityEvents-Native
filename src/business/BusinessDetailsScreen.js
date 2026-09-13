@@ -128,7 +128,7 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
       const result = await sendBusinessMessage({ business, user, profile, text: contactText });
       if (result?.isNew) onTrackAction?.('message_enquiry', { threadId: result.threadId });
       setContactText('');
-      setContactStatus('Message sent. Follow the conversation from Business Inbox.');
+      setContactStatus('Message sent. Follow the conversation in Business messaging → Sent messages.');
     } catch (error) {
       setContactStatus(error?.message || 'Could not send this message.');
     } finally { setContactBusy(false); }
