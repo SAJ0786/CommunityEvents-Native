@@ -1,5 +1,6 @@
 'use strict';
 const { createHash } = require('node:crypto');
+const { renderEmail, detailRows, escapeHtml, emailBrand } = require('./email-template');
 const SUPPORT = 'support@siza.info';
 const APP_CATEGORIES = ['App feedback / suggestion', 'Technical problem', 'Account / login issue', 'Privacy enquiry', 'Other'];
 const BUSINESS_CATEGORIES = ['Incorrect information', 'Misleading or unsafe conduct', 'Suspected fraud or impersonation', 'Inappropriate content', 'Business closed', 'Other'];
@@ -7,7 +8,6 @@ const clean = value => String(value || '').trim();
 const validEmail = value => /^[^\s@<>\r\n]+@[^\s@<>\r\n]+\.[^\s@<>\r\n]+$/.test(value) && value.length <= 254;
 const digest = value => createHash('sha256').update(value).digest('hex');
 const cityOf = value => clean(value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'sydney';
-const escapeHtml = value => clean(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function adminEmails(users, city) {
   return [...new Set(users.filter(user => user.active !== false && user.isActive !== false
@@ -24,11 +24,15 @@ function buildEmail(job, reference) {
     ['Email verification', job.senderEmailVerified ? 'Verified account email' : 'User-provided / profile email'],
     ['Category', job.category], ['Submitted', job.submittedAt],
   ].filter(([, value]) => value);
+  const module = ['business-report', 'business-enquiry'].includes(job.kind) ? 'directory' : undefined;
+  const subjectTitle = `${title}${job.businessName ? `: ${clean(job.businessName).replace(/[\r\n]/g, ' ').slice(0, 120)}` : ''}`;
   return {
-    from: { name: 'Community Connect Australia', address: SUPPORT }, replyTo: SUPPORT,
-    subject: `${title}${job.businessName ? `: ${clean(job.businessName).replace(/[\r\n]/g, ' ').slice(0, 120)}` : ''} [${reference.slice(0, 12)}]`,
-    text: `${title}\n\n${details.map(([k, v]) => `${k}: ${v}`).join('\n')}\n\nMessage:\n${job.message}\n\nReplies to this notification go to ${SUPPORT}.`,
-    html: `<div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#15233b"><h1 style="background:#138477;color:white;padding:20px">${title}</h1><table style="width:100%">${details.map(([k, v]) => `<tr><th style="text-align:left;padding:8px;vertical-align:top">${escapeHtml(k)}</th><td style="padding:8px">${escapeHtml(v)}</td></tr>`).join('')}</table><h2>Message</h2><div style="white-space:pre-wrap;padding:16px;background:#f2f8f7">${escapeHtml(job.message)}</div><p>Replies go to ${SUPPORT}.</p></div>`,
+    from: { name: emailBrand(module), address: SUPPORT }, replyTo: SUPPORT,
+    subject: `${subjectTitle} [${reference.slice(0, 12)}]`,
+    ...renderEmail({ module, title: subjectTitle,
+      bodyText: `${details.map(([k, v]) => `${k}: ${v}`).join('\n')}\n\nMessage:\n${job.message}`,
+      bodyHtml: `${detailRows(details)}<h2 style="margin:20px 0 8px;font-size:18px;line-height:1.4">Message</h2><div style="white-space:pre-wrap;padding:16px;background:#f2f8f7;border-radius:8px;overflow-wrap:anywhere">${escapeHtml(job.message)}</div>`,
+    }),
     headers: { 'Auto-Submitted': 'auto-generated', 'X-Auto-Response-Suppress': 'All' },
   };
 }

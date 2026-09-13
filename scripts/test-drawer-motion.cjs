@@ -75,6 +75,10 @@ assert.equal(pan.onStartShouldSetPanResponder(), false);
 assert.equal(pan.onMoveShouldSetPanResponder(null, { dy: 5, dx: 1 }), true);
 assert.equal(pan.onMoveShouldSetPanResponder(null, { dy: 5, dx: 20 }), false);
 assert.equal(pan.onMoveShouldSetPanResponder(null, { dy: -30, dx: 0 }), false);
+assert.equal(pan.onMoveShouldSetPanResponderCapture(null, { dy: 5, dx: 1 }), true, 'header must capture downward drags before nested Text/Pressable controls');
+assert.equal(pan.onMoveShouldSetPanResponderCapture(null, { dy: 1, dx: 0 }), false, 'a tap on Close must not become a drag');
+assert.equal(pan.onMoveShouldSetPanResponderCapture(null, { dy: 5, dx: 20 }), false, 'horizontal motion remains available to children');
+assert.equal(pan.onMoveShouldSetPanResponderCapture(null, { dy: -30, dx: 0 }), false, 'upward drags must not dismiss');
 pan.onPanResponderGrant();
 assert.equal(h.animations[0].finished, true, 'drag must stop the opening spring');
 pan.onPanResponderMove(null, { dy: 20 });
@@ -95,6 +99,7 @@ drawer.requestClose();
 pan.onPanResponderTerminate();
 assert.equal(h.animations.length, count, 'no duplicate close or spring-back during dismissal');
 assert.equal(pan.onMoveShouldSetPanResponder(null, { dy: 20, dx: 0 }), false);
+assert.equal(pan.onMoveShouldSetPanResponderCapture(null, { dy: 20, dx: 0 }), false, 'do not recapture while already dismissing');
 closing.finish();
 assert.equal(h.calls.join(','), 'close');
 

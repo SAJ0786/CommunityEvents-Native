@@ -1,0 +1,384 @@
+<title>Deep Stories — Featured Story Index</title>
+<style>
+  :root{
+    --bg:#f7f2e7; --surface:#fffaf0; --ink:#241a0f; --muted:#6b5a44;
+    --accent:#b6802c; --accent-ink:#5e4210; --line:#e2d5bd; --line-strong:#d6c39e;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#1b140c; --surface:#241c12; --ink:#f3e9d6; --muted:#b9a483;
+           --accent:#d99f3f; --accent-ink:#f6dba3; --line:#3a2e1c; --line-strong:#4a3b23; }
+  }
+  :root[data-theme="dark"]{
+    --bg:#1b140c; --surface:#241c12; --ink:#f3e9d6; --muted:#b9a483;
+    --accent:#d99f3f; --accent-ink:#f6dba3; --line:#3a2e1c; --line-strong:#4a3b23;
+  }
+  :root[data-theme="light"]{
+    --bg:#f7f2e7; --surface:#fffaf0; --ink:#241a0f; --muted:#6b5a44;
+    --accent:#b6802c; --accent-ink:#5e4210; --line:#e2d5bd; --line-strong:#d6c39e;
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Avenir Next','Avenir',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .serif{font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif}
+
+  .wrap{max-width:760px;margin:0 auto;padding:56px 24px 100px}
+
+  /* ── masthead ─────────────────────────────────────────────── */
+  header.masthead{display:flex;align-items:flex-start;gap:16px;margin-bottom:8px}
+  .mark{flex:0 0 auto;margin-top:4px}
+  .mast-text h1{
+    font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
+    font-size:clamp(28px,4vw,36px);font-weight:600;letter-spacing:-.01em;margin:0 0 4px;
+    text-wrap:balance;color:var(--ink);
+  }
+  .mast-text .kicker{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent-ink);font-weight:600}
+  .intro{color:var(--muted);font-size:15.5px;line-height:1.65;max-width:62ch;margin:22px 0 6px}
+  .meta-row{display:flex;flex-wrap:wrap;gap:8px 18px;margin:22px 0 44px;
+    padding:14px 18px;background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    font-size:13px;color:var(--muted)}
+  .meta-row b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .meta-row span{white-space:nowrap}
+
+  /* ── collection jump nav ──────────────────────────────────── */
+  nav.jump{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 48px}
+  nav.jump a{font-size:12.5px;color:var(--muted);text-decoration:none;
+    border:1px solid var(--line);border-radius:999px;padding:6px 13px;
+    display:inline-flex;align-items:center;gap:7px;transition:border-color .15s,color .15s}
+  nav.jump a:hover{border-color:var(--dot);color:var(--ink)}
+  nav.jump i{width:8px;height:8px;border-radius:50%;background:var(--dot);display:inline-block}
+
+  /* ── collection sections ──────────────────────────────────── */
+  section.coll{margin-bottom:56px;scroll-margin-top:20px}
+  .coll-head{display:flex;align-items:center;gap:16px;margin-bottom:22px;
+    padding-bottom:14px;border-bottom:2px solid var(--dot)}
+  .coll-cover{flex:0 0 auto;width:44px;height:60px;border-radius:3px;object-fit:cover;
+    box-shadow:0 1px 3px rgba(0,0,0,.25);background:var(--line)}
+  .coll-cover.empty{display:flex;align-items:center;justify-content:center;
+    background:color-mix(in srgb, var(--dot) 16%, var(--surface));
+    color:var(--dot);font-size:20px}
+  .coll-title{font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
+    font-size:21px;font-weight:600;color:var(--ink);margin:0 0 2px;text-wrap:balance}
+  .coll-sub{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--dot);
+    font-weight:600}
+
+  ol.stories{list-style:none;margin:0;padding:0;
+    display:flex;flex-direction:column;gap:2px}
+  .story{display:grid;grid-template-columns:38px 1fr;gap:14px;padding:16px 12px;
+    border-radius:8px;transition:background .15s}
+  .story:hover{background:var(--surface)}
+  .story .num{font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
+    font-size:15px;font-weight:600;color:var(--dot);
+    display:flex;align-items:center;justify-content:center;
+    width:34px;height:34px;border-radius:50%;
+    background:color-mix(in srgb, var(--dot) 14%, var(--surface));
+    font-variant-numeric:tabular-nums;margin-top:1px}
+  .story-body a.title{font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
+    font-size:17.5px;font-weight:600;color:var(--ink);text-decoration:none;
+    display:inline-block;text-wrap:balance;line-height:1.3}
+  .story-body a.title:hover{color:var(--dot)}
+  .story-body a.title:focus-visible{outline:2px solid var(--dot);outline-offset:3px;border-radius:2px}
+  .story-body .brief{color:var(--muted);font-size:14px;line-height:1.6;margin:6px 0 8px;max-width:58ch}
+  .read-link{font-size:12.5px;color:var(--dot);text-decoration:none;font-weight:600;
+    display:inline-flex;align-items:center;gap:5px}
+  .read-link:hover{text-decoration:underline}
+  .read-link:focus-visible{outline:2px solid var(--dot);outline-offset:3px;border-radius:2px}
+
+  footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:12.5px;line-height:1.7}
+  footer code{background:var(--surface);border:1px solid var(--line);border-radius:5px;
+    padding:1px 6px;font-size:12px}
+
+  @media (max-width:520px){
+    .wrap{padding:40px 16px 80px}
+    .story{grid-template-columns:30px 1fr;gap:10px;padding:14px 8px}
+    .story .num{width:28px;height:28px;font-size:13px}
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <svg class="mark" width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M20 5c-4 4-7 8-7 13s3 9 7 13c4-4 7-8 7-13s-3-9-7-13z" stroke="var(--accent)" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M20 15c-1.6 2-2.7 3.8-2.7 6s1.1 4 2.7 6c1.6-2 2.7-3.8 2.7-6s-1.1-4-2.7-6z" fill="var(--accent)" opacity=".85"/>
+      <path d="M13 33h14" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M20 31v3" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>
+    <div class="mast-text">
+      <div class="kicker">Share My Books · Deep Stories</div>
+      <h1>Featured Story Index</h1>
+    </div>
+  </header>
+
+  <p class="intro">Every story currently live across the five Deep Stories collections, in reading order, with a
+    direct link to its chapter and a one-line hook. Click a title to open it straight in the reader — nothing to
+    copy or retype.</p>
+
+  <div class="meta-row">
+    <span><b>35</b> stories</span>
+    <span><b>5</b> collections</span>
+    <span>Updated with <b>The Nest: Hold Fast</b> (stations six–ten)</span>
+  </div>
+
+  <nav class="jump" aria-label="Jump to collection">
+    <a href="#lanterns" style="--dot:#7c8f6a"><i></i>Lanterns of the Heart</a>
+    <a href="#keepers" style="--dot:#a85c3f"><i></i>The Lantern Keepers</a>
+    <a href="#nest1" style="--dot:#4f7a7a"><i></i>The Nest: Stations of the Heart</a>
+    <a href="#nest2" style="--dot:#7d5a7c"><i></i>The Nest: Hold Fast</a>
+    <a href="#truthful" style="--dot:#4a5578"><i></i>The Truthful Life</a>
+  </nav>
+
+  <!-- ── Lanterns of the Heart ─────────────────────────────── -->
+  <section class="coll" id="lanterns" style="--dot:#7c8f6a">
+    <div class="coll-head">
+      <div class="coll-cover empty" aria-hidden="true">🏮</div>
+      <div>
+        <p class="coll-title">Lanterns of the Heart</p>
+        <p class="coll-sub">10 stories · English</p>
+      </div>
+    </div>
+    <ol class="stories">
+      <li class="story"><span class="num">1</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=2" target="_blank" rel="noopener">The Great Lunchbox Economy</a>
+        <p class="brief">The school bans the tuck shop and overnight lunchboxes become treasure. Nobody planned for Yusuf to become the richest kid in Grade 5 — so what will he do with a fortune in snacks?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=2" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">2</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=3" target="_blank" rel="noopener">The Apology Olympics</a>
+        <p class="brief">Bilal holds the school record for the longest grudge: three years, over a dinosaur drawing someone called "a potato with legs." Can a grudge that big ever be put down?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=3" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">3</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=4" target="_blank" rel="noopener">The Gratitude Heist</a>
+        <p class="brief">Zara complains about everything. Then her eight-year-old cousin Musa quietly plans something that will flip her whole world. What exactly is the heist?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=4" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">4</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=5" target="_blank" rel="noopener">The Worst Substitute King</a>
+        <p class="brief">Tariq wins Head Boy by a single vote — his own. Power goes straight to his head. How far does the worst king in school history have to fall?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=5" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">5</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=6" target="_blank" rel="noopener">The Tree That Was Definitely Going to Lose</a>
+        <p class="brief">Maryam drops her seed down a drain and secretly plants a wrinkled apple pip instead. Everyone laughs at her pot of "brown dirt" — but is she really losing?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=6" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">6</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=7" target="_blank" rel="noopener">The Smallest Voice</a>
+        <p class="brief">New girl Noor speaks so softly you have to lean in. Who will stand up for the quietest kid in class?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=7" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">7</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=8" target="_blank" rel="noopener">Exhibit B</a>
+        <p class="brief">Junaid finds a fat leather wallet the day before the school trip he can't afford. The exact money he needs is right there in his hand — now what?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=8" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">8</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=9" target="_blank" rel="noopener">The Mic Is On</a>
+        <p class="brief">The school council is a joke where the loudest kids decide everything. What happens when the smallest voice refuses to sit back down?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=9" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">9</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=10" target="_blank" rel="noopener">The Robot That Quit</a>
+        <p class="brief">Rehan is a champion quitter. He and Imran build a robot to help blind students find dropped things… and then it breaks. Does the quitter quit one last time?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=10" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">10</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=11" target="_blank" rel="noopener">The Secret War of Kindness</a>
+        <p class="brief">It began as a legendary prank war. Then one uncle's Ramadan story turns the whole war upside down. Who wins when the weapon becomes kindness?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/lanterns-of-the-heart?ch=11" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+    </ol>
+  </section>
+
+  <!-- ── The Lantern Keepers ───────────────────────────────── -->
+  <section class="coll" id="keepers" style="--dot:#a85c3f">
+    <div class="coll-head">
+      <img class="coll-cover" src="https://sharemybooks.net/api/media/lantern/cover.jpg" alt="" loading="lazy">
+      <div>
+        <p class="coll-title">The Lantern Keepers</p>
+        <p class="coll-sub">10 stories · English</p>
+      </div>
+    </div>
+    <ol class="stories">
+      <li class="story"><span class="num">1</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=1" target="_blank" rel="noopener">The Lantern Keepers</a>
+        <p class="brief">In a valley the sun hasn't touched for a hundred years, every child dreams of becoming a Lantern Keeper. When a Keeper falls in the fog, Zayd must choose: keep his own light, or give it away to save her.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=1" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">2</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=2" target="_blank" rel="noopener">The Watcher of Whistling Mountain</a>
+        <p class="brief">In a village where the wind keeps secrets, Tamin can talk his way out of anything — until the day those little lies start to cost far more than the truth ever would.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=2" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">3</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=3" target="_blank" rel="noopener">The Stone and the Star</a>
+        <p class="brief">Clever, proud Idris is wronged and furious, and revenge is right there for the taking. Will he get even — or rise above it?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=3" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">4</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=4" target="_blank" rel="noopener">The Door That Faced the Wind</a>
+        <p class="brief">An ancient gate that never falls, a promise to guard it, and a city calling Harith away to something bigger. What is a promise really worth when nobody is watching you keep it?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=4" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">5</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=5" target="_blank" rel="noopener">The Tree That Wouldn't Fall</a>
+        <p class="brief">In Bahar, winter lasts nine months and nothing grows — everyone knows it. Stubborn Layla plants a tree anyway.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=5" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">6</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=6" target="_blank" rel="noopener">The Tunnel in the Hills</a>
+        <p class="brief">A "family bonding" hike goes wrong and Zoya is lost in a pitch-black tunnel. In the dark she learns what trust really means: try first, then trust.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=6" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">7</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=7" target="_blank" rel="noopener">The Samosa Case</a>
+        <p class="brief">Every Thursday, one kid always gets the extra samosa, and everyone just lets it happen. Hamza decides today is the day someone finally speaks up.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=7" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">8</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=8" target="_blank" rel="noopener">The Last Runner</a>
+        <p class="brief">Areeb isn't fast — not on the track, not anywhere. He crosses the finish line dead last… and then shows the whole school what being truly "ready" actually means.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=8" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">9</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=9" target="_blank" rel="noopener">The Broken Robot</a>
+        <p class="brief">Five days to the STEM Expo, one robot in pieces, and a boy famous for quitting everything he starts. Does he walk away — or finish, for once?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=9" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">10</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=10" target="_blank" rel="noopener">Operation Sibling Shield</a>
+        <p class="brief">Safiya and Bilal fight like a sitcom gone wrong. Then, at camp, one of them gets hurt — watch how fast a rivalry becomes a shield.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-lantern-keepers?ch=10" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+    </ol>
+  </section>
+
+  <!-- ── The Nest: Stations of the Heart ───────────────────── -->
+  <section class="coll" id="nest1" style="--dot:#4f7a7a">
+    <div class="coll-head">
+      <img class="coll-cover" src="https://sharemybooks.net/static/img/nest/cover.jpg" alt="" loading="lazy">
+      <div>
+        <p class="coll-title">The Nest: Stations of the Heart</p>
+        <p class="coll-sub">5 stories · English</p>
+      </div>
+    </div>
+    <ol class="stories">
+      <li class="story"><span class="num">1</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-nest-stations-of-the-heart?ch=2" target="_blank" rel="noopener">Awakening</a>
+        <p class="brief">Six friends and a parrot share a leaning canal-side shed called the Nest. What finally wakes Bahlo up to the person at the edge of the light?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-nest-stations-of-the-heart?ch=2" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">2</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-nest-stations-of-the-heart?ch=3" target="_blank" rel="noopener">The Turning</a>
+        <p class="brief">Saki remembers everything. But some things you can't recite your way out of. A story about turning back after you've hurt someone.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-nest-stations-of-the-heart?ch=3" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">3</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-nest-stations-of-the-heart?ch=4" target="_blank" rel="noopener">Whose Fault</a>
+        <p class="brief">The stall comes down in four seconds — two days of work flat on the floor. Zara's first instinct is to find who to blame. The reckoning begins with a harder question.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-nest-stations-of-the-heart?ch=4" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">4</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-nest-stations-of-the-heart?ch=5" target="_blank" rel="noopener">The Thing He Was Building</a>
+        <p class="brief">By midnight Mahdi has fixed everything in the shed and is running out of broken things. What is he actually trying to repair?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-nest-stations-of-the-heart?ch=5" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">5</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-nest-stations-of-the-heart?ch=6" target="_blank" rel="noopener">Things That Go Missing</a>
+        <p class="brief">Objects are vanishing from the neighbourhood, and Bahlo is having the best week of his summer — until the trail leads somewhere he really didn't want it to go.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-nest-stations-of-the-heart?ch=6" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+    </ol>
+  </section>
+
+  <!-- ── The Nest: Hold Fast (new) ──────────────────────────── -->
+  <section class="coll" id="nest2" style="--dot:#7d5a7c">
+    <div class="coll-head">
+      <div class="coll-cover empty" aria-hidden="true">🪢</div>
+      <div>
+        <p class="coll-title">The Nest: Hold Fast <span style="font-size:12px;font-weight:600;color:var(--dot);vertical-align:middle;margin-left:6px">NEW</span></p>
+        <p class="coll-sub">5 stories · English</p>
+      </div>
+    </div>
+    <ol class="stories">
+      <li class="story"><span class="num">6</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-nest-hold-fast?ch=2" target="_blank" rel="noopener">The Bird Who Remembered</a>
+        <p class="brief">Ferdowsi says a sentence nobody ever taught him — and it leads to a light that has been out for eleven months. What has the parrot been keeping all this time?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-nest-hold-fast?ch=2" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">7</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-nest-hold-fast?ch=3" target="_blank" rel="noopener">The Rope</a>
+        <p class="brief">An eviction notice, a flood, and a boy in the water: a rope only holds if nobody lets go first. Six friends on a bank, one canal, one chance.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-nest-hold-fast?ch=3" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">8</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-nest-hold-fast?ch=4" target="_blank" rel="noopener">The Fastest Boy on the Towpath</a>
+        <p class="brief">The cool crowd will finally want Idris — if he'll be cruel to the ones who wanted him first. Sometimes the bravest thing your legs will ever do is run away.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-nest-hold-fast?ch=4" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">9</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-nest-hold-fast?ch=5" target="_blank" rel="noopener">The Horse You Can't Punch</a>
+        <p class="brief">Zara tries to fix her whole self in three days flat. A half-wild cat quietly teaches her how real change actually happens.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-nest-hold-fast?ch=5" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">10</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-nest-hold-fast?ch=6" target="_blank" rel="noopener">The One Who Listens</a>
+        <p class="brief">The girl everyone brings their troubles to is quietly falling apart — and no one has thought to listen. Until someone finally does.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-nest-hold-fast?ch=6" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+    </ol>
+  </section>
+
+  <!-- ── The Truthful Life ─────────────────────────────────── -->
+  <section class="coll" id="truthful" style="--dot:#4a5578">
+    <div class="coll-head">
+      <img class="coll-cover" src="https://sharemybooks.net/static/img/truthful/cover.jpg" alt="" loading="lazy">
+      <div>
+        <p class="coll-title">The Truthful Life</p>
+        <p class="coll-sub">5 stories · English</p>
+      </div>
+    </div>
+    <ol class="stories">
+      <li class="story"><span class="num">1</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-truthful-life?ch=2" target="_blank" rel="noopener">The Locker 113 Problem</a>
+        <p class="brief">Forty kids look away at the same time. One quiet girl couldn't.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-truthful-life?ch=2" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">2</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-truthful-life?ch=3" target="_blank" rel="noopener">The Group Chat Knows</a>
+        <p class="brief">My cat, Biryani, has exactly one facial expression: I am not impressed.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-truthful-life?ch=3" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">3</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-truthful-life?ch=4" target="_blank" rel="noopener">Things That Go Missing</a>
+        <p class="brief">I solved my first real case completely wrong, in front of everyone. It's the best thing I've ever done.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-truthful-life?ch=4" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">4</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-truthful-life?ch=5" target="_blank" rel="noopener">What the House Remembers</a>
+        <p class="brief">For forty years the answer sat in a cage, saying his name in her voice, to a family that had stopped listening.</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-truthful-life?ch=5" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+      <li class="story"><span class="num">5</span><div class="story-body">
+        <a class="title" href="https://sharemybooks.net/read/deepstories/the-truthful-life?ch=6" target="_blank" rel="noopener">The Truth About Me</a>
+        <p class="brief">Before you hear anyone else's version, hear mine. That's only fair. Right?</p>
+        <a class="read-link" href="https://sharemybooks.net/read/deepstories/the-truthful-life?ch=6" target="_blank" rel="noopener">Read chapter →</a>
+      </div></li>
+    </ol>
+  </section>
+
+  <footer>
+    <p>Every title links straight to <code>sharemybooks.net</code> — no copying, no retyping. Source data pulled live
+      from the Deep Stories catalog; chapter links point to their exact position with <code>?ch=</code>.</p>
+    <p>The <code>.xlsx</code> built from this same data (for the Community Events import) lives at
+      <code>Downloads/Community_Events_Featured_STORIES_DeepStories_EN.xlsx</code> on your Mac — an actual
+      spreadsheet file still has to be attached to the email itself, since this page can't become a file
+      attachment. This page is the readable, clickable view of the same 35 rows.</p>
+  </footer>
+
+</div>
+

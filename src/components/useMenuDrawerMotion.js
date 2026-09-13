@@ -64,16 +64,22 @@ export default function useMenuDrawerMotion({ visible, onClose }) {
     restoreSheet();
   }, [requestClose, restoreSheet]);
 
+  const shouldCaptureDrag = useCallback((_, gesture) => !closingRef.current
+    && gesture.dy > 3 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.15, []);
+
   const responder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, gesture) => !closingRef.current
-      && gesture.dy > 3 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.15,
+    // Native Modal headers contain Text/Pressable descendants. Claim a real
+    // downward drag during capture, before a child can consume the responder
+    // event. No capture at touch-down: close buttons and other taps still work.
+    onMoveShouldSetPanResponderCapture: shouldCaptureDrag,
+    onMoveShouldSetPanResponder: shouldCaptureDrag,
     onPanResponderGrant: () => translateY.stopAnimation(),
     onPanResponderMove: (_, gesture) => { if (!closingRef.current) translateY.setValue(Math.max(0, gesture.dy)); },
     onPanResponderRelease: (_, gesture) => releaseDrag(gesture),
     onPanResponderTerminate: restoreSheet,
     onPanResponderTerminationRequest: () => false,
-  }), [releaseDrag, restoreSheet, translateY]);
+  }), [releaseDrag, restoreSheet, shouldCaptureDrag, translateY]);
 
   return { translateY, requestClose, panHandlers: responder.panHandlers };
 }

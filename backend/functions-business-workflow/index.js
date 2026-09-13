@@ -6,6 +6,7 @@ const { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } = require('fir
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
+const { buildWorkflowEmail, emailBrand } = require('./email-template');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -19,7 +20,7 @@ const EMAIL_SECRETS = [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS];
 const GOOGLE_PLACES_SERVER_API_KEY = defineSecret('GOOGLE_PLACES_SERVER_API_KEY');
 const SUPPORT_EMAIL = 'support@siza.info';
 const BUSINESS_FROM_ADDRESS = SUPPORT_EMAIL;
-const BUSINESS_FROM_NAME = 'Community Businesses Australia';
+const BUSINESS_FROM_NAME = emailBrand('directory');
 const PROFILE_FIELDS = [
   'fullName', 'email', 'phone', 'defaultCity', 'defaultModule',
   'pushNotificationsEnabled', 'smsNotificationsEnabled', 'emailNotificationsEnabled',
@@ -67,15 +68,6 @@ function sameValue(left, right) {
   if (left && typeof left.toMillis === 'function') left = left.toMillis();
   if (right && typeof right.toMillis === 'function') right = right.toMillis();
   return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
-}
-
-function html(value) {
-  return clean(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 function buildTransporter() {
@@ -209,15 +201,14 @@ async function deliver(recipients, notification) {
   const emailRecipients = unique.filter(recipient => recipient.emailNotificationsEnabled !== false && clean(recipient.email));
   const results = await Promise.allSettled(emailRecipients.map(recipient => transporter.sendMail({
     from,
-    replyTo: EMAIL_REPLY_TO,
+    replyTo: SUPPORT_EMAIL,
     headers: {
       'Auto-Submitted': 'auto-generated',
       'X-Auto-Response-Suppress': 'All',
     },
     to: clean(recipient.email),
     subject: notification.title,
-    text: `${notification.title}\n\n${notification.body}\n\nCommunity Businesses Australia\nThis is an automated directory update from Community Connect Australia. Replies are sent to ${SUPPORT_EMAIL}.`,
-    html: `<div style="margin:0;padding:24px;background:#f3f7f6;font-family:Arial,sans-serif;line-height:1.55;color:#10172f"><div style="max-width:620px;margin:0 auto;overflow:hidden;border:1px solid #d7e4e1;border-radius:14px;background:#ffffff"><div style="padding:22px 24px;background:#138477;color:#ffffff"><div style="font-size:12px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;opacity:.86">Community Businesses Australia</div><h1 style="margin:7px 0 0;font-size:25px;line-height:1.25;color:#ffffff">${html(notification.title)}</h1></div><div style="padding:24px"><p style="margin:0;font-size:16px;line-height:1.65">${html(notification.body)}</p><div style="margin-top:22px;padding-top:16px;border-top:1px solid #e3ecea;color:#64727c;font-size:12px">This is an automated Business Directory update from Community Connect Australia. Replies are sent to ${SUPPORT_EMAIL}.</div></div></div></div>`,
+    ...buildWorkflowEmail(notification),
   })));
   results.forEach((result, index) => {
     if (result.status === 'rejected') {

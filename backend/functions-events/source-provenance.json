@@ -1,0 +1,147 @@
+{
+  "importedOn": "2026-09-13",
+  "verifiedArchiveFunction": "sendRemindersNow",
+  "otherFunctionSourcesVerified": false,
+  "metadata": [
+    {
+      "buildConfig": {
+        "entryPoint": "sendPrivateStreamLinkEmail",
+        "source": {
+          "storageSource": {
+            "bucket": "gcf-v2-sources-209723097611-australia-southeast1",
+            "generation": "1786334136007936",
+            "object": "sendPrivateStreamLinkEmail/function-source.zip"
+          }
+        }
+      },
+      "name": "projects/community-event-8b639/locations/australia-southeast1/functions/sendPrivateStreamLinkEmail",
+      "updateTime": "2026-08-10T03:55:52.355928082Z"
+    },
+    {
+      "buildConfig": {
+        "entryPoint": "onReminderEmailJobCreated",
+        "source": {
+          "storageSource": {
+            "bucket": "gcf-v2-sources-209723097611-australia-southeast1",
+            "generation": "1786334122578246",
+            "object": "onReminderEmailJobCreated/function-source.zip"
+          }
+        }
+      },
+      "name": "projects/community-event-8b639/locations/australia-southeast1/functions/onReminderEmailJobCreated",
+      "updateTime": "2026-08-10T03:55:38.027651346Z"
+    },
+    {
+      "buildConfig": {
+        "entryPoint": "monthlyHijriReminder",
+        "source": {
+          "storageSource": {
+            "bucket": "gcf-v2-sources-209723097611-australia-southeast1",
+            "generation": "1786334123086523",
+            "object": "monthlyHijriReminder/function-source.zip"
+          }
+        }
+      },
+      "name": "projects/community-event-8b639/locations/australia-southeast1/functions/monthlyHijriReminder",
+      "updateTime": "2026-08-10T03:55:37.032967145Z"
+    },
+    {
+      "buildConfig": {
+        "entryPoint": "dailyEmailReminders",
+        "source": {
+          "storageSource": {
+            "bucket": "gcf-v2-sources-209723097611-australia-southeast1",
+            "generation": "1786334125431050",
+            "object": "dailyEmailReminders/function-source.zip"
+          }
+        }
+      },
+      "name": "projects/community-event-8b639/locations/australia-southeast1/functions/dailyEmailReminders",
+      "updateTime": "2026-08-10T03:55:36.447762303Z"
+    },
+    {
+      "buildConfig": {
+        "entryPoint": "onEventDeleted",
+        "source": {
+          "storageSource": {
+            "bucket": "gcf-v2-sources-209723097611-australia-southeast1",
+            "generation": "1786334125860857",
+            "object": "onEventDeleted/function-source.zip"
+          }
+        }
+      },
+      "name": "projects/community-event-8b639/locations/australia-southeast1/functions/onEventDeleted",
+      "updateTime": "2026-08-10T03:55:43.341969793Z"
+    },
+    {
+      "buildConfig": {
+        "entryPoint": "onUserCreated",
+        "source": {
+          "storageSource": {
+            "bucket": "gcf-v2-sources-209723097611-australia-southeast1",
+            "generation": "1786334126048901",
+            "object": "onUserCreated/function-source.zip"
+          }
+        }
+      },
+      "name": "projects/community-event-8b639/locations/australia-southeast1/functions/onUserCreated",
+      "updateTime": "2026-08-10T03:55:43.311003124Z"
+    },
+    {
+      "buildConfig": {
+        "entryPoint": "sendRemindersNow",
+        "source": {
+          "storageSource": {
+            "bucket": "gcf-v2-sources-209723097611-australia-southeast1",
+            "generation": "1786334124438795",
+            "object": "sendRemindersNow/function-source.zip"
+          }
+        }
+      },
+      "name": "projects/community-event-8b639/locations/australia-southeast1/functions/sendRemindersNow",
+      "updateTime": "2026-08-10T03:55:38.273841548Z"
+    },
+    {
+      "buildConfig": {
+        "entryPoint": "onEventCreated",
+        "source": {
+          "storageSource": {
+            "bucket": "gcf-v2-sources-209723097611-australia-southeast1",
+            "generation": "1786334123514682",
+            "object": "onEventCreated/function-source.zip"
+          }
+        }
+      },
+      "name": "projects/community-event-8b639/locations/australia-southeast1/functions/onEventCreated",
+      "updateTime": "2026-08-10T03:55:50.306249797Z"
+    },
+    {
+      "buildConfig": {
+        "entryPoint": "sendEditOtp",
+        "source": {
+          "storageSource": {
+            "bucket": "gcf-v2-sources-209723097611-australia-southeast1",
+            "generation": "1786334126037321",
+            "object": "sendEditOtp/function-source.zip"
+          }
+        }
+      },
+      "name": "projects/community-event-8b639/locations/australia-southeast1/functions/sendEditOtp",
+      "updateTime": "2026-08-10T03:55:43.344789337Z"
+    },
+    {
+      "buildConfig": {
+        "entryPoint": "onAiReportCreated",
+        "source": {
+          "storageSource": {
+            "bucket": "gcf-v2-sources-209723097611-australia-southeast1",
+            "generation": "1786334122416574",
+            "object": "onAiReportCreated/function-source.zip"
+          }
+        }
+      },
+      "name": "projects/community-event-8b639/locations/australia-southeast1/functions/onAiReportCreated",
+      "updateTime": "2026-08-10T03:55:38.021175042Z"
+    }
+  ]
+}
