@@ -56,7 +56,6 @@ export default ({ config }) => ({
   extra: {
     ...(config.extra || {}),
     androidCertificateSha1,
-    testBuild: releaseMode !== 'production',
     appCheckProvider,
     ...(appCheckDebugToken ? { appCheckDebugToken } : {}),
     eas: {

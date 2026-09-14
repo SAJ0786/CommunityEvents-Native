@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import ScrollView from '../components/KeyboardAwareScrollView';
-import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import CompactSelect from '../components/CompactSelect';
@@ -13,7 +12,6 @@ import { LEGAL_DOCUMENT_VERSION, LEGAL_URLS } from '../config/legal';
 import { openExternalUrl } from '../utils/openExternalUrl';
 import { formatAbn, isValidAbn, lookupBusinessAbnForSubmission, normalizeAbn, validateBusinessPayload } from '../services/businesses';
 
-const IS_TEST_BUILD = Constants.expoConfig?.extra?.testBuild !== false;
 const LISTING_TERMS_VERSION = LEGAL_DOCUMENT_VERSION;
 
 const DAYS = [
@@ -331,13 +329,7 @@ export default function BusinessListingForm({
 
   return (
     <ScrollView contentContainerStyle={[styles.content, compactLayout && styles.contentCompact]} keyboardShouldPersistTaps="handled">
-      {IS_TEST_BUILD ? (
-        <View style={styles.testNotice}>
-          <Text style={styles.testNoticeTitle}>TEST BUILD</Text>
-          <Text style={styles.testNoticeText}>Use fictional or authorised test information only. Do not submit real business or personal data before the public store launch.</Text>
-        </View>
-      ) : null}
-      <View style={styles.titleRow}>
+        <View style={styles.titleRow}>
         <View style={styles.titleCopy}>
           <Text style={styles.eyebrow}>{initialBusiness?.id ? 'EDIT LISTING' : 'NEW LISTING'}</Text>
           <Text style={styles.title}>{initialBusiness?.id ? 'Update your business' : 'Add your business'}</Text>
@@ -542,9 +534,6 @@ export default function BusinessListingForm({
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
   contentCompact: { paddingHorizontal: spacing.md },
-  testNotice: { marginBottom: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: '#d99b28', borderRadius: radius.md, backgroundColor: '#fff7df' },
-  testNoticeTitle: { color: '#7a4a00', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  testNoticeText: { marginTop: 4, color: '#6a4b13', fontSize: 11, lineHeight: 16, fontWeight: '700' },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.lg },
   titleCopy: { flex: 1, minWidth: 0 },
   eyebrow: { color: colors.tealDark, fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },

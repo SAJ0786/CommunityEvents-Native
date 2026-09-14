@@ -55,8 +55,7 @@
     },
     "extra": {
       "firebaseProjectId": "community-event-8b639",
-      "androidCertificateSha1": "5E8F16062EA3CD2C4A0D547876BAA6F38CABF625",
-      "testBuild": true
+      "androidCertificateSha1": "5E8F16062EA3CD2C4A0D547876BAA6F38CABF625"
     },
     "plugins": [
       [

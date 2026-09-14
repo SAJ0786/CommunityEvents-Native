@@ -61,7 +61,7 @@ export default function AddressAutocomplete({
   const changeText = text => {
     selectedTextRef.current = '';
     setQuery(text);
-    setError(isGooglePlacesConfigured() ? '' : 'Google address search is unavailable in this build. Please install the latest test APK.');
+    setError(isGooglePlacesConfigured() ? '' : 'Google address search is unavailable in this build. Please check your connection or contact support.');
     onChange?.({
       ...value,
       placeId: '',
@@ -105,7 +105,7 @@ export default function AddressAutocomplete({
           editable={!selecting}
           onChangeText={changeText}
           onFocus={() => {
-            if (!configured) setError('Google address search is unavailable in this build. Please install the latest test APK.');
+            if (!configured) setError('Google address search is unavailable in this build. Please check your connection or contact support.');
           }}
           placeholder={placeholder}
           placeholderTextColor={colors.muted}
@@ -136,7 +136,7 @@ export default function AddressAutocomplete({
       {verified ? (
         <Text style={styles.verified}>✓ {value.suburb}, {value.state} {value.postcode} · GPS saved</Text>
       ) : !configured ? (
-        <Text style={styles.helper}>Address search requires the latest configured test build.</Text>
+        <Text style={styles.helper}>Address search is temporarily unavailable. You can enter the address manually.</Text>
       ) : (
         <Text style={styles.helper}>Select an Australian address from the Google suggestions.</Text>
       )}
