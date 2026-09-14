@@ -174,7 +174,12 @@ async function main() {
   assert.match(read('src/components/EventDetailsModal.js'), /styles.sheetHeader\} \{\.\.\.panHandlers\}/);
   assert.match(read('src/components/KeyboardAwareScrollView.js'), /input !== focused.current/);
   assert.match(read('src/components/NotificationsDrawer.js'), /BusinessNotificationsScreen.*user=\{user\}/);
-  assert.doesNotMatch(read('src/components/InboxScreen.js'), /onOpenFeedback/);
+  const hostInbox = read('src/components/InboxScreen.js');
+  assert.doesNotMatch(hostInbox, /onOpenFeedback/);
+  assert.match(hostInbox, /if \(selected\) \{[\s\S]*Write a reply or follow-up/);
+  assert.match(hostInbox, /setSelectedId\(''\)/, 'Host Inbox must provide a back path from the thread');
+  assert.doesNotMatch(hostInbox, /setSelectedId\(current => current \|\| rows\[0\]\?\.id/,
+    'Host Inbox must not open the first thread automatically');
   assert.doesNotMatch(read('src/business/BusinessInboxScreen.js'), /onOpenFeedback/);
   assert.match(read('src/components/ProfileScreen.js'), /Feedback &amp; Report a Problem/);
   assert.match(read('src/business/BusinessDetailsScreen.js'), /Report a Problem/);

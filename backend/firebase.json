@@ -9,6 +9,10 @@
     {
       "source": "functions-business-workflow",
       "codebase": "business-workflow"
-    }
+    },
+    {
+  "source": "functions-events",
+  "codebase": "events-email"
+}
   ]
 }

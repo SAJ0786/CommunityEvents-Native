@@ -50,7 +50,6 @@ export default function InboxScreen({ user, profile, onBack }) {
       setThreads(rows);
       setLoading(false);
       setLoadError('');
-      setSelectedId(current => current || rows[0]?.id || '');
     }, error => {
       setLoading(false);
       setLoadError(error?.message || 'Could not load host messages.');
@@ -95,6 +94,54 @@ export default function InboxScreen({ user, profile, onBack }) {
           <NativeBackButton onPress={onBack} />
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // Keep the inbox as a compact conversation list. Opening a thread replaces
+  // the list with the complete message history and composer; this avoids
+  // showing the same conversation twice on one screen.
+  if (selected) {
+    return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.screen}>
+        <View style={styles.conversationHeader}>
+          <NativeBackButton accessibilityLabel="Back to host inbox" onPress={() => setSelectedId('')} />
+          <View style={styles.headerCopy}>
+            <Text style={styles.title}>{selected.eventTitle || 'Event message'}</Text>
+            <Text style={styles.subtitle}>Host: {selected.hostName || 'Host'}</Text>
+          </View>
+        </View>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.conversationContent}>
+          {messages.length ? messages.map(message => {
+            const mine = message.senderUid === user.uid;
+            return (
+              <View key={message.id} style={[styles.messageBubble, mine ? styles.messageBubbleMine : styles.messageBubbleOther]}>
+                <Text style={[styles.messageSender, mine && styles.messageSenderMine]}>{mine ? 'You' : (message.senderName || 'Sender')}</Text>
+                <Text style={[styles.messageText, mine && styles.messageTextMine]}>{message.text}</Text>
+                <Text style={[styles.messageTime, mine && styles.messageTimeMine]}>{formatDateTime(message.createdAt)}</Text>
+              </View>
+            );
+          }) : <Text style={styles.emptyText}>Loading conversation…</Text>}
+        </ScrollView>
+        <View style={styles.composer}>
+          <TextInput
+            multiline
+            value={reply}
+            onChangeText={setReply}
+            placeholder="Write a reply or follow-up…"
+            placeholderTextColor={colors.muted}
+            style={styles.textarea}
+            textAlignVertical="top"
+          />
+          <Pressable
+            onPress={handleReply}
+            disabled={sending || !reply.trim()}
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, (sending || !reply.trim()) && styles.disabled]}
+          >
+            {sending ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>Send Reply</Text>}
+          </Pressable>
+          {status ? <Text style={styles.statusText}>{status}</Text> : null}
+        </View>
       </KeyboardAvoidingView>
     );
   }
@@ -197,6 +244,7 @@ const styles = StyleSheet.create({
   card: { padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   centerCard: { padding: spacing.xl, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, alignItems: 'center', gap: spacing.md, ...shadow },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  conversationHeader: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
   headerCopy: { flex: 1 },
   title: { color: colors.navy, fontSize: 28, fontWeight: '700' },
   subtitle: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: spacing.xs },
