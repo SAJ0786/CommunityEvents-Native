@@ -605,6 +605,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   sheetHeader: {
+    minHeight: 78,
+    zIndex: 20,
+    elevation: 20,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,

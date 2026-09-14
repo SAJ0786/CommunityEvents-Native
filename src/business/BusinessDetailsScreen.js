@@ -269,13 +269,14 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
           <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setContactOpen(false)} />
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
             style={styles.contactKeyboard}
           >
           <ScrollView
             bounces={false}
             contentContainerStyle={styles.contactScrollContent}
             keyboardShouldPersistTaps="handled"
-            automaticallyAdjustKeyboardInsets={false}
+            automaticallyAdjustKeyboardInsets
           >
           <View style={styles.contactCard}>
             <Text style={styles.contactTitle}>Contact {business.name}</Text>
@@ -375,9 +376,9 @@ const styles = StyleSheet.create({
   emptyCard: { alignItems: 'center', padding: spacing.xl, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   emptyTitle: { color: colors.navy, fontSize: 18, fontWeight: '700' },
   emptyText: { marginTop: spacing.sm, color: colors.muted, fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  contactModal: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(15,23,42,0.46)' },
-  contactKeyboard: { flex: 1, width: '100%' },
-  contactScrollContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.sm },
+  contactModal: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', padding: spacing.md, backgroundColor: 'rgba(15,23,42,0.46)' },
+  contactKeyboard: { flex: 1, width: '100%', justifyContent: 'flex-end' },
+  contactScrollContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'flex-end', paddingVertical: spacing.sm },
   contactCard: { width: '100%', maxWidth: 440, maxHeight: '100%', padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   contactTitle: { color: colors.navy, fontSize: 20, fontWeight: '700' }, contactHelp: { marginTop: 4, color: colors.muted, fontSize: 12, lineHeight: 18 },
   contactInput: { minHeight: 130, marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, color: colors.text, textAlignVertical: 'top' },
