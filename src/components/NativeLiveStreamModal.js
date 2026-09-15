@@ -118,19 +118,21 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
     }
   };
 
-  const minimiseStream = async () => {
-    if (!nativeStreamStartedRef.current || endingRef.current) return;
-    if (Platform.OS === 'android' && streaming && StreamingPip?.enterPictureInPicture) {
-      const entered = await StreamingPip.enterPictureInPicture().catch(() => false);
-      if (entered) return;
-    }
-    // A pending system PiP request must not minimise a stream already ended.
-    if (!nativeStreamStartedRef.current || endingRef.current) return;
-    setMinimized(true);
-    if (streaming) setStatus(connectionStateRef.current
-      ? 'LIVE — the broadcast remains connected while you use the app.'
-      : 'Connecting to YouTube. Keep the stream open.');
-  };
+const minimiseStream = () => {
+  if (!nativeStreamStartedRef.current || endingRef.current) return;
+
+  // Do not resize the native camera surface. Resizing it can freeze
+  // RootEncoder/OpenGL capture on Android devices.
+  setMinimized(true);
+
+  if (streaming) {
+    setStatus(
+      connectionStateRef.current
+        ? 'LIVE — the broadcast remains connected while you use the app.'
+        : 'Connecting to YouTube. Keep the stream open.'
+    );
+  }
+};
 
   const restoreStream = () => {
     setMinimized(false);
@@ -584,13 +586,9 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
   return (
     <View pointerEvents="box-none" style={styles.overlayLayer}>
       <SafeAreaView
-        pointerEvents="auto"
-        style={[
-          styles.root,
-          minimized && styles.minimizedRoot,
-          minimized && streamOrientation === 'landscape' && styles.minimizedRootLandscape,
-        ]}
-      >
+  pointerEvents={minimized ? 'none' : 'auto'}
+  style={[styles.root, minimized && styles.streamHostHidden]}
+>
         {!ending && !['phone', 'ending', 'end-error'].includes(step) ? <View style={styles.header}>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>{event.isLive || streaming || step === 'external-live' ? 'LIVE EVENT' : 'EVENT STREAMING'}</Text>
@@ -743,11 +741,6 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
                 {error ? <Text numberOfLines={3} style={styles.streamErrorText}>{error}</Text> : null}
               </View> : null}
             </> : null}
-
-            {minimized ? <Pressable accessibilityLabel="Return to live stream" onPress={restoreStream} style={styles.minimizedTapTarget}>
-              <MaterialCommunityIcons color="#fff" name="arrow-expand-all" size={23} />
-              <Text style={styles.minimizedTapText}>{connected ? 'LIVE' : interrupted ? 'PAUSED' : 'CONNECTING'}</Text>
-            </Pressable> : null}
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -852,6 +845,34 @@ export default function NativeLiveStreamModal({ event, visible, onClose, onStrea
           </View>
         ) : null}
       </SafeAreaView>
+     {minimized ? (
+  <Pressable
+    accessibilityLabel="Return to live stream"
+    onPress={restoreStream}
+    style={({ pressed }) => [
+      styles.floatingStreamController,
+      pressed && styles.pressed,
+    ]}
+  >
+    <View style={[styles.liveDot, connected && styles.liveDotConnected]} />
+
+    <View style={styles.floatingStreamCopy}>
+      <Text style={styles.floatingStreamTitle}>
+        {interrupted
+          ? 'STREAM INTERRUPTED'
+          : connected
+            ? 'LIVE ON YOUTUBE'
+            : 'STREAM CONNECTING'}
+      </Text>
+
+      <Text style={styles.floatingStreamText}>
+        Tap to return to camera
+      </Text>
+    </View>
+
+    <Text style={styles.floatingStreamExpand}>↗</Text>
+  </Pressable>
+) : null} 
     </View>
   );
 }
@@ -860,8 +881,51 @@ const styles = StyleSheet.create({
   overlayLayer: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
   root: { flex: 1, backgroundColor: colors.background },
   endingOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 20, elevation: 20, backgroundColor: colors.background, justifyContent: 'center', padding: spacing.lg, gap: spacing.md },
-  minimizedRoot: { position: 'absolute', right: 12, bottom: 96, width: 168, height: 250, flex: 0, overflow: 'hidden', borderWidth: 2, borderColor: '#ef4444', borderRadius: radius.lg, backgroundColor: '#050b12', ...shadow },
-  minimizedRootLandscape: { width: 248, height: 146 },
+  streamHostHidden: {
+  opacity: 0,
+},
+
+floatingStreamController: {
+  position: 'absolute',
+  right: 14,
+  bottom: 92,
+  width: 218,
+  minHeight: 82,
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 9,
+  padding: 12,
+  borderWidth: 2,
+  borderColor: '#ef4444',
+  borderRadius: radius.lg,
+  backgroundColor: '#050b12',
+  ...shadow,
+},
+
+floatingStreamCopy: {
+  flex: 1,
+},
+
+floatingStreamTitle: {
+  color: '#fff',
+  fontSize: 11,
+  fontWeight: '900',
+  letterSpacing: 0.5,
+},
+
+floatingStreamText: {
+  color: '#dbeafe',
+  fontSize: 10,
+  fontWeight: '700',
+  marginTop: 3,
+},
+
+floatingStreamExpand: {
+  color: '#fff',
+  fontSize: 22,
+  lineHeight: 24,
+  fontWeight: '900',
+},
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
   headerCopy: { flex: 1 },
   eyebrow: { color: colors.danger, fontSize: 11, fontWeight: '700', letterSpacing: 1.2 },

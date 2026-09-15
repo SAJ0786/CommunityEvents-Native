@@ -43,6 +43,8 @@ public final class AndroidRootEncoderLiveStreamView extends FrameLayout
 
     private boolean surfaceReady = false;
     private boolean previewStarted = false;
+    private boolean previewNeedsRestore = false;
+    private int surfaceRestoreAttempts = 0;
     private boolean videoPrepared = false;
     private boolean audioPrepared = false;
     private boolean muted = false;
@@ -173,7 +175,43 @@ public final class AndroidRootEncoderLiveStreamView extends FrameLayout
         }
         postDelayed(this::runPendingStart, 300);
     }
+    private void restorePreviewAfterSurfaceReady() {
+    if (!previewNeedsRestore || !surfaceReady || stopping || released) return;
 
+    try {
+        if (!camera.isOnPreview()) {
+            camera.startPreview(
+                    facing,
+                    WIDTH_720P,
+                    HEIGHT_720P,
+                    FPS,
+                    fixedCaptureRotation
+            );
+        }
+
+        previewStarted = camera.isOnPreview();
+        if (previewStarted) {
+            previewNeedsRestore = false;
+            surfaceRestoreAttempts = 0;
+            return;
+        }
+
+        throw new IllegalStateException("Android preview did not resume.");
+    } catch (Exception error) {
+        surfaceRestoreAttempts++;
+
+        if (surfaceRestoreAttempts <= 4) {
+            postDelayed(this::restorePreviewAfterSurfaceReady, 700);
+        } else {
+            previewNeedsRestore = false;
+            surfaceRestoreAttempts = 0;
+            sendConnectionFailed(
+                    "Camera preview could not resume after minimisation: "
+                            + errorMessage(error)
+            );
+        }
+    }
+}
     private void runPendingStart() {
         if (pendingRequestId == 0 || stopping || released) return;
         int requestId = pendingRequestId;
@@ -258,6 +296,8 @@ public final class AndroidRootEncoderLiveStreamView extends FrameLayout
         }
         videoPrepared = false;
         audioPrepared = false;
+        previewNeedsRestore = false;
+        surfaceRestoreAttempts = 0;
     }
 
     private void scheduleReconnect(String reason) {
@@ -411,21 +451,56 @@ public final class AndroidRootEncoderLiveStreamView extends FrameLayout
     }
 
     @Override
-    public void surfaceCreated(SurfaceHolder holder) {
-        surfaceReady = holder.getSurface() != null && holder.getSurface().isValid();
-        if (surfaceReady && pendingRequestId != 0) postDelayed(this::runPendingStart, 300);
+public void surfaceCreated(SurfaceHolder holder) {
+    surfaceReady = holder.getSurface() != null
+            && holder.getSurface().isValid();
+
+    if (!surfaceReady) return;
+
+    if (pendingRequestId != 0) {
+        postDelayed(this::runPendingStart, 300);
     }
 
-    @Override
-    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        surfaceReady = holder.getSurface() != null && holder.getSurface().isValid();
+    if (previewNeedsRestore) {
+        postDelayed(this::restorePreviewAfterSurfaceReady, 300);
     }
+}
 
-    @Override
-    public void surfaceDestroyed(SurfaceHolder holder) {
-        surfaceReady = false;
+@Override
+public void surfaceChanged(
+        SurfaceHolder holder,
+        int format,
+        int width,
+        int height
+) {
+    surfaceReady = holder.getSurface() != null
+            && holder.getSurface().isValid();
+
+    if (surfaceReady && previewNeedsRestore) {
+        postDelayed(this::restorePreviewAfterSurfaceReady, 300);
     }
+}
 
+@Override
+public void surfaceDestroyed(SurfaceHolder holder) {
+    surfaceReady = false;
+
+    if (stopping || released) return;
+
+    if (previewStarted || camera.isOnPreview() || camera.isStreaming()) {
+        previewNeedsRestore = true;
+        surfaceRestoreAttempts = 0;
+
+        try {
+            // Releases the old camera/GL preview surface only.
+            // It does not end the YouTube RTMP session.
+            camera.stopCamera();
+        } catch (Exception ignored) {
+        }
+
+        previewStarted = false;
+    }
+}
     @Override
     public void onHostResume() {
         // Capture and RTMP stay owned by this view until End Stream is confirmed.
