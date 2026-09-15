@@ -273,6 +273,7 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
             style={styles.contactKeyboard}
           >
           <ScrollView
+            style={styles.contactScroll}
             bounces={false}
             contentContainerStyle={styles.contactScrollContent}
             keyboardShouldPersistTaps="handled"
@@ -378,6 +379,7 @@ const styles = StyleSheet.create({
   emptyText: { marginTop: spacing.sm, color: colors.muted, fontSize: 13, fontWeight: '700', textAlign: 'center' },
   contactModal: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', padding: spacing.md, backgroundColor: 'rgba(15,23,42,0.46)' },
   contactKeyboard: { flex: 1, width: '100%', justifyContent: 'flex-end' },
+  contactScroll: { flex: 1, minHeight: 0, width: '100%' },
   contactScrollContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'flex-end', paddingVertical: spacing.sm },
   contactCard: { width: '100%', maxWidth: 440, maxHeight: '100%', padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   contactTitle: { color: colors.navy, fontSize: 20, fontWeight: '700' }, contactHelp: { marginTop: 4, color: colors.muted, fontSize: 12, lineHeight: 18 },

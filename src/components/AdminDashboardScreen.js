@@ -146,7 +146,7 @@ const LIVE_ACTIONS = [
     local: true,
   },
   {
-    key: 'settings', title: 'Calendar Settings', description: 'Manage Hijri calendar adjustment only.', local: true,
+    key: 'settings', title: 'Calendar Settings', description: 'Manage Hijri Date & Events adjustment only.', local: true,
   },
   {
     key: 'messaging', title: 'Community Messaging', description: 'Community Update and Email Reminders.', local: true,
@@ -2563,7 +2563,30 @@ export default function AdminDashboardScreen({
                           </Text>
                         </Pressable>
                         <Pressable onPress={() => openTransfer(event)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>⇄ Transfer</Text></Pressable>
-                        {event.isLive && event.eventDate < todayIso() ? <Pressable onPress={() => updateEventSubmission(event.id, { isLive: false, liveUrl: '', liveEndedAt: new Date().toISOString() }).then(() => loadAdminEvents(adminEventView)).catch(nextError => Alert.alert('Could not remove stale live status', nextError?.message || 'Please try again.'))} style={styles.ghostButtonDanger}><Text style={styles.ghostButtonDangerText}>Remove Live Stale</Text></Pressable> : null}
+                        {event.isLive ? (
+  <Pressable
+    onPress={() => updateEventSubmission(event.id, {
+      isLive: false,
+      liveUrl: null,
+      liveWatchUrl: null,
+      liveRoomCode: null,
+      liveSource: null,
+      liveAppVisibility: null,
+      liveVideoRecordId: null,
+      liveEndedAt: new Date().toISOString(),
+    })
+      .then(() => loadAdminEvents(adminEventView))
+      .catch(nextError => Alert.alert(
+        'Could not remove live status',
+        nextError?.message || 'Please try again.'
+      ))}
+    style={styles.ghostButtonDanger}
+  >
+    <Text style={styles.ghostButtonDangerText}>
+      Remove Stale Live
+    </Text>
+  </Pressable>
+) : null}
                       </View>
                     ) : null}
 
@@ -2975,7 +2998,7 @@ export default function AdminDashboardScreen({
         </View>
       ) : (
         <View style={styles.section}>
-          <AdminPageHeader title={panel === 'settings' ? 'Calendar Settings' : panel === 'messaging' ? 'Community Messaging' : panel === 'troubleshooting' ? 'Diagnostics Register' : 'Tools'} subtitle={panel === 'settings' ? 'Hijri calendar adjustment only' : panel === 'messaging' ? 'Community updates and email reminders' : panel === 'troubleshooting' ? 'Installation, session and crash investigation' : 'Live connections and utilities'} onBack={() => setPanel('overview')} />
+          <AdminPageHeader title={panel === 'settings' ? 'Calendar Settings' : panel === 'messaging' ? 'Community Messaging' : panel === 'troubleshooting' ? 'Diagnostics Register' : 'Tools'} subtitle={panel === 'settings' ? 'Hijri Dates & Events adjustment only' : panel === 'messaging' ? 'Community updates and email reminders' : panel === 'troubleshooting' ? 'Installation, session and crash investigation' : 'Live connections and utilities'} onBack={() => setPanel('overview')} />
 
           {status.message ? (
             <View style={[styles.noticeBox, status.error ? styles.noticeError : styles.noticeSuccess]}>
@@ -3168,7 +3191,7 @@ export default function AdminDashboardScreen({
             <View style={styles.actionCard}>
               <Text style={styles.cardTitle}>Hijri settings access</Text>
               <Text style={styles.cardDescription}>
-                Hijri Calendar Adjustment follows the PWA access rule and is available to super admins only.
+                Hijri Dates & Events Adjustment follows the PWA access rule and is available to super admins only.
               </Text>
             </View>
           ) : settingsLoading ? (
@@ -3179,7 +3202,7 @@ export default function AdminDashboardScreen({
           ) : (
             <>
               <View style={styles.actionCard}>
-                <Text style={styles.cardTitle}>Hijri Calendar Adjustment</Text>
+                <Text style={styles.cardTitle}>Hijri Dates and Events Adjustment</Text>
                 <Text style={styles.cardDescription}>
                   Select the Gregorian date that corresponds to the 1st of the observed Hijri month. After saving, native recalculates stored event Hijri metadata too.
                 </Text>
@@ -3246,137 +3269,139 @@ export default function AdminDashboardScreen({
                 ) : null}
               </View>
 
-              {false ? <View style={styles.actionCard}>
-                <Text style={styles.cardTitle}>Important Hijri Dates</Text>
-                <Text style={styles.cardDescription}>
-                  Add, edit, disable, or delete the Islamic dates shown in the Hijri Calendar page.
-                </Text>
+              {(
+                <View style={styles.actionCard}>
+                  <Text style={styles.cardTitle}>Important Hijri Dates</Text>
+                  <Text style={styles.cardDescription}>
+                    Add, edit, disable, or delete the Islamic dates shown in the Hijri Calendar page.
+                  </Text>
 
-                <View style={styles.rowWrap}>
-                  <Pressable
-                    onPress={() => resetHijriObservanceForm('__new__')}
-                    style={[styles.secondaryButton, hijriObsSelection === '__new__' && styles.secondaryButtonActive]}
-                  >
-                    <Text style={[styles.secondaryButtonText, hijriObsSelection === '__new__' && styles.secondaryButtonTextActive]}>
-                      New Important Date
-                    </Text>
-                  </Pressable>
-                </View>
-
-                <View style={styles.stack}>
-                  {sortedObservances.map(item => (
-                    <View key={item.id} style={styles.listRowTall}>
-                      <Pressable style={styles.listTextWrap} onPress={() => editHijriObservance(item)}>
-                        <Text style={styles.listTitle}>{item.name}</Text>
-                        <Text style={styles.listMeta}>
-                          {item.day} {HIJRI_MONTHS.find(month => month.value === Number(item.month))?.name || `Month ${item.month}`} • {item.category}
-                        </Text>
-                        {item.notes ? <Text style={styles.listSubtle}>{item.notes}</Text> : null}
-                      </Pressable>
-                      <View style={styles.rowWrap}>
-                        <Pressable onPress={() => toggleObservance(item)} style={styles.ghostButton}>
-                          <Text style={styles.ghostButtonText}>{item.enabled === false ? 'Enable' : 'Disable'}</Text>
-                        </Pressable>
-                        <Pressable onPress={() => confirmDeleteObservance(item)} style={styles.ghostButtonDanger}>
-                          <Text style={styles.ghostButtonDangerText}>Delete</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-
-                {(hijriObsSelection === '__new__' || editingHijriObsId) ? (
-                  <View style={styles.formCard}>
-                    <Text style={styles.subsectionTitle}>{editingHijriObsId ? 'Edit Important Date' : 'New Important Date'}</Text>
-
-                    <Text style={styles.inputLabel}>Name</Text>
-                    <TextInput
-                      value={hijriObsForm.name}
-                      onChangeText={value => setHijriObsForm(current => ({ ...current, name: value }))}
-                      placeholder="Important date name"
-                      style={styles.input}
-                    />
-
-                    <View style={styles.formRow}>
-                      <View style={styles.flexField}>
-                        <Text style={styles.inputLabel}>Day</Text>
-                        <TextInput
-                          value={hijriObsForm.day}
-                          onChangeText={value => setHijriObsForm(current => ({ ...current, day: value.replace(/\D/g, '').slice(0, 2) }))}
-                          keyboardType="number-pad"
-                          style={styles.input}
-                        />
-                      </View>
-                      <View style={styles.flexField}>
-                        <Text style={styles.inputLabel}>Month</Text>
-                        <TextInput
-                          value={hijriObsForm.month}
-                          onChangeText={value => setHijriObsForm(current => ({ ...current, month: value.replace(/\D/g, '').slice(0, 2) }))}
-                          keyboardType="number-pad"
-                          style={styles.input}
-                        />
-                      </View>
-                      <View style={styles.flexField}>
-                        <Text style={styles.inputLabel}>Priority</Text>
-                        <TextInput
-                          value={hijriObsForm.priority}
-                          onChangeText={value => setHijriObsForm(current => ({ ...current, priority: value.replace(/\D/g, '').slice(0, 3) }))}
-                          keyboardType="number-pad"
-                          style={styles.input}
-                        />
-                      </View>
-                    </View>
-
-                    <Text style={styles.inputLabel}>Category</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-                      {HIJRI_OBSERVANCE_CATEGORIES.map(category => {
-                        const active = hijriObsForm.category === category;
-                        return (
-                          <Pressable
-                            key={category}
-                            onPress={() => setHijriObsForm(current => ({ ...current, category }))}
-                            style={[styles.chip, active && styles.chipActive]}
-                          >
-                            <Text style={[styles.chipText, active && styles.chipTextActive]}>{category}</Text>
-                          </Pressable>
-                        );
-                      })}
-                    </ScrollView>
-
-                    <Text style={styles.inputLabel}>Notes</Text>
-                    <TextInput
-                      value={hijriObsForm.notes}
-                      onChangeText={value => setHijriObsForm(current => ({ ...current, notes: value }))}
-                      placeholder="Optional notes"
-                      multiline
-                      textAlignVertical="top"
-                      style={[styles.input, styles.multilineInput]}
-                    />
-
+                  <View style={styles.rowWrap}>
                     <Pressable
-                      onPress={() => setHijriObsForm(current => ({ ...current, enabled: !current.enabled }))}
-                      style={[styles.toggleBox, hijriObsForm.enabled && styles.toggleBoxActive]}
+                      onPress={() => resetHijriObservanceForm('__new__')}
+                      style={[styles.secondaryButton, hijriObsSelection === '__new__' && styles.secondaryButtonActive]}
                     >
-                      <Text style={[styles.toggleBoxText, hijriObsForm.enabled && styles.toggleBoxTextActive]}>
-                        {hijriObsForm.enabled ? 'Shown to users' : 'Hidden from users'}
+                      <Text style={[styles.secondaryButtonText, hijriObsSelection === '__new__' && styles.secondaryButtonTextActive]}>
+                        New Important Date
                       </Text>
                     </Pressable>
-
-                    <View style={styles.rowWrap}>
-                      <Pressable
-                        onPress={saveObservance}
-                        disabled={observanceSaving}
-                        style={[styles.primaryButton, observanceSaving && styles.disabledButton, styles.rowButton]}
-                      >
-                        <Text style={styles.primaryButtonText}>{observanceSaving ? 'Saving…' : 'Save Important Date'}</Text>
-                      </Pressable>
-                      <Pressable onPress={() => resetHijriObservanceForm()} style={[styles.secondaryButton, styles.rowButton]}>
-                        <Text style={styles.secondaryButtonText}>Cancel</Text>
-                      </Pressable>
-                    </View>
                   </View>
-                ) : null}
-              </View> : null}
+
+                  <View style={styles.stack}>
+                    {sortedObservances.map(item => (
+                      <View key={item.id} style={styles.listRowTall}>
+                        <Pressable style={styles.listTextWrap} onPress={() => editHijriObservance(item)}>
+                          <Text style={styles.listTitle}>{item.name}</Text>
+                          <Text style={styles.listMeta}>
+                            {item.day} {HIJRI_MONTHS.find(month => month.value === Number(item.month))?.name || `Month ${item.month}`} • {item.category}
+                          </Text>
+                          {item.notes ? <Text style={styles.listSubtle}>{item.notes}</Text> : null}
+                        </Pressable>
+                        <View style={styles.rowWrap}>
+                          <Pressable onPress={() => toggleObservance(item)} style={styles.ghostButton}>
+                            <Text style={styles.ghostButtonText}>{item.enabled === false ? 'Enable' : 'Disable'}</Text>
+                          </Pressable>
+                          <Pressable onPress={() => confirmDeleteObservance(item)} style={styles.ghostButtonDanger}>
+                            <Text style={styles.ghostButtonDangerText}>Delete</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+
+                  {(hijriObsSelection === '__new__' || editingHijriObsId) ? (
+                    <View style={styles.formCard}>
+                      <Text style={styles.subsectionTitle}>{editingHijriObsId ? 'Edit Important Date' : 'New Important Date'}</Text>
+
+                      <Text style={styles.inputLabel}>Name</Text>
+                      <TextInput
+                        value={hijriObsForm.name}
+                        onChangeText={value => setHijriObsForm(current => ({ ...current, name: value }))}
+                        placeholder="Important date name"
+                        style={styles.input}
+                      />
+
+                      <View style={styles.formRow}>
+                        <View style={styles.flexField}>
+                          <Text style={styles.inputLabel}>Day</Text>
+                          <TextInput
+                            value={hijriObsForm.day}
+                            onChangeText={value => setHijriObsForm(current => ({ ...current, day: value.replace(/\D/g, '').slice(0, 2) }))}
+                            keyboardType="number-pad"
+                            style={styles.input}
+                          />
+                        </View>
+                        <View style={styles.flexField}>
+                          <Text style={styles.inputLabel}>Month</Text>
+                          <TextInput
+                            value={hijriObsForm.month}
+                            onChangeText={value => setHijriObsForm(current => ({ ...current, month: value.replace(/\D/g, '').slice(0, 2) }))}
+                            keyboardType="number-pad"
+                            style={styles.input}
+                          />
+                        </View>
+                        <View style={styles.flexField}>
+                          <Text style={styles.inputLabel}>Priority</Text>
+                          <TextInput
+                            value={hijriObsForm.priority}
+                            onChangeText={value => setHijriObsForm(current => ({ ...current, priority: value.replace(/\D/g, '').slice(0, 3) }))}
+                            keyboardType="number-pad"
+                            style={styles.input}
+                          />
+                        </View>
+                      </View>
+
+                      <Text style={styles.inputLabel}>Category</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                        {HIJRI_OBSERVANCE_CATEGORIES.map(category => {
+                          const active = hijriObsForm.category === category;
+                          return (
+                            <Pressable
+                              key={category}
+                              onPress={() => setHijriObsForm(current => ({ ...current, category }))}
+                              style={[styles.chip, active && styles.chipActive]}
+                            >
+                              <Text style={[styles.chipText, active && styles.chipTextActive]}>{category}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </ScrollView>
+
+                      <Text style={styles.inputLabel}>Notes</Text>
+                      <TextInput
+                        value={hijriObsForm.notes}
+                        onChangeText={value => setHijriObsForm(current => ({ ...current, notes: value }))}
+                        placeholder="Optional notes"
+                        multiline
+                        textAlignVertical="top"
+                        style={[styles.input, styles.multilineInput]}
+                      />
+
+                      <Pressable
+                        onPress={() => setHijriObsForm(current => ({ ...current, enabled: !current.enabled }))}
+                        style={[styles.toggleBox, hijriObsForm.enabled && styles.toggleBoxActive]}
+                      >
+                        <Text style={[styles.toggleBoxText, hijriObsForm.enabled && styles.toggleBoxTextActive]}>
+                          {hijriObsForm.enabled ? 'Shown to users' : 'Hidden from users'}
+                        </Text>
+                      </Pressable>
+
+                      <View style={styles.rowWrap}>
+                        <Pressable
+                          onPress={saveObservance}
+                          disabled={observanceSaving}
+                          style={[styles.primaryButton, observanceSaving && styles.disabledButton, styles.rowButton]}
+                        >
+                          <Text style={styles.primaryButtonText}>{observanceSaving ? 'Saving…' : 'Save Important Date'}</Text>
+                        </Pressable>
+                        <Pressable onPress={() => resetHijriObservanceForm()} style={[styles.secondaryButton, styles.rowButton]}>
+                          <Text style={styles.secondaryButtonText}>Cancel</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              )}
             </>
           )) : null}
         </View>

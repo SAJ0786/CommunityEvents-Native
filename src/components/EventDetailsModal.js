@@ -379,7 +379,20 @@ export default function EventDetailsModal({
 
   return (
     <>
-      <Modal transparent visible={visible} animationType="none" onRequestClose={animateClose}>
+    <Modal 
+  transparent
+  visible={visible}
+  animationType="none"
+  presentationStyle="overFullScreen"
+  supportedOrientations={[
+    'portrait',
+    'portrait-upside-down',
+    'landscape',
+    'landscape-left',
+    'landscape-right',
+  ]}
+  onRequestClose={animateClose}
+>
         <SafeAreaView style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={animateClose} />
           <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
@@ -496,10 +509,11 @@ export default function EventDetailsModal({
             >
           <Pressable style={styles.overlayBackdrop} onPress={() => setHostMessageOpen(false)} />
           <ScrollView
+            style={styles.overlayScroll}
             bounces={false}
             contentContainerStyle={styles.overlayScrollContent}
             keyboardShouldPersistTaps="handled"
-            automaticallyAdjustKeyboardInsets={false}
+            automaticallyAdjustKeyboardInsets
           >
           <View style={styles.overlayCard}>
             <Text style={styles.overlayTitle}>Contact Host</Text>
@@ -810,6 +824,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     paddingVertical: spacing.sm,
+  },
+  overlayScroll: {
+    flex: 1,
+    minHeight: 0,
+    width: '100%',
   },
   overlayBackdrop: {
     ...StyleSheet.absoluteFillObject,
