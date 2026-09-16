@@ -44,10 +44,7 @@ const AndroidRootEncoderLiveStreamView = forwardRef(({
       const denied = Object.entries(permissions)
         .filter(([, result]) => result !== PermissionsAndroid.RESULTS.GRANTED)
         .map(([permission]) => permission);
-private boolean surfaceReady = false;
-private boolean previewStarted = false;
-private boolean previewNeedsRestore = false;
-private int surfaceRestoreAttempts = 0;  
+
       if (generation !== startGeneration.current) throw new Error('Streaming was stopped.');
       if (denied.length) {
         onPermissionsDenied?.(denied);
