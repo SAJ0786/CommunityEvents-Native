@@ -1,16 +1,13 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, shadow, spacing } from '../theme';
+import MemberPageHeader from './MemberPageHeader';
 
 export default function AddEventChoice({ canCreateRecurring, onChoose }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.card}>
-        <View style={styles.heroBadge}>
-          <Text style={styles.heroBadgeText}>EVENT CREATION</Text>
-        </View>
-        <Text style={styles.title}>Add Event</Text>
-        <Text style={styles.subtitle}>Choose the same event setup style you use in the PWA.</Text>
+        <MemberPageHeader title="Add Event" subtitle="Choose the same event setup style you use in the PWA." />
 
         <Pressable onPress={() => onChoose('single')} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
           <View style={styles.choiceIconWrap}>

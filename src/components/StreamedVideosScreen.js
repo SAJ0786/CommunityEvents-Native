@@ -13,6 +13,7 @@ import { httpsCallable } from '@react-native-firebase/functions';
 import { functions } from '../firebase/firebase';
 import { colors, radius, shadow, spacing } from '../theme';
 import NativeBackButton from './NativeBackButton';
+import MemberPageHeader from './MemberPageHeader';
 
 function formatDate(value) {
   if (!value) return '';
@@ -61,18 +62,11 @@ export default function StreamedVideosScreen({ isGuest = false, onBack }) {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.headerRow}>
-        <NativeBackButton onPress={onBack} />
-        <View style={styles.headerCopy}>
-          <Text style={styles.title}>Streamed Videos</Text>
-          <Text style={styles.subtitle}>Community Events Australia live-stream archive</Text>
-        </View>
-        <View style={styles.headerActions}>
-          <Pressable onPress={loadVideos} style={({ pressed }) => [styles.lightButton, pressed && styles.pressed]}>
-            <Text style={styles.lightButtonText}>{loading ? 'Loading...' : 'Refresh'}</Text>
-          </Pressable>
-        </View>
-      </View>
+      <MemberPageHeader title="Streamed Videos" subtitle="Community Events Australia live-stream archive" onBack={onBack}>
+        <Pressable onPress={loadVideos} style={({ pressed }) => [styles.lightButton, pressed && styles.pressed]}>
+          <Text style={styles.lightButtonText}>{loading ? 'Loading...' : 'Refresh'}</Text>
+        </Pressable>
+      </MemberPageHeader>
 
       {isGuest ? (
         <View style={styles.noticeCard}>

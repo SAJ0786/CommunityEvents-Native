@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BUSINESS_STATUSES, formatAbn } from '../services/businesses';
 import { colors, radius, shadow, spacing } from '../theme';
+import MemberPageHeader from '../components/MemberPageHeader';
 
 function StatusBadge({ status }) {
   const config = BUSINESS_STATUSES[status] || BUSINESS_STATUSES.pending;
@@ -113,14 +114,7 @@ export default function BusinessOwnerScreen({
   const pending = businesses.filter(item => item.status === 'pending').length;
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.hero}>
-        <View style={styles.heroCopy}>
-          <Text style={styles.eyebrow}>BUSINESS OWNER</Text>
-          <Text style={styles.title}>Your businesses</Text>
-          <Text style={styles.subtitle}>Create listings, follow their approval status and keep business information current.</Text>
-        </View>
-        <View style={styles.heroIcon}><Text style={styles.heroIconText}>{'\u{1F4BC}'}</Text></View>
-      </View>
+      <MemberPageHeader title="Your businesses" subtitle="Create listings, follow their approval status and keep business information current." />
 
       <View style={styles.summaryRow}>
         <View style={styles.summaryCard}><Text style={styles.summaryValue}>{businesses.length}</Text><Text style={styles.summaryLabel}>LISTINGS</Text></View>

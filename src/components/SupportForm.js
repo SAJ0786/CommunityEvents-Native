@@ -4,6 +4,7 @@ import ScrollView from './KeyboardAwareScrollView';
 import NativeBackButton from './NativeBackButton';
 import { APP_SUPPORT_CATEGORIES, BUSINESS_REPORT_CATEGORIES, newSupportReference, submitSupportRequest } from '../services/support';
 import { colors, radius, spacing } from '../theme';
+import MemberPageHeader from './MemberPageHeader';
 
 export default function SupportForm({ user, profile, business, onBack }) {
   const categories = business ? BUSINESS_REPORT_CATEGORIES : APP_SUPPORT_CATEGORIES;
@@ -34,9 +35,11 @@ export default function SupportForm({ user, profile, business, onBack }) {
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-        <NativeBackButton onPress={() => { if (!busy) onBack?.(); }} />
-        <Text style={styles.title}>{business ? 'Report a Problem' : 'Feedback & Report a Problem'}</Text>
-        <Text style={styles.help}>{business ? `${business.name}\nYour report is emailed privately to this business’s city admins and all super admins, not the business owner.` : 'App feedback, account issues and other problems are emailed to support@siza.info.'}</Text>
+        <MemberPageHeader
+          title={business ? 'Report a Problem' : 'Feedback & Report a Problem'}
+          subtitle={business ? `${business.name}\nYour report is emailed privately to this business’s city admins and all super admins, not the business owner.` : 'App feedback, account issues and other problems are emailed to support@siza.info.'}
+          onBack={() => { if (!busy) onBack?.(); }}
+        />
         <Text style={styles.label}>Your name</Text>
         <TextInput accessibilityLabel="Your name" value={name} onChangeText={setName} editable={!busy && !sent} maxLength={100} style={styles.input} />
         <Text style={styles.label}>Your email</Text>

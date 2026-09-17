@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import EventCard from './EventCard';
 import { colors, radius, shadow, spacing } from '../theme';
+import MemberPageHeader from './MemberPageHeader';
 
 function EmptyState({ title, text }) {
   return (
@@ -114,8 +115,7 @@ export default function MyEventsScreen({
       ItemSeparatorComponent={() => <View style={styles.separator} />}
       ListHeaderComponent={(
         <View style={styles.headerContent}>
-          <Text style={styles.title}>My Events</Text>
-          <Text style={styles.subtitle}>Events you created. Toggle visibility to show or hide from the home screen.</Text>
+          <MemberPageHeader title="My Events" subtitle="Events you created. Toggle visibility to show or hide from the home screen." />
           {loading ? (
             <View style={styles.loadingCard}>
               <ActivityIndicator color={colors.teal} size="large" />
@@ -146,18 +146,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: spacing.lg,
     paddingBottom: spacing.xl,
-  },
-  title: {
-    color: colors.navy,
-    fontSize: 28,
-    fontWeight: '700',
-  },
-  subtitle: {
-    color: colors.muted,
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: spacing.xs,
-    marginBottom: spacing.lg,
   },
   loadingCard: {
     alignItems: 'center',
