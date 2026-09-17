@@ -85,6 +85,17 @@ async function main() {
   assert.match(source, /AppState.addEventListener/);
   assert.match(source, /userActionRow: \{ flexDirection: 'row'/);
   assert.match(source, /<ScrollView horizontal[^>]*styles.userActionRow/);
+  assert.match(source, /<Text style=\{styles\.cardTitle\}>Important Hijri Events Adjustment<\/Text>/);
+  assert.match(source, /getHijriObservances\(\)/);
+  assert.match(source, /saveHijriObservances\(sorted\)/);
+  for (const field of ['name', 'day', 'month', 'category', 'priority', 'notes', 'enabled']) {
+    assert.match(source, new RegExp(`hijriObsForm\\.${field}`), `Hijri observance form should include ${field}`);
+  }
+  for (const handler of ['saveObservance', 'toggleObservance', 'confirmDeleteObservance', 'editHijriObservance']) {
+    assert.match(source, new RegExp(`const ${handler} =`), `Hijri observance CRUD should include ${handler}`);
+  }
+  assert.match(source, /if \(!canManageHijriSettings\)/);
+  assert.match(read('backend/firestore.rules'), /!\(docId in \['hijriCalendar', 'hijriObservances'\]\)/);
   for (const file of ['src/components/AdminDashboardScreen.js', 'src/business/BusinessAdminDashboard.js', 'src/business/BusinessApprovalPanel.js', 'src/business/BusinessStatisticsScreen.js']) assert.match(read(file), /AdminPageHeader/);
   assert.match(read('src/components/AccountMenuSheet.js'), /paddingBottom: bottomInset/);
   for (const file of ['src/components/BottomNavigation.js', 'src/business/DirectoryBottomNavigation.js']) assert.match(read(file), /onNavigationLayout\?\.\(navigationRef.current\)/);
