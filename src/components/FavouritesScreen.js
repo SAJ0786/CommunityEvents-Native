@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import EventCard from './EventCard';
 import { colors, radius, shadow, spacing } from '../theme';
+import MemberPageHeader from './MemberPageHeader';
 
 export default function FavouritesScreen({
   events = [],
@@ -13,11 +14,13 @@ export default function FavouritesScreen({
 }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.titleRow}>
-        <Text style={styles.title}>Favourites</Text>
+      <MemberPageHeader
+        title="Favourites"
+        subtitle="Events you've saved. Tap \u2605 on any event to save it here."
+        style={styles.header}
+      >
         {events.length ? <Text style={styles.count}>{events.length}</Text> : null}
-      </View>
-      <Text style={styles.subtitle}>Events you've saved. Tap {'\u2605'} on any event to save it here.</Text>
+      </MemberPageHeader>
 
       {loading ? (
         <View style={styles.stateCard}>
@@ -65,10 +68,8 @@ export default function FavouritesScreen({
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xl },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  title: { color: colors.navy, fontSize: 28, fontWeight: '700' },
+  header: { marginBottom: spacing.lg },
   count: { color: colors.tealDark, fontSize: 14, fontWeight: '700' },
-  subtitle: { color: colors.muted, fontSize: 14, fontWeight: '700', marginTop: spacing.xs, marginBottom: spacing.lg },
   stateCard: { alignItems: 'center', justifyContent: 'center', padding: spacing.xl, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, ...shadow },
   emptyStar: { color: colors.teal, fontSize: 44, lineHeight: 52, marginBottom: spacing.sm },
   emptyTitle: { color: colors.navy, fontSize: 20, fontWeight: '700' },

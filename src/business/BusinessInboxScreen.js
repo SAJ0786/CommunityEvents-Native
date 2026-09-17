@@ -5,6 +5,7 @@ import { businessThreadFolder, listenBusinessThreads, listenThreadMessages, mark
 import { setBusinessConversationBlocked } from '../services/businessSafety';
 import { colors, radius, shadow, spacing } from '../theme';
 import NativeBackButton from '../components/NativeBackButton';
+import MemberPageHeader from '../components/MemberPageHeader';
 
 function timeLabel(value) {
   const millis = value?.toMillis?.() || (value?.seconds ? value.seconds * 1000 : Date.parse(value || ''));
@@ -97,8 +98,7 @@ export default function BusinessInboxScreen({ user, profile, onBack }) {
   );
   return (
     <ScrollView contentContainerStyle={styles.list}>
-      <NativeBackButton accessibilityLabel="Back to directory" onPress={onBack} />
-      <Text style={styles.eyebrow}>COMMUNITY BUSINESSES AUSTRALIA</Text><Text style={styles.pageTitle}>Business messaging</Text>
+      <MemberPageHeader title="Business messaging" subtitle="Private enquiries received for your businesses and conversations you started." onBack={onBack} backAccessibilityLabel="Back to directory" />
       <View accessibilityRole="tablist" style={styles.folderRow}>
         {[{ value: 'received', label: 'Inbox', count: receivedThreads.length }, { value: 'sent', label: 'Sent messages', count: sentThreads.length }].map(item => (
           <Pressable key={item.value} accessibilityRole="tab" accessibilityState={{ selected: folder === item.value }}

@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import CompactSelect from '../components/CompactSelect';
 import NativeDateTimeField from '../components/NativeDateTimeField';
+import MemberPageHeader from '../components/MemberPageHeader';
 import { classifyMetroArea } from '../utils/cities';
 import { friendlyError } from '../utils/errors';
 import { colors, radius, shadow, spacing } from '../theme';
@@ -329,14 +330,12 @@ export default function BusinessListingForm({
 
   return (
     <ScrollView contentContainerStyle={[styles.content, compactLayout && styles.contentCompact]} keyboardShouldPersistTaps="handled">
-        <View style={styles.titleRow}>
-        <View style={styles.titleCopy}>
-          <Text style={styles.eyebrow}>{initialBusiness?.id ? 'EDIT LISTING' : 'NEW LISTING'}</Text>
-          <Text style={styles.title}>{initialBusiness?.id ? 'Update your business' : 'Add your business'}</Text>
-          <Text style={styles.subtitle}>Listings are checked by Community Businesses Australia before becoming public. Only ABN status is verified where an ABN is supplied.</Text>
-        </View>
-        {onCancel ? <Pressable onPress={onCancel} style={styles.closeButton}><Text style={styles.closeText}>{'\u2715'}</Text></Pressable> : null}
-      </View>
+        <MemberPageHeader
+          title={initialBusiness?.id ? 'Update your business' : 'Add your business'}
+          subtitle="Listings are checked by Community Businesses Australia before becoming public. Only ABN status is verified where an ABN is supplied."
+        >
+          {onCancel ? <Pressable onPress={onCancel} style={styles.closeButton}><Text style={styles.closeText}>{'\u2715'}</Text></Pressable> : null}
+        </MemberPageHeader>
 
       {!canSubmit ? (
         <View style={styles.signInCard}>

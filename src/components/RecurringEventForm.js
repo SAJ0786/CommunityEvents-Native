@@ -16,6 +16,7 @@ import {
 } from '../services/recurrence';
 import { colors, radius, shadow, spacing } from '../theme';
 import NativeBackButton from './NativeBackButton';
+import MemberPageHeader from './MemberPageHeader';
 
 const FREQUENCIES = [
   { value: 'day', label: 'Daily' },
@@ -254,8 +255,10 @@ export default function RecurringEventForm({
   return (
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       <View style={styles.card}>
-        <Text style={styles.title}>{editing ? 'Edit Entire Series' : 'Recurring Event'}</Text>
-        <Text style={styles.subtitle}>{editing ? 'Update the recurrence schedule and shared event details. Review the regenerated dates before saving.' : 'Create repeating events from one shared set of details. Dates are previewed before saving.'}</Text>
+        <MemberPageHeader
+          title={editing ? 'Edit Entire Series' : 'Recurring Event'}
+          subtitle={editing ? 'Update the recurrence schedule and shared event details. Review the regenerated dates before saving.' : 'Create repeating events from one shared set of details. Dates are previewed before saving.'}
+        />
 
         <ToggleRow
           options={[{ value: 'gregorian', label: 'Gregorian' }, { value: 'hijri', label: 'Hijri' }]}

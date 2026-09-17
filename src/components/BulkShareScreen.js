@@ -8,6 +8,7 @@ import { DEFAULT_CITY, cityLabel, getEventMetroArea, normalizeCity } from '../ut
 import { compareEventsByDateTime } from '../services/events';
 import { formatEventDate } from '../utils/formatters';
 import { STORE_SHARE_LINES } from '../utils/storeLinks';
+import MemberPageHeader from './MemberPageHeader';
 
 const EMPTY_FILTERS = {
   organiser: '',
@@ -236,15 +237,10 @@ export default function BulkShareScreen({ events = [], profile, user }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.card}>
-        <View style={styles.topRow}>
-          <View style={styles.topCopy}>
-            <Text style={styles.title}>Bulk Share Events</Text>
-            <Text style={styles.subtitle}>
-              Filter events, select the ones you want, then share or copy.
-              {!isNationalBulkShare ? ` Your bulk share list is limited to ${cityLabel(bulkShareCity)}.` : ''}
-            </Text>
-          </View>
-        </View>
+        <MemberPageHeader
+          title="Bulk Share Events"
+          subtitle={`Filter events, select the ones you want, then share or copy.${!isNationalBulkShare ? ` Your bulk share list is limited to ${cityLabel(bulkShareCity)}.` : ''}`}
+        />
 
         <Text style={styles.label}>Message title</Text>
         <TextInput

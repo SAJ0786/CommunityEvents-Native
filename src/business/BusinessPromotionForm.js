@@ -6,6 +6,7 @@ import CompactSelect from '../components/CompactSelect';
 import NativeDateTimeField from '../components/NativeDateTimeField';
 import { validateBusinessPromotion } from '../services/businesses';
 import { colors, radius, shadow, spacing } from '../theme';
+import MemberPageHeader from '../components/MemberPageHeader';
 
 function isoDate(offsetDays = 0) {
   const date = new Date();
@@ -85,14 +86,9 @@ export default function BusinessPromotionForm({
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>BUSINESS PROMOTION</Text>
-          <Text style={styles.title}>{initialPromotion?.id ? 'Edit promotion' : 'Create promotion'}</Text>
-          <Text style={styles.subtitle}>Promotions remain private until approved by the central admin team.</Text>
-        </View>
+      <MemberPageHeader title={initialPromotion?.id ? 'Edit promotion' : 'Create promotion'} subtitle="Promotions remain private until approved by the central admin team.">
         <Pressable onPress={onCancel} style={styles.close}><Text style={styles.closeText}>{'\u2715'}</Text></Pressable>
-      </View>
+      </MemberPageHeader>
 
       <View style={styles.card}>
         <Field label="Business" error={attempted && !form.businessId ? 'Choose an approved business.' : ''}>

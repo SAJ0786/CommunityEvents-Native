@@ -12,6 +12,7 @@ import {
 import ScrollView from './KeyboardAwareScrollView';
 import { colors, radius, shadow, spacing } from '../theme';
 import NativeBackButton from './NativeBackButton';
+import MemberPageHeader from './MemberPageHeader';
 import {
   listenHostThreads,
   listenThreadMessages,
@@ -89,9 +90,8 @@ export default function InboxScreen({ user, profile, onBack }) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.screen}>
       <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.centerCard}>
-          <Text style={styles.title}>Inbox</Text>
+          <MemberPageHeader title="Inbox" onBack={onBack} />
           <Text style={styles.emptyText}>Please sign in to use your inbox.</Text>
-          <NativeBackButton onPress={onBack} />
         </View>
       </ScrollView>
       </KeyboardAvoidingView>
@@ -149,13 +149,7 @@ export default function InboxScreen({ user, profile, onBack }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.card}>
-        <View style={styles.headerRow}>
-          <NativeBackButton onPress={onBack} />
-          <View style={styles.headerCopy}>
-            <Text style={styles.title}>Inbox</Text>
-            <Text style={styles.subtitle}>Messages between event hosts and community members.</Text>
-          </View>
-        </View>
+        <MemberPageHeader title="Inbox" subtitle="Messages between event hosts and community members." onBack={onBack} />
       </View>
 
       {loadError ? <View style={styles.centerCard}><Text style={styles.emptyText}>{loadError}</Text></View> : null}

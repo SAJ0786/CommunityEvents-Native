@@ -29,6 +29,7 @@ import {
 } from '../services/reminders';
 import { getPrayerLocation } from '../utils/prayerLocations';
 import { openExternalUrl } from '../utils/openExternalUrl';
+import MemberPageHeader from './MemberPageHeader';
 
 const sizaLogo = require('../../assets/siza-apps.jpg');
 
@@ -259,8 +260,7 @@ export default function ProfileScreen({
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-      <Text maxFontSizeMultiplier={1.2} style={styles.title}>Profile &amp; Settings</Text>
-      <Text maxFontSizeMultiplier={1.2} style={styles.subtitle}>Your account and app preferences</Text>
+      <MemberPageHeader title="Profile & Settings" subtitle="Your account and app preferences" />
       <Pressable accessibilityRole="button" onPress={() => setSupportOpen(true)} style={styles.card}>
         <Text style={styles.cardTitle}>Feedback &amp; Report a Problem</Text>
         <Text style={styles.body}>App feedback, technical issues, account help and other enquiries.</Text>

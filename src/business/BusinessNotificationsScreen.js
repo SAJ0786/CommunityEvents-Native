@@ -8,6 +8,7 @@ import { listenBusinessModerationNotices, recordBusinessModerationAppeal } from 
 import { friendlyError } from '../utils/errors';
 import { colors, radius, shadow, spacing } from '../theme';
 import NativeBackButton from '../components/NativeBackButton';
+import MemberPageHeader from '../components/MemberPageHeader';
 
 function createdLabel(value) {
   const date = typeof value?.toDate === 'function' ? value.toDate() : null;
@@ -78,17 +79,15 @@ export default function BusinessNotificationsScreen({ user, profile, onBack, ren
   };
 
   const header = (
-      <View style={styles.headerRow}>
-        {!renderHeader ? <NativeBackButton onPress={onBack} style={styles.backButton} /> : null}
-        <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>COMMUNITY CONNECT</Text>
-          <Text style={styles.title}>Notifications</Text>
-          <Text style={styles.subtitle}>{unreadCount ? `${unreadCount} unread update${unreadCount === 1 ? '' : 's'}` : 'You are up to date'}</Text>
-          {rows.length ? <Pressable accessibilityRole="button" accessibilityHint="Marks updates read and clears them from this device; moderation notices are retained." onPress={clearNotifications} style={styles.clearButton}><Text style={styles.clearButtonText}>Clear notifications on this device</Text></Pressable> : null}
-        </View>
-        {renderHeader ? <Pressable accessibilityRole="button" accessibilityLabel="Close notifications" onPress={onBack} style={styles.backButton}><MaterialCommunityIcons name="close" size={24} color={colors.navy} /></Pressable> : null}
-      </View>
-
+    <MemberPageHeader
+      title="Notifications"
+      subtitle={unreadCount ? `${unreadCount} unread update${unreadCount === 1 ? '' : 's'}` : 'You are up to date'}
+      onBack={!renderHeader ? onBack : undefined}
+      backAccessibilityLabel="Back to business directory"
+      footer={rows.length ? <Pressable accessibilityRole="button" accessibilityHint="Marks updates read and clears them from this device; moderation notices are retained." onPress={clearNotifications} style={styles.clearButton}><Text style={styles.clearButtonText}>Clear notifications on this device</Text></Pressable> : null}
+    >
+      {renderHeader ? <Pressable accessibilityRole="button" accessibilityLabel="Close notifications" onPress={onBack} style={styles.backButton}><MaterialCommunityIcons name="close" size={24} color={colors.navy} /></Pressable> : null}
+    </MemberPageHeader>
   );
 
   return (
