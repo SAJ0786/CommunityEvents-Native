@@ -210,13 +210,12 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
 
   return (
     <ScrollView contentContainerStyle={styles.pageContent} keyboardShouldPersistTaps="handled">
-      <View style={styles.directoryTitleRow}>
-        <View style={styles.heroCopy}>
-          <Text style={styles.eyebrow}>COMMUNITY BUSINESS DIRECTORY</Text>
-          <Text style={styles.heroTitle}>Local businesses</Text>
-        </View>
+      <MemberPageHeader
+        title="Local businesses"
+        subtitle={`Browse approved businesses in ${cityLabel(city).replace(', Australia', '')}.`}
+      >
         <View style={styles.cityControl}><CitySelector compact selectedCity={city} onChange={onCityChange} onLocationResolved={onLocationResolved} allowCurrentLocation /></View>
-      </View>
+      </MemberPageHeader>
 
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>

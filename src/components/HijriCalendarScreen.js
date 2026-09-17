@@ -33,7 +33,7 @@ import { DEFAULT_CITY, cityLabel, normalizeCity } from '../utils/cities';
 import { getPrayerLocation } from '../utils/prayerLocations';
 import CompactSelect from './CompactSelect';
 import NativeDateTimeField from './NativeDateTimeField';
-import NativeBackButton from './NativeBackButton';
+import MemberPageHeader from './MemberPageHeader';
 
 const CATEGORIES = ['Wiladat', 'Shahadat', 'Wafat', 'Eid', 'Ayyam-e-Aza', 'Amaal', 'Season', 'Event'];
 const PRAYER_VISUALS = {
@@ -236,19 +236,12 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
       contentContainerStyle={[styles.content, compactLayout && styles.contentCompact]}
       showsVerticalScrollIndicator={false}
     >
-      <NativeBackButton onPress={onBack} />
-      <View style={styles.hero}>
-        <View style={styles.heroGlowLarge} />
-        <View style={styles.heroGlowSmall} />
-        <View style={styles.heroIcon}>
-          <MaterialCommunityIcons name="moon-waning-crescent" color={colors.tealDark} size={25} />
-        </View>
-        <View style={styles.heroCopy}>
-          <Text style={styles.heroEyebrow}>ISLAMIC CALENDAR</Text>
-          <Text style={styles.title}>Hijri Calendar</Text>
-          <Text numberOfLines={2} style={styles.subtitle}>Dates, prayer times and quick conversion</Text>
-        </View>
-      </View>
+      <MemberPageHeader
+        title="Hijri Calendar"
+        subtitle="Dates, prayer times and quick conversion"
+        onBack={onBack}
+        backAccessibilityLabel="Back to events"
+      />
 
       {loading ? (
         <View style={styles.loadingCard}>

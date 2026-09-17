@@ -42,6 +42,7 @@ import { getOrganisations, normalizeOrganisationType } from '../services/organis
 import AddressAutocomplete from './AddressAutocomplete';
 import CompactSelect from './CompactSelect';
 import { getDynamicEventOptions } from '../services/eventOptionsAdmin';
+import MemberPageHeader from './MemberPageHeader';
 
 const FIELD_LIMITS = {
   hostName: 40,
@@ -809,8 +810,7 @@ export default function CreateEventForm({
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.content}
     >
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.subtitle}>{subtitle}</Text>
+      <MemberPageHeader title={title} subtitle={subtitle} />
 
       {!canSubmit ? (
         <View style={styles.accountNotice}>
