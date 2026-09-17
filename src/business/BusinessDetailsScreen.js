@@ -7,6 +7,7 @@ import NativeBackButton from '../components/NativeBackButton';
 import { SupportModal } from '../components/SupportForm';
 import { sendBusinessMessage } from '../services/messaging';
 import { buildWhatsAppUrl } from '../utils/phone';
+import MemberPageHeader from '../components/MemberPageHeader';
 
 const fallbackBusinessImage = require('../../assets/business-placeholder.png');
 
@@ -136,8 +137,12 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
 
   return (
     <ScrollView ref={screenRef} contentContainerStyle={styles.content}>
-      <View style={styles.topRow}>
-        <NativeBackButton onPress={onBack} style={styles.backButton} />
+      <MemberPageHeader
+        title={business.name}
+        subtitle={[(business.categories || [business.category]).filter(Boolean).join(', '), business.suburb, business.distanceKm != null ? `${business.distanceKm} km away` : ''].filter(Boolean).join(' · ')}
+        onBack={onBack}
+        backAccessibilityLabel="Back to businesses"
+      >
         <Pressable
           accessibilityLabel={saved ? 'Remove business from Favourites' : 'Add business to Favourites'}
           onPress={onToggleSaved}
@@ -145,7 +150,7 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
         >
           <Text style={[styles.saveIcon, saved && styles.saveIconActive]}>{saved ? '\u2665' : '\u2661'}</Text>
         </Pressable>
-      </View>
+      </MemberPageHeader>
 
       <View style={[styles.cover, { backgroundColor: business.coverColor || colors.teal }]}> 
         <View style={styles.coverOrb} />
@@ -165,11 +170,7 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
         ) : null}
         {business.verificationBadge && business.abnVerified !== true ? <View style={styles.badge}><Text style={styles.badgeText}>{business.verificationBadge}</Text></View> : null}
       </View>
-      <View style={styles.titleRow}>
-        <Text style={styles.title}>{business.name}</Text>
-        {businessPromotions.length ? <Pressable accessibilityLabel="View active promotions" onPress={() => { onTrackAction?.('promotions'); setTab('promotions'); setTimeout(() => screenRef.current?.scrollTo({ y: 540, animated: true }), 50); }}><Animated.View style={[styles.promotionPulse, { opacity: promotionPulse }]}><Text style={styles.promotionPulseIcon}>🏷️</Text><Text style={styles.promotionPulseText}>PROMO</Text></Animated.View></Pressable> : null}
-      </View>
-      <Text style={styles.metaSummary}>{[(business.categories || [business.category]).filter(Boolean).join(', '), business.suburb, business.distanceKm != null ? `${business.distanceKm} km away` : ''].filter(Boolean).join(' · ')}</Text>
+      {businessPromotions.length ? <Pressable accessibilityLabel="View active promotions" onPress={() => { onTrackAction?.('promotions'); setTab('promotions'); setTimeout(() => screenRef.current?.scrollTo({ y: 540, animated: true }), 50); }}><Animated.View style={[styles.promotionPulse, { opacity: promotionPulse }]}><Text style={styles.promotionPulseIcon}>🏷️</Text><Text style={styles.promotionPulseText}>PROMO</Text></Animated.View></Pressable> : null}
       {business.abnVerified === true ? (
         <View style={styles.verified}><Text style={styles.verifiedText}>{'\u2713'} ABN Verified{formatVerificationDate(business.abnCheckedAt || business.approvedAt) ? ` · Checked ${formatVerificationDate(business.abnCheckedAt || business.approvedAt)}` : ''}</Text></View>
       ) : null}

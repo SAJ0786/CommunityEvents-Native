@@ -4,17 +4,15 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
-const header = read('src/components/MemberPageHeader.js');
+const header = read('src/components/PageHeader.js');
 
-assert.match(header, /fontSize: 22/);
+assert.match(header, /fontSize: 18/);
 assert.match(header, /fontWeight: '700'/);
 assert.match(header, /fontSize: 11/);
-assert.match(header, /fontWeight: '500'/);
-assert.match(header, /panel = false/);
-assert.match(header, /borderColor: '#b9dfd9'/);
-assert.match(header, /backgroundColor: '#effaf7'/);
-assert.match(header, /\.\.\.shadow/);
-assert.match(read('src/components/AdminPageHeader.js'), /fontSize: 18/);
+assert.match(header, /borderColor: colors\.border/);
+assert.match(header, /backgroundColor: colors\.tealSoft/);
+assert.match(read('src/components/AdminPageHeader.js'), /PageHeader/);
+assert.match(read('src/components/MemberPageHeader.js'), /PageHeader/);
 
 const panelPages = [
   'src/components/StreamedVideosScreen.js',
@@ -45,8 +43,8 @@ const migrated = [
 ];
 
 for (const file of migrated) assert.match(read(file), /MemberPageHeader/, `${file} should use MemberPageHeader`);
-for (const file of ['src/components/CalendarScreen.js', 'src/components/HijriCalendarScreen.js']) {
-  assert.doesNotMatch(read(file), /MemberPageHeader/, `${file} retains its intentional custom calendar hero`);
+for (const file of ['src/components/CalendarScreen.js', 'src/components/HijriCalendarScreen.js', 'src/components/CreateEventForm.js', 'src/business/BusinessDirectoryModule.js', 'src/business/BusinessDetailsScreen.js']) {
+  assert.match(read(file), /MemberPageHeader/, `${file} should use MemberPageHeader`);
 }
 
-console.log('PASS member page header: shared typography, admin exception, migrations and calendar hero exceptions.');
+console.log('PASS page headers: shared Admin Dashboard typography, surface and migrations.');

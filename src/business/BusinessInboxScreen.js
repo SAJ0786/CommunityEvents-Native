@@ -86,7 +86,12 @@ export default function BusinessInboxScreen({ user, profile, onBack }) {
   };
   if (selected) return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen} keyboardVerticalOffset={0}>
-      <View style={styles.header}><NativeBackButton accessibilityLabel="Back to inbox" onPress={() => setSelected(null)} /><View style={styles.headerCopy}><Text style={styles.title}>{selected.businessName}</Text><Text style={styles.subtitle}>{folder === 'received' ? `Enquiry from ${selected.senderName || 'a customer'}` : 'Your enquiry to this business'}</Text></View></View>
+      <MemberPageHeader
+        title={selected.businessName}
+        subtitle={folder === 'received' ? `Enquiry from ${selected.senderName || 'a customer'}` : 'Your enquiry to this business'}
+        onBack={() => setSelected(null)}
+        backAccessibilityLabel="Back to inbox"
+      />
       <View style={styles.safetyRow}>
         <Pressable onPress={toggleBlock} style={styles.safetyButton}><Text style={styles.safetyButtonText}>{blockedByMe ? 'Unblock' : 'Block'}</Text></Pressable>
         <Pressable onPress={() => setReporting(value => !value)} style={styles.safetyButton}><Text style={styles.safetyButtonText}>Report</Text></Pressable>

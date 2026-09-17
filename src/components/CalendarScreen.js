@@ -8,6 +8,7 @@ import { getHijriParts, HIJRI_MONTHS } from '../services/hijri';
 import { getHijriSettings } from '../services/settings';
 import { colors, radius, shadow, spacing } from '../theme';
 import NativeBackButton from './NativeBackButton';
+import MemberPageHeader from './MemberPageHeader';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
@@ -50,10 +51,7 @@ function CalendarSync({ user, onBack }) {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.screenHeader}>
-        <NativeBackButton accessibilityLabel="Back to calendar" onPress={onBack} />
-        <Text style={styles.screenTitle}>Sync Calendar</Text>
-      </View>
+      <MemberPageHeader title="Sync Calendar" subtitle="Subscribe to the Community Events calendar on your phone." onBack={onBack} backAccessibilityLabel="Back to calendar" />
 
       <View style={styles.syncHero}>
         <Text style={styles.syncHeroTitle}>Community Event Calendar</Text>
@@ -185,10 +183,7 @@ export default function CalendarScreen({
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.screenHeader}>
-        <NativeBackButton accessibilityLabel="Back to events" onPress={onBack} />
-        <Text style={styles.screenTitle}>Calendar</Text>
-      </View>
+      <MemberPageHeader title="Calendar" subtitle="Browse upcoming community events by month or week." onBack={onBack} backAccessibilityLabel="Back to events" />
 
       <Pressable
         disabled={isGuest}
