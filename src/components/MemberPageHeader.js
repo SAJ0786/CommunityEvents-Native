@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import NativeBackButton from './NativeBackButton';
-import { colors, spacing } from '../theme';
+import { colors, radius, shadow, spacing } from '../theme';
 
 export default function MemberPageHeader({
   title,
@@ -11,9 +11,10 @@ export default function MemberPageHeader({
   children,
   footer,
   style,
+  panel = false,
 }) {
   return (
-    <View style={[styles.header, style]}>
+    <View style={[styles.header, panel && styles.panel, style]}>
       <View style={styles.row}>
         {onBack ? <NativeBackButton accessibilityLabel={backAccessibilityLabel} onPress={onBack} /> : null}
         <View style={styles.copy}>
@@ -29,6 +30,14 @@ export default function MemberPageHeader({
 
 const styles = StyleSheet.create({
   header: { marginBottom: spacing.lg },
+  panel: {
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: '#b9dfd9',
+    backgroundColor: '#effaf7',
+    ...shadow,
+  },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   copy: { flex: 1, minWidth: 0 },
   actions: { flexDirection: 'row', alignItems: 'center' },

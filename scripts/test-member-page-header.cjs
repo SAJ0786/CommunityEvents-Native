@@ -10,7 +10,21 @@ assert.match(header, /fontSize: 22/);
 assert.match(header, /fontWeight: '700'/);
 assert.match(header, /fontSize: 11/);
 assert.match(header, /fontWeight: '500'/);
+assert.match(header, /panel = false/);
+assert.match(header, /borderColor: '#b9dfd9'/);
+assert.match(header, /backgroundColor: '#effaf7'/);
+assert.match(header, /\.\.\.shadow/);
 assert.match(read('src/components/AdminPageHeader.js'), /fontSize: 18/);
+
+const panelPages = [
+  'src/components/StreamedVideosScreen.js',
+  'src/components/ProfileScreen.js',
+  'src/components/InboxScreen.js',
+  'src/business/BusinessInboxScreen.js',
+  'src/business/BusinessNotificationsScreen.js',
+];
+
+for (const file of panelPages) assert.match(read(file), /MemberPageHeader[\s\S]*?panel/, `${file} should opt into the shared heading panel`);
 
 const migrated = [
   'src/components/ProfileScreen.js',

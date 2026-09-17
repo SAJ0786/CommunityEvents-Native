@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import useMenuDrawerMotion from './useMenuDrawerMotion';
+import DrawerDragZone from './DrawerDragZone';
 import ScrollView from './KeyboardAwareScrollView';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -396,7 +397,7 @@ export default function EventDetailsModal({
         <SafeAreaView style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={animateClose} />
           <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
-            <View style={styles.sheetHeader} {...panHandlers}>
+            <DrawerDragZone panHandlers={panHandlers} style={styles.sheetHeader}>
               <View style={styles.dragHandle} />
               <View style={styles.headerRow}>
                 <View style={styles.headerCopy}>
@@ -407,7 +408,7 @@ export default function EventDetailsModal({
                   <Text maxFontSizeMultiplier={1} style={styles.closeText}>{'\u00D7'}</Text>
                 </Pressable>
               </View>
-            </View>
+            </DrawerDragZone>
 
             <ScrollView
               bounces={false}

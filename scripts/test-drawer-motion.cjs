@@ -122,9 +122,12 @@ interrupted.unmount();
 for (const name of ['AccountMenuSheet', 'EventDetailsModal', 'NotificationsDrawer']) {
   const source = read(`src/components/${name}.js`);
   assert.match(source, /useMenuDrawerMotion\(\{ visible, onClose \}\)/);
-  assert.match(source, /\{\.\.\.panHandlers\}/);
+  assert.match(source, /DrawerDragZone/);
+  assert.match(source, /panHandlers=\{panHandlers\}/);
   assert.doesNotMatch(source, /PanResponder.create|Animated.spring|Animated.timing/);
 }
+const dragZone = read('src/components/DrawerDragZone.js');
+assert.match(dragZone, /collapsable=\{false\}/, 'shared drag surface must remain a native hit-test target');
 const notices = read('src/business/BusinessNotificationsScreen.js');
 assert.ok(notices.indexOf('renderHeader(header)') < notices.indexOf('<ScrollView bounces='), 'draggable heading must be outside scroll content');
 assert.match(notices, /!renderHeader \? header : null/, 'full Notifications page keeps its header');

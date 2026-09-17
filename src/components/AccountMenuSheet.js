@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import useMenuDrawerMotion from './useMenuDrawerMotion';
+import DrawerDragZone from './DrawerDragZone';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, radius, shadow, spacing } from '../theme';
 import { cityLabel, normalizeCity } from '../utils/cities';
@@ -68,13 +69,13 @@ export default function AccountMenuSheet({ visible, activeModule = 'events', isG
     <View pointerEvents="box-none" style={[styles.layer, { paddingBottom: bottomInset }]}>
       <Pressable accessibilityLabel="Close menu" onPress={() => requestClose()} style={[styles.backdrop, { bottom: bottomInset }]} />
       <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
-        <View style={styles.dragZone} {...panHandlers}>
+        <DrawerDragZone panHandlers={panHandlers} style={styles.dragZone}>
           <View style={styles.handle} />
           <View style={styles.headingRow}>
           <View><Text style={styles.title}>Menu</Text><Text style={styles.subtitle}>Account, services and app settings</Text></View>
           <Pressable accessibilityLabel="Close menu" onPress={() => requestClose()} style={styles.close}><MaterialCommunityIcons color={colors.blue} name="close" size={24} /></Pressable>
           </View>
-        </View>
+        </DrawerDragZone>
         <View style={styles.identity}>
           <View style={styles.initials}><Text style={styles.initialsText}>{isGuest ? 'G' : userInitials(user, profile)}</Text></View>
           <View style={styles.identityCopy}><Text numberOfLines={1} style={styles.name}>{isGuest ? 'Guest User' : displayName}</Text><Text style={styles.role}>{[role, roleScope].filter(Boolean).join(' · ')}</Text></View>
