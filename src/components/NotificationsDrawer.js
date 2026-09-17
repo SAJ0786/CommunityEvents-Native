@@ -2,6 +2,7 @@ import React from 'react';
 import { Animated, Modal, Pressable, SafeAreaView, StyleSheet, View } from 'react-native';
 import BusinessNotificationsScreen from '../business/BusinessNotificationsScreen';
 import useMenuDrawerMotion from './useMenuDrawerMotion';
+import DrawerDragZone from './DrawerDragZone';
 import { colors } from '../theme';
 
 export default function NotificationsDrawer({ visible, onClose, user, profile }) {
@@ -13,10 +14,10 @@ export default function NotificationsDrawer({ visible, onClose, user, profile })
         <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
           {visible ? <BusinessNotificationsScreen key={user?.uid || 'guest'} user={user} profile={profile} onBack={requestClose}
             renderHeader={header => (
-              <View {...panHandlers} style={styles.dragZone}>
+              <DrawerDragZone panHandlers={panHandlers} style={styles.dragZone}>
                 <View style={styles.handle} />
                 {header}
-              </View>
+              </DrawerDragZone>
             )}
           /> : null}
         </Animated.View>

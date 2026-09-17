@@ -82,6 +82,7 @@ export default function BusinessNotificationsScreen({ user, profile, onBack, ren
     <MemberPageHeader
       title="Notifications"
       subtitle={unreadCount ? `${unreadCount} unread update${unreadCount === 1 ? '' : 's'}` : 'You are up to date'}
+      panel
       onBack={!renderHeader ? onBack : undefined}
       backAccessibilityLabel="Back to business directory"
       footer={rows.length ? <Pressable accessibilityRole="button" accessibilityHint="Marks updates read and clears them from this device; moderation notices are retained." onPress={clearNotifications} style={styles.clearButton}><Text style={styles.clearButtonText}>Clear notifications on this device</Text></Pressable> : null}

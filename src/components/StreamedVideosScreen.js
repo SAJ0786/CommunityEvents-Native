@@ -62,7 +62,7 @@ export default function StreamedVideosScreen({ isGuest = false, onBack }) {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <MemberPageHeader title="Streamed Videos" subtitle="Community Events Australia live-stream archive" onBack={onBack}>
+      <MemberPageHeader panel title="Streamed Videos" subtitle="Community Events Australia live-stream archive" onBack={onBack}>
         <Pressable onPress={loadVideos} style={({ pressed }) => [styles.lightButton, pressed && styles.pressed]}>
           <Text style={styles.lightButtonText}>{loading ? 'Loading...' : 'Refresh'}</Text>
         </Pressable>

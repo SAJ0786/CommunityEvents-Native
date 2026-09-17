@@ -98,7 +98,7 @@ export default function BusinessInboxScreen({ user, profile, onBack }) {
   );
   return (
     <ScrollView contentContainerStyle={styles.list}>
-      <MemberPageHeader title="Business messaging" subtitle="Private enquiries received for your businesses and conversations you started." onBack={onBack} backAccessibilityLabel="Back to directory" />
+      <MemberPageHeader panel title="Business messaging" subtitle="Private enquiries received for your businesses and conversations you started." onBack={onBack} backAccessibilityLabel="Back to directory" />
       <View accessibilityRole="tablist" style={styles.folderRow}>
         {[{ value: 'received', label: 'Inbox', count: receivedThreads.length }, { value: 'sent', label: 'Sent messages', count: sentThreads.length }].map(item => (
           <Pressable key={item.value} accessibilityRole="tab" accessibilityState={{ selected: folder === item.value }}

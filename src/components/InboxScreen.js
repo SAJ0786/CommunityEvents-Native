@@ -90,7 +90,7 @@ export default function InboxScreen({ user, profile, onBack }) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.screen}>
       <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.centerCard}>
-          <MemberPageHeader title="Inbox" onBack={onBack} />
+          <MemberPageHeader panel title="Inbox" onBack={onBack} />
           <Text style={styles.emptyText}>Please sign in to use your inbox.</Text>
         </View>
       </ScrollView>
@@ -149,7 +149,7 @@ export default function InboxScreen({ user, profile, onBack }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.card}>
-        <MemberPageHeader title="Inbox" subtitle="Messages between event hosts and community members." onBack={onBack} />
+        <MemberPageHeader panel title="Inbox" subtitle="Messages between event hosts and community members." onBack={onBack} />
       </View>
 
       {loadError ? <View style={styles.centerCard}><Text style={styles.emptyText}>{loadError}</Text></View> : null}

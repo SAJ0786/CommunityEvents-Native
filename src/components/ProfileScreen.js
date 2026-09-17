@@ -260,7 +260,7 @@ export default function ProfileScreen({
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-      <MemberPageHeader title="Profile & Settings" subtitle="Your account and app preferences" />
+      <MemberPageHeader panel title="Profile & Settings" subtitle="Your account and app preferences" />
       <Pressable accessibilityRole="button" onPress={() => setSupportOpen(true)} style={styles.card}>
         <Text style={styles.cardTitle}>Feedback &amp; Report a Problem</Text>
         <Text style={styles.body}>App feedback, technical issues, account help and other enquiries.</Text>
