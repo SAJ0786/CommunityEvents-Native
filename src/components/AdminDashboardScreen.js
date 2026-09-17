@@ -814,6 +814,15 @@ export default function AdminDashboardScreen({
     setHijriObsSelection(item.id);
   };
 
+  const selectHijriObservance = selection => {
+    if (selection === '__new__') {
+      resetHijriObservanceForm('__new__');
+      return;
+    }
+    const item = sortedObservances.find(observance => observance.id === selection);
+    if (item) editHijriObservance(item);
+  };
+
   const handleAction = key => {
     if (key === 'messaging') {
       setPanel('messaging');
@@ -3276,40 +3285,18 @@ export default function AdminDashboardScreen({
                     Add, edit, disable, or delete the Islamic dates shown in the Hijri Calendar page.
                   </Text>
 
-                  <View style={styles.rowWrap}>
-                    <Pressable
-                      onPress={() => resetHijriObservanceForm('__new__')}
-                      style={[styles.secondaryButton, hijriObsSelection === '__new__' && styles.secondaryButtonActive]}
-                    >
-                      <Text style={[styles.secondaryButtonText, hijriObsSelection === '__new__' && styles.secondaryButtonTextActive]}>
-                        New Important Date
-                      </Text>
-                    </Pressable>
-                  </View>
+                  <Text style={styles.inputLabel}>Important Hijri event</Text>
+                  <CompactSelect
+                    options={[
+                      { value: '__new__', label: 'New event' },
+                      ...sortedObservances.map(item => ({ value: item.id, label: item.name })),
+                    ]}
+                    value={hijriObsSelection}
+                    onChange={selectHijriObservance}
+                    placeholder="Choose an important Hijri event"
+                  />
 
-                  <View style={styles.stack}>
-                    {sortedObservances.map(item => (
-                      <View key={item.id} style={styles.listRowTall}>
-                        <Pressable style={styles.listTextWrap} onPress={() => editHijriObservance(item)}>
-                          <Text style={styles.listTitle}>{item.name}</Text>
-                          <Text style={styles.listMeta}>
-                            {item.day} {HIJRI_MONTHS.find(month => month.value === Number(item.month))?.name || `Month ${item.month}`} • {item.category}
-                          </Text>
-                          {item.notes ? <Text style={styles.listSubtle}>{item.notes}</Text> : null}
-                        </Pressable>
-                        <View style={styles.rowWrap}>
-                          <Pressable onPress={() => toggleObservance(item)} style={styles.ghostButton}>
-                            <Text style={styles.ghostButtonText}>{item.enabled === false ? 'Enable' : 'Disable'}</Text>
-                          </Pressable>
-                          <Pressable onPress={() => confirmDeleteObservance(item)} style={styles.ghostButtonDanger}>
-                            <Text style={styles.ghostButtonDangerText}>Delete</Text>
-                          </Pressable>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-
-                  {(hijriObsSelection === '__new__' || editingHijriObsId) ? (
+                  {hijriObsSelection ? (
                     <View style={styles.formCard}>
                       <Text style={styles.subsectionTitle}>{editingHijriObsId ? 'Edit Important Date' : 'New Important Date'}</Text>
 
@@ -3386,18 +3373,38 @@ export default function AdminDashboardScreen({
                         </Text>
                       </Pressable>
 
-                      <View style={styles.rowWrap}>
-                        <Pressable
-                          onPress={saveObservance}
-                          disabled={observanceSaving}
-                          style={[styles.primaryButton, observanceSaving && styles.disabledButton, styles.rowButton]}
-                        >
-                          <Text style={styles.primaryButtonText}>{observanceSaving ? 'Saving…' : 'Save Important Date'}</Text>
-                        </Pressable>
-                        <Pressable onPress={() => resetHijriObservanceForm()} style={[styles.secondaryButton, styles.rowButton]}>
-                          <Text style={styles.secondaryButtonText}>Cancel</Text>
-                        </Pressable>
-                      </View>
+                    <View style={styles.rowWrap}>
+                      <Pressable
+                        onPress={saveObservance}
+                        disabled={observanceSaving}
+                        style={[styles.primaryButton, observanceSaving && styles.disabledButton, styles.rowButton]}
+                      >
+                        <Text style={styles.primaryButtonText}>{observanceSaving ? 'Saving…' : 'Save Important Date'}</Text>
+                      </Pressable>
+                      <Pressable onPress={() => resetHijriObservanceForm()} style={[styles.secondaryButton, styles.rowButton]}>
+                        <Text style={styles.secondaryButtonText}>Cancel</Text>
+                      </Pressable>
+                      {editingHijriObsId ? (
+                        <>
+                          <Pressable
+                            onPress={() => toggleObservance(sortedObservances.find(item => item.id === editingHijriObsId))}
+                            disabled={observanceSaving}
+                            style={styles.ghostButton}
+                          >
+                            <Text style={styles.ghostButtonText}>
+                              {hijriObsForm.enabled ? 'Disable' : 'Enable'}
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => confirmDeleteObservance(sortedObservances.find(item => item.id === editingHijriObsId))}
+                            disabled={observanceSaving}
+                            style={styles.ghostButtonDanger}
+                          >
+                            <Text style={styles.ghostButtonDangerText}>Delete</Text>
+                          </Pressable>
+                        </>
+                      ) : null}
+                    </View>
                     </View>
                   ) : null}
                 </View>
