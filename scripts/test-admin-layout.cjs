@@ -88,6 +88,12 @@ async function main() {
   assert.match(source, /<Text style=\{styles\.cardTitle\}>Important Hijri Events Adjustment<\/Text>/);
   assert.match(source, /getHijriObservances\(\)/);
   assert.match(source, /saveHijriObservances\(sorted\)/);
+  assert.match(source, /const selectHijriObservance = selection =>/);
+  assert.match(source, /options=\{\[\s*\{ value: '__new__', label: 'New event' \},\s*\.\.\.sortedObservances\.map/);
+  assert.match(source, /onChange=\{selectHijriObservance\}/);
+  assert.match(source, /value=\{hijriObsSelection\}/);
+  assert.match(source, /\{hijriObsSelection \? \(/);
+  assert.match(source, /onPress=\{\(\) => resetHijriObservanceForm\(\)\}[\s\S]{0,180}>[\s\S]*Cancel</);
   for (const field of ['name', 'day', 'month', 'category', 'priority', 'notes', 'enabled']) {
     assert.match(source, new RegExp(`hijriObsForm\\.${field}`), `Hijri observance form should include ${field}`);
   }
