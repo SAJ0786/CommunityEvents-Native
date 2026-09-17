@@ -3271,7 +3271,7 @@ export default function AdminDashboardScreen({
 
               {(
                 <View style={styles.actionCard}>
-                  <Text style={styles.cardTitle}>Important Hijri Dates</Text>
+                  <Text style={styles.cardTitle}>Important Hijri Events Adjustment</Text>
                   <Text style={styles.cardDescription}>
                     Add, edit, disable, or delete the Islamic dates shown in the Hijri Calendar page.
                   </Text>
