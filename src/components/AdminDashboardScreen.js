@@ -43,6 +43,7 @@ import {
   saveHijriSettings,
   saveMonthOverride,
 } from '../services/settings';
+import { uploadCommunityMessageImage } from '../services/images';
 import {
   DEFAULT_HIJRI_OBSERVANCES,
   getHijriObservances,
@@ -471,6 +472,8 @@ export default function AdminDashboardScreen({
   const [sendingReminder, setSendingReminder] = useState(false);
   const [reminderResult, setReminderResult] = useState(null);
   const [communityMsg, setCommunityMsg] = useState('');
+  const [communityImage, setCommunityImage] = useState(null);
+  const [communityImageError, setCommunityImageError] = useState('');
   const [youtubeStatus, setYouTubeStatus] = useState('checking');
   const [youtubeBusy, setYouTubeBusy] = useState(false);
   const [thumbnailBusy, setThumbnailBusy] = useState(false);
@@ -1598,20 +1601,59 @@ export default function AdminDashboardScreen({
     }
   };
 
+  const pickCommunityMessageImage = async () => {
+    setCommunityImageError('');
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setCommunityImageError('Allow photo access to add an image to the community update.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.85,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      if (asset.fileSize && asset.fileSize >= 5 * 1024 * 1024) {
+        setCommunityImageError('Community update images must be smaller than 5 MB.');
+        return;
+      }
+      setCommunityImage({ uri: asset.uri, mimeType: asset.mimeType || 'image/jpeg' });
+    } catch (error) {
+      setCommunityImageError(error?.message || 'Could not open your photo library.');
+    }
+  };
+
+  const removeCommunityMessageImage = () => {
+    setCommunityImage(null);
+    setCommunityImageError('');
+  };
+
   const sendCommunityMessageNow = async () => {
-    if (!communityMsg.trim()) {
-      setReminderResult({ message: 'Enter a message before sending the community update.', error: true });
+    const trimmedMessage = communityMsg.trim();
+    if (!trimmedMessage && !communityImage) {
+      setReminderResult({ message: 'Enter a message or add an image before sending the community update.', error: true });
       return;
     }
     setSendingReminder(true);
     setReminderResult(null);
+    setCommunityImageError('');
     try {
+      let imageUrl = '';
+      if (communityImage?.uri) {
+        const uploaded = await uploadCommunityMessageImage(communityImage.uri, user?.uid, communityImage.mimeType);
+        imageUrl = uploaded.imageUrl;
+      }
       const result = await sendCommunityUpdateMessage({
-        message: communityMsg.trim(),
+        message: trimmedMessage,
         city: reminderCityScope,
+        imageUrl,
       });
       setReminderResult({ message: result.message || 'Community update queued.', error: false });
       setCommunityMsg('');
+      setCommunityImage(null);
     } catch (error) {
       setReminderResult({ message: error?.message || 'Failed to queue the community update.', error: true });
     } finally {
@@ -3097,11 +3139,35 @@ export default function AdminDashboardScreen({
               style={[styles.input, styles.multilineInput]}
             />
 
+            <Text style={[styles.inputLabel, styles.imagePickerLabel]}>Image (optional)</Text>
+            {communityImage?.uri ? (
+              <View style={styles.imagePreviewWrap}>
+                <Image source={{ uri: communityImage.uri }} resizeMode="cover" style={styles.imagePreview} />
+                <View style={styles.rowWrap}>
+                  <Pressable onPress={pickCommunityMessageImage} style={styles.addButton}>
+                    <Text style={styles.addButtonText}>Replace image</Text>
+                  </Pressable>
+                  <Pressable onPress={removeCommunityMessageImage} style={styles.removeButton}>
+                    <Text style={styles.removeText}>Remove image</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Pressable onPress={pickCommunityMessageImage} style={styles.imageDropZone}>
+                <Text style={styles.imageDropZoneIcon}>{'\u{1F4F7}'}</Text>
+                <Text style={styles.imageDropZoneText}>Tap to add an image</Text>
+              </Pressable>
+            )}
+            {communityImageError ? <Text style={styles.fieldError}>{communityImageError}</Text> : null}
+            <Text style={styles.helper}>
+              Optional - send text only, image only, or both. Images must be smaller than 5 MB.
+            </Text>
+
             <View style={styles.rowWrap}>
               <Pressable
                 onPress={sendCommunityMessageNow}
-                disabled={sendingReminder || !communityMsg.trim()}
-                style={[styles.primaryButton, styles.rowButton, (sendingReminder || !communityMsg.trim()) && styles.disabledButton]}
+                disabled={sendingReminder || (!communityMsg.trim() && !communityImage)}
+                style={[styles.primaryButton, styles.rowButton, (sendingReminder || (!communityMsg.trim() && !communityImage)) && styles.disabledButton]}
               >
                 <Text style={styles.primaryButtonText}>
                   {sendingReminder ? 'Queueing message...' : 'Send to All Users'}
@@ -3456,6 +3522,41 @@ const styles = StyleSheet.create({
   },
   messagingUpdateCard: { order: 1 },
   messagingEmailCard: { order: 2 },
+  imagePickerLabel: { marginTop: spacing.md },
+  imageDropZone: {
+    minHeight: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.teal,
+    borderRadius: radius.md,
+    backgroundColor: '#eef8f6',
+    padding: spacing.lg,
+  },
+  imageDropZoneIcon: { fontSize: 28 },
+  imageDropZoneText: { marginTop: spacing.sm, color: colors.tealDark, fontSize: 13, fontWeight: '700' },
+  imagePreviewWrap: { gap: spacing.sm },
+  imagePreview: {
+    width: '100%',
+    height: 160,
+    borderRadius: radius.md,
+    backgroundColor: colors.tealSoft,
+  },
+  addButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.teal,
+  },
+  addButtonText: { color: colors.tealDark, fontSize: 13, fontWeight: '700' },
+  removeButton: { alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  removeText: { color: colors.danger, fontSize: 12, fontWeight: '700' },
+  fieldError: { color: colors.danger, fontSize: 12, fontWeight: '700', marginTop: spacing.xs },
+  helper: { color: colors.muted, fontSize: 12, marginTop: spacing.xs },
   statisticsCard: {
     gap: spacing.md,
     padding: spacing.md,

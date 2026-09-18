@@ -30,6 +30,20 @@ export async function uploadBusinessImage(localUri, userId, businessId, kind = '
   return { imagePath, imageUrl };
 }
 
+export async function uploadCommunityMessageImage(localUri, userId, contentType = 'image/jpeg') {
+  if (!localUri || !userId) throw new Error('A selected image and signed-in user are required.');
+  const safeType = String(contentType || 'image/jpeg').startsWith('image/')
+    ? String(contentType || 'image/jpeg')
+    : 'image/jpeg';
+  const extension = safeType.includes('png') ? 'png' : safeType.includes('webp') ? 'webp' : 'jpg';
+  const fileName = `${Date.now()}.${extension}`;
+  const imagePath = `community-message-images/${userId}/${fileName}`;
+  const imageRef = ref(storage, imagePath);
+  await putFile(imageRef, localUri, { contentType: safeType });
+  const imageUrl = await getDownloadURL(imageRef);
+  return { imagePath, imageUrl };
+}
+
 export async function deleteBusinessImage(imagePath) {
   const safePath = String(imagePath || '').trim();
   if (!safePath || !safePath.startsWith('business-images/')) return;

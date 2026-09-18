@@ -783,6 +783,69 @@ function escapeHtml(value) {
     .replace(/'/g, '&#039;');
 }
 
+// Community Update Message images must be a download URL this app generated
+// (Firebase Storage, community-message-images/<uid>/<file>, ?alt=media).
+// Anything else (including base64/data URIs) is rejected and the image is
+// omitted rather than interpolated into the email HTML.
+function isTrustedCommunityMessageImageUrl(url) {
+  const value = String(url || '').trim();
+  if (!value) return false;
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'https:') return false;
+  if (parsed.hostname !== 'firebasestorage.googleapis.com') return false;
+  const match = parsed.pathname.match(/^\/v0\/b\/[^/]+\/o\/(.+)$/);
+  if (!match) return false;
+  let objectPath;
+  try {
+    objectPath = decodeURIComponent(match[1]);
+  } catch {
+    return false;
+  }
+  if (!objectPath.startsWith('community-message-images/')) return false;
+  if (parsed.searchParams.get('alt') !== 'media') return false;
+  return true;
+}
+
+// Builds the body for a Community Update Message email. Supports text only,
+// image only, or text followed by the image, and never base64/data URIs.
+function buildCustomMessageEmailBody(customMessage, customImageUrl) {
+  const trimmedMessage = String(customMessage || '').trim();
+  const requestedImageUrl = String(customImageUrl || '').trim();
+  const trustedImageUrl = requestedImageUrl && isTrustedCommunityMessageImageUrl(requestedImageUrl)
+    ? requestedImageUrl
+    : '';
+  if (requestedImageUrl && !trustedImageUrl) {
+    console.error('[Manual Email] Rejected untrusted community message image URL:', requestedImageUrl);
+  }
+  const messageHtml = trimmedMessage
+    ? `<p style="white-space:pre-wrap;margin:0">${escapeHtml(trimmedMessage)}</p>`
+    : '';
+  const imageHtml = trustedImageUrl
+    ? `<img src="${escapeHtml(trustedImageUrl)}" alt="Community update image" style="width:100%;max-width:600px;height:auto;display:block;margin:${trimmedMessage ? '12px 0 0' : '0'}" />`
+    : '';
+  return `<div>${messageHtml}${imageHtml}</div>`;
+}
+
+// True for the freeform Community Update Message flow (not the store
+// announcement custom template), where empty text + no image must be rejected.
+function isCustomMessagePayload(payload = {}) {
+  return Boolean(payload?.customMode) && payload?.customTemplate !== 'storeAnnouncement';
+}
+
+function assertCustomMessagePayloadHasContent(payload = {}) {
+  if (!isCustomMessagePayload(payload)) return;
+  const trimmedMessage = String(payload.customMessage || '').trim();
+  const hasImage = Boolean(String(payload.customImageUrl || '').trim());
+  if (!trimmedMessage && !hasImage) {
+    throw new HttpsError('invalid-argument', 'Enter a message or add an image before sending the community update.');
+  }
+}
+
 function sortEventsForUpdate(events) {
   return [...events].sort((a, b) => {
     const timeCompare = String(a.startTime || '').localeCompare(String(b.startTime || ''));
@@ -2325,8 +2388,16 @@ async function runManualReminderEmailSend({ payload = {}, callerData = {}, cityS
     month,
     customMode = false,
     customMessage = '',
+    customImageUrl = '',
     customTemplate = ''
   } = payload || {};
+
+  // Defense in depth: the callable already rejects an empty text + no image
+  // request, but the Firestore-triggered job runs from stored payload data too.
+  if (isCustomMessagePayload(payload) && !String(customMessage || '').trim() && !String(customImageUrl || '').trim()) {
+    return { sent: 0, failed: 0, events: 0, message: "No message or image provided. No emails sent." };
+  }
+
   const safeCityScope = cityScope || requestedCityScope(payload.city, callerData);
   const todaySyd = new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
 
@@ -2433,10 +2504,7 @@ async function runManualReminderEmailSend({ payload = {}, callerData = {}, cityS
         html: customMode && customTemplate === 'storeAnnouncement'
           ? buildStoreAnnouncementEmail() + unsubscribeFooter(doc.id)
           : customMode
-          ? `<div>
-              <p style="white-space:pre-wrap;margin:0">${escapeHtml(customMessage)}</p>
-              ${unsubscribeFooter(doc.id)}
-            </div>`
+          ? buildCustomMessageEmailBody(customMessage, customImageUrl) + unsubscribeFooter(doc.id)
           : recipientHtml + unsubscribeFooter(doc.id)
       });
       sent++;
@@ -2473,6 +2541,7 @@ exports.sendRemindersNow = onCall(
     }
 
     const payload = request.data || {};
+    assertCustomMessagePayloadHasContent(payload);
     const cityScope = requestedCityScope(payload.city, callerData);
     const jobRef = await db.collection("reminderEmailJobs").add({
       payload,
@@ -5053,3 +5122,12 @@ exports.nativeStreamEndEvent = onCall(
     return { ok: true };
   }
 );
+
+// Test-only pure helpers for the Community Update Message image feature.
+// Not part of the email-entrypoints.js allowlist, so nothing extra is deployed.
+exports.__testables = {
+  isTrustedCommunityMessageImageUrl,
+  buildCustomMessageEmailBody,
+  isCustomMessagePayload,
+  assertCustomMessagePayloadHasContent,
+};

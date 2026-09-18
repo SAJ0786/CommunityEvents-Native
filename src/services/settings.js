@@ -97,13 +97,19 @@ export async function sendReminderEmailJob(payload = {}) {
   return result.data || { queued: false, sent: 0, message: 'Reminder request finished.' };
 }
 
-export async function sendCommunityUpdateMessage({ message, city } = {}) {
+export async function sendCommunityUpdateMessage({ message, city, imageUrl } = {}) {
+  const trimmedMessage = String(message || '').trim();
+  const safeImageUrl = String(imageUrl || '').trim();
+  if (!trimmedMessage && !safeImageUrl) {
+    throw new Error('Enter a message or add an image before sending the community update.');
+  }
   const today = new Date().toISOString().slice(0, 10);
   return sendReminderEmailJob({
     mode: 'date',
     date: today,
     customMode: true,
-    customMessage: String(message || '').trim(),
+    customMessage: trimmedMessage,
+    customImageUrl: safeImageUrl,
     city,
   });
 }
