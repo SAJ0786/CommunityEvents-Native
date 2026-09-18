@@ -86,7 +86,7 @@ export default function BusinessPromotionForm({
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-      <MemberPageHeader title={initialPromotion?.id ? 'Edit promotion' : 'Create promotion'} subtitle="Promotions remain private until approved by the central admin team.">
+      <MemberPageHeader title={initialPromotion?.id ? 'Edit promotion' : 'Create promotion'} subtitle="Promotions remain private until approved by the central admin team." icon="bullhorn-outline" tone="amber">
         <Pressable onPress={onCancel} style={styles.close}><Text style={styles.closeText}>{'\u2715'}</Text></Pressable>
       </MemberPageHeader>
 

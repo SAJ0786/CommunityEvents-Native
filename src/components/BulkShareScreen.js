@@ -240,6 +240,8 @@ export default function BulkShareScreen({ events = [], profile, user }) {
         <MemberPageHeader
           title="Bulk Share Events"
           subtitle={`Filter events, select the ones you want, then share or copy.${!isNationalBulkShare ? ` Your bulk share list is limited to ${cityLabel(bulkShareCity)}.` : ''}`}
+          icon="share-variant-outline"
+          tone="teal"
         />
 
         <Text style={styles.label}>Message title</Text>

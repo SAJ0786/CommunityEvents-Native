@@ -213,6 +213,8 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
       <MemberPageHeader
         title="Local businesses"
         subtitle={`Browse approved businesses in ${cityLabel(city).replace(', Australia', '')}.`}
+        icon="store-search-outline"
+        tone="amber"
       >
         <View style={styles.cityControl}><CitySelector compact selectedCity={city} onChange={onCityChange} onLocationResolved={onLocationResolved} allowCurrentLocation /></View>
       </MemberPageHeader>
@@ -372,7 +374,7 @@ function PromotionsScreen({ city, businesses, promotions, ownerPromotions = [], 
     .sort((left, right) => Number(ownedActiveIds.has(right.id)) - Number(ownedActiveIds.has(left.id)) || Number(right.boosted) - Number(left.boosted));
   return (
     <ScrollView contentContainerStyle={styles.pageContent}>
-      <MemberPageHeader title="Promotions" subtitle={`Your active promotions appear first, followed by current promotions for ${cityLabel(city).replace(', Australia', '')}. Tap a promotion to view the business.`} />
+      <MemberPageHeader title="Promotions" subtitle={`Your active promotions appear first, followed by current promotions for ${cityLabel(city).replace(', Australia', '')}. Tap a promotion to view the business.`} icon="bullhorn-outline" tone="amber" />
       {loading ? <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Loading promotions</Text></View> : null}
       {error ? <View style={styles.errorCard}><Text style={styles.errorTitle}>Promotions unavailable</Text><Text style={styles.errorText}>{error}</Text></View> : null}
       {!loading && !error && !rows.length ? <View style={styles.emptyCard}><Text style={styles.emptyIcon}>{'\u{1F3F7}\uFE0F'}</Text><Text style={styles.emptyTitle}>No active promotions</Text><Text style={styles.emptyText}>Approved business promotions will appear here.</Text></View> : null}
@@ -402,7 +404,7 @@ function FavouritesScreen({ businesses, savedIds, onOpenBusiness, onToggleSaved,
   const savedBusinesses = businesses.filter(business => savedIds.includes(business.id));
   return (
     <ScrollView contentContainerStyle={styles.pageContent}>
-      <MemberPageHeader title="Business Favourites" subtitle="Your event Favourites remain available in the Events module." />
+      <MemberPageHeader title="Business Favourites" subtitle="Your event Favourites remain available in the Events module." icon="heart-outline" tone="rose" />
       {savedBusinesses.length ? (
         <CardGrid businesses={savedBusinesses} savedIds={savedIds} onOpen={onOpenBusiness} onToggleSaved={onToggleSaved} />
       ) : (
@@ -420,7 +422,7 @@ function FavouritesScreen({ businesses, savedIds, onOpenBusiness, onToggleSaved,
 function AddBusinessPreview({ onOpenAccount }) {
   return (
     <ScrollView contentContainerStyle={styles.pageContent}>
-      <MemberPageHeader title="List your business" subtitle="Sign in with your verified mobile account to submit and manage a business listing." />
+      <MemberPageHeader title="List your business" subtitle="Sign in with your verified mobile account to submit and manage a business listing." icon="store-plus-outline" tone="amber" />
       <View style={styles.stepsCard}>
         {[
           ['1', 'Business details', 'Name, category, services and ABN status'],
@@ -445,7 +447,7 @@ function DirectorySupportScreen({ mode, onBack, businesses = [], user, profile }
   const business = businesses.find(item => item.id === businessId);
   if (mode !== 'report' || business) return <SupportForm key={businessId || 'app'} business={business} user={user} profile={profile} onBack={onBack} />;
   return <ScrollView contentContainerStyle={styles.pageContent}>
-    <MemberPageHeader title="Report a Problem" subtitle="Choose a business. You can also report directly from its details page." onBack={onBack} />
+    <MemberPageHeader title="Report a Problem" subtitle="Choose a business. You can also report directly from its details page." icon="lifebuoy" tone="amber" onBack={onBack} />
     <CompactSelect options={businesses.map(item => ({ value: item.id, label: item.name }))} value={businessId} onChange={setBusinessId} placeholder="Choose the business" />
   </ScrollView>;
 }

@@ -90,7 +90,7 @@ export default function InboxScreen({ user, profile, onBack }) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.screen}>
       <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.centerCard}>
-          <MemberPageHeader panel title="Inbox" onBack={onBack} />
+          <MemberPageHeader panel title="Inbox" icon="email-outline" tone="blue" onBack={onBack} />
           <Text style={styles.emptyText}>Please sign in to use your inbox.</Text>
         </View>
       </ScrollView>
@@ -149,7 +149,7 @@ export default function InboxScreen({ user, profile, onBack }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.card}>
-        <MemberPageHeader panel title="Inbox" subtitle="Messages between event hosts and community members." onBack={onBack} />
+        <MemberPageHeader panel title="Inbox" subtitle="Messages between event hosts and community members." icon="email-outline" tone="blue" onBack={onBack} />
       </View>
 
       {loadError ? <View style={styles.centerCard}><Text style={styles.emptyText}>{loadError}</Text></View> : null}
@@ -240,9 +240,9 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   conversationHeader: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
   headerCopy: { flex: 1 },
-  title: { color: colors.navy, fontSize: 28, fontWeight: '700' },
-  subtitle: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: spacing.xs },
-  sectionTitle: { color: colors.navy, fontSize: 18, fontWeight: '700', marginBottom: spacing.sm },
+  title: { color: colors.navy, fontSize: 17, fontWeight: '700' },
+  subtitle: { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: spacing.xs },
+  sectionTitle: { color: colors.navy, fontSize: 16, fontWeight: '700', marginBottom: spacing.sm },
   emptyText: { color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   lightButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   lightButtonText: { color: colors.tealDark, fontSize: 13, fontWeight: '700' },

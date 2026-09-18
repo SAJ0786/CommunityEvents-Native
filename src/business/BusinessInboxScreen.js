@@ -89,6 +89,8 @@ export default function BusinessInboxScreen({ user, profile, onBack }) {
       <MemberPageHeader
         title={selected.businessName}
         subtitle={folder === 'received' ? `Enquiry from ${selected.senderName || 'a customer'}` : 'Your enquiry to this business'}
+        icon="message-text-outline"
+        tone="blue"
         onBack={() => setSelected(null)}
         backAccessibilityLabel="Back to inbox"
       />
@@ -103,7 +105,7 @@ export default function BusinessInboxScreen({ user, profile, onBack }) {
   );
   return (
     <ScrollView contentContainerStyle={styles.list}>
-      <MemberPageHeader panel title="Business messaging" subtitle="Private enquiries received for your businesses and conversations you started." onBack={onBack} backAccessibilityLabel="Back to directory" />
+      <MemberPageHeader panel title="Business messaging" subtitle="Private enquiries received for your businesses and conversations you started." icon="message-text-outline" tone="blue" onBack={onBack} backAccessibilityLabel="Back to directory" />
       <View accessibilityRole="tablist" style={styles.folderRow}>
         {[{ value: 'received', label: 'Inbox', count: receivedThreads.length }, { value: 'sent', label: 'Sent messages', count: sentThreads.length }].map(item => (
           <Pressable key={item.value} accessibilityRole="tab" accessibilityState={{ selected: folder === item.value }}

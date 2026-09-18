@@ -38,6 +38,8 @@ export default function SupportForm({ user, profile, business, onBack }) {
         <MemberPageHeader
           title={business ? 'Report a Problem' : 'Feedback & Report a Problem'}
           subtitle={business ? `${business.name}\nYour report is emailed privately to this business’s city admins and all super admins, not the business owner.` : 'App feedback, account issues and other problems are emailed to support@siza.info.'}
+          icon="lifebuoy"
+          tone="amber"
           onBack={() => { if (!busy) onBack?.(); }}
         />
         <Text style={styles.label}>Your name</Text>

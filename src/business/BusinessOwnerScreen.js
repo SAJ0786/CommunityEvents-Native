@@ -114,7 +114,7 @@ export default function BusinessOwnerScreen({
   const pending = businesses.filter(item => item.status === 'pending').length;
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <MemberPageHeader title="Your businesses" subtitle="Create listings, follow their approval status and keep business information current." />
+      <MemberPageHeader title="Your businesses" subtitle="Create listings, follow their approval status and keep business information current." icon="store-outline" tone="amber" />
 
       <View style={styles.summaryRow}>
         <View style={styles.summaryCard}><Text style={styles.summaryValue}>{businesses.length}</Text><Text style={styles.summaryLabel}>LISTINGS</Text></View>

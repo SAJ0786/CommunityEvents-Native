@@ -132,4 +132,27 @@ const notices = read('src/business/BusinessNotificationsScreen.js');
 assert.ok(notices.indexOf('renderHeader(header)') < notices.indexOf('<ScrollView bounces='), 'draggable heading must be outside scroll content');
 assert.match(notices, /!renderHeader \? header : null/, 'full Notifications page keeps its header');
 assert.doesNotMatch(read('src/components/NotificationsDrawer.js'), /animationType="slide"/);
+
+// All three drawers use the same plain absolute overlay architecture. The two
+// former Modal-backed drawers explicitly restore Android back dismissal.
+for (const name of ['AccountMenuSheet', 'EventDetailsModal', 'NotificationsDrawer']) {
+  const source = read(`src/components/${name}.js`);
+  assert.doesNotMatch(source, /<Modal|import\s+\{[^}]*Modal/, `${name} must not use React Native Modal for the drawer surface`);
+  assert.match(source, /StyleSheet\.absoluteFillObject/, `${name} must cover the full screen`);
+  assert.match(source, /zIndex:\s*(80|1000)/, `${name} must render above app content`);
+}
+for (const name of ['EventDetailsModal', 'NotificationsDrawer']) {
+  assert.match(read(`src/components/${name}.js`), /accessibilityViewIsModal=\{true\}/,
+    `${name} must preserve modal accessibility isolation`);
+}
+for (const name of ['EventDetailsModal', 'NotificationsDrawer']) {
+  const source = read(`src/components/${name}.js`);
+  assert.match(source, /BackHandler\.addEventListener\('hardwareBackPress'/, `${name} must restore Android back dismissal`);
+  assert.match(source, /return true/, `${name} must consume Android back while open`);
+}
+// Both former Modal-backed drag zones must offer the same guaranteed minimum
+// hit area as the Menu drawer's header row, regardless of text/content wrapping.
+assert.match(read('src/components/EventDetailsModal.js'), /sheetHeader: \{\s*minHeight: 78,/, 'event details drag zone must keep a fixed minimum hit height');
+assert.match(read('src/components/NotificationsDrawer.js'), /dragZone: \{ minHeight: 78,/, 'notifications drag zone must match the same minimum hit height');
+
 console.log('PASS shared drawers: Menu spring settings, drag ownership, snap-back, projected swipe, deferred/duplicate close, reopen interruption, navigation ordering and fixed notification header');

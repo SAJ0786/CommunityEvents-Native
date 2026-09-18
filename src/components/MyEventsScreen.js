@@ -115,7 +115,7 @@ export default function MyEventsScreen({
       ItemSeparatorComponent={() => <View style={styles.separator} />}
       ListHeaderComponent={(
         <View style={styles.headerContent}>
-          <MemberPageHeader title="My Events" subtitle="Events you created. Toggle visibility to show or hide from the home screen." />
+          <MemberPageHeader title="My Events" subtitle="Events you created. Toggle visibility to show or hide from the home screen." icon="calendar-check-outline" tone="teal" />
           {loading ? (
             <View style={styles.loadingCard}>
               <ActivityIndicator color={colors.teal} size="large" />
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     color: colors.navy,
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '700',
   },
   emptyText: {

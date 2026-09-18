@@ -260,7 +260,7 @@ export default function ProfileScreen({
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-      <MemberPageHeader panel title="Profile & Settings" subtitle="Your account and app preferences" />
+      <MemberPageHeader panel title="Profile & Settings" subtitle="Your account and app preferences" icon="account-circle-outline" tone="purple" />
       <Pressable accessibilityRole="button" onPress={() => setSupportOpen(true)} style={styles.card}>
         <Text style={styles.cardTitle}>Feedback &amp; Report a Problem</Text>
         <Text style={styles.body}>App feedback, technical issues, account help and other enquiries.</Text>
@@ -645,7 +645,7 @@ const styles = StyleSheet.create({
   },
   statusPill: { alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.tealSoft },
   statusText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
-  cardTitle: { color: colors.navy, fontSize: 22, fontWeight: '700', marginTop: spacing.md },
+  cardTitle: { color: colors.navy, fontSize: 17, fontWeight: '700', marginTop: spacing.md },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -654,7 +654,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   sectionHeaderCopy: { flex: 1 },
-  sectionTitle: { color: colors.navy, fontSize: 20, fontWeight: '700' },
+  sectionTitle: { color: colors.navy, fontSize: 16, fontWeight: '700' },
   sectionHint: { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 4 },
   body: { color: colors.text, fontSize: 15, lineHeight: 22, marginTop: spacing.sm },
   bodySmall: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: spacing.xs, marginBottom: spacing.md },
@@ -697,7 +697,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 15,
   },
-  otpInput: { fontSize: 22, fontWeight: '700', letterSpacing: 8, textAlign: 'center' },
+  otpInput: { fontSize: 19, fontWeight: '700', letterSpacing: 8, textAlign: 'center' },
   consentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   consentCopy: { flex: 1 },
   consentText: { color: colors.text, fontSize: 13, lineHeight: 19, fontWeight: '700' },
@@ -784,7 +784,7 @@ const styles = StyleSheet.create({
   aboutBrand: { color: colors.tealDark, fontSize: 13, fontWeight: '700', marginTop: spacing.sm },
   sizaLogo: { width: '100%', height: 110, marginTop: spacing.md, borderRadius: radius.md },
   aboutTagline: { color: colors.muted, fontSize: 12, fontWeight: '700', marginTop: 4 },
-  aboutTitle: { color: colors.navy, fontSize: 22, fontWeight: '700', marginTop: spacing.md },
+  aboutTitle: { color: colors.navy, fontSize: 18, fontWeight: '700', marginTop: spacing.md },
   aboutBody: { color: colors.text, fontSize: 14, lineHeight: 21, marginTop: spacing.sm },
   buildText: { color: colors.muted, fontSize: 12, fontWeight: '600', marginTop: spacing.md },
   inlineError: { color: colors.danger, fontSize: 13, fontWeight: '600', marginTop: spacing.md },

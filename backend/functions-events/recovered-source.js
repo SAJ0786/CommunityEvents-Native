@@ -2831,7 +2831,7 @@ exports.adminUnbanUser = onCall(
 
 // â”€â”€â”€ EMAIL HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const APP_URL = 'https://communityevents.siza.info';
-const APP_DOWNLOAD_URL = 'https://download.communityevents.siza.info';
+const APP_DOWNLOAD_URL = 'https://download.communityconnect.siza.info';
 
 exports.submitAiContentReport = onRequest(
   { region: REGION, cors: true },

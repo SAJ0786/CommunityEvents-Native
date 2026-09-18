@@ -810,7 +810,7 @@ export default function CreateEventForm({
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.content}
     >
-      <MemberPageHeader title={title} subtitle={subtitle} />
+      <MemberPageHeader title={title} subtitle={subtitle} icon="calendar-edit" tone="teal" />
 
       {!canSubmit ? (
         <View style={styles.accountNotice}>

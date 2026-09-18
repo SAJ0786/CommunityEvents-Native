@@ -140,6 +140,8 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
       <MemberPageHeader
         title={business.name}
         subtitle={[(business.categories || [business.category]).filter(Boolean).join(', '), business.suburb, business.distanceKm != null ? `${business.distanceKm} km away` : ''].filter(Boolean).join(' · ')}
+        icon="store"
+        tone="amber"
         onBack={onBack}
         backAccessibilityLabel="Back to businesses"
       >
@@ -383,7 +385,7 @@ const styles = StyleSheet.create({
   contactScroll: { flex: 1, minHeight: 0, width: '100%' },
   contactScrollContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'flex-end', paddingVertical: spacing.sm },
   contactCard: { width: '100%', maxWidth: 440, maxHeight: '100%', padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
-  contactTitle: { color: colors.navy, fontSize: 20, fontWeight: '700' }, contactHelp: { marginTop: 4, color: colors.muted, fontSize: 12, lineHeight: 18 },
+  contactTitle: { color: colors.navy, fontSize: 17, fontWeight: '700' }, contactHelp: { marginTop: 4, color: colors.muted, fontSize: 12, lineHeight: 18 },
   contactInput: { minHeight: 130, marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, color: colors.text, textAlignVertical: 'top' },
   contactStatus: { marginTop: spacing.sm, color: colors.tealDark, fontSize: 12, fontWeight: '600' },
   contactSend: { minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md, borderRadius: radius.md, backgroundColor: colors.teal }, contactSendText: { color: colors.surface, fontWeight: '700' },

@@ -7,7 +7,7 @@ export default function AddEventChoice({ canCreateRecurring, onChoose }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.card}>
-        <MemberPageHeader title="Add Event" subtitle="Choose the same event setup style you use in the PWA." />
+        <MemberPageHeader title="Add Event" subtitle="Choose the same event setup style you use in the PWA." icon="calendar-plus-outline" tone="teal" />
 
         <Pressable onPress={() => onChoose('single')} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
           <View style={styles.choiceIconWrap}>

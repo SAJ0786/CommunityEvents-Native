@@ -258,6 +258,8 @@ export default function RecurringEventForm({
         <MemberPageHeader
           title={editing ? 'Edit Entire Series' : 'Recurring Event'}
           subtitle={editing ? 'Update the recurrence schedule and shared event details. Review the regenerated dates before saving.' : 'Create repeating events from one shared set of details. Dates are previewed before saving.'}
+          icon="calendar-refresh-outline"
+          tone="teal"
         />
 
         <ToggleRow
