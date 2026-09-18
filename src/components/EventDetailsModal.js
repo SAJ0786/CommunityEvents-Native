@@ -813,6 +813,8 @@ const styles = StyleSheet.create({
   },
   overlayRoot: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: spacing.lg,
     backgroundColor: 'rgba(15, 23, 42, 0.46)',
   },
