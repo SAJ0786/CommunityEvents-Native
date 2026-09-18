@@ -36,6 +36,7 @@ function testVisibleActionContract() {
   assert.match(details, /shareOpen \? <View style=\{styles\.inlineOverlayLayer\}/);
   assert.match(details, /hostMessageOpen \? <View style=\{styles\.inlineOverlayLayer\}/);
   assert.match(details, /reminderOpen \? <View style=\{styles\.inlineOverlayLayer\}/);
+  assert.match(details, /overlayRoot:\s*\{[\s\S]*?alignItems:\s*'center',[\s\S]*?justifyContent:\s*'center'/);
   assert.match(details, /label="Contact Host" disabled=\{!canConnectHost\}/);
   assert.match(details, /const canConnectHost = Boolean\(!isGuest && user\?\.uid && \(!hostUid \|\| hostUid !== user\.uid\)\)/);
   assert.match(details, /isSeriesEvent \? <ActionButton[^>]+label="Edit Series" disabled=\{!onEditSeries\}/);
