@@ -83,6 +83,8 @@ export default function BusinessNotificationsScreen({ user, profile, onBack, ren
       title="Notifications"
       subtitle={unreadCount ? `${unreadCount} unread update${unreadCount === 1 ? '' : 's'}` : 'You are up to date'}
       panel
+      icon="bell-outline"
+      tone="rose"
       onBack={!renderHeader ? onBack : undefined}
       backAccessibilityLabel="Back to business directory"
       footer={rows.length ? <Pressable accessibilityRole="button" accessibilityHint="Marks updates read and clears them from this device; moderation notices are retained." onPress={clearNotifications} style={styles.clearButton}><Text style={styles.clearButtonText}>Clear notifications on this device</Text></Pressable> : null}
@@ -175,7 +177,7 @@ const styles = StyleSheet.create({
   appealSubmitted: { marginTop: spacing.md, color: colors.tealDark, fontSize: 12, fontWeight: '600' },
   modalBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(12,20,38,0.45)' },
   appealCard: { padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
-  appealTitle: { color: colors.navy, fontSize: 20, fontWeight: '700' },
+  appealTitle: { color: colors.navy, fontSize: 17, fontWeight: '700' },
   appealInput: { minHeight: 130, marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, color: colors.text, textAlignVertical: 'top' },
   appealSubmit: { minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md, borderRadius: radius.md, backgroundColor: '#3b82f6' },
   appealSubmitText: { color: colors.surface, fontWeight: '700' },

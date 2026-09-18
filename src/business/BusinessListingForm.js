@@ -333,6 +333,8 @@ export default function BusinessListingForm({
         <MemberPageHeader
           title={initialBusiness?.id ? 'Update your business' : 'Add your business'}
           subtitle="Listings are checked by Community Businesses Australia before becoming public. Only ABN status is verified where an ABN is supplied."
+          icon="store-edit-outline"
+          tone="amber"
         >
           {onCancel ? <Pressable onPress={onCancel} style={styles.closeButton}><Text style={styles.closeText}>{'\u2715'}</Text></Pressable> : null}
         </MemberPageHeader>

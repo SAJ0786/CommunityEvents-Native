@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Animated,
+  BackHandler,
   Image,
   KeyboardAvoidingView,
   Linking,
-  Modal,
   Platform,
   Pressable,
   SafeAreaView,
@@ -204,7 +204,16 @@ export default function EventDetailsModal({
     };
   }, [event]);
 
-  if (!event) return null;
+  useEffect(() => {
+    if (!visible || !event) return undefined;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      animateClose();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [animateClose, event, visible]);
+
+  if (!visible || !event) return null;
 
   const displayType = event.eventTypeDisplay || event.customEventType || event.eventType || event.type || '';
   const host = event.hostName || event.organiserName || event.organizationName || '';
@@ -380,21 +389,7 @@ export default function EventDetailsModal({
 
   return (
     <>
-    <Modal 
-  transparent
-  visible={visible}
-  animationType="none"
-  presentationStyle="overFullScreen"
-  supportedOrientations={[
-    'portrait',
-    'portrait-upside-down',
-    'landscape',
-    'landscape-left',
-    'landscape-right',
-  ]}
-  onRequestClose={animateClose}
->
-        <SafeAreaView style={styles.modalRoot}>
+        <SafeAreaView accessibilityViewIsModal={true} style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={animateClose} />
           <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
             <DrawerDragZone panHandlers={panHandlers} style={styles.sheetHeader}>
@@ -593,16 +588,18 @@ export default function EventDetailsModal({
             </View>
           </View> : null}
         </SafeAreaView>
-      </Modal>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   modalRoot: {
+    ...StyleSheet.absoluteFillObject,
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(15, 23, 42, 0.36)',
+    zIndex: 1000,
+    elevation: 1000,
   },
   inlineOverlayLayer: {
     ...StyleSheet.absoluteFillObject,

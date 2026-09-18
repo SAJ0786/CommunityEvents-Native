@@ -125,6 +125,7 @@ async function main() {
     react,
     'react-native': { KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: { OS: 'ios' }, Pressable: 'Pressable', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: value => value } },
     '../components/KeyboardAwareScrollView': 'ScrollView', '../components/NativeBackButton': 'Back',
+    '../components/MemberPageHeader': 'MemberPageHeader',
     '../services/messaging': messaging, '../services/businessSafety': {},
     '../theme': { colors: {}, radius: {}, shadow: {}, spacing: {} },
   };
@@ -132,7 +133,7 @@ async function main() {
   const flatten = node => node && typeof node === 'object' ? [node, ...(node.children || []).flatMap(flatten)] : [];
   const renderInbox = () => { hookIndex = 0; return flatten(inboxExports.default({ user: { uid: 'tester' }, profile: { role: 'user' } })); };
   let inboxTree = renderInbox();
-  assert.ok(inboxTree.some(node => node.children.includes('Business messaging')));
+  assert.ok(inboxTree.some(node => node.type === 'MemberPageHeader' && node.props.title === 'Business messaging'));
   assert.ok(inboxTree.some(node => node.children.includes('Inbox')));
   assert.ok(inboxTree.some(node => node.children.includes('Sent messages')));
   assert.ok(inboxTree.some(node => node.props.key === 'own-enquiry'));
@@ -171,7 +172,10 @@ async function main() {
   assert.equal(current[0].id, 'new');
 
   assert.match(read('backend/firestore.rules'), /getAfter\(\/databases\/\$\(database\)\/documents\/hostMessageThreads/);
-  assert.match(read('src/components/EventDetailsModal.js'), /styles.sheetHeader\} \{\.\.\.panHandlers\}/);
+  assert.match(read('src/components/EventDetailsModal.js'), /<DrawerDragZone panHandlers=\{panHandlers\} style=\{styles\.sheetHeader\}>/,
+    'Event details drawer header must keep using the shared drag-zone wiring, not a bespoke panHandlers spread');
+  assert.doesNotMatch(read('src/components/EventDetailsModal.js'), /<Modal|import\s+\{[^}]*Modal/,
+    'Event details drawer must use the shared in-tree overlay architecture');
   assert.match(read('src/components/KeyboardAwareScrollView.js'), /input !== focused.current/);
   assert.match(read('src/components/NotificationsDrawer.js'), /BusinessNotificationsScreen.*user=\{user\}/);
   const hostInbox = read('src/components/InboxScreen.js');

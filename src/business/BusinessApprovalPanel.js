@@ -437,7 +437,7 @@ export default function BusinessApprovalPanel({ mode = 'approvals', onBack, prof
 
   return (
     <View style={styles.panel}>
-      <AdminPageHeader onBack={onBack} title={isManagement ? 'Business Management' : 'Business Approvals'} subtitle={isManagement
+      <AdminPageHeader onBack={onBack} title={isManagement ? 'Business Management' : 'Business Approvals'} icon="clipboard-check-outline" tone="amber" subtitle={isManagement
             ? 'Search and manage every business listing, including approved, draft, pending and rejected records.'
             : queueType === 'promotions'
               ? 'Review promotion content, dates and featured placement.'

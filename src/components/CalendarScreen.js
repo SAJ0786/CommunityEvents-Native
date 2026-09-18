@@ -51,7 +51,7 @@ function CalendarSync({ user, onBack }) {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <MemberPageHeader title="Sync Calendar" subtitle="Subscribe to the Community Events calendar on your phone." onBack={onBack} backAccessibilityLabel="Back to calendar" />
+      <MemberPageHeader title="Sync Calendar" subtitle="Subscribe to the Community Events calendar on your phone." icon="calendar-sync-outline" tone="teal" onBack={onBack} backAccessibilityLabel="Back to calendar" />
 
       <View style={styles.syncHero}>
         <Text style={styles.syncHeroTitle}>Community Event Calendar</Text>
@@ -183,7 +183,7 @@ export default function CalendarScreen({
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <MemberPageHeader title="Calendar" subtitle="Browse upcoming community events by month or week." onBack={onBack} backAccessibilityLabel="Back to events" />
+      <MemberPageHeader title="Calendar" subtitle="Browse upcoming community events by month or week." icon="calendar-month-outline" tone="teal" onBack={onBack} backAccessibilityLabel="Back to events" />
 
       <Pressable
         disabled={isGuest}
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   weekTitle: { color: colors.navy, fontSize: 14, fontWeight: '700' },
   weekDay: { color: colors.text, fontSize: 12, fontWeight: '700', marginTop: spacing.md, marginBottom: 6 },
   syncHero: { padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.tealDark, marginBottom: spacing.md },
-  syncHeroTitle: { color: colors.surface, fontSize: 23, fontWeight: '700' },
+  syncHeroTitle: { color: colors.surface, fontSize: 17, fontWeight: '700' },
   syncHeroText: { color: 'rgba(255,255,255,0.88)', fontSize: 14, lineHeight: 20, marginTop: 5 },
   card: { padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, marginBottom: spacing.md, ...shadow },
   cardTitle: { color: colors.navy, fontSize: 19, fontWeight: '700', marginBottom: 5 },

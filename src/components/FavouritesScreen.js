@@ -17,6 +17,8 @@ export default function FavouritesScreen({
       <MemberPageHeader
         title="Favourites"
         subtitle="Events you've saved. Tap \u2605 on any event to save it here."
+        icon="heart-outline"
+        tone="rose"
         style={styles.header}
       >
         {events.length ? <Text style={styles.count}>{events.length}</Text> : null}
@@ -72,7 +74,7 @@ const styles = StyleSheet.create({
   count: { color: colors.tealDark, fontSize: 14, fontWeight: '700' },
   stateCard: { alignItems: 'center', justifyContent: 'center', padding: spacing.xl, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, ...shadow },
   emptyStar: { color: colors.teal, fontSize: 44, lineHeight: 52, marginBottom: spacing.sm },
-  emptyTitle: { color: colors.navy, fontSize: 20, fontWeight: '700' },
+  emptyTitle: { color: colors.navy, fontSize: 17, fontWeight: '700' },
   stateText: { color: colors.muted, fontSize: 15, lineHeight: 21, fontWeight: '700', marginTop: spacing.sm, textAlign: 'center' },
   browseButton: { minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md, paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.teal },
   browseText: { color: colors.surface, fontSize: 14, fontWeight: '700' },

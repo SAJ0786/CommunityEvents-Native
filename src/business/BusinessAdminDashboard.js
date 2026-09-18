@@ -41,7 +41,7 @@ function joinedDate(user = {}) {
 }
 
 function PanelHeader({ title, subtitle, onBack }) {
-  return <AdminPageHeader title={title} subtitle={subtitle} onBack={onBack} />;
+  return <AdminPageHeader title={title} subtitle={subtitle} icon="store-cog-outline" tone="amber" onBack={onBack} />;
 }
 
 export default function BusinessAdminDashboard({ user, profile, categories = [] }) {

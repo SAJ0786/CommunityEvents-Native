@@ -62,11 +62,7 @@ export default function StreamedVideosScreen({ isGuest = false, onBack }) {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <MemberPageHeader panel title="Streamed Videos" subtitle="Community Events Australia live-stream archive" onBack={onBack}>
-        <Pressable onPress={loadVideos} style={({ pressed }) => [styles.lightButton, pressed && styles.pressed]}>
-          <Text style={styles.lightButtonText}>{loading ? 'Loading...' : 'Refresh'}</Text>
-        </Pressable>
-      </MemberPageHeader>
+      <MemberPageHeader panel title="Streamed Videos" subtitle="Community Events Australia live-stream archive" icon="play-circle-outline" tone="indigo" onBack={onBack} />
 
       {isGuest ? (
         <View style={styles.noticeCard}>
@@ -193,7 +189,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     ...shadow,
   },
-  emptyTitle: { color: colors.navy, fontSize: 20, fontWeight: '700' },
+  emptyTitle: { color: colors.navy, fontSize: 17, fontWeight: '700' },
   stateText: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: spacing.sm, textAlign: 'center' },
   videoCard: {
     padding: spacing.md,

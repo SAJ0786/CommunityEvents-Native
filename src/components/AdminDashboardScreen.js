@@ -1936,7 +1936,7 @@ export default function AdminDashboardScreen({
         </>
       ) : panel === 'users' ? (
         <View style={styles.section}>
-          <AdminPageHeader title={"Users"} subtitle={"User management and contact updates"} onBack={() => setPanel('overview')}>
+          <AdminPageHeader title={"Users"} subtitle={"User management and contact updates"} icon="account-group-outline" onBack={() => setPanel('overview')}>
             <Pressable accessibilityRole="button" accessibilityLabel="Export users as CSV" onPress={exportUsersCsv} style={styles.compactUserAction}><MaterialCommunityIcons name="download-outline" size={21} color={colors.tealDark} /></Pressable>
           </AdminPageHeader>
 
@@ -2186,7 +2186,7 @@ export default function AdminDashboardScreen({
         </View>
       ) : panel === 'import' ? (
         <View style={styles.section}>
-          <AdminPageHeader title={"Import & Export"} subtitle={"Bulk event spreadsheets and upcoming-event reports"} onBack={() => setPanel('overview')} />
+          <AdminPageHeader title={"Import & Export"} subtitle={"Bulk event spreadsheets and upcoming-event reports"} icon="database-export-outline" onBack={() => setPanel('overview')} />
 
           <View style={styles.actionCard}>
             <Text style={styles.cardTitle}>Export Upcoming Events</Text>
@@ -2322,7 +2322,7 @@ export default function AdminDashboardScreen({
         </View>
       ) : panel === 'events' ? (
         <View style={styles.section}>
-          <AdminPageHeader title={"Events"} subtitle={"Admin event management"} onBack={() => setPanel('overview')} />
+          <AdminPageHeader title={"Events"} subtitle={"Admin event management"} icon="calendar-outline" onBack={() => setPanel('overview')} />
 
           <View style={styles.statisticsCard}>
             <View style={styles.statisticsHead}>
@@ -2677,7 +2677,7 @@ export default function AdminDashboardScreen({
         </View>
       ) : panel === 'repair' ? (
         <View style={styles.section}>
-          <AdminPageHeader title={"Hijri Repair Tool"} subtitle={"Super-admin repair for Hijri-entered events"} onBack={() => setPanel('overview')} />
+          <AdminPageHeader title={"Hijri Repair Tool"} subtitle={"Super-admin repair for Hijri-entered events"} icon="wrench-outline" onBack={() => setPanel('overview')} />
 
           {!canManageHijriSettings ? (
             <View style={styles.actionCard}>
@@ -2783,7 +2783,7 @@ export default function AdminDashboardScreen({
         </View>
       ) : panel === 'orgs' ? (
         <View style={styles.section}>
-          <AdminPageHeader title={"Organisation Management"} subtitle={"Organisation names, IDs, locations, and types"} onBack={() => setPanel('overview')} />
+          <AdminPageHeader title={"Organisation Management"} subtitle={"Organisation names, IDs, locations, and types"} icon="domain" onBack={() => setPanel('overview')} />
 
           <View style={styles.actionCard}>
             <Text style={styles.cardTitle}>Add Organisation</Text>
@@ -3007,7 +3007,7 @@ export default function AdminDashboardScreen({
         </View>
       ) : (
         <View style={styles.section}>
-          <AdminPageHeader title={panel === 'settings' ? 'Calendar Settings' : panel === 'messaging' ? 'Community Messaging' : panel === 'troubleshooting' ? 'Diagnostics Register' : 'Tools'} subtitle={panel === 'settings' ? 'Hijri Dates & Events adjustment only' : panel === 'messaging' ? 'Community updates and email reminders' : panel === 'troubleshooting' ? 'Installation, session and crash investigation' : 'Live connections and utilities'} onBack={() => setPanel('overview')} />
+          <AdminPageHeader title={panel === 'settings' ? 'Calendar Settings' : panel === 'messaging' ? 'Community Messaging' : panel === 'troubleshooting' ? 'Diagnostics Register' : 'Tools'} subtitle={panel === 'settings' ? 'Hijri Dates & Events adjustment only' : panel === 'messaging' ? 'Community updates and email reminders' : panel === 'troubleshooting' ? 'Installation, session and crash investigation' : 'Live connections and utilities'} icon={panel === 'settings' ? 'cog-outline' : panel === 'messaging' ? 'message-text-outline' : panel === 'troubleshooting' ? 'clipboard-pulse-outline' : 'toolbox-outline'} onBack={() => setPanel('overview')} />
 
           {status.message ? (
             <View style={[styles.noticeBox, status.error ? styles.noticeError : styles.noticeSuccess]}>

@@ -46,6 +46,8 @@ const diagnosticRegistrySource = fs.readFileSync(path.join(projectRoot, 'src', '
 const diagnosticPanelSource = fs.readFileSync(path.join(projectRoot, 'src', 'components', 'DiagnosticRegisterPanel.js'), 'utf8');
 const firestoreRulesSource = fs.readFileSync(path.join(projectRoot, 'backend', 'firestore.rules'), 'utf8');
 const storageRulesSource = fs.readFileSync(path.join(projectRoot, 'backend', 'storage.rules'), 'utf8');
+const storeLinksSource = fs.readFileSync(path.join(projectRoot, 'src', 'utils', 'storeLinks.js'), 'utf8');
+const recoveredEventsSource = fs.readFileSync(path.join(projectRoot, 'backend', 'functions-events', 'recovered-source.js'), 'utf8');
 
 if (packageJson.dependencies.expo !== '~54.0.37') {
   throw new Error(`Expected Expo SDK 54 dependency, found ${packageJson.dependencies.expo || 'missing'}.`);
@@ -125,6 +127,15 @@ if (!appSource.includes("from './src/services/appVersion'") ||
 }
 if (!externalLinkSource.includes("Platform.OS === 'web'") || !externalLinkSource.includes("window.open(url, '_blank'")) {
   throw new Error('PWA external policy links must open in a separate browser tab.');
+}
+const appDownloadDomain = 'https://download.communityconnect.siza.info';
+for (const [source, label] of [[storeLinksSource, 'native app share link'], [recoveredEventsSource, 'native events email link']]) {
+  if (!source.includes(appDownloadDomain)) {
+    throw new Error(`The ${label} must use ${appDownloadDomain}.`);
+  }
+  if (source.includes('https://download.communities.siza.info') || source.includes('https://download.communityevents.siza.info')) {
+    throw new Error(`The ${label} still contains a legacy app download hostname.`);
+  }
 }
 for (const legacyReference of [
   ['communityeventssydney', 'gmail.com'].join('@'),

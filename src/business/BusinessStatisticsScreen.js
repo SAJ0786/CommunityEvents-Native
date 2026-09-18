@@ -86,7 +86,7 @@ export default function BusinessStatisticsScreen({ businesses = [], categories =
 
   return (
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <AdminPageHeader title="Business Statistics" subtitle="Overall interaction status and individual-business performance. Counters measure actions, not completed sales or unique people." onBack={onBack} />
+      <AdminPageHeader title="Business Statistics" subtitle="Overall interaction status and individual-business performance. Counters measure actions, not completed sales or unique people." icon="chart-bar" tone="amber" onBack={onBack} />
 
       <View style={styles.filters}>
         <Text style={styles.filterLabel}>CITY</Text>
