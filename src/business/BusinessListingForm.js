@@ -120,6 +120,7 @@ function ImageField({ label, shape, image, existingUrl, error, onChoose, onRemov
 }
 
 function HoursEditor({ hours, onChange }) {
+  const [activePicker, setActivePicker] = useState(null);
   const update = (day, field, value) => onChange({
     ...hours,
     [day]: { ...hours[day], [field]: value },
@@ -142,11 +143,25 @@ function HoursEditor({ hours, onChange }) {
               </View>
             </View>
             {!row.closed ? (
-              <View style={styles.timeRow}>
-                <View style={styles.timeInput}><NativeDateTimeField compact mode="time" value={row.open} onChange={value => update(key, 'open', value)} accessibilityLabel={`Select ${label} opening time`} /></View>
+              <>
+                <View style={styles.timeRow}>
+                <View style={styles.timeInput}><NativeDateTimeField compact mode="time" pickerEnabled={false} onPress={() => setActivePicker({ day: key, field: 'open' })} value={row.open} onChange={value => update(key, 'open', value)} accessibilityLabel={`Select ${label} opening time`} /></View>
                 <Text style={styles.timeTo}>to</Text>
-                <View style={styles.timeInput}><NativeDateTimeField compact mode="time" value={row.close} onChange={value => update(key, 'close', value)} accessibilityLabel={`Select ${label} closing time`} /></View>
-              </View>
+                <View style={styles.timeInput}><NativeDateTimeField compact mode="time" pickerEnabled={false} onPress={() => setActivePicker({ day: key, field: 'close' })} value={row.close} onChange={value => update(key, 'close', value)} accessibilityLabel={`Select ${label} closing time`} /></View>
+                </View>
+                {activePicker?.day === key ? (
+                  <View style={styles.timePickerRow}>
+                    <NativeDateTimeField
+                      pickerOnly
+                      mode="time"
+                      value={row[activePicker.field]}
+                      onChange={value => update(key, activePicker.field, value)}
+                      onPickerDismiss={() => setActivePicker(null)}
+                      accessibilityLabel={`Select ${label} ${activePicker.field === 'open' ? 'opening' : 'closing'} time`}
+                    />
+                  </View>
+                ) : null}
+              </>
             ) : null}
           </View>
         );
@@ -610,6 +625,7 @@ const styles = StyleSheet.create({
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
   timeInput: { flex: 1, minWidth: 0, minHeight: 44, textAlign: 'center' },
   timeTo: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  timePickerRow: { width: '100%', marginTop: spacing.sm },
   messageError: { marginBottom: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: '#fff0f0' },
   messageErrorText: { color: colors.danger, fontSize: 12, lineHeight: 18, fontWeight: '600' },
   messageSuccess: { marginBottom: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: '#eaf7ed' },

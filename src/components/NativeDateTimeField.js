@@ -56,28 +56,56 @@ export default function NativeDateTimeField({
   minuteInterval = 5,
   compact = false,
   accessibilityLabel,
+  pickerEnabled = true,
+  pickerOnly = false,
+  onPress,
+  onPickerDismiss,
 }) {
   const [visible, setVisible] = useState(false);
   const pickerDate = useMemo(() => dateFromValue(value, mode), [mode, value]);
+  const closePicker = () => {
+    setVisible(false);
+    onPickerDismiss?.();
+  };
   const choose = (event, selectedDate) => {
-    if (Platform.OS !== 'ios') setVisible(false);
+    if (Platform.OS !== 'ios') closePicker();
     if (event?.type === 'dismissed' || !selectedDate) return;
     onChange?.(storedValue(selectedDate, mode, valueFormat));
   };
+
+  if (pickerOnly) {
+    return (
+      <View style={styles.pickerOnly}>
+        <DateTimePicker
+          value={pickerDate}
+          mode={mode}
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          minimumDate={minimumDate}
+          maximumDate={maximumDate}
+          minuteInterval={mode === 'time' ? minuteInterval : undefined}
+          onChange={choose}
+        />
+        {Platform.OS === 'ios' ? <Pressable onPress={closePicker} style={styles.done}><Text style={styles.doneText}>Done</Text></Pressable> : null}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.wrap}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel || `Select ${mode}`}
-        onPress={() => setVisible(true)}
+        onPress={() => {
+          onPress?.();
+          if (pickerEnabled) setVisible(true);
+        }}
         style={({ pressed }) => [styles.button, compact && styles.buttonCompact, pressed && styles.pressed]}
       >
         <Text style={styles.icon}>{mode === 'time' ? '\u{1F552}' : '\u{1F4C5}'}</Text>
         <Text numberOfLines={1} style={[styles.value, !value && styles.placeholder]}>{displayValue(value, mode, valueFormat)}</Text>
         <Text style={styles.chevron}>{'\u203A'}</Text>
       </Pressable>
-      {visible ? (
+      {pickerEnabled && visible ? (
         <View style={Platform.OS === 'ios' ? styles.iosPicker : null}>
           <DateTimePicker
             value={pickerDate}
@@ -88,7 +116,7 @@ export default function NativeDateTimeField({
             minuteInterval={mode === 'time' ? minuteInterval : undefined}
             onChange={choose}
           />
-          {Platform.OS === 'ios' ? <Pressable onPress={() => setVisible(false)} style={styles.done}><Text style={styles.doneText}>Done</Text></Pressable> : null}
+          {Platform.OS === 'ios' ? <Pressable onPress={closePicker} style={styles.done}><Text style={styles.doneText}>Done</Text></Pressable> : null}
         </View>
       ) : null}
     </View>
@@ -97,6 +125,7 @@ export default function NativeDateTimeField({
 
 const styles = StyleSheet.create({
   wrap: { minWidth: 0 },
+  pickerOnly: { width: '100%', padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   button: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   buttonCompact: { minHeight: 44, paddingHorizontal: spacing.sm },
   icon: { fontSize: 17 },

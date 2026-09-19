@@ -33,9 +33,11 @@ assert.doesNotMatch(read('src/components/HijriCalendarScreen.js'), /styles\.hero
 assert.doesNotMatch(read('src/business/BusinessDetailsScreen.js'), /styles\.topRow/);
 assert.match(read('src/components/PageHeader.js'), /accessibilityRole="header"/);
 
-// The Hijri Calendar panel is the reference/gold-standard pattern: icon chip,
-// specific eyebrow label, decorative teal accent restored on the shared header.
-assert.match(read('src/components/HijriCalendarScreen.js'), /eyebrow="ISLAMIC CALENDAR"/);
+// Every shared header uses the same product eyebrow above its page title.
+assert.match(read('src/components/PageHeader.js'), /eyebrow = 'COMMUNITY CONNECT'/);
+assert.match(read('src/components/MemberPageHeader.js'), /eyebrow="COMMUNITY CONNECT"/);
+assert.match(read('src/components/AdminPageHeader.js'), /eyebrow="COMMUNITY CONNECT"/);
+assert.doesNotMatch(read('src/components/HijriCalendarScreen.js'), /eyebrow="ISLAMIC CALENDAR"/);
 assert.match(read('src/components/HijriCalendarScreen.js'), /icon="moon-waning-crescent"/);
 
 console.log('PASS page header standard: all screen-level headers use the shared component and legacy targeted headers are absent.');

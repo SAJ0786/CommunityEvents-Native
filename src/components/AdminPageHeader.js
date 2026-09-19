@@ -6,7 +6,7 @@ export default function AdminPageHeader({ title, subtitle, icon = 'shield-accoun
     <PageHeader
       title={title}
       subtitle={subtitle}
-      eyebrow="ADMIN DASHBOARD"
+      eyebrow="COMMUNITY CONNECT"
       icon={icon}
       tone={tone}
       onBack={onBack}

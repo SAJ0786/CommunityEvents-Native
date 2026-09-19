@@ -8,6 +8,8 @@ const { eventEmailFixtures } = require('./events-email-fixtures.cjs');
 const folder = path.resolve(__dirname, '../backend/functions-events');
 async function main() {
   const source = fs.readFileSync(path.join(folder, 'recovered-source.js'), 'utf8');
+  assert.match(source, /Important Update from Community Connect Australia/);
+  assert.doesNotMatch(source, /Important Update from Community Events/);
   assert.doesNotMatch(source, /temporaryStoreTesterLogin|transporter\.sendMail\(/);
   assert.equal((source.match(/await sendEventEmail\(transporter,/g) || []).length, 7);
   assert.equal(fs.existsSync(path.join(folder, '.env')), false);

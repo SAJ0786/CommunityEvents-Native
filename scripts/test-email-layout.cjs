@@ -20,9 +20,9 @@ async function main() {
     assert.ok(email.html.includes(expected), name + ' branding');
     assert.ok(email.text.startsWith(expected));
     assert.match(email.html, /font-size:16px/);
-    assert.match(email.html, /<h1 style="[^"]*font-size:22px/);
+    assert.match(email.html, /<h1 style="[^"]*font-size:18px/);
     assert.match(email.html, /data-email-brand style="font-size:20px/);
-    assert.ok(22 / 16 >= 1.25 && 22 / 16 <= 1.5);
+    assert.ok(18 < 20, 'subject title must be smaller than the brand line');
     assert.match(email.html, /border-radius:14px/);
     assert.match(email.html, /support@siza.info/);
     assert.doesNotMatch(email.html, /Community Businesses Australia|Community Events Sydney|<h1>/);
@@ -76,7 +76,7 @@ async function main() {
             otpFits: (() => { const otp = document.querySelector('[data-email-otp]'); return !otp || (getComputedStyle(otp).whiteSpace === 'nowrap' && otp.scrollWidth <= otp.clientWidth); })(),
           }));
           assert.ok(measurement.width <= width, name + ' must not overflow at ' + width);
-          assert.equal(measurement.titleSize / measurement.bodySize, 22 / 16);
+          assert.equal(measurement.titleSize / measurement.bodySize, 18 / 16);
           assert.ok(measurement.otpFits, 'OTP must fit on one line at ' + width);
           await page.screenshot({ path: path.join(output, `${name}-${width}.png`), fullPage: true });
         }
