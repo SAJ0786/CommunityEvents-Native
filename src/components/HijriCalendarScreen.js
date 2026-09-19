@@ -239,7 +239,6 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
       <MemberPageHeader
         title="Hijri Calendar"
         subtitle="Dates, prayer times and quick conversion"
-        eyebrow="ISLAMIC CALENDAR"
         icon="moon-waning-crescent"
         tone="teal"
         onBack={onBack}

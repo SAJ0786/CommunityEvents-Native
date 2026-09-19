@@ -24,6 +24,10 @@ assert.match(theme, /pageTitle: \{ fontSize: 22,/, 'shared header title size sho
 for (const tone of ['teal', 'blue', 'purple', 'rose', 'amber', 'indigo']) {
   assert.match(theme, new RegExp(`${tone}: \\{[\\s\\S]*?icon:`), `panelTones should define a ${tone} accent`);
 }
+for (const tone of ['purple', 'rose', 'amber', 'indigo']) {
+  const block = theme.slice(theme.indexOf(`${tone}: {`), theme.indexOf(`${tone}: {`) + 400);
+  assert.doesNotMatch(block, /#fbeaf0|#f8dbe6|#fff4d9|#ffe9b3|#e7defa|#e3e1fb/, `${tone} panel tone should remain in the blue family`);
+}
 assert.match(read('src/components/AdminPageHeader.js'), /PageHeader/);
 assert.match(read('src/components/MemberPageHeader.js'), /PageHeader/);
 

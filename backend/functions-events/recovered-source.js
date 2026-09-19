@@ -2499,7 +2499,7 @@ async function runManualReminderEmailSend({ payload = {}, callerData = {}, cityS
         subject: customMode
           ? (customTemplate === 'storeAnnouncement'
               ? 'Community Events Australia is now on Google Play, the App Store and Microsoft Store'
-              : 'Important Update from Community Events')
+              : 'Important Update from Community Connect Australia')
           : `${EMAIL_ICON_CALENDAR} Community Events - Events for ${label}`,
         html: customMode && customTemplate === 'storeAnnouncement'
           ? buildStoreAnnouncementEmail() + unsubscribeFooter(doc.id)

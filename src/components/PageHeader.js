@@ -13,7 +13,7 @@ import { colors, panelTones, radius, shadow, spacing, typography } from '../them
 export default function PageHeader({
   title,
   subtitle,
-  eyebrow = 'COMMUNITY EVENTS',
+  eyebrow = 'COMMUNITY CONNECT',
   icon = 'shape-outline',
   tone = 'teal',
   onBack,

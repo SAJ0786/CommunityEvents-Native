@@ -19,7 +19,7 @@ export default function MemberPageHeader({
     <PageHeader
       title={title}
       subtitle={subtitle}
-      eyebrow={eyebrow}
+      eyebrow="COMMUNITY CONNECT"
       icon={icon}
       tone={tone}
       onBack={onBack}
