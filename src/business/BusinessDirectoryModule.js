@@ -21,6 +21,7 @@ import { cityLabel, normalizeCity } from '../utils/cities';
 import { colors, radius, shadow, spacing } from '../theme';
 import {
   assertBusinessSubmissionConnectivity,
+  isHistoricalBusiness,
   createBusinessPromotion,
   createBusinessSubmission,
   deleteBusinessPromotion,
@@ -638,6 +639,17 @@ export default function BusinessDirectoryModule({
     onTabChange?.(nextTab);
   };
 
+  useEffect(() => {
+    if (!listingFormOpen || !editingBusiness?.id) return;
+    const current = ownerBusinesses.find(item => item.id === editingBusiness.id);
+    if (!isHistoricalBusiness(current)) return;
+    setListingFormOpen(false);
+    setEditingBusiness(null);
+    setListingError('');
+    onTabChange?.('my-businesses');
+    Alert.alert(current.status === 'deleted' ? 'Deleted listing' : 'Archived listing', 'This listing was archived or deleted while you were editing. It is now read-only; your changes have not been submitted.');
+  }, [listingFormOpen, editingBusiness?.id, ownerBusinesses, onTabChange]);
+
   const openNewListing = () => {
     setEditingBusiness(null);
     setListingError('');
@@ -647,6 +659,10 @@ export default function BusinessDirectoryModule({
   };
 
   const openEditListing = business => {
+    if (isHistoricalBusiness(business)) {
+      Alert.alert(business.status === 'deleted' ? 'Deleted listing' : 'Archived listing', 'This historical listing is read-only and cannot be edited.');
+      return;
+    }
     setEditingBusiness(business);
     setListingError('');
     setListingSuccess('');

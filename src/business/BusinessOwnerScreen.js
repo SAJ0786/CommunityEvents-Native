@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { BUSINESS_STATUSES, formatAbn } from '../services/businesses';
+import { BUSINESS_STATUSES, formatAbn, isHistoricalBusiness } from '../services/businesses';
 import { colors, radius, shadow, spacing } from '../theme';
 import MemberPageHeader from '../components/MemberPageHeader';
 
@@ -11,11 +11,13 @@ function StatusBadge({ status }) {
       styles.statusBadge,
       config.tone === 'green' && styles.statusGreen,
       config.tone === 'red' && styles.statusRed,
+      config.tone === 'grey' && styles.statusGrey,
     ]}>
       <Text style={[
         styles.statusText,
         config.tone === 'green' && styles.statusTextGreen,
         config.tone === 'red' && styles.statusTextRed,
+        config.tone === 'grey' && styles.statusTextGrey,
       ]}>{config.label}</Text>
     </View>
   );
@@ -23,7 +25,8 @@ function StatusBadge({ status }) {
 
 function OwnerBusinessCard({ business, onEdit, onAddPromotion }) {
   const imageUrl = business.logoUrl || business.coverUrl;
-  const isPublic = business.status === 'approved' || business.hasPublishedVersion === true;
+  const isHistorical = isHistoricalBusiness(business);
+  const isPublic = !isHistorical && business.hidden !== true && (business.status === 'approved' || business.hasPublishedVersion === true);
   return (
     <View style={styles.businessCard}>
       <View style={styles.businessTop}>
@@ -43,6 +46,12 @@ function OwnerBusinessCard({ business, onEdit, onAddPromotion }) {
         <View style={styles.infoItem}><Text style={styles.infoLabel}>TIER</Text><Text style={styles.infoValue}>{String(business.tier || 'free').toUpperCase()}</Text></View>
         <View style={styles.infoItem}><Text style={styles.infoLabel}>SERVICES</Text><Text numberOfLines={1} style={styles.infoValue}>{business.subcategoryIds?.length || 0} selected</Text></View>
       </View>
+      {isHistorical ? (
+        <View accessibilityRole="text" style={styles.historyNotice}>
+          <Text style={styles.historyTitle}>{business.status === 'deleted' ? 'Deleted listing' : 'Archived listing'} — read-only</Text>
+          <Text style={styles.historyText}>Retained for your records. This listing is not public and cannot be edited. Submit a new listing if needed.</Text>
+        </View>
+      ) : null}
       {business.status === 'pending' ? (
         <View style={styles.reviewNotice}><Text style={styles.reviewNoticeText}>{business.hasPublishedVersion ? 'Your existing approved listing remains public while the directory team reviews these proposed changes.' : 'Your new listing is private while the directory team reviews it. Only ABN status is checked, and only when an ABN is supplied.'}</Text></View>
       ) : null}
@@ -53,10 +62,10 @@ function OwnerBusinessCard({ business, onEdit, onAddPromotion }) {
         </View>
       ) : null}
       <View style={styles.cardActions}>
-        <Pressable onPress={() => onEdit?.(business)} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}>
+        {!isHistorical ? <Pressable onPress={() => onEdit?.(business)} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}>
           <Text style={styles.editIcon}>{'\u270E'}</Text>
           <Text style={styles.editText}>Edit listing</Text>
-        </Pressable>
+        </Pressable> : null}
         {isPublic && !business.hidden ? (
           <Pressable onPress={() => onAddPromotion?.(business)} style={({ pressed }) => [styles.promotionButton, pressed && styles.pressed]}>
             <Text style={styles.promotionButtonIcon}>{'\u{1F3F7}\uFE0F'}</Text>
@@ -222,6 +231,11 @@ const styles = StyleSheet.create({
   statusBadge: { maxWidth: 88, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 99, backgroundColor: '#fff2d8' },
   statusGreen: { backgroundColor: '#e7f5ea' },
   statusRed: { backgroundColor: '#ffeded' },
+  statusGrey: { backgroundColor: '#eceff2' },
+  statusTextGrey: { color: '#475569' },
+  historyNotice: { marginTop: spacing.sm, padding: spacing.sm, borderRadius: 10, backgroundColor: '#f1f5f9' },
+  historyTitle: { color: '#334155', fontSize: 12, fontWeight: '700' },
+  historyText: { color: '#475569', fontSize: 11, lineHeight: 16, marginTop: 4 },
   statusText: { color: '#8b5c08', fontSize: 8.5, fontWeight: '700', textAlign: 'center' },
   statusTextGreen: { color: '#2f7740' },
   statusTextRed: { color: colors.danger },

@@ -5,6 +5,7 @@ import {
   archiveBusinessListing,
   formatAbn,
   isValidAbn,
+  isHistoricalBusiness,
   listenBusinessesForAdmin,
   priorBusinessHistoryMatches,
   rejectBusinessListing,
@@ -50,6 +51,7 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, isManagem
   const [historyReviewed, setHistoryReviewed] = useState(false);
   const [reason, setReason] = useState(business.rejectionReason || '');
   const imageUrl = business.logoUrl || business.coverUrl;
+  const isHistorical = isHistoricalBusiness(business);
   const initials = String(business.name || 'Business').split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
   const validAbn = isValidAbn(business.abn);
   const hasAbn = Boolean(String(business.abn || '').replace(/\D/g, ''));
@@ -68,6 +70,7 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, isManagem
   }, [business.abnVerified, business.foundingMember, business.foundingMemberCandidate, business.id, business.referrerReview?.status, business.rejectionReason, business.tier]);
 
   const confirmApproval = () => {
+    if (isHistorical) return;
     if (hasAbn && !validAbn) {
       Alert.alert('ABN cannot be verified', 'Reject this listing and ask the owner to correct its ABN.');
       return;
@@ -87,6 +90,7 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, isManagem
   };
 
   const confirmRejection = () => {
+    if (isHistorical) return;
     if (reason.trim().length < 10) {
       Alert.alert('Add a reason', 'Enter a clear reason of at least 10 characters so the owner knows what to change.');
       return;
@@ -151,7 +155,12 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, isManagem
           {business.coverUrl ? <Image source={{ uri: business.coverUrl }} resizeMode="cover" style={styles.cover} /> : null}
           <Text style={styles.description}>{business.description}</Text>
 
-          {hasHistoricalMatch ? <View style={styles.historyWarning}>
+          {isHistorical ? <View style={styles.historyWarning}>
+            <Text style={styles.historyWarningTitle}>{business.status === 'deleted' ? 'Deleted listing' : 'Archived listing'} — read-only</Text>
+            <Text style={styles.historyWarningText}>This record is retained for history. It is not public and cannot be edited, verified or published while archived or deleted.</Text>
+            {business.archiveReason ? <Text style={styles.historyMatchText}>Reason: {business.archiveReason}</Text> : null}
+          </View> : null}
+          {!isHistorical && hasHistoricalMatch ? <View style={styles.historyWarning}>
             <Text style={styles.historyWarningTitle}>Previous listing history found</Text>
             <Text style={styles.historyWarningText}>This submission matches {historyMatches.length} permanently retained business record(s). Review the reason and eligibility before approval.</Text>
             {historyMatches.slice(0, 5).map(item => (
@@ -163,7 +172,7 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, isManagem
             </View>
           </View> : null}
 
-          {business.publishedSnapshot ? <View style={styles.comparisonCard}>
+          {!isHistorical && business.publishedSnapshot ? <View style={styles.comparisonCard}>
             <Text style={styles.comparisonTitle}>Published listing vs proposed update</Text>
             <Text style={styles.comparisonHelp}>The existing approved listing remains public until this update is approved.</Text>
             {[
@@ -202,10 +211,10 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, isManagem
                 <Text style={styles.referrerHelp}>Confirm only that the reference was contacted and supports this listing. This does not verify licences, insurance or service quality.</Text>
               </> : <Text style={styles.invalid}>Reference details are missing. Request changes.</Text>}
             </View>
-            <View style={styles.referrerSwitch}>
+            {!isHistorical ? <View style={styles.referrerSwitch}>
               <Text style={styles.referrerSwitchLabel}>{referrerConfirmed ? 'CONFIRMED' : 'NOT CHECKED'}</Text>
               <Switch disabled={!hasCompleteReferrer} value={referrerConfirmed} onValueChange={setReferrerConfirmed} trackColor={{ false: colors.border, true: colors.teal }} />
-            </View>
+            </View> : null}
           </View>
 
           {hasAbn ? <View style={styles.abrReview}>
@@ -217,19 +226,20 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, isManagem
                   ? `Name does not match the ABR record: ${[business.abrVerification?.entityName, ...(business.abrVerification?.businessNames || []), ...(business.abrVerification?.tradingNames || [])].filter(Boolean).join(', ')}`
                   : 'The secure server checks that the ABN is active and the submitted name matches an ABR entity, registered business or current trading name.'}</Text>
               <Pressable onPress={() => Linking.openURL(`https://abr.business.gov.au/ABN/View?abn=${String(business.abn || '').replace(/\D/g, '')}`)} style={styles.abrLink}><Text style={styles.abrLinkText}>Open ABR record ↗</Text></Pressable>
-              <Pressable disabled={busy || !validAbn} onPress={() => onVerify?.(business)} style={[styles.abrVerifyButton, (busy || !validAbn) && styles.disabled]}>
+              {!isHistorical ? <Pressable disabled={busy || !validAbn} onPress={() => onVerify?.(business)} style={[styles.abrVerifyButton, (busy || !validAbn) && styles.disabled]}>
                 {busy ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.abrVerifyText}>{abrVerified ? 'Recheck with ABR' : 'Verify with ABR'}</Text>}
-              </Pressable>
+              </Pressable> : null}
             </View>
             <View style={[styles.abrStatus, abrVerified && styles.abrStatusVerified]}><Text style={[styles.abrStatusText, abrVerified && styles.abrStatusTextVerified]}>{abrVerified ? 'VERIFIED' : 'NOT VERIFIED'}</Text></View>
-          </View> : <View style={styles.abrReview}>
+          </View> : !isHistorical ? <View style={styles.abrReview}>
             <View style={styles.abrCopy}>
               <Text style={styles.abrTitle}>Publish without ABN</Text>
               <Text style={styles.abrText}>Confirm only that this basic directory listing may be published without an ABN. It will receive no verification badge. Do not describe this as an identity, licence, insurance or quality check.</Text>
             </View>
             <Switch value={publishWithoutAbn} onValueChange={setPublishWithoutAbn} trackColor={{ false: colors.border, true: colors.teal }} />
-          </View>}
+          </View> : null}
 
+          {!isHistorical ? <>
           <Text style={styles.controlLabel}>LISTING TIER</Text>
           <View style={styles.tierRow}>
             {TIERS.map(value => (
@@ -244,17 +254,20 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, isManagem
             <Switch value={foundingMember} onValueChange={setFoundingMember} trackColor={{ false: colors.border, true: colors.teal }} />
           </View>
 
-          <Text style={styles.controlLabel}>CHANGES REQUIRED REASON</Text>
+          </> : null}
+          {!isHistorical || (isManagement && isSuperAdmin) ? <>
+          <Text style={styles.controlLabel}>{isHistorical ? 'RESTORATION REASON' : 'CHANGES REQUIRED REASON'}</Text>
           <TextInput
             value={reason}
             onChangeText={setReason}
             multiline
-            placeholder="Explain exactly what the owner must correct…"
+            placeholder={isHistorical ? "Explain why this record should return for review…" : "Explain exactly what the owner must correct…"}
             placeholderTextColor={colors.muted}
             style={styles.reasonInput}
           />
+          </> : null}
 
-          {!['archived', 'deleted'].includes(business.status) ? <View style={styles.actionRow}>
+          {!isHistorical ? <View style={styles.actionRow}>
             <Pressable disabled={busy || !approvalReady} onPress={confirmApproval} style={({ pressed }) => [styles.approveButton, (busy || !approvalReady) && styles.disabled, pressed && styles.pressed]}>
               {busy ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.approveText}>✓ Approve & Publish</Text>}
             </Pressable>
@@ -269,11 +282,11 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, isManagem
             </Pressable>
           ) : null}
 
-          {isManagement && !['archived', 'deleted'].includes(business.status) ? <View style={styles.lifecycleActions}>
+          {isManagement && !isHistorical ? <View style={styles.lifecycleActions}>
             <Pressable disabled={busy} onPress={() => confirmLifecycle(false)} style={styles.archiveButton}><Text style={styles.archiveButtonText}>Archive Business</Text></Pressable>
             {isSuperAdmin ? <Pressable disabled={busy} onPress={() => confirmLifecycle(true)} style={styles.deleteRecordButton}><Text style={styles.deleteRecordText}>Mark as Deleted</Text></Pressable> : null}
           </View> : null}
-          {isManagement && ['archived', 'deleted'].includes(business.status) && isSuperAdmin ? (
+          {isManagement && isHistorical && isSuperAdmin ? (
             <Pressable disabled={busy} onPress={confirmRestore} style={styles.restoreButton}><Text style={styles.restoreButtonText}>Restore for Review</Text></Pressable>
           ) : null}
         </View>

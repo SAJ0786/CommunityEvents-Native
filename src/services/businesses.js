@@ -29,6 +29,10 @@ export const BUSINESS_STATUSES = {
   deleted: { label: 'Deleted record', tone: 'red' },
 };
 
+export function isHistoricalBusiness(business) {
+  return ['archived', 'deleted'].includes(business?.status);
+}
+
 export function normalizeAbn(value) {
   return String(value || '').replace(/\D/g, '').slice(0, 11);
 }
@@ -355,7 +359,7 @@ export async function updateBusinessSubmission(businessId, payload = {}) {
   if (!snapshot.exists()) throw new Error('This business listing could not be found.');
   const current = snapshot.data() || {};
   if (current.ownerId !== user.uid) throw new Error('Only the listing owner can edit this business.');
-  if (['archived', 'deleted'].includes(current.status)) {
+  if (isHistoricalBusiness(current)) {
     throw new Error('This historical listing cannot be edited. Submit a new listing for administrator review.');
   }
   const publicSnapshot = await getDoc(doc(db, PUBLIC_COLLECTION_NAME, businessId));
@@ -502,6 +506,9 @@ export async function getPriorBusinessHistoryMatches(businessId) {
 export async function verifyBusinessAbn(businessId) {
   await requireAdminSession();
   if (!businessId) throw new Error('Business reference is missing.');
+  const snapshot = await getDoc(doc(db, COLLECTION_NAME, businessId));
+  if (!snapshot.exists()) throw new Error('This business listing could not be found.');
+  if (isHistoricalBusiness(snapshot.data())) throw new Error('This historical listing is read-only. Restore it for review before making changes.');
   const callable = httpsCallable(functions, 'verifyBusinessAbn');
   const result = await callable({ businessId });
   return result.data || {};
@@ -701,8 +708,11 @@ export async function restoreBusinessListing(businessId, reason) {
 
 export async function rejectBusinessListing(businessId, reason) {
   const user = await requireAdminSession();
-  const cleanReason = clean(reason);
   if (!businessId) throw new Error('Business reference is missing.');
+  const snapshot = await getDoc(doc(db, COLLECTION_NAME, businessId));
+  if (!snapshot.exists()) throw new Error('This business listing could not be found.');
+  if (isHistoricalBusiness(snapshot.data())) throw new Error('This historical listing is read-only. Restore it for review before making changes.');
+  const cleanReason = clean(reason);
   if (cleanReason.length < 10) throw new Error('Add a clear rejection reason of at least 10 characters.');
   const publicReference = doc(db, PUBLIC_COLLECTION_NAME, businessId);
   const publicSnapshot = await getDoc(publicReference);
@@ -734,6 +744,7 @@ export async function setBusinessVisibility(businessId, hidden) {
   const snapshot = await getDoc(reference);
   if (!snapshot.exists()) throw new Error('This business listing could not be found.');
   const business = snapshot.data() || {};
+  if (isHistoricalBusiness(business)) throw new Error('This historical listing is read-only. Restore it for review before making changes.');
   const batch = writeBatch(db);
   batch.update(reference, {
     hidden: Boolean(hidden),
