@@ -35,6 +35,8 @@ import {
   AUDIENCE_TYPES,
   buildEventTypeGroups,
   getEventTypeCategory,
+  eventTypesForExistingEvent,
+  hasExistingReciterDetails,
   ORGANISER_OPTIONS,
   RECITER_TYPES,
   RELIGIOUS_EVENT_TYPES,
@@ -358,7 +360,8 @@ export default function CreateEventForm({
 
   const update = (field, value) => setForm(current => ({ ...current, [field]: value }));
   const reciterTypeOptions = useMemo(() => [...new Set([...RECITER_TYPES.filter(item => item !== 'Custom'), ...dynamicOptions.reciterTypes, 'Custom'])], [dynamicOptions.reciterTypes]);
-  const showReligious = RELIGIOUS_EVENT_TYPES.has(form.eventType) || getEventTypeCategory(form.eventType, dynamicOptions.eventTypeCategories) === 'faith' || Boolean(dynamicOptions.legacyEventTypes?.includes(form.eventType));
+  const eventTypeOptions = eventTypesForExistingEvent(dynamicOptions.eventTypes, initialEvent);
+  const showReligious = hasExistingReciterDetails(initialEvent, form.eventType) || RELIGIOUS_EVENT_TYPES.has(form.eventType) || getEventTypeCategory(form.eventType, dynamicOptions.eventTypeCategories) === 'faith' || Boolean(dynamicOptions.legacyEventTypes?.includes(form.eventType));
   const prayerAddress = useMemo(() => ({
     fullAddress: form.fullAddress,
     street: form.street,
@@ -1071,7 +1074,7 @@ export default function CreateEventForm({
         ) : null}
 
         <Field label="Event Type">
-          <EventTypeSelector dynamicOptions={dynamicOptions.eventTypes} categories={dynamicOptions.eventTypeCategories} value={form.eventType} onChange={value => update('eventType', value)} />
+          <EventTypeSelector dynamicOptions={eventTypeOptions} categories={dynamicOptions.eventTypeCategories} value={form.eventType} onChange={value => update('eventType', value)} />
         </Field>
 
         {form.eventType === 'Custom' ? (

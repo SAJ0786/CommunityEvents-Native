@@ -21,6 +21,7 @@ function load(file, mocks) {
       return mocks[id];
     },
     console,
+    Date: class extends Date { constructor(...args) { super(...(args.length ? args : ['2026-08-01T00:00:00Z'])); } },
   });
   return exports;
 }
@@ -68,8 +69,8 @@ function testVisibleActionContract() {
 async function testRecurrenceReschedule() {
   const writes = [];
   const seriesDocs = [
-    { id: 'second', recurrenceIndex: 2, eventDate: '2026-09-08' },
-    { id: 'first', recurrenceIndex: 1, eventDate: '2026-09-01' },
+    { id: 'second', seriesId: 'series-1', recurrenceIndex: 2, eventDate: '2026-09-08' },
+    { id: 'first', seriesId: 'series-1', recurrenceIndex: 1, eventDate: '2026-09-01' },
   ];
   const firestore = {
     addDoc: async () => ({ id: 'new' }),
@@ -87,6 +88,10 @@ async function testRecurrenceReschedule() {
     setDoc: async () => {},
     updateDoc: async () => {},
     where: (...value) => value,
+    runTransaction: async (_, action) => action({
+      get: async ref => ({ exists: () => true, data: () => seriesDocs.find(event => event.id === ref.id) }),
+      update: (ref, data) => writes.push({ ref, data }),
+    }),
     writeBatch: () => ({
       update: (ref, data) => writes.push({ ref, data }),
       set: () => { throw new Error('Series recurrence edits must not create events'); },
@@ -100,6 +105,7 @@ async function testRecurrenceReschedule() {
     '../utils/cities': { getEventMetroArea: () => 'sydney' },
     './prayerTimes': { applyPrayerOffset: value => value, calculatePrayerTimes: () => null, prayerLabel: value => value },
     './hijri': { getHijriDisplay: () => '', getHijriParts: () => ({}), hijriDisplayFromParts: () => '', hijriToGregorian: () => '' },
+    '../utils/seriesScope': { isFutureSeriesEvent: (event, now) => require('../src/utils/seriesScope').isFutureSeriesEvent(event, now || new Date('2026-08-01T00:00:00Z')) },
     './organisations': { getOrganisations: async () => [], resolveOrganisationLogo: () => '' },
   });
   const schedule = {
@@ -125,7 +131,7 @@ async function testRecurrenceReschedule() {
     { id: 'first', seriesId: 'series-1', eventDate: '2026-09-01' },
     { eventType: 'Majlis' },
     { ...schedule, occurrences: schedule.occurrences.slice(0, 1) },
-  ), /Keep this series at 2 occurrences/);
+  ), /Keep the remaining series at 2 future occurrences/);
 }
 
 (async () => {

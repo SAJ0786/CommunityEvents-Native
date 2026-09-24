@@ -14,9 +14,7 @@ function duplicateKey(value) {
   return normalise(value).toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
 }
 
-export async function getDynamicEventOptions() {
-  const snapshot = await getDoc(OPTIONS_REF());
-  const data = snapshot.exists() ? snapshot.data() : {};
+function parseDynamicEventOptions(data = {}) {
   const eventEntries = Array.isArray(data.eventTypes) ? data.eventTypes.filter(Boolean) : [];
   return {
     legacyEventTypes: eventEntries.filter(item => typeof item === 'string' || !EVENT_TYPE_GROUPS.some(group => group.key === item.category))
@@ -28,6 +26,39 @@ export async function getDynamicEventOptions() {
     eventTypes: Array.isArray(data.eventTypes) ? eventEntries.map(item => typeof item === 'string' ? item : item.label).filter(Boolean) : [],
     reciterTypes: Array.isArray(data.reciterTypes) ? data.reciterTypes.map(item => typeof item === 'string' ? item : item.label).filter(Boolean) : [],
   };
+}
+
+export async function getDynamicEventOptions() {
+  const snapshot = await getDoc(OPTIONS_REF());
+  return parseDynamicEventOptions(snapshot.exists() ? snapshot.data() : {});
+}
+
+// Only remove admin-added choices, never events or the built-in catalogue.
+export async function deleteDynamicEventType(value) {
+  const label = normalise(value);
+  const key = duplicateKey(label);
+  if (!key) throw new Error('Choose an event type to delete.');
+  if (EVENT_TYPES.some(item => duplicateKey(item) === key)) throw new Error('Built-in event types cannot be deleted.');
+  const actor = auth.currentUser;
+  if (!actor || actor.isAnonymous) throw new Error('Sign in as an administrator.');
+  const result = await runTransaction(db, async transaction => {
+    const actorSnapshot = await transaction.get(doc(db, 'users', actor.uid));
+    const role = actorSnapshot.exists() ? actorSnapshot.data()?.role : '';
+    if (role !== 'admin' && role !== 'superAdmin') throw new Error('Administrator access is required.');
+    const reference = OPTIONS_REF();
+    const snapshot = await transaction.get(reference);
+    const data = snapshot.exists() ? snapshot.data() : {};
+    const current = Array.isArray(data.eventTypes) ? data.eventTypes : [];
+    const next = current.filter(item => duplicateKey(typeof item === 'string' ? item : item?.label) !== key);
+    if (next.length === current.length) throw new Error('This event type has already been removed. Refresh the list.');
+    transaction.set(reference, {
+      eventTypes: next,
+      lastEventTypeDeletion: { label, deletedByUid: actor.uid, deletedAt: serverTimestamp() },
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+    return { ...data, eventTypes: next };
+  });
+  return parseDynamicEventOptions(result);
 }
 
 export async function addDynamicEventOption(kind, value, category) {

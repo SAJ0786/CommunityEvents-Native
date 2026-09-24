@@ -28,6 +28,18 @@ export function buildEventTypeGroups(dynamicOptions = [], categories = {}) {
   }));
 }
 
+// A retired type remains editable on the event which already uses it.
+export function eventTypesForExistingEvent(dynamicOptions = [], initialEvent) {
+  const retained = initialEvent?.id ? initialEvent.eventType : '';
+  return retained && !EVENT_TYPES.includes(retained) ? [...new Set([...dynamicOptions, retained])] : dynamicOptions;
+}
+
+export function hasExistingReciterDetails(initialEvent, selectedType) {
+  return Boolean(initialEvent?.id && selectedType === initialEvent.eventType && (
+    initialEvent.speakerName || initialEvent.reciters?.some(item => item.name)
+  ));
+}
+
 export const AUDIENCE_TYPES = [
   'Gents only',
   'Ladies only',

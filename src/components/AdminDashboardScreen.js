@@ -82,8 +82,8 @@ import EventCard from './EventCard';
 import EventDetailsModal from './EventDetailsModal';
 import CompactSelect from './CompactSelect';
 import { CITY_OPTIONS, DEFAULT_CITY, cityCode, cityLabel, getEventMetroArea, normalizeCity } from '../utils/cities';
-import { addDynamicEventOption } from '../services/eventOptionsAdmin';
-import { EVENT_TYPE_GROUPS } from '../utils/eventOptions';
+import { addDynamicEventOption, deleteDynamicEventType, getDynamicEventOptions } from '../services/eventOptionsAdmin';
+import { EVENT_TYPES, EVENT_TYPE_GROUPS } from '../utils/eventOptions';
 import AdminPageHeader from './AdminPageHeader';
 import DiagnosticRegisterPanel from './DiagnosticRegisterPanel';
 
@@ -554,6 +554,12 @@ export default function AdminDashboardScreen({
   const [newReciterType, setNewReciterType] = useState('');
   const [optionStatus, setOptionStatus] = useState('');
   const [optionBusy, setOptionBusy] = useState(false);
+  const optionMutationRef = useRef(false);
+  const [managedEventOptions, setManagedEventOptions] = useState({ eventTypes: [], eventTypeCategories: {} });
+  const [eventOptionsLoading, setEventOptionsLoading] = useState(false);
+  const [eventOptionsLoadError, setEventOptionsLoadError] = useState('');
+  const [eventOptionsReload, setEventOptionsReload] = useState(0);
+  const [deleteEventType, setDeleteEventType] = useState('');
 
   const roleLabel = profile?.role === 'superAdmin' ? 'Super Admin' : 'Admin';
   const adminDisplayName = profile?.fullName || user?.displayName || user?.email || 'Admin user';
@@ -562,6 +568,20 @@ export default function AdminDashboardScreen({
     : cityLabel(getAdminCity(profile)).replace(', Australia', '');
   const canAccess = profile?.role === 'admin' || profile?.role === 'superAdmin';
   const canManageHijriSettings = profile?.role === 'superAdmin';
+  const removableEventTypes = managedEventOptions.eventTypes.filter(label => !EVENT_TYPES.includes(label));
+
+  useEffect(() => {
+    if (panel !== 'tools' || !canAccess) return undefined;
+    let active = true;
+    setEventOptionsLoading(true);
+    setEventOptionsLoadError('');
+    getDynamicEventOptions().then(options => {
+      if (active) { setManagedEventOptions(options); setDeleteEventType(''); }
+    }).catch(error => {
+      if (active) setEventOptionsLoadError(error?.message || 'Could not load event types.');
+    }).finally(() => { if (active) setEventOptionsLoading(false); });
+    return () => { active = false; };
+  }, [canAccess, panel, eventOptionsReload]);
   const adminEventsLoading = Boolean(adminEventLoadingViews[adminEventView]);
 
   useEffect(() => {
@@ -791,11 +811,38 @@ export default function AdminDashboardScreen({
   };
 
   const addEventOption = async (kind, value, clear) => {
+    if (optionMutationRef.current || eventOptionsLoading || !canAccess) return;
+    optionMutationRef.current = true;
     setOptionBusy(true);
     setOptionStatus('');
-    try { await addDynamicEventOption(kind, value, kind === 'eventType' ? newEventCategory : undefined); clear(''); setOptionStatus(`${value.trim()} added. It is now available in Add/Edit Event.`); }
+    try { const options = await addDynamicEventOption(kind, value, kind === 'eventType' ? newEventCategory : undefined); setManagedEventOptions(options); clear(''); setOptionStatus(`${value.trim()} added. It is now available in Add/Edit Event.`); }
     catch (nextError) { setOptionStatus(nextError?.message || 'Could not add this option.'); }
-    finally { setOptionBusy(false); }
+    finally { optionMutationRef.current = false; setOptionBusy(false); }
+  };
+
+  const removeEventType = () => {
+    if (!canAccess || optionBusy || eventOptionsLoading || !removableEventTypes.includes(deleteEventType)) return;
+    const label = deleteEventType;
+    Alert.alert('Delete event type?', 'Remove "' + label + '" from new event selections? Existing events will not be changed. This affects the shared list for all cities.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        if (optionMutationRef.current) return;
+        optionMutationRef.current = true;
+        setOptionBusy(true);
+        setOptionStatus('');
+        try {
+          const options = await deleteDynamicEventType(label);
+          setManagedEventOptions(options);
+          setDeleteEventType('');
+          setOptionStatus(label + ' deleted from new selections. Existing events are unchanged.');
+        } catch (error) {
+          setOptionStatus(error?.message || 'Could not delete this event type.');
+        } finally {
+          optionMutationRef.current = false;
+          setOptionBusy(false);
+        }
+      } },
+    ]);
   };
 
   const resetHijriObservanceForm = (nextSelection = '') => {
@@ -3203,13 +3250,25 @@ export default function AdminDashboardScreen({
 
           {panel === 'tools' ? <View style={styles.actionCard}>
             <Text style={styles.cardTitle}>Event option management</Text>
-            <Text style={styles.cardDescription}>Add approved Event Type and Reciter Type options. Existing values cannot be deleted, duplicates are blocked case-insensitively, and each addition records the administrator and time.</Text>
+            <Text style={styles.cardDescription}>Add approved Event Type and Reciter Type options. Admin-added event types can be deleted from new selections without changing existing events. Built-in types are protected. This list is shared across all cities.</Text>
             <Text style={styles.inputLabel}>New Event Type</Text>
             <Text style={styles.inputLabel}>Event category *</Text>
             <CompactSelect title="Choose event category" value={newEventCategory} onChange={setNewEventCategory} disabled={optionBusy} options={[{ value: '', label: 'Choose category' }, ...EVENT_TYPE_GROUPS.map(group => ({ value: group.key, label: group.label }))]} />
-            <View style={styles.formRow}><View style={styles.flexField}><TextInput value={newEventType} onChangeText={setNewEventType} placeholder="Event type" placeholderTextColor={colors.muted} style={styles.input} /></View><Pressable disabled={optionBusy || !newEventCategory || newEventType.trim().length < 2} onPress={() => addEventOption('eventType', newEventType, setNewEventType)} style={[styles.primaryButton, (optionBusy || !newEventCategory || newEventType.trim().length < 2) && styles.disabledButton]}><Text style={styles.primaryButtonText}>＋ Add</Text></Pressable></View>
+            <View style={styles.formRow}><View style={styles.flexField}><TextInput value={newEventType} onChangeText={setNewEventType} placeholder="Event type" placeholderTextColor={colors.muted} style={styles.input} /></View><Pressable disabled={optionBusy || eventOptionsLoading || !newEventCategory || newEventType.trim().length < 2} onPress={() => addEventOption('eventType', newEventType, setNewEventType)} style={[styles.primaryButton, (optionBusy || eventOptionsLoading || !newEventCategory || newEventType.trim().length < 2) && styles.disabledButton]}><Text style={styles.primaryButtonText}>＋ Add</Text></Pressable></View>
+            <Text style={styles.inputLabel}>Delete admin-added event type</Text>
+            {eventOptionsLoading ? <Text style={styles.listMeta}>Loading event types...</Text> : eventOptionsLoadError ? (
+              <View>
+                <Text style={styles.listMeta}>{eventOptionsLoadError}</Text>
+                <Pressable onPress={() => setEventOptionsReload(value => value + 1)} disabled={optionBusy} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Retry loading types</Text></Pressable>
+              </View>
+            ) : removableEventTypes.length ? (
+              <View>
+                <CompactSelect title="Choose event type to delete" value={deleteEventType} onChange={setDeleteEventType} disabled={optionBusy} options={[{ value: '', label: 'Choose event type' }, ...removableEventTypes.map(label => ({ value: label, label, group: EVENT_TYPE_GROUPS.find(group => group.key === managedEventOptions.eventTypeCategories[label])?.label || 'Other' }))]} />
+                <Pressable accessibilityRole="button" disabled={optionBusy || !deleteEventType} onPress={removeEventType} style={[styles.dangerButton, (optionBusy || !deleteEventType) && styles.disabledButton]}><Text style={styles.dangerButtonText}>Delete selected event type</Text></Pressable>
+              </View>
+            ) : <Text style={styles.listMeta}>No admin-added event types to delete.</Text>}
             <Text style={styles.inputLabel}>New Reciter Type</Text>
-            <View style={styles.formRow}><View style={styles.flexField}><TextInput value={newReciterType} onChangeText={setNewReciterType} placeholder="Reciter type" placeholderTextColor={colors.muted} style={styles.input} /></View><Pressable disabled={optionBusy || newReciterType.trim().length < 2} onPress={() => addEventOption('reciterType', newReciterType, setNewReciterType)} style={[styles.primaryButton, (optionBusy || newReciterType.trim().length < 2) && styles.disabledButton]}><Text style={styles.primaryButtonText}>＋ Add</Text></Pressable></View>
+            <View style={styles.formRow}><View style={styles.flexField}><TextInput value={newReciterType} onChangeText={setNewReciterType} placeholder="Reciter type" placeholderTextColor={colors.muted} style={styles.input} /></View><Pressable disabled={optionBusy || eventOptionsLoading || newReciterType.trim().length < 2} onPress={() => addEventOption('reciterType', newReciterType, setNewReciterType)} style={[styles.primaryButton, (optionBusy || eventOptionsLoading || newReciterType.trim().length < 2) && styles.disabledButton]}><Text style={styles.primaryButtonText}>＋ Add</Text></Pressable></View>
             {optionStatus ? <Text style={styles.listMeta}>{optionStatus}</Text> : null}
           </View> : null}
 

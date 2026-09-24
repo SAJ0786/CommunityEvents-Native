@@ -116,15 +116,15 @@ export default function RecurringEventForm({
 }) {
   const today = formatLocalDate(new Date());
   const existingRule = initialEvent?.recurrenceRuleSnapshot || {};
-  const initialStartDate = initialEvent?.seriesStartDate || initialEvent?.eventDate || today;
+  const initialStartDate = (editing ? initialEvent?.eventDate : initialEvent?.seriesStartDate || initialEvent?.eventDate) || today;
   const [stage, setStage] = useState('schedule');
   const [calendarType, setCalendarType] = useState(existingRule.calendarType || (initialEvent?.enteredAsHijri ? 'hijri' : 'gregorian'));
   const [startDate, setStartDate] = useState(initialStartDate);
   const [frequency, setFrequency] = useState(existingRule.frequency || 'week');
   const [repeatEvery, setRepeatEvery] = useState(String(existingRule.repeatEvery || 1));
-  const [endMode, setEndMode] = useState(existingRule.endMode || 'count');
+  const [endMode, setEndMode] = useState(editing ? 'count' : existingRule.endMode || 'count');
   const [endDate, setEndDate] = useState(existingRule.endDate || initialEvent?.seriesEndDate || defaultEndDate(existingRule.frequency || 'week', initialStartDate));
-  const [occurrenceCount, setOccurrenceCount] = useState(String(existingRule.occurrenceCount || initialEvent?.recurrenceTotal || 4));
+  const [occurrenceCount, setOccurrenceCount] = useState(String(editing ? initialEvent?.__futureOccurrences?.length || 0 : existingRule.occurrenceCount || initialEvent?.recurrenceTotal || 4));
   const [overrides, setOverrides] = useState([]);
   const [settingsReady, setSettingsReady] = useState(false);
   const [hijriStart, setHijriStart] = useState({
@@ -174,6 +174,16 @@ export default function RecurringEventForm({
   const preview = useMemo(() => {
     if (!settingsReady) return { occurrences: [], error: '' };
     try {
+      // Preserve individually moved/skipped occurrences until recurrence settings change.
+      const originalHijri = getHijriParts(initialStartDate, overrides);
+      const unchanged = editing && initialEvent?.__futureOccurrences?.length
+        && calendarType === (existingRule.calendarType || (initialEvent.enteredAsHijri ? 'hijri' : 'gregorian'))
+        && frequency === (existingRule.frequency || 'week') && Number(repeatEvery) === Number(existingRule.repeatEvery || 1)
+        && endMode === 'count' && Number(occurrenceCount) === initialEvent.__futureOccurrences.length
+        && (calendarType === 'hijri'
+          ? ['day', 'month', 'year'].every(key => Number(hijriStart[key]) === Number(initialEvent['hijri' + key[0].toUpperCase() + key.slice(1)] || originalHijri[key]))
+          : startDate === initialStartDate);
+      if (unchanged) return { occurrences: initialEvent.__futureOccurrences, error: '' };
       const occurrences = calendarType === 'hijri'
         ? generateHijriOccurrences({
           startHijri: hijriStart,
@@ -197,7 +207,7 @@ export default function RecurringEventForm({
     } catch (previewError) {
       return { occurrences: [], error: previewError.message };
     }
-  }, [calendarType, endDate, endMode, frequency, hijriEnd, hijriStart, occurrenceCount, overrides, repeatEvery, settingsReady, startDate]);
+  }, [calendarType, endDate, endMode, frequency, hijriEnd, hijriStart, occurrenceCount, overrides, repeatEvery, settingsReady, startDate, editing, initialEvent, initialStartDate]);
 
   const recurrence = useMemo(() => ({
     calendarType,
@@ -208,9 +218,9 @@ export default function RecurringEventForm({
     endHijri: hijriEnd,
     occurrenceCount: Number(occurrenceCount),
   }), [calendarType, endDate, endMode, frequency, hijriEnd, occurrenceCount, repeatEvery]);
-  const expectedOccurrenceCount = editing ? Number(initialEvent?.recurrenceTotal || 0) : 0;
+  const expectedOccurrenceCount = editing ? Number(initialEvent?.__futureOccurrences?.length || 0) : 0;
   const scheduleCountError = expectedOccurrenceCount && preview.occurrences.length !== expectedOccurrenceCount
-    ? `Keep this series at ${expectedOccurrenceCount} occurrences. Change the recurrence settings until the preview shows ${expectedOccurrenceCount} events.`
+    ? `Keep the remaining series at ${expectedOccurrenceCount} future occurrences. Change the recurrence settings until the preview shows ${expectedOccurrenceCount} events.`
     : '';
 
   const detailsInitialEvent = useMemo(() => {
@@ -218,7 +228,7 @@ export default function RecurringEventForm({
     if (!first) return null;
     return {
       ...(editing && initialEvent ? initialEvent : {}),
-      metroArea: defaultCity,
+      metroArea: initialEvent?.metroArea || defaultCity,
       eventDate: first.eventDate,
       hijriDate: first.hijriDate,
       hijriDay: first.hijriDay || null,
@@ -236,9 +246,9 @@ export default function RecurringEventForm({
         defaultHostPhone={defaultHostPhone}
         existingEvents={existingEvents}
         initialEvent={detailsInitialEvent}
-        title={editing ? 'Edit Entire Series' : 'Recurring Event'}
+        title={editing ? 'Edit Future Events' : 'Recurring Event'}
         subtitle={`${recurrenceLabel(frequency, repeatEvery)} - ${preview.occurrences.length} event${preview.occurrences.length === 1 ? '' : 's'} - ${preview.occurrences[0].eventDate} to ${preview.occurrences[preview.occurrences.length - 1].eventDate}`}
-        submitLabel={editing ? `Update ${preview.occurrences.length} series event${preview.occurrences.length === 1 ? '' : 's'}` : `Create ${preview.occurrences.length} recurring event${preview.occurrences.length === 1 ? '' : 's'}`}
+        submitLabel={editing ? `Update ${preview.occurrences.length} future event${preview.occurrences.length === 1 ? '' : 's'}` : `Create ${preview.occurrences.length} recurring event${preview.occurrences.length === 1 ? '' : 's'}`}
         submitting={submitting}
         error={error}
         success={success}
@@ -256,8 +266,8 @@ export default function RecurringEventForm({
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       <View style={styles.card}>
         <MemberPageHeader
-          title={editing ? 'Edit Entire Series' : 'Recurring Event'}
-          subtitle={editing ? 'Update the recurrence schedule and shared event details. Review the regenerated dates before saving.' : 'Create repeating events from one shared set of details. Dates are previewed before saving.'}
+          title={editing ? 'Edit Future Events' : 'Recurring Event'}
+          subtitle={editing ? 'Update only events that have not started. Past and live events are left unchanged. Review the dates before saving.' : 'Create repeating events from one shared set of details. Dates are previewed before saving.'}
           icon="calendar-refresh-outline"
           tone="teal"
         />

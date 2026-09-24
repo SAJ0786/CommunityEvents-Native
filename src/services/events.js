@@ -1,6 +1,7 @@
-import { addDoc, collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@react-native-firebase/firestore';
+import { addDoc, collection, doc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@react-native-firebase/firestore';
 import { httpsCallable } from '@react-native-firebase/functions';
 import { auth, db, ensureFirebaseSession, functions } from '../firebase/firebase';
+import { isFutureSeriesEvent } from '../utils/seriesScope';
 import { getEventMetroArea } from '../utils/cities';
 import { applyPrayerOffset, calculatePrayerTimes, prayerLabel } from './prayerTimes';
 import { getHijriDisplay, getHijriParts, hijriDisplayFromParts, hijriToGregorian } from './hijri';
@@ -372,135 +373,119 @@ function seriesQueryForEvent(event = {}) {
   };
 }
 
+export async function getFutureSeriesEvents(sourceEvent) {
+  if (!auth.currentUser || auth.currentUser.isAnonymous) throw new Error('Sign in to manage this recurring series.');
+  const { seriesId } = seriesQueryForEvent(sourceEvent);
+  const snapshots = await Promise.all(['seriesId', 'recurringSeriesId'].map(field =>
+    getDocs(query(collection(db, 'events'), where(field, '==', seriesId)))));
+  const now = new Date();
+  return [...new Map(snapshots.flatMap(snapshot => snapshot.docs).map(item => [item.id, { ...item.data(), id: item.id }])).values()]
+    .filter(event => isFutureSeriesEvent(event, now)).sort(compareEventsByDateTime);
+}
+
+export async function prepareFutureSeriesEdit(sourceEvent) {
+  const events = await getFutureSeriesEvents(sourceEvent);
+  if (!events.length) throw new Error('No future events remain in this series.');
+  return { ...events[0], __editSeries: true, __futureIds: events.map(event => event.id), __futureOccurrences: events };
+}
+
 export async function updateEventSeries(sourceEvent, payload = {}, schedule = null) {
-  const user = auth.currentUser;
-  if (!user || user.isAnonymous) throw new Error('Sign in to update this recurring series.');
-
-  const { seriesId, ref } = seriesQueryForEvent(sourceEvent);
+  if (!auth.currentUser || auth.currentUser.isAnonymous) throw new Error('Sign in to update this recurring series.');
+  const { seriesId } = seriesQueryForEvent(sourceEvent);
   const protectedFields = new Set([
-    'id',
-    '__editSeries',
-    'eventDate',
-    'hijriDate',
-    'hijriDay',
-    'hijriMonth',
-    'hijriYear',
-    'enteredAsHijri',
-    'seriesId',
-    'recurringSeriesId',
-    'isRecurring',
-    'recurrenceIndex',
-    'recurrenceTotal',
-    'recurrenceRuleSnapshot',
-    'seriesStartDate',
-    'seriesEndDate',
-    'createdAt',
-    'createdByUserId',
-    'createdByUserEmail',
-    'createdByUserPhone',
-    'submittedAt',
-    'submittedByUserId',
-    'submittedByName',
-    'submittedByRole',
-    'isLive',
-    'liveUrl',
-    'liveWatchUrl',
-    'liveRoomCode',
-    'liveStartedAt',
-    'liveEndedAt',
+    'id', 'eventDate', 'hijriDate', 'hijriDay', 'hijriMonth', 'hijriYear', 'enteredAsHijri',
+    'seriesId', 'recurringSeriesId', 'isRecurring', 'recurrenceIndex', 'recurrenceTotal',
+    'recurrenceRuleSnapshot', 'seriesStartDate', 'seriesEndDate', 'createdAt', 'createdByUserId',
+    'createdByUserEmail', 'createdByUserPhone', 'submittedAt', 'submittedByUserId', 'submittedByName',
+    'submittedByRole', 'isLive', 'liveUrl', 'liveWatchUrl', 'liveRoomCode', 'liveStartedAt', 'liveEndedAt',
   ]);
-  const updates = Object.fromEntries(
-    Object.entries(payload).filter(([key]) => !protectedFields.has(key))
-  );
-  const snapshot = await getDocs(ref);
-  if (snapshot.empty) throw new Error('No matching series events were found.');
-
-  const existingDocs = [...snapshot.docs].sort((left, right) => {
-    const leftEvent = left.data();
-    const rightEvent = right.data();
-    const indexDifference = Number(leftEvent.recurrenceIndex || 0) - Number(rightEvent.recurrenceIndex || 0);
-    return indexDifference || compareEventsByDateTime(leftEvent, rightEvent);
-  });
+  const updates = Object.fromEntries(Object.entries(payload).filter(([key]) => !protectedFields.has(key) && !key.startsWith('__')));
+  const futureEvents = await getFutureSeriesEvents(sourceEvent);
+  if (!futureEvents.length) throw new Error('No future events remain in this series.');
+  const expectedIds = sourceEvent.__futureIds;
+  if (expectedIds && (expectedIds.length !== futureEvents.length || futureEvents.some(item => !expectedIds.includes(item.id)))) {
+    throw new Error('The remaining events have changed. Reopen Edit Series to refresh the schedule.');
+  }
   const occurrences = Array.isArray(schedule?.occurrences) ? schedule.occurrences : null;
-  if (occurrences && occurrences.length !== existingDocs.length) {
-    throw new Error(`Keep this series at ${existingDocs.length} occurrences. You can change its dates and recurrence pattern without adding or removing events.`);
+  if (occurrences && occurrences.length !== futureEvents.length) {
+    throw new Error('Keep the remaining series at ' + futureEvents.length + ' future occurrences. Reopen Edit Series if an event has started.');
   }
   const recurrence = schedule?.recurrence || sourceEvent.recurrenceRuleSnapshot || {};
   const recurrenceRuleSnapshot = occurrences ? {
     calendarType: recurrence.calendarType || 'gregorian',
-    frequency: recurrence.frequency || 'week',
-    repeatEvery: Number(recurrence.repeatEvery || 1),
+    frequency: recurrence.frequency || 'week', repeatEvery: Number(recurrence.repeatEvery || 1),
     endMode: recurrence.endMode || 'count',
     endDate: recurrence.endMode === 'date' && recurrence.calendarType !== 'hijri' ? recurrence.endDate || null : null,
     endHijri: recurrence.endMode === 'date' && recurrence.calendarType === 'hijri' ? recurrence.endHijri || null : null,
     occurrenceCount: recurrence.endMode === 'count' ? Number(recurrence.occurrenceCount || occurrences.length) : null,
   } : sourceEvent.recurrenceRuleSnapshot || {};
-  const seriesStartDate = occurrences?.[0]?.eventDate || sourceEvent.seriesStartDate || sourceEvent.eventDate;
-  const seriesEndDate = occurrences?.[occurrences.length - 1]?.eventDate || sourceEvent.seriesEndDate || sourceEvent.eventDate;
-
-  for (let offset = 0; offset < existingDocs.length; offset += 450) {
-    const batch = writeBatch(db);
-    existingDocs.slice(offset, offset + 450).forEach((item, indexInChunk) => {
-      const occurrence = occurrences?.[offset + indexInChunk];
-      const prayerTimes = occurrence && payload.timeMode === 'prayer'
-        ? calculatePrayerTimes(occurrence.eventDate, payload.address)
-        : null;
+  const originalTotal = Math.max(Number(sourceEvent.recurrenceTotal || 0), futureEvents.length, ...futureEvents.map(event => Number(event.recurrenceTotal || 0)));
+  const seriesStartDate = sourceEvent.seriesStartDate || sourceEvent.eventDate;
+  const seriesEndDate = occurrences?.[occurrences.length - 1]?.eventDate || sourceEvent.seriesEndDate || futureEvents[futureEvents.length - 1].eventDate;
+  if (futureEvents.length > 450) throw new Error('This series is too large to edit safely in one operation.');
+  // Recheck dates and live state in the same transaction as the writes.
+  await runTransaction(db, async transaction => {
+    const refs = futureEvents.map(event => doc(db, 'events', event.id));
+    const currentDocs = await Promise.all(refs.map(ref => transaction.get(ref)));
+    const now = new Date();
+    currentDocs.forEach((current, index) => {
+      const before = futureEvents[index];
+      const data = current.data();
+      if (!current.exists() || !isFutureSeriesEvent(data, now)
+        || data.eventDate !== before.eventDate || data.startTime !== before.startTime
+        || (data.seriesId || data.recurringSeriesId) !== seriesId) {
+        throw new Error('The remaining events have changed. Reopen Edit Series to refresh the schedule.');
+      }
+    });
+    const planned = futureEvents.map((event, index) => {
+      const occurrence = occurrences?.[index];
+      const prayerTimes = occurrence && payload.timeMode === 'prayer' ? calculatePrayerTimes(occurrence.eventDate, payload.address) : null;
       const prayerName = payload.prayerName || '';
       const prayerOffsetMinutes = Number(payload.prayerOffsetMinutes || 0);
-      batch.update(item.ref, {
+      const nextData = {
         ...updates,
         ...(occurrence ? {
           eventDate: occurrence.eventDate,
-          startTime: prayerTimes?.[prayerName]
-            ? applyPrayerOffset(prayerTimes[prayerName], prayerOffsetMinutes)
-            : payload.startTime,
-          prayerLabel: prayerName ? prayerLabel(prayerName) : '',
-          prayerOffsetMinutes,
+          startTime: prayerTimes?.[prayerName] ? applyPrayerOffset(prayerTimes[prayerName], prayerOffsetMinutes) : payload.startTime,
+          prayerLabel: prayerName ? prayerLabel(prayerName) : '', prayerOffsetMinutes,
           prayerTimeZone: prayerTimes?.timeZone || payload.prayerTimeZone || '',
-          hijriDate: occurrence.hijriDate || '',
-          hijriDay: occurrence.hijriDay || null,
-          hijriMonth: occurrence.hijriMonth || null,
-          hijriYear: occurrence.hijriYear || null,
+          hijriDate: occurrence.hijriDate || '', hijriDay: occurrence.hijriDay || null,
+          hijriMonth: occurrence.hijriMonth || null, hijriYear: occurrence.hijriYear || null,
           enteredAsHijri: Boolean(occurrence.enteredAsHijri),
-          recurrenceIndex: offset + indexInChunk + 1,
-          recurrenceTotal: occurrences.length,
-          recurrenceRuleSnapshot,
-          seriesStartDate,
-          seriesEndDate,
+          recurrenceIndex: event.recurrenceIndex || index + 1, recurrenceTotal: originalTotal,
+          recurrenceRuleSnapshot, seriesStartDate, seriesEndDate,
         } : {}),
         updatedAt: serverTimestamp(),
-      });
+      };
+      if (!isFutureSeriesEvent({ ...currentDocs[index].data(), ...nextData }, now)) {
+        throw new Error('Every updated event must start in the future. Check the dates and start time.');
+      }
+      return { ref: refs[index], data: nextData };
     });
-    await batch.commit();
-  }
-
+    planned.forEach(item => transaction.update(item.ref, item.data));
+  });
   try {
     await setDoc(doc(db, 'recurringEventSeries', seriesId), {
-      title: `${payload.eventTypeDisplay || payload.eventType || 'Event'} - ${payload.hostName || ''}`.trim(),
-      startDate: seriesStartDate,
-      endDate: seriesEndDate,
-      totalEvents: existingDocs.length,
-      rule: recurrenceRuleSnapshot,
-      updatedAt: serverTimestamp(),
+      title: ((payload.eventTypeDisplay || payload.eventType || 'Event') + ' - ' + (payload.hostName || '')).trim(),
+      startDate: seriesStartDate, endDate: seriesEndDate, totalEvents: originalTotal,
+      futureEvents: futureEvents.length, rule: recurrenceRuleSnapshot, updatedAt: serverTimestamp(),
     }, { merge: true });
   } catch (metadataError) {
     if (!String(metadataError?.code || '').includes('permission-denied')) throw metadataError;
   }
-
-  return { totalEvents: existingDocs.length };
+  return { totalEvents: futureEvents.length };
 }
 
-export async function deleteEventSeries(sourceEvent) {
-  const user = auth.currentUser;
-  if (!user || user.isAnonymous) throw new Error('Sign in to delete this recurring series.');
-
-  const { seriesId, ref } = seriesQueryForEvent(sourceEvent);
-  const snapshot = await getDocs(ref);
-  if (snapshot.empty) throw new Error('No matching series events were found.');
-  const archiveEvents = httpsCallable(functions, 'archiveEventRecords');
-  const result = await archiveEvents({ seriesId });
-  return Number(result.data?.archived || snapshot.docs.length);
+export async function deleteEventSeries(sourceEvent, expectedIds) {
+  if (!auth.currentUser || auth.currentUser.isAnonymous) throw new Error('Sign in to delete this recurring series.');
+  const { seriesId } = seriesQueryForEvent(sourceEvent);
+  const archiveEvents = httpsCallable(functions, 'archiveFutureSeriesEvents');
+  const result = await archiveEvents({ seriesId, expectedIds });
+  if (!Array.isArray(result.data?.archivedIds)) throw new Error('Could not confirm which future events were archived. Refresh the event list.');
+  return result.data;
 }
+
+
 
 function buildRecalculatedEventData(event = {}, overrides = []) {
   const updates = {};

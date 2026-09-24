@@ -58,7 +58,7 @@ import BusinessDirectoryModule from './src/business/BusinessDirectoryModule';
 import BusinessNotificationsScreen from './src/business/BusinessNotificationsScreen';
 import { listenUserNotifications } from './src/services/businessNotifications';
 import { auth, confirmPhoneVerification, ensureFirebaseSession, sendPhoneVerification, setNativeDisplayName } from './src/firebase/firebase';
-import { compareEventsByDateTime, createEventSubmission, createRecurringEventSeries, deleteEventSeries, deleteEventSubmission, getPublicEvents, getUserEventSubmissions, listenActiveEvents, prepareHomeEvents, setEventVisibility, updateEventSeries, updateEventSubmission } from './src/services/events';
+import { compareEventsByDateTime, createEventSubmission, createRecurringEventSeries, getFutureSeriesEvents, prepareFutureSeriesEdit, deleteEventSeries, deleteEventSubmission, getPublicEvents, getUserEventSubmissions, listenActiveEvents, prepareHomeEvents, setEventVisibility, updateEventSeries, updateEventSubmission } from './src/services/events';
 import { uploadEventPoster } from './src/services/images';
 import { deleteMyAccountAndEvents, ensureUserProfile, migratePhoneAccount, toggleSavedEvent, updateUserPreferences } from './src/services/users';
 import { cancelFavouriteReminder, initializeDefaultPrayerReminders, scheduleFavouriteReminder } from './src/services/reminders';
@@ -864,7 +864,7 @@ function MainApp() {
       };
       if (editingEvent?.__editSeries) {
         const result = await updateEventSeries(editingEvent, submissionPayload, schedule);
-        setCreateSuccess(`${result.totalEvents} events and the recurrence schedule were updated successfully.`);
+        setCreateSuccess(`${result.totalEvents} future events and their recurrence schedule were updated successfully.`);
       } else {
         const result = await createRecurringEventSeries({
           payload: submissionPayload,
@@ -921,18 +921,20 @@ function MainApp() {
     setActiveTab('create');
   }, []);
 
-  const handleEditSeries = useCallback(event => {
-    const seriesId = event?.seriesId || event?.recurringSeriesId;
-    if (!seriesId) {
-      setMyEventsError('This recurring series does not have a series ID yet.');
-      return;
+  const handleEditSeries = useCallback(async event => {
+    try {
+      const draft = await prepareFutureSeriesEdit(event);
+      setEditingEvent(draft);
+      setCreateMode('recurring');
+      setCreateError('');
+      setCreateSuccess('');
+      setActiveTab('create');
+    } catch (err) {
+      Alert.alert('Edit future events', friendlyError(err, 'Could not load the remaining series events.'));
     }
-    setEditingEvent({ ...event, __editSeries: true });
-    setCreateMode('recurring');
-    setCreateError('');
-    setCreateSuccess('');
-    setActiveTab('create');
   }, []);
+
+
 
   const handleCopyMyEvent = useCallback(event => {
     const draft = {
@@ -988,24 +990,32 @@ function MainApp() {
   const handleDeleteSeries = useCallback(async event => {
     const seriesId = event?.seriesId || event?.recurringSeriesId;
     if (!seriesId) return;
+    let futureEvents;
+    try {
+      futureEvents = await getFutureSeriesEvents(event);
+      if (!futureEvents.length) throw new Error('No future events remain in this series.');
+    } catch (err) {
+      Alert.alert('Delete future events', friendlyError(err, 'Could not load the remaining series events.'));
+      return;
+    }
     Alert.alert(
-      'Delete entire recurring series',
-      'This will permanently remove every event in this recurring series. Continue?',
+      'Delete future events',
+      'Archive ' + futureEvents.length + ' future events in this series? Past, already-started and live events will remain unchanged.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete Series',
-          style: 'destructive',
+          text: 'Delete Future Events', style: 'destructive',
           onPress: async () => {
             setDeleteSeriesBusyId(seriesId);
             setMyEventsError('');
             try {
-              await deleteEventSeries(event);
-              setMyEvents(current => current.filter(item => (item.seriesId || item.recurringSeriesId) !== seriesId));
-              setEvents(current => current.filter(item => (item.seriesId || item.recurringSeriesId) !== seriesId));
-              setCreateSuccess('Recurring series deleted.');
+              const result = await deleteEventSeries(event, futureEvents.map(item => item.id));
+              const archivedIds = new Set(result.archivedIds);
+              setMyEvents(current => current.filter(item => !archivedIds.has(item.id)));
+              setEvents(current => current.filter(item => !archivedIds.has(item.id)));
+              setCreateSuccess(result.archived + ' future events archived. Past and live events were not changed.');
             } catch (err) {
-              setMyEventsError(friendlyError(err, 'Could not delete the recurring series.'));
+              Alert.alert('Could not delete future events', friendlyError(err, 'Refresh the event list and try again.'));
             } finally {
               setDeleteSeriesBusyId('');
             }
@@ -1014,6 +1024,8 @@ function MainApp() {
       ]
     );
   }, []);
+
+
 
   const handleToggleVisibility = useCallback(async event => {
     if (!event?.id) return;

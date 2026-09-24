@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const { isFutureSeriesEvent } = require('./seriesScope');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 
 admin.initializeApp();
@@ -66,6 +67,62 @@ exports.archiveEventRecords = onCall({ region: REGION }, async request => {
   }
   if (seriesId) await db.collection('recurringEventSeries').doc(seriesId).set({ status: 'archived', archivedAt, archivedBy: request.auth.uid, updatedAt: archivedAt }, { merge: true });
   return { archived: eventDocs.length };
+});
+
+// Separate endpoint prevents a new client calling the old all-series handler.
+exports.archiveFutureSeriesEvents = onCall({ region: REGION }, async request => {
+  if (!request.auth || request.auth.token?.firebase?.sign_in_provider === 'anonymous') throw new HttpsError('unauthenticated', 'Login required.');
+  const seriesId = String(request.data?.seriesId || '').trim();
+  const expectedIds = request.data?.expectedIds;
+  if (!seriesId || !Array.isArray(expectedIds) || !expectedIds.length || expectedIds.length > 500
+    || expectedIds.some(id => typeof id !== 'string') || new Set(expectedIds).size !== expectedIds.length) {
+    throw new HttpsError('invalid-argument', 'Select a series with future events first.');
+  }
+  const caller = await callerProfile(request);
+  const snapshots = await Promise.all(['seriesId', 'recurringSeriesId'].map(field =>
+    db.collection('events').where(field, '==', seriesId).get()));
+  const docs = [...new Map(snapshots.flatMap(snapshot => snapshot.docs).map(item => [item.id, item])).values()];
+  const now = new Date();
+  const future = docs.filter(item => isFutureSeriesEvent(item.data(), now));
+  if (!future.length) throw new HttpsError('failed-precondition', 'No future events remain in this series.');
+  if (future.length !== expectedIds.length || future.some(item => !expectedIds.includes(item.id))) {
+    throw new HttpsError('failed-precondition', 'The remaining events have changed. Reopen Delete Series and confirm the new count.');
+  }
+  const authorize = data => {
+    const owner = data.createdByUserId === request.auth.uid || data.ownerUid === request.auth.uid;
+    if (!owner && !adminCanAccessEvent(caller, data)) throw new HttpsError('permission-denied', 'You cannot archive one or more selected events.');
+  };
+  future.forEach(item => authorize(item.data()));
+  const archivedIds = [];
+  for (let offset = 0; offset < future.length; offset += 240) {
+    const chunk = future.slice(offset, offset + 240);
+    const ids = await db.runTransaction(async transaction => {
+      const current = await transaction.getAll(...chunk.map(item => item.ref));
+      const checkedAt = new Date();
+      const eligible = current.filter(item => item.exists && isFutureSeriesEvent(item.data(), checkedAt));
+      eligible.forEach(item => {
+        const data = item.data();
+        if (data.seriesId !== seriesId && data.recurringSeriesId !== seriesId) throw new HttpsError('failed-precondition', 'Series membership changed. Refresh and try again.');
+        authorize(data);
+      });
+      const archivedAt = admin.firestore.Timestamp.now();
+      eligible.forEach(item => {
+        transaction.set(db.collection('archivedEvents').doc(item.id), {
+          ...item.data(), status: 'inactive', archivedAt, archivedBy: request.auth.uid,
+          archivedFromEventId: item.id, archiveReason: 'future_series_archived_by_user_or_admin',
+        }, { merge: true });
+        transaction.delete(item.ref);
+      });
+      return eligible.map(item => item.id);
+    });
+    archivedIds.push(...ids);
+  }
+  // Historical or live occurrences may remain; do not archive the whole series.
+  await db.collection('recurringEventSeries').doc(seriesId).set({
+    lastFutureDeletionAt: admin.firestore.Timestamp.now(), lastFutureDeletionBy: request.auth.uid,
+    lastFutureDeletionCount: archivedIds.length, updatedAt: admin.firestore.Timestamp.now(),
+  }, { merge: true });
+  return { archived: archivedIds.length, archivedIds };
 });
 
 exports.deleteUserData = onCall({ region: REGION }, async request => {

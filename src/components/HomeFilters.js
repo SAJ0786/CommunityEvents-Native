@@ -53,15 +53,10 @@ export default function HomeFilters({
             <Text maxFontSizeMultiplier={1} style={styles.clearSearchText}>x</Text>
           </Pressable>
         ) : null}
-        <Pressable accessibilityRole="button" accessibilityLabel="Customised filters" accessibilityState={{ expanded: showFilters }} onPress={onToggleFilters} style={[styles.filterButton, showFilters && styles.filterButtonActive]}>
-          <MaterialCommunityIcons color={showFilters ? colors.surface : colors.blue} name="tune-variant" size={19} />
-          {activeCount ? <View style={styles.filterCount}><Text style={styles.filterCountText}>{activeCount}</Text></View> : null}
-        </Pressable>
       </View>
 
-      {showFilters ? (
-        <View style={styles.panel}>
-          <Text style={styles.label}>Customised filters</Text>
+      <View style={styles.panel}>
+          <Text style={styles.panelTitle}>Customised filters</Text>
           <View style={styles.choiceRow}>
             {EVENT_BROWSE_PRESETS.map(({ label, field, value }) => {
               const selected = field === 'nearby' ? nearby : field ? filters[field] === value : !filters.period && !filters.eventType && !nearby;
@@ -80,6 +75,11 @@ export default function HomeFilters({
               <Text maxFontSizeMultiplier={1.08} style={styles.clearButtonText}>Clear Filters</Text>
             </Pressable>
           ) : null}
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: showFilters }} onPress={onToggleFilters} style={styles.moreFiltersButton}>
+            <MaterialCommunityIcons color={colors.blue} name="tune-variant" size={19} />
+            <Text style={styles.moreFiltersText}>{showFilters ? 'Hide extra filters' : 'More filters'}{activeCount ? ' (' + activeCount + ')' : ''}</Text>
+          </Pressable>
+          {showFilters ? <View style={styles.advancedFilters}>
           <FilterChoices
             label="Event type"
             options={[{ value: '', label: 'All event types' }, ...eventTypes.map(value => ({ value, label: value }))]}
@@ -126,8 +126,8 @@ export default function HomeFilters({
               />
             </View>
           </View>
-        </View>
-      ) : null}
+          </View> : null}
+      </View>
     </View>
   );
 }
@@ -146,6 +146,10 @@ const styles = StyleSheet.create({
   filterCount: { position: 'absolute', right: -3, top: -3, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderRadius: 8, backgroundColor: colors.rose },
   filterCountText: { color: colors.surface, fontSize: 8, fontWeight: '700' },
   panel: { gap: spacing.md, marginTop: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  panelTitle: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  moreFiltersButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: radius.md, backgroundColor: colors.blueSoft },
+  moreFiltersText: { color: colors.blue, fontSize: 12, fontWeight: '600' },
+  advancedFilters: { gap: spacing.md },
   group: { gap: 6 },
   label: { color: colors.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
   choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
