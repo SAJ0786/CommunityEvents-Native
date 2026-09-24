@@ -27,9 +27,15 @@ async function main() {
     assert.match(email.html, /support@siza.info/);
     assert.doesNotMatch(email.html, /Community Businesses Australia|Community Events Sydney|<h1>/);
     assert.ok(email.html.indexOf('data-email-brand') < email.html.indexOf('<h1'));
+    assert.match(email.html, /<img data-email-logo src="cid:community-connect-logo@siza.info"/);
+    const logo = email.attachments.find(item => item.cid === 'community-connect-logo@siza.info');
+    assert.ok(logo, name + ' inline PNG attachment');
+    assert.equal(logo.contentType, 'image/png');
+    assert.deepEqual(logo.content, fs.readFileSync(path.join(root, 'assets/logo.png')));
   }
   const hostile = buildEmail({ kind: 'business-report', businessName: '<script>alert(1)</script>', message: '<img src=x onerror=alert(1)>', senderName: '<b>Fake</b>' }, '<reference>');
-  assert.doesNotMatch(hostile.html, /<script|<img|<b>/);
+  assert.doesNotMatch(hostile.html, /<script|<img src=x|<b>/);
+  assert.equal((hostile.html.match(/<img\b/g) || []).length, 1, 'only the trusted logo is an image');
   assert.match(hostile.html, /&lt;img/);
   assert.match(hostile.html, /&lt;reference&gt;/);
   const workflow = fs.readFileSync(path.join(root, 'backend/functions-business-workflow/index.js'), 'utf8');
@@ -59,16 +65,20 @@ async function main() {
 
   if (process.argv.includes('--render')) {
     const { chromium } = require('playwright');
-    const output = path.join(root, '.tools/email-layout-preview');
+    const output = process.env.EMAIL_PREVIEW_OUTPUT || path.join(root, '.tools/email-layout-preview');
     fs.mkdirSync(output, { recursive: true });
     const browser = await chromium.launch({ headless: true, channel: process.env.EMAIL_PREVIEW_BROWSER || undefined });
     try {
       const page = await browser.newPage();
       for (const [name, email] of Object.entries(samples)) {
-        fs.writeFileSync(path.join(output, name + '.html'), email.html);
+        // Browser previews cannot resolve MIME CID attachments; inline identical PNG bytes for preview only.
+        const previewHtml = email.attachments.reduce((html, item) => item.cid && Buffer.isBuffer(item.content)
+          ? html.replace(`cid:${item.cid}`, `data:${item.contentType};base64,${item.content.toString('base64')}`) : html, email.html);
+        fs.writeFileSync(path.join(output, name + '.html'), previewHtml);
         for (const width of [320, 393, 800]) {
           await page.setViewportSize({ width, height: 850 });
-          await page.setContent(email.html);
+          await page.setContent(previewHtml);
+          await page.locator('[data-email-logo]').evaluate(img => img.decode());
           const measurement = await page.evaluate(() => ({
             width: document.documentElement.scrollWidth,
             titleSize: parseFloat(getComputedStyle(document.querySelector('h1')).fontSize),

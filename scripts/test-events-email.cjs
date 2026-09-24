@@ -27,7 +27,10 @@ async function main() {
   let delivered;
   const result = await sendEventEmail({ sendMail: async value => { delivered = value; return 'smtp-result'; } }, message);
   assert.equal(result, 'smtp-result');
-  for (const key of ['from', 'to', 'replyTo', 'subject', 'headers', 'attachments']) assert.equal(delivered[key], message[key]);
+  for (const key of ['from', 'to', 'replyTo', 'subject', 'headers']) assert.equal(delivered[key], message[key]);
+  assert.equal(delivered.attachments[0], message.attachments[0]);
+  assert.equal(delivered.attachments.length, message.attachments.length + 1);
+  assert.equal(delivered.attachments.at(-1).cid, 'community-connect-logo@siza.info');
   assert.match(delivered.html, /Test &lt;subject&gt;/);
   assert.match(delivered.text, /https:\/\/example.test\/unsubscribe\?uid=synthetic/);
   assert.equal(textAlternative('<p>A &amp; B</p>'), 'A & B');

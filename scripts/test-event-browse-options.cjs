@@ -112,13 +112,13 @@ async function main() {
     assert.equal(alerted, status !== 'granted');
   }
   const react = { useMemo: fn => fn(), createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat() }) };
-  const HomeFilters = load('src/components/HomeFilters.js', {
-    react, 'react-native': { Pressable: 'Pressable', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: value => value } },
+  const EventPresetStrip = load('src/components/HomeFilters.js', {
+    react, 'react-native': { ScrollView: 'ScrollView', Pressable: 'Pressable', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: value => value } },
     '@expo/vector-icons/MaterialCommunityIcons': 'Icon', '../utils/eventOptions': options,
     '../utils/eventBrowseOptions': browse, '../theme': { colors: {}, radius: {}, spacing: {} }, './CompactSelect': 'CompactSelect',
-  }).default;
+  }).EventPresetStrip;
   const selections = [];
-  const filterTree = HomeFilters({ events, query: '', filters: noFilters, showFilters: true,
+  const filterTree = EventPresetStrip({ filters: noFilters,
     onNearbyChange: () => selections.push('nearby'), onPresetChange: (field, value) => selections.push([field, value]) });
   function nodes(tree) { return tree && typeof tree === 'object' ? [tree, ...(tree.children || []).flatMap(nodes)] : []; }
   for (const preset of browse.EVENT_BROWSE_PRESETS) {

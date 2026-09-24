@@ -31,41 +31,60 @@ async function main() {
   const cities = load('src/utils/cities.js');
   const presets = load('src/utils/eventBrowseOptions.js', { './cities': cities });
   const react = { useMemo: fn => fn(), createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat() }) };
-  const HomeFilters = load('src/components/HomeFilters.js', {
-    react, 'react-native': { Pressable: 'Pressable', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: value => value } },
+  const filterComponents = load('src/components/HomeFilters.js', {
+    react, 'react-native': { ScrollView: 'ScrollView', Pressable: 'Pressable', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: value => value } },
     '@expo/vector-icons/MaterialCommunityIcons': 'Icon', '../utils/eventOptions': options,
-    '../utils/eventBrowseOptions': presets, '../theme': { colors: {}, radius: {}, spacing: {} }, './CompactSelect': 'CompactSelect',
-  }).default;
+    '../utils/eventBrowseOptions': presets, '../theme': { colors: { blue: '#2563eb' }, radius: {}, spacing: {} }, './CompactSelect': 'CompactSelect',
+  });
+  const { default: HomeFilters, EventPresetStrip } = filterComponents;
   const filters = { period: '', eventType: '', audienceType: '', organiser: '', hostName: '', suburb: '' };
   for (const expanded of [false, true]) {
     let toggled = false;
-    let cleared = false;
-    const selected = [];
     const tree = HomeFilters({ query: '', events: [], filters, showFilters: expanded,
-      onToggleFilters: () => { toggled = true; }, onClear: () => { cleared = true; },
-      onNearbyChange: () => selected.push('nearby'), onPresetChange: (field, value) => selected.push([field, value]) });
-    assert.ok(text(tree).includes('Customised filters'));
-    for (const preset of presets.EVENT_BROWSE_PRESETS) {
-      const button = nodes(tree).find(node => node.type === 'Pressable' && text(node) === preset.label);
-      assert.ok(button, `${preset.label} must be visible with showFilters=${expanded}`);
-      button.props.onPress();
-      assert.deepEqual(selected.at(-1), preset.field === 'nearby' ? 'nearby' : [preset.field, preset.value]);
-    }
-    const more = nodes(tree).find(node => node.type === 'Pressable' && text(node).includes(expanded ? 'Hide extra filters' : 'More filters'));
+      onToggleFilters: () => { toggled = true; } });
+    assert.equal(text(tree).includes('Customised filters'), expanded);
+    assert.ok(!text(tree).includes('Upcoming'), 'presets must not be above Quick access');
+    const more = nodes(tree).find(node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Filters');
     assert.ok(more);
+    assert.equal(more.props.accessibilityState.expanded, expanded);
+    const searchRow = nodes(tree).find(node => node.children?.some(child => child?.type === 'TextInput'));
+    assert.equal(searchRow.children.at(-1), more, 'filter icon is at right of search textbox');
     more.props.onPress();
     assert.equal(toggled, true);
     assert.equal(nodes(tree).some(node => node.props?.label === 'Audience type'), expanded);
-    assert.equal(cleared, false);
+  }
+  for (const preset of presets.EVENT_BROWSE_PRESETS) {
+    const selected = [];
+    const state = { ...filters, ...(preset.field && preset.field !== 'nearby' ? { [preset.field]: preset.value } : {}) };
+    const tree = EventPresetStrip({ filters: state, nearby: preset.field === 'nearby',
+      onNearbyChange: () => selected.push('nearby'), onPresetChange: (field, value) => selected.push([field, value]) });
+    const strip = nodes(tree).find(node => node.type === 'ScrollView');
+    assert.equal(strip.props.horizontal, true);
+    assert.equal(strip.props.showsHorizontalScrollIndicator, false);
+    assert.notEqual(strip.props.contentContainerStyle.flexWrap, 'wrap');
+    const buttons = nodes(strip).filter(node => node.type === 'Pressable');
+    assert.equal(buttons.length, 9);
+    const button = buttons.find(node => text(node) === preset.label);
+    assert.equal(button.props.accessibilityState.selected, true);
+    assert.equal(button.props.style[1].backgroundColor, '#2563eb', 'selection must be blue');
+    button.props.onPress();
+    assert.deepEqual(selected.at(-1), preset.field === 'nearby' ? 'nearby' : [preset.field, preset.value]);
   }
   let cleared = false;
-  const active = HomeFilters({ query: '', events: [], filters, nearby: true, showFilters: false, onClear: () => { cleared = true; } });
+  const active = HomeFilters({ query: '', events: [], filters, nearby: true, showFilters: true, onClear: () => { cleared = true; } });
   const clear = nodes(active).find(node => node.type === 'Pressable' && text(node) === 'Clear Filters');
   assert.ok(clear);
   clear.props.onPress();
   assert.equal(cleared, true);
-  assert.match(read('App.js'), /<EventMapView events=\{displayedEvents\}/);
-  console.log('PASS visibility: nine presets always visible, More filters toggles extra fields, clear remains accessible');
+  const app = read('App.js');
+  assert.match(app, /<EventMapView events=\{displayedEvents\}/);
+  const header = app.slice(app.indexOf('const renderHeader ='), app.indexOf('const renderEmpty ='));
+  assert.ok(header.indexOf('<HomeFilters') < header.indexOf('Quick access'));
+  assert.ok(header.indexOf('Quick access') < header.indexOf('Browse events'));
+  assert.ok(header.indexOf('Browse events') < header.indexOf('<EventPresetStrip'));
+  assert.ok(header.indexOf('<EventPresetStrip') < header.indexOf('Hijri dates depend'));
+  assert.equal((header.match(/<EventPresetStrip/g) || []).length, 1);
+  console.log('PASS visibility: nine horizontal presets below Browse events, blue selection, right-edge search filter toggle, advanced fields and clear.');
 
   let role = 'admin';
   let saved = { eventTypes: ['Legacy', { label: 'Lecture', category: 'faith', addedByUid: 'creator' }], reciterTypes: ['Reciter A'] };

@@ -14,14 +14,16 @@ function textAlternative(html) {
 }
 
 function sendEventEmail(transporter, message) {
+  const rendered = renderEmail({ module: 'events', title: message.subject,
+    bodyHtml: message.html || `<p style="white-space:pre-wrap">${escapeHtml(message.text)}</p>`,
+    bodyText: message.text || textAlternative(message.html),
+  });
   // Preserve envelope, recipients, attachments, subjects and unsubscribe URLs.
   // The function returns the SMTP result exactly as before.
   return transporter.sendMail({
     ...message,
-    ...renderEmail({ module: 'events', title: message.subject,
-      bodyHtml: message.html || `<p style="white-space:pre-wrap">${escapeHtml(message.text)}</p>`,
-      bodyText: message.text || textAlternative(message.html),
-    }),
+    ...rendered,
+    attachments: [...(message.attachments || []), ...rendered.attachments],
   });
 }
 module.exports = { sendEventEmail, textAlternative };

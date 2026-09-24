@@ -2,6 +2,8 @@
 
 // One email shell for workflow updates, enquiries and support reports.
 // Keep all user-supplied values escaped before inserting body HTML.
+const emailLogo = require('./email-logo');
+const EMAIL_LOGO_CID = 'community-connect-logo@siza.info';
 const SUPPORT_EMAIL = 'support@siza.info';
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g,
   character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
@@ -12,8 +14,9 @@ function renderEmail({ module, title, bodyHtml, bodyText }) {
   const brand = emailBrand(module);
   const footer = `This is an automated update from ${brand}. Replies are sent to ${SUPPORT_EMAIL}.`;
   return {
+    attachments: [{ filename: 'community-connect.png', content: emailLogo, contentType: 'image/png', cid: EMAIL_LOGO_CID, contentDisposition: 'inline' }],
     text: `${brand}\n${title}\n\n${bodyText}\n\n${footer}`,
-    html: `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;padding:0;background:#f3f7f6;font-family:Arial,sans-serif;color:#10172f;font-size:16px;line-height:1.6"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f7f6"><tr><td style="padding:16px 12px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" align="center" style="max-width:620px;margin:0 auto;border:1px solid #d7e4e1;border-radius:14px;background:#ffffff;overflow:hidden;table-layout:fixed"><tr><td style="padding:20px;background:#138477;color:#ffffff;border-radius:14px 14px 0 0;overflow-wrap:anywhere;word-wrap:break-word"><div data-email-brand style="font-size:20px;line-height:1.35;font-weight:600">${escapeHtml(brand)}</div><h1 style="margin:10px 0 0;font-size:18px;line-height:1.35;font-weight:700;color:#ffffff">${escapeHtml(title)}</h1></td></tr><tr><td style="padding:20px;font-size:16px;line-height:1.6;overflow-wrap:anywhere;word-wrap:break-word">${bodyHtml}<div style="margin-top:22px;padding-top:16px;border-top:1px solid #e3ecea;color:#64727c;font-size:13px;line-height:1.55">${escapeHtml(footer)}</div></td></tr></table></td></tr></table></body></html>`,
+    html: `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;padding:0;background:#f3f7f6;font-family:Arial,sans-serif;color:#10172f;font-size:16px;line-height:1.6"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f7f6"><tr><td style="padding:16px 12px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" align="center" style="max-width:620px;margin:0 auto;border:1px solid #d7e4e1;border-radius:14px;background:#ffffff;overflow:hidden;table-layout:fixed"><tr><td style="padding:20px;background:#138477;color:#ffffff;border-radius:14px 14px 0 0;overflow-wrap:anywhere;word-wrap:break-word"><img data-email-logo src="cid:${EMAIL_LOGO_CID}" width="72" height="72" alt="Community Connect Australia" style="display:block;width:72px;height:72px;border:0;margin:0 0 12px;background:#ffffff;border-radius:12px"><div data-email-brand style="font-size:20px;line-height:1.35;font-weight:600">${escapeHtml(brand)}</div><h1 style="margin:10px 0 0;font-size:18px;line-height:1.35;font-weight:700;color:#ffffff">${escapeHtml(title)}</h1></td></tr><tr><td style="padding:20px;font-size:16px;line-height:1.6;overflow-wrap:anywhere;word-wrap:break-word">${bodyHtml}<div style="margin-top:22px;padding-top:16px;border-top:1px solid #e3ecea;color:#64727c;font-size:13px;line-height:1.55">${escapeHtml(footer)}</div></td></tr></table></td></tr></table></body></html>`,
   };
 }
 

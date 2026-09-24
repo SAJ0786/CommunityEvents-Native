@@ -45,7 +45,7 @@ import EventCard from './src/components/EventCard';
 import EventDetailsModal from './src/components/EventDetailsModal';
 import FeedbackScreen from './src/components/FeedbackScreen';
 import FavouritesScreen from './src/components/FavouritesScreen';
-import HomeFilters from './src/components/HomeFilters';
+import HomeFilters, { EventPresetStrip } from './src/components/HomeFilters';
 import HijriCalendarScreen from './src/components/HijriCalendarScreen';
 import InboxScreen from './src/components/InboxScreen';
 import EventMapView from './src/components/EventMapView';
@@ -1236,11 +1236,6 @@ function MainApp() {
           showFilters={showHomeFilters}
           onToggleFilters={() => setShowHomeFilters(current => !current)}
           nearby={nearbyEventsOnly}
-          onNearbyChange={enableNearbyEvents}
-          onPresetChange={(field, value) => {
-            setHomeFilters(current => ({ ...current, period: field === 'period' ? value : '', eventType: field === 'eventType' ? value : '' }));
-            setNearbyEventsOnly(false);
-          }}
           onClear={() => { setHomeFilters({ ...EMPTY_HOME_FILTERS }); setNearbyEventsOnly(false); }}
         />
       <View style={styles.sectionHeadingRow}><Text style={styles.homeSectionTitle}>Quick access</Text></View>
@@ -1261,6 +1256,15 @@ function MainApp() {
         <Text style={styles.homeSectionTitle}>Browse events</Text>
         <Text style={styles.resultCount}>{displayedEvents.length} in {cityLabel(selectedCity).replace(', Australia', '')}</Text>
       </View>
+      <EventPresetStrip
+        filters={homeFilters}
+        nearby={nearbyEventsOnly}
+        onNearbyChange={enableNearbyEvents}
+        onPresetChange={(field, value) => {
+          setHomeFilters(current => ({ ...current, period: field === 'period' ? value : '', eventType: field === 'eventType' ? value : '' }));
+          setNearbyEventsOnly(false);
+        }}
+      />
       <Text maxFontSizeMultiplier={1.08} style={[styles.notice, compactEventsLayout && styles.noticeCompact]}>Hijri dates depend on moon sighting. Please verify user-submitted details with the host.</Text>
       {isGuest ? (
         <View style={styles.guestNotice}>
