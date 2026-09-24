@@ -144,6 +144,7 @@ export default function EventDetailsModal({
   user = null,
   profile = null,
   onNiazArrangement,
+  canArrangeNiaz = false,
   onEdit,
   onDelete,
   onCopy,
@@ -436,7 +437,7 @@ export default function EventDetailsModal({
                   ) : null}
                   <ActionButton icon={reminder ? 'bell-check-outline' : 'alarm'} label={reminder ? 'Reminder Set' : 'Reminder'} onPress={() => { setReminderError(''); setReminderOpen(true); }} disabled={isGuest} />
                   <ActionButton icon="calendar-sync-outline" label="Sync Calendar" variant="primary" onPress={addToCalendar} disabled={isGuest} />
-                  {onNiazArrangement ? <ActionButton icon="bowl-mix-outline" label="Niaz Arrangement" variant="share" onPress={() => onNiazArrangement(event)} /> : null}
+                  {onNiazArrangement ? <ActionButton icon="bowl-mix-outline" label="Niaz Arrangement" variant="share" disabled={isGuest || !canArrangeNiaz} onPress={() => onNiazArrangement(event)} /> : null}
                   <ActionButton icon="pencil-outline" label="Edit" disabled={!onEdit} onPress={() => onEdit?.(event)} />
                   {isSeriesEvent ? <ActionButton icon="folder-edit-outline" label="Edit Series" disabled={!onEditSeries} onPress={() => onEditSeries?.(event)} /> : null}
                   <ActionButton icon="content-copy" label="Copy" disabled={!onCopy} onPress={() => onCopy?.(event)} />

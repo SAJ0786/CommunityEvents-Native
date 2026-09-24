@@ -1,34 +1,32 @@
-export const EVENT_TYPES = [
-  'Majlis',
-  'Milad',
-  'Prayers',
-  'Dua',
-  'Prayers & Amal',
-  'Birthday',
-  'Informal get together',
-  'Custom',
-];
-
 export const EVENT_TYPE_GROUPS = [
   {
-    key: 'faith',
-    label: 'Faith & Worship',
-    icon: '\u{1F54C}',
-    eventTypes: ['Majlis', 'Milad', 'Prayers', 'Dua', 'Prayers & Amal'],
+    key: 'faith', label: 'Faith & Worship', icon: '\u{1F54C}',
+    eventTypes: ['Majlis', 'Milad', 'Prayers', 'Friday Prayers', 'Dua', 'Prayers & Amal', 'Dua-e-Kumail', 'Dua-e-Tawassul', 'Dua-e-Nutba'],
   },
   {
-    key: 'community',
-    label: 'Community & Social',
-    icon: '\u{1F389}',
-    eventTypes: ['Birthday', 'Informal get together'],
+    key: 'community', label: 'Community & Social', icon: '\u{1F389}',
+    eventTypes: ['Birthday', 'Marriage', 'Informal get together'],
   },
-  {
-    key: 'other',
-    label: 'Other',
-    icon: '\u2728',
-    eventTypes: ['Custom'],
-  },
+  { key: 'other', label: 'Other', icon: '\u2728', eventTypes: ['Custom'] },
 ];
+
+export const EVENT_TYPES = EVENT_TYPE_GROUPS.flatMap(group => group.eventTypes);
+
+export function getEventTypeCategory(label, categories = {}) {
+  const builtIn = EVENT_TYPE_GROUPS.find(group => group.eventTypes.includes(label));
+  if (builtIn) return builtIn.key;
+  return EVENT_TYPE_GROUPS.some(group => group.key === categories[label]) ? categories[label] : 'other';
+}
+
+export function buildEventTypeGroups(dynamicOptions = [], categories = {}) {
+  return EVENT_TYPE_GROUPS.map(group => ({
+    ...group,
+    eventTypes: [...new Set([
+      ...group.eventTypes,
+      ...dynamicOptions.filter(label => getEventTypeCategory(label, categories) === group.key),
+    ])],
+  }));
+}
 
 export const AUDIENCE_TYPES = [
   'Gents only',
@@ -59,11 +57,7 @@ export const ORGANISER_OPTIONS = [
 ];
 
 export const RELIGIOUS_EVENT_TYPES = new Set([
-  'Majlis',
-  'Milad',
-  'Prayers',
-  'Dua',
-  'Prayers & Amal',
+  ...EVENT_TYPE_GROUPS.find(group => group.key === 'faith').eventTypes,
   'Custom',
 ]);
 

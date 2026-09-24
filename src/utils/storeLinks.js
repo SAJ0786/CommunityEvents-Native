@@ -5,6 +5,21 @@ export const APP_OPEN_LINK = 'https://download.communityconnect.siza.info';
 
 export const STORE_SHARE_LINES = [
   '--------------------',
-  '*Download Community Events App to keep connected with community*',
+  '*Download Community Connect Australia to stay connected with your community*',
   APP_OPEN_LINK,
 ];
+
+// Include the URL in the message itself: some share targets ignore a separate
+// URL attachment, particularly when receiving both text and a URL on iOS.
+export function buildAppShareContent() {
+  return {
+    title: 'Community Connect Australia',
+    message: [
+      'Community Connect Australia',
+      'Events and Business Directory in one app.',
+      '',
+      'Download the app:',
+      APP_OPEN_LINK,
+    ].join('\n'),
+  };
+}

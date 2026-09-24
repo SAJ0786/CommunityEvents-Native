@@ -112,7 +112,7 @@ if (!appConfigSource.includes('FIREBASE_APP_CHECK_DEBUG_TOKEN') ||
 if (/from\s+['"]react-native['"]/.test(moduleExperienceSource)) {
   throw new Error('Module experience content must remain platform-neutral for native/PWA parity.');
 }
-if (!moduleExperienceSource.includes('Community Events Australia') || !moduleExperienceSource.includes('Community Businesses Australia')) {
+if (!moduleExperienceSource.includes("productTitle: 'Events'") || !moduleExperienceSource.includes("productTitle: 'Business Directory'")) {
   throw new Error('Module-specific product titles are missing from the shared experience configuration.');
 }
 if (!legalSource.includes("SUPPORT_EMAIL = 'support@siza.info'") || !legalSource.includes("SIZA_WEBSITE_URL = 'https://siza.info'")) {

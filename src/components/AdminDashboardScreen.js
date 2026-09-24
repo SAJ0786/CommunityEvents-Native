@@ -83,6 +83,7 @@ import EventDetailsModal from './EventDetailsModal';
 import CompactSelect from './CompactSelect';
 import { CITY_OPTIONS, DEFAULT_CITY, cityCode, cityLabel, getEventMetroArea, normalizeCity } from '../utils/cities';
 import { addDynamicEventOption } from '../services/eventOptionsAdmin';
+import { EVENT_TYPE_GROUPS } from '../utils/eventOptions';
 import AdminPageHeader from './AdminPageHeader';
 import DiagnosticRegisterPanel from './DiagnosticRegisterPanel';
 
@@ -549,6 +550,7 @@ export default function AdminDashboardScreen({
   const [exporting, setExporting] = useState(false);
   const [exportResult, setExportResult] = useState({ message: '', error: false });
   const [newEventType, setNewEventType] = useState('');
+  const [newEventCategory, setNewEventCategory] = useState('');
   const [newReciterType, setNewReciterType] = useState('');
   const [optionStatus, setOptionStatus] = useState('');
   const [optionBusy, setOptionBusy] = useState(false);
@@ -791,7 +793,7 @@ export default function AdminDashboardScreen({
   const addEventOption = async (kind, value, clear) => {
     setOptionBusy(true);
     setOptionStatus('');
-    try { await addDynamicEventOption(kind, value); clear(''); setOptionStatus(`${value.trim()} added. It is now available in Add/Edit Event.`); }
+    try { await addDynamicEventOption(kind, value, kind === 'eventType' ? newEventCategory : undefined); clear(''); setOptionStatus(`${value.trim()} added. It is now available in Add/Edit Event.`); }
     catch (nextError) { setOptionStatus(nextError?.message || 'Could not add this option.'); }
     finally { setOptionBusy(false); }
   };
@@ -3203,7 +3205,9 @@ export default function AdminDashboardScreen({
             <Text style={styles.cardTitle}>Event option management</Text>
             <Text style={styles.cardDescription}>Add approved Event Type and Reciter Type options. Existing values cannot be deleted, duplicates are blocked case-insensitively, and each addition records the administrator and time.</Text>
             <Text style={styles.inputLabel}>New Event Type</Text>
-            <View style={styles.formRow}><View style={styles.flexField}><TextInput value={newEventType} onChangeText={setNewEventType} placeholder="Event type" placeholderTextColor={colors.muted} style={styles.input} /></View><Pressable disabled={optionBusy || newEventType.trim().length < 2} onPress={() => addEventOption('eventType', newEventType, setNewEventType)} style={[styles.primaryButton, (optionBusy || newEventType.trim().length < 2) && styles.disabledButton]}><Text style={styles.primaryButtonText}>＋ Add</Text></Pressable></View>
+            <Text style={styles.inputLabel}>Event category *</Text>
+            <CompactSelect title="Choose event category" value={newEventCategory} onChange={setNewEventCategory} disabled={optionBusy} options={[{ value: '', label: 'Choose category' }, ...EVENT_TYPE_GROUPS.map(group => ({ value: group.key, label: group.label }))]} />
+            <View style={styles.formRow}><View style={styles.flexField}><TextInput value={newEventType} onChangeText={setNewEventType} placeholder="Event type" placeholderTextColor={colors.muted} style={styles.input} /></View><Pressable disabled={optionBusy || !newEventCategory || newEventType.trim().length < 2} onPress={() => addEventOption('eventType', newEventType, setNewEventType)} style={[styles.primaryButton, (optionBusy || !newEventCategory || newEventType.trim().length < 2) && styles.disabledButton]}><Text style={styles.primaryButtonText}>＋ Add</Text></Pressable></View>
             <Text style={styles.inputLabel}>New Reciter Type</Text>
             <View style={styles.formRow}><View style={styles.flexField}><TextInput value={newReciterType} onChangeText={setNewReciterType} placeholder="Reciter type" placeholderTextColor={colors.muted} style={styles.input} /></View><Pressable disabled={optionBusy || newReciterType.trim().length < 2} onPress={() => addEventOption('reciterType', newReciterType, setNewReciterType)} style={[styles.primaryButton, (optionBusy || newReciterType.trim().length < 2) && styles.disabledButton]}><Text style={styles.primaryButtonText}>＋ Add</Text></Pressable></View>
             {optionStatus ? <Text style={styles.listMeta}>{optionStatus}</Text> : null}

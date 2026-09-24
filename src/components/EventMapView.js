@@ -2,17 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { compareEventsByDateTime, getEventTitle } from '../services/events';
+import { getEventTitle } from '../services/events';
 import { colors, radius, shadow, spacing } from '../theme';
 import { formatEventTime } from '../utils/formatters';
-
-const TIME_FILTERS = [
-  { key: 'today', label: 'Today' },
-  { key: 'tomorrow', label: 'Tomorrow' },
-  { key: 'week', label: 'Next 7 Days' },
-  { key: 'month', label: 'Next 30 Days' },
-  { key: 'all', label: 'All Upcoming' },
-];
 
 const AUDIENCE_COLORS = {
   ladies: '#ec4899',
@@ -38,35 +30,6 @@ function audienceLabel(value = '') {
   if (key === 'kids') return 'Kids';
   if (key === 'family') return 'Family';
   return 'Other';
-}
-
-function localDateString(offset = 0) {
-  const date = new Date();
-  date.setDate(date.getDate() + offset);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function parseTimeMinutes(value = '') {
-  const match = String(value).match(/^(\d{1,2}):(\d{2})/);
-  return match ? Number(match[1]) * 60 + Number(match[2]) : 24 * 60;
-}
-
-function filterEventsByTime(events, filter) {
-  const today = localDateString();
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const tomorrow = localDateString(1);
-  const weekEnd = localDateString(7);
-  const monthEnd = localDateString(30);
-  return events.filter(event => {
-    if (event.isLive) return true;
-    if (!event.eventDate || event.eventDate < today) return false;
-    if (filter === 'today') return event.eventDate === today && parseTimeMinutes(event.startTime) >= nowMinutes;
-    if (filter === 'tomorrow') return event.eventDate === tomorrow;
-    if (filter === 'week') return event.eventDate >= today && event.eventDate <= weekEnd;
-    if (filter === 'month') return event.eventDate >= today && event.eventDate <= monthEnd;
-    return event.eventDate >= today;
-  });
 }
 
 function getCoordinates(event = {}) {
@@ -115,7 +78,6 @@ function distanceLabel(from, to) {
 export default function EventMapView({ events = [], onSelectEvent }) {
   const mapRef = useRef(null);
   const markerPressAt = useRef(0);
-  const [timeFilter, setTimeFilter] = useState('today');
   const [previewEvent, setPreviewEvent] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [locationEnabled, setLocationEnabled] = useState(false);
@@ -135,19 +97,14 @@ export default function EventMapView({ events = [], onSelectEvent }) {
     return () => clearTimeout(timeout);
   }, [mapLoaded, mapReady, mapAttempt]);
 
-  const filteredEvents = useMemo(
-    () => filterEventsByTime(events, timeFilter).sort(compareEventsByDateTime),
-    [events, timeFilter]
-  );
-
   const mapEvents = useMemo(
-    () => filteredEvents
+    () => events
       .map(event => ({ event, coords: getCoordinates(event) }))
       .filter(item => item.coords),
-    [filteredEvents]
+    [events]
   );
 
-  const missingCoordinatesCount = filteredEvents.length - mapEvents.length;
+  const missingCoordinatesCount = events.length - mapEvents.length;
 
   useEffect(() => {
     if (!previewEvent) return;
@@ -211,18 +168,6 @@ export default function EventMapView({ events = [], onSelectEvent }) {
       <Text style={styles.introText}>
         Browse upcoming events by location. Tap a marker to preview the event on the map.
       </Text>
-
-      <View style={styles.filterBar}>
-        {TIME_FILTERS.map(filter => (
-          <Pressable
-            key={filter.key}
-            onPress={() => setTimeFilter(filter.key)}
-            style={[styles.filterSegment, timeFilter === filter.key && styles.filterSegmentActive]}
-          >
-            <Text numberOfLines={2} style={[styles.filterSegmentText, timeFilter === filter.key && styles.filterSegmentTextActive]}>{filter.label}</Text>
-          </Pressable>
-        ))}
-      </View>
 
       <View style={styles.legend}>
         {Object.entries({ Family: 'family', Gents: 'gents', Ladies: 'ladies', Kids: 'kids', Other: 'other' }).map(([label, key]) => (
@@ -387,28 +332,6 @@ const styles = StyleSheet.create({
   container: { paddingHorizontal: spacing.lg, paddingBottom: 120 },
   introTitle: { color: colors.navy, fontSize: 22, fontWeight: '700' },
   introText: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 4, marginBottom: spacing.md },
-  filterBar: {
-    flexDirection: 'row',
-    gap: 4,
-    padding: 4,
-    marginBottom: spacing.md,
-    borderRadius: 16,
-    backgroundColor: '#edf3f2',
-  },
-  filterSegment: {
-    flex: 1,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    paddingHorizontal: 4,
-  },
-  filterSegmentActive: {
-    backgroundColor: colors.surface,
-    ...shadow,
-  },
-  filterSegmentText: { color: colors.muted, fontSize: 10, lineHeight: 12, fontWeight: '700', textAlign: 'center' },
-  filterSegmentTextActive: { color: colors.tealDark },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: spacing.md },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 9, height: 9, borderRadius: 5 },

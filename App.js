@@ -31,6 +31,7 @@ import useMenuNavigationInset from './src/components/useMenuNavigationInset';
 import { isPublicPlayableLiveEvent } from './src/utils/liveVideo';
 import AppErrorBoundary from './src/components/AppErrorBoundary';
 import ModuleEntryScreen from './src/components/ModuleEntryScreen';
+import AuthDiagnosticReportButton from './src/components/AuthDiagnosticReportButton';
 import AdminDashboardScreen from './src/components/AdminDashboardScreen';
 import AzaanPlaybackController from './src/components/AzaanPlaybackController';
 import NotificationsDrawer from './src/components/NotificationsDrawer';
@@ -64,10 +65,13 @@ import { cancelFavouriteReminder, initializeDefaultPrayerReminders, scheduleFavo
 import { listenForDevicePushTokenChanges, registerDevicePushNotifications } from './src/services/pushNotifications';
 import { getPrayerLocation } from './src/utils/prayerLocations';
 import { EVENT_TYPE_GROUPS } from './src/utils/eventOptions';
+import { canArrangeEventNiaz, matchesEventPeriod } from './src/utils/eventBrowseOptions';
 import { DEFAULT_CITY, cityLabel, getEventMetroArea, normalizeCity } from './src/utils/cities';
 import { colors, radius, shadow, spacing } from './src/theme';
 import { friendlyError } from './src/utils/errors';
 import { LEGAL_DOCUMENT_VERSION } from './src/config/legal';
+import { buildAppShareContent } from './src/utils/storeLinks';
+import { recordAuthenticationFailure } from './src/services/diagnostics/authFailures';
 import {
   clearDiagnosticUser,
   initializeDiagnostics,
@@ -143,14 +147,8 @@ function eventDistanceKm(from, event) {
 
 function filterHomeEvents(events, query, filters) {
   let displayed = [...events];
-  const today = localDateString();
   if (filters.period) {
-    const end = filters.period === 'today'
-      ? today
-      : localDateString(filters.period === 'week' ? 7 : 30);
-    displayed = displayed.filter(event => event.isLive || (
-      event.eventDate >= today && event.eventDate <= end
-    ));
+    displayed = displayed.filter(event => matchesEventPeriod(event, filters.period));
   }
   if (filters.organiser) {
     displayed = displayed.filter(event => {
@@ -283,10 +281,10 @@ function MainApp() {
   const hasEventsRef = useRef(false);
 
   useEffect(() => listenUserNotifications(
-    currentUser?.uid,
+    currentUser?.isAnonymous ? null : currentUser?.uid,
     rows => setNotificationUnreadCount(rows.filter(item => item.read !== true).length),
     () => setNotificationUnreadCount(0),
-  ), [currentUser?.uid]);
+  ), [currentUser?.uid, currentUser?.isAnonymous]);
 
   const isGuest = !currentUser || currentUser.isAnonymous;
 
@@ -549,6 +547,7 @@ function MainApp() {
     return liveFiltered.slice().sort((left, right) => {
       const leftDistance = eventDistanceKm(eventUserLocation, left);
       const rightDistance = eventDistanceKm(eventUserLocation, right);
+      if (leftDistance == null && rightDistance == null) return 0;
       if (leftDistance == null) return 1;
       if (rightDistance == null) return -1;
       return leftDistance - rightDistance;
@@ -628,6 +627,9 @@ function MainApp() {
   }, []);
 
   const requestSignIn = useCallback((message = '') => {
+    setNotificationsDrawerOpen(false);
+    setAccountMenuOpen(false);
+    setSelectedEvent(null);
     setProfileError(message);
     setProfileMessage('');
     setGuestAccessGranted(false);
@@ -668,6 +670,7 @@ function MainApp() {
     try {
       return await sendPhoneVerification(phoneNumber);
     } catch (err) {
+      recordAuthenticationFailure(err, 'send_phone_code');
       setProfileError(friendlyError(err, 'Could not send the verification code.'));
       return null;
     } finally {
@@ -699,6 +702,7 @@ function MainApp() {
       setProfileMessage('Mobile number verified.');
       return user;
     } catch (err) {
+      recordAuthenticationFailure(err, 'verify_phone_code');
       setProfileError(friendlyError(err, 'Could not verify the code.'));
       return null;
     } finally {
@@ -724,9 +728,12 @@ function MainApp() {
     setProfileError('');
     try {
       await ensureFirebaseSession();
+      setActiveTab('home');
+      setDirectoryTab('home');
       setGuestAccessGranted(true);
       setAppModule(preferredModule);
     } catch (err) {
+      recordAuthenticationFailure(err, 'guest_sign_in');
       setProfileError(friendlyError(err, 'Guest browsing could not start. Check your connection and try again.'));
     } finally {
       setAuthBusy(false);
@@ -1028,7 +1035,7 @@ function MainApp() {
 
   const requestTabChange = useCallback(nextTab => {
     setAccountMenuOpen(false);
-    if (isGuest && nextTab === 'profile') {
+    if (isGuest && ['profile', 'notifications'].includes(nextTab)) {
       requestSignIn();
       return;
     }
@@ -1116,15 +1123,16 @@ function MainApp() {
   }, [appModule, businessListingOpen, editingEvent]);
 
   const handleHeaderNavigate = useCallback(nextTab => {
+    if (isGuest && ['notifications', 'business-notifications'].includes(nextTab)) {
+      requestSignIn();
+      return;
+    }
     if (nextTab === 'login') {
       requestSignIn();
       return;
     }
     if (nextTab === 'share-app') {
-      Share.share({
-        title: 'Community Connect Australia',
-        message: 'Community Connect Australia — one app for Community Events and the Community Business Directory.',
-      }).catch(() => {});
+      Share.share(buildAppShareContent()).catch(() => {});
       return;
     }
     if (nextTab === 'business-favourites') {
@@ -1166,7 +1174,7 @@ function MainApp() {
       return;
     }
     navigate();
-  }, [appModule, businessListingOpen, requestSignIn, requestTabChange]);
+  }, [appModule, businessListingOpen, isGuest, requestSignIn, requestTabChange]);
 
   const openEventsProfile = useCallback(() => {
     setAppModule('events');
@@ -1175,6 +1183,7 @@ function MainApp() {
   }, [requestTabChange]);
 
   const openNiazArrangement = useCallback(event => {
+    if (!canArrangeEventNiaz(event, currentUser, profile, isGuest)) return;
     const eventCity = getEventMetroArea(event);
     handleCityChange(eventCity);
     setSelectedEvent(null);
@@ -1187,7 +1196,7 @@ function MainApp() {
     });
     setDirectoryTab('home');
     setAppModule('directory');
-  }, [handleCityChange]);
+  }, [currentUser, handleCityChange, isGuest, profile]);
 
   const renderHeader = () => (
     <View style={[styles.contentHeader, compactEventsLayout && styles.contentHeaderCompact]}>
@@ -1206,7 +1215,7 @@ function MainApp() {
           </Pressable>
         ) : null}
       </View>
-      {homeViewMode === 'list' ? <HomeFilters
+      <HomeFilters
           events={visibleEvents}
           query={homeQuery}
           onQueryChange={setHomeQuery}
@@ -1214,8 +1223,14 @@ function MainApp() {
           onFilterChange={(field, value) => setHomeFilters(current => ({ ...current, [field]: value }))}
           showFilters={showHomeFilters}
           onToggleFilters={() => setShowHomeFilters(current => !current)}
-          onClear={() => setHomeFilters({ ...EMPTY_HOME_FILTERS })}
-        /> : null}
+          nearby={nearbyEventsOnly}
+          onNearbyChange={enableNearbyEvents}
+          onPresetChange={(field, value) => {
+            setHomeFilters(current => ({ ...current, period: field === 'period' ? value : '', eventType: field === 'eventType' ? value : '' }));
+            setNearbyEventsOnly(false);
+          }}
+          onClear={() => { setHomeFilters({ ...EMPTY_HOME_FILTERS }); setNearbyEventsOnly(false); }}
+        />
       <View style={styles.sectionHeadingRow}><Text style={styles.homeSectionTitle}>Quick access</Text></View>
       <View style={styles.quickGrid}>
         {[
@@ -1234,24 +1249,6 @@ function MainApp() {
         <Text style={styles.homeSectionTitle}>Browse events</Text>
         <Text style={styles.resultCount}>{displayedEvents.length} in {cityLabel(selectedCity).replace(', Australia', '')}</Text>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.browseChips}>
-        {[
-          ['Upcoming', '', ''],
-          ['Today', 'period', 'today'],
-          ['Near me', 'nearby', 'nearby'],
-          ['This week', 'period', 'week'],
-          ['Prayers', 'eventType', 'Prayers'],
-          ['Majlis', 'eventType', 'Majlis'],
-          ['Milad', 'eventType', 'Milad'],
-          ['Community', 'eventType', 'Community'],
-        ].map(([label, field, value]) => {
-          const active = field === 'nearby' ? nearbyEventsOnly : field ? homeFilters[field] === value : !homeFilters.period && !homeFilters.eventType && !nearbyEventsOnly;
-          const onPress = field === 'nearby'
-            ? enableNearbyEvents
-            : () => { setNearbyEventsOnly(false); setHomeFilters(current => ({ ...current, period: field === 'period' ? value : '', eventType: field === 'eventType' ? value : '' })); };
-          return <Pressable key={label} onPress={onPress} style={[styles.browseChip, active && styles.browseChipActive]}><Text style={[styles.browseChipText, active && styles.browseChipTextActive]}>{label}</Text></Pressable>;
-        })}
-      </ScrollView>
       <Text maxFontSizeMultiplier={1.08} style={[styles.notice, compactEventsLayout && styles.noticeCompact]}>Hijri dates depend on moon sighting. Please verify user-submitted details with the host.</Text>
       {isGuest ? (
         <View style={styles.guestNotice}>
@@ -1300,6 +1297,7 @@ function MainApp() {
       <SafeAreaView style={styles.safeArea}>
         <ExpoStatusBar style="dark" />
         <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+        {profileError ? <View style={{ paddingHorizontal: spacing.lg }}><AuthDiagnosticReportButton /></View> : null}
         <ModuleEntryScreen
           logoSource={logo}
           preferredModule={preferredModule}
@@ -1325,6 +1323,10 @@ function MainApp() {
         onModuleChange={requestModuleChange}
         notificationUnreadCount={notificationUnreadCount}
         onOpenNotifications={() => {
+          if (isGuest) {
+            requestSignIn();
+            return;
+          }
           setAccountMenuOpen(false);
           setNotificationsDrawerOpen(true);
         }}
@@ -1334,6 +1336,10 @@ function MainApp() {
         <BusinessDirectoryModule
           activeTab={directoryTab}
           onTabChange={nextTab => {
+            if (isGuest && nextTab === 'notifications') {
+              requestSignIn();
+              return;
+            }
             setAccountMenuOpen(false);
             setDirectoryTab(nextTab);
           }}
@@ -1354,7 +1360,7 @@ function MainApp() {
       ) : activeTab === 'home' && homeViewMode === 'map' ? (
         <ScrollView contentContainerStyle={styles.mapScrollContent} nestedScrollEnabled>
           <View style={styles.mapHeader}>{renderHeader()}</View>
-          <EventMapView events={visibleEvents} onSelectEvent={setSelectedEvent} />
+          <EventMapView events={displayedEvents} onSelectEvent={setSelectedEvent} />
         </ScrollView>
       ) : activeTab === 'home' ? (
         <FlatList
@@ -1536,6 +1542,7 @@ function MainApp() {
         user={currentUser}
         profile={profile}
         onNiazArrangement={openNiazArrangement}
+        canArrangeNiaz={canArrangeEventNiaz(selectedEvent, currentUser, profile, isGuest)}
         onEdit={canManageSelectedEvent ? event => {
           setSelectedEvent(null);
           handleEditMyEvent(event);
@@ -1592,7 +1599,7 @@ function MainApp() {
           onNavigate={handleHeaderNavigate}
           onSignOut={handleSignOut}
         />
-        <NotificationsDrawer visible={notificationsDrawerOpen} onClose={() => setNotificationsDrawerOpen(false)} user={currentUser} profile={profile} />
+        <NotificationsDrawer visible={!isGuest && notificationsDrawerOpen} onClose={() => setNotificationsDrawerOpen(false)} user={currentUser} profile={profile} />
         {appModule === 'events' ? (
           <BottomNavigation
             onNavigationLayout={menuLayout.onNavigationLayout}

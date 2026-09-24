@@ -33,7 +33,8 @@ import { getHijriSettings } from '../services/settings';
 import { cityLabel, classifyMetroArea, normalizeCity } from '../utils/cities';
 import {
   AUDIENCE_TYPES,
-  EVENT_TYPE_GROUPS,
+  buildEventTypeGroups,
+  getEventTypeCategory,
   ORGANISER_OPTIONS,
   RECITER_TYPES,
   RELIGIOUS_EVENT_TYPES,
@@ -91,13 +92,8 @@ function ChoiceGroup({ options, value, onChange }) {
   );
 }
 
-function EventTypeSelector({ dynamicOptions, value, onChange }) {
-  const groups = EVENT_TYPE_GROUPS.map(group => ({
-    ...group,
-    eventTypes: group.key === 'other'
-      ? [...new Set([...dynamicOptions, ...group.eventTypes])]
-      : group.eventTypes,
-  }));
+function EventTypeSelector({ dynamicOptions, categories, value, onChange }) {
+  const groups = buildEventTypeGroups(dynamicOptions, categories);
   const activeGroup = groups.find(group => group.eventTypes.includes(value)) || groups[0];
 
   return (
@@ -362,7 +358,7 @@ export default function CreateEventForm({
 
   const update = (field, value) => setForm(current => ({ ...current, [field]: value }));
   const reciterTypeOptions = useMemo(() => [...new Set([...RECITER_TYPES.filter(item => item !== 'Custom'), ...dynamicOptions.reciterTypes, 'Custom'])], [dynamicOptions.reciterTypes]);
-  const showReligious = RELIGIOUS_EVENT_TYPES.has(form.eventType) || dynamicOptions.eventTypes.includes(form.eventType);
+  const showReligious = RELIGIOUS_EVENT_TYPES.has(form.eventType) || getEventTypeCategory(form.eventType, dynamicOptions.eventTypeCategories) === 'faith' || Boolean(dynamicOptions.legacyEventTypes?.includes(form.eventType));
   const prayerAddress = useMemo(() => ({
     fullAddress: form.fullAddress,
     street: form.street,
@@ -1075,7 +1071,7 @@ export default function CreateEventForm({
         ) : null}
 
         <Field label="Event Type">
-          <EventTypeSelector dynamicOptions={dynamicOptions.eventTypes} value={form.eventType} onChange={value => update('eventType', value)} />
+          <EventTypeSelector dynamicOptions={dynamicOptions.eventTypes} categories={dynamicOptions.eventTypeCategories} value={form.eventType} onChange={value => update('eventType', value)} />
         </Field>
 
         {form.eventType === 'Custom' ? (

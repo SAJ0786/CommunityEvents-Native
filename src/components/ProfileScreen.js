@@ -18,7 +18,7 @@ import { LEGAL_DOCUMENT_VERSION, LEGAL_URLS, SIZA_WEBSITE_URL, SUPPORT_EMAIL } f
 import { cityLabel, DEFAULT_CITY, normalizeCity } from '../utils/cities';
 import CitySelector from './CitySelector';
 import { SupportModal } from './SupportForm';
-import { APP_OPEN_LINK, STORE_SHARE_LINES } from '../utils/storeLinks';
+import { buildAppShareContent } from '../utils/storeLinks';
 import * as Clipboard from 'expo-clipboard';
 import { getDiagnosticIdentity, getDiagnosticSessionId } from '../services/diagnostics';
 import {
@@ -192,31 +192,8 @@ export default function ProfileScreen({
   };
 
   const shareApp = async () => {
-    const message = [
-      '🌙 *Community Connect Australia*',
-      '_Community events and local businesses in one app_',
-      '*Features:*',
-      '📅 Browse upcoming Majalis, Milads & community events',
-      '🔔 Get push notifications before events',
-      '📲 Install as an app on iPhone & Android',
-      '📤 Share events to WhatsApp instantly',
-      '🗺️ Get directions to any event',
-      '🌙 Hijri dates on every event',
-      '📅 Sync events to your phone calendar',
-      '🤖 AI Search — ask anything about events',
-      '⭐ Save your favourite events',
-      '➕ Add & manage your own events',
-      '',
-      ...STORE_SHARE_LINES,
-      '',
-      '_Download Community Connect Australia to stay connected with your community_',
-    ].join('\n');
     try {
-      await Share.share({
-        title: 'Share the App',
-        message,
-        ...(Platform.OS === 'ios' ? { url: APP_OPEN_LINK } : {}),
-      });
+      await Share.share(buildAppShareContent());
     } catch {
       setProfileValidation('Could not open sharing on this device.');
     }

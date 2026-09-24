@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { AUDIENCE_TYPES } from '../utils/eventOptions';
+import { EVENT_BROWSE_PRESETS } from '../utils/eventBrowseOptions';
 import { colors, radius, spacing } from '../theme';
 import CompactSelect from './CompactSelect';
 
@@ -23,11 +24,14 @@ export default function HomeFilters({
   showFilters,
   onToggleFilters,
   onClear,
+  nearby = false,
+  onNearbyChange,
+  onPresetChange,
 }) {
   const eventTypes = useMemo(() => [...new Set(events
     .map(event => event.eventTypeDisplay || event.customEventType || event.eventType)
     .filter(Boolean))].sort(), [events]);
-  const activeCount = Object.values(filters).filter(Boolean).length;
+  const activeCount = Object.values(filters).filter(Boolean).length + Number(nearby);
 
   return (
     <View style={styles.wrap}>
@@ -49,7 +53,7 @@ export default function HomeFilters({
             <Text maxFontSizeMultiplier={1} style={styles.clearSearchText}>x</Text>
           </Pressable>
         ) : null}
-        <Pressable onPress={onToggleFilters} style={[styles.filterButton, showFilters && styles.filterButtonActive]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Customised filters" accessibilityState={{ expanded: showFilters }} onPress={onToggleFilters} style={[styles.filterButton, showFilters && styles.filterButtonActive]}>
           <MaterialCommunityIcons color={showFilters ? colors.surface : colors.blue} name="tune-variant" size={19} />
           {activeCount ? <View style={styles.filterCount}><Text style={styles.filterCountText}>{activeCount}</Text></View> : null}
         </Pressable>
@@ -57,22 +61,25 @@ export default function HomeFilters({
 
       {showFilters ? (
         <View style={styles.panel}>
+          <Text style={styles.label}>Customised filters</Text>
+          <View style={styles.choiceRow}>
+            {EVENT_BROWSE_PRESETS.map(({ label, field, value }) => {
+              const selected = field === 'nearby' ? nearby : field ? filters[field] === value : !filters.period && !filters.eventType && !nearby;
+              return (
+                <Pressable key={label} accessibilityRole="button" accessibilityState={{ selected }}
+                  onPress={() => field === 'nearby' ? onNearbyChange() : onPresetChange(field, value)}
+                  style={[styles.choice, selected && styles.choiceSelected]}>
+                  <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {nearby ? <Text style={styles.nearbyHelp}>Nearest events first. Map shows matching events with available locations.</Text> : null}
           {activeCount ? (
             <Pressable accessibilityRole="button" onPress={onClear} style={styles.clearButton}>
               <Text maxFontSizeMultiplier={1.08} style={styles.clearButtonText}>Clear Filters</Text>
             </Pressable>
           ) : null}
-          <FilterChoices
-            label="Time period"
-            options={[
-              { value: '', label: 'All upcoming' },
-              { value: 'today', label: 'Today' },
-              { value: 'week', label: 'Next 7 days' },
-              { value: 'month', label: 'Next 30 days' },
-            ]}
-            value={filters.period}
-            onChange={value => onFilterChange('period', value)}
-          />
           <FilterChoices
             label="Event type"
             options={[{ value: '', label: 'All event types' }, ...eventTypes.map(value => ({ value, label: value }))]}
@@ -141,7 +148,8 @@ const styles = StyleSheet.create({
   panel: { gap: spacing.md, marginTop: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   group: { gap: 6 },
   label: { color: colors.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
-  choiceRow: { gap: spacing.sm },
+  choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  nearbyHelp: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   choice: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, paddingVertical: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.surface },
   choiceSelected: { borderColor: colors.teal, backgroundColor: colors.teal },
   choiceText: { color: colors.text, fontSize: 11, fontWeight: '600' },
