@@ -4,7 +4,8 @@ import ScrollView from '../components/KeyboardAwareScrollView';
 import * as ImagePicker from 'expo-image-picker';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import CompactSelect from '../components/CompactSelect';
-import NativeDateTimeField from '../components/NativeDateTimeField';
+import BusinessHoursEditor from './BusinessHoursEditor';
+import { BUSINESS_DAYS as DAYS } from '../utils/businessHours';
 import MemberPageHeader from '../components/MemberPageHeader';
 import { classifyMetroArea } from '../utils/cities';
 import { friendlyError } from '../utils/errors';
@@ -14,16 +15,6 @@ import { openExternalUrl } from '../utils/openExternalUrl';
 import { formatAbn, isValidAbn, lookupBusinessAbnForSubmission, normalizeAbn, validateBusinessPayload } from '../services/businesses';
 
 const LISTING_TERMS_VERSION = LEGAL_DOCUMENT_VERSION;
-
-const DAYS = [
-  ['mon', 'Monday'],
-  ['tue', 'Tuesday'],
-  ['wed', 'Wednesday'],
-  ['thu', 'Thursday'],
-  ['fri', 'Friday'],
-  ['sat', 'Saturday'],
-  ['sun', 'Sunday'],
-];
 
 function defaultHours() {
   return Object.fromEntries(DAYS.map(([key], index) => [key, {
@@ -71,7 +62,7 @@ function createFormState(business, defaultCity) {
       city: business?.location?.city || business?.city || defaultCity || 'sydney',
       publicDisplay: business?.location?.publicDisplay || 'suburb',
     },
-    hours: { ...defaultHours(), ...(business?.hours || {}) },
+    hours: business ? { ...(business.hours || {}) } : defaultHours(),
     hoursSummary: business?.hoursSummary || '',
     referrer: {
       name: business?.referrer?.name || '',
@@ -116,57 +107,6 @@ function ImageField({ label, shape, image, existingUrl, error, onChoose, onRemov
       </View>
       <Text style={styles.helper}>JPG, PNG or WebP. Maximum size 5 MB.</Text>
     </Field>
-  );
-}
-
-function HoursEditor({ hours, onChange }) {
-  const [activePicker, setActivePicker] = useState(null);
-  const update = (day, field, value) => onChange({
-    ...hours,
-    [day]: { ...hours[day], [field]: value },
-  });
-  return (
-    <View style={styles.hoursList}>
-      {DAYS.map(([key, label]) => {
-        const row = hours[key] || {};
-        return (
-          <View key={key} style={styles.hoursRow}>
-            <View style={styles.dayRow}>
-              <Text style={styles.dayLabel}>{label}</Text>
-              <View style={styles.closedToggle}>
-                <Text style={styles.closedText}>{row.closed ? 'Closed' : 'Open'}</Text>
-                <Switch
-                  value={!row.closed}
-                  onValueChange={value => update(key, 'closed', !value)}
-                  trackColor={{ false: colors.border, true: colors.teal }}
-                />
-              </View>
-            </View>
-            {!row.closed ? (
-              <>
-                <View style={styles.timeRow}>
-                <View style={styles.timeInput}><NativeDateTimeField compact mode="time" pickerEnabled={false} onPress={() => setActivePicker({ day: key, field: 'open' })} value={row.open} onChange={value => update(key, 'open', value)} accessibilityLabel={`Select ${label} opening time`} /></View>
-                <Text style={styles.timeTo}>to</Text>
-                <View style={styles.timeInput}><NativeDateTimeField compact mode="time" pickerEnabled={false} onPress={() => setActivePicker({ day: key, field: 'close' })} value={row.close} onChange={value => update(key, 'close', value)} accessibilityLabel={`Select ${label} closing time`} /></View>
-                </View>
-                {activePicker?.day === key ? (
-                  <View style={styles.timePickerRow}>
-                    <NativeDateTimeField
-                      pickerOnly
-                      mode="time"
-                      value={row[activePicker.field]}
-                      onChange={value => update(key, activePicker.field, value)}
-                      onPickerDismiss={() => setActivePicker(null)}
-                      accessibilityLabel={`Select ${label} ${activePicker.field === 'open' ? 'opening' : 'closing'} time`}
-                    />
-                  </View>
-                ) : null}
-              </>
-            ) : null}
-          </View>
-        );
-      })}
-    </View>
   );
 }
 
@@ -489,8 +429,8 @@ export default function BusinessListingForm({
       <View style={styles.sectionCard}>
         <Text style={styles.sectionIcon}>{'\u{1F552}'}</Text>
         <Text style={styles.sectionTitle}>Opening hours</Text>
-        <Text style={styles.sectionSubtitle}>Tap each opening and closing time to select it.</Text>
-        <HoursEditor hours={form.hours} onChange={hours => update('hours', hours)} />
+        <Text style={styles.sectionSubtitle}>Set hours once for multiple days, then adjust individual days below.</Text>
+        <BusinessHoursEditor key={initialBusiness?.id || 'new'} hours={form.hours} onChange={hours => update('hours', hours)} error={attempted ? validation.hours : ''} />
         <Field label="Hours note" optional helper="Use this for appointment-only or variable opening arrangements.">
           <TextInput value={form.hoursSummary} onChangeText={value => update('hoursSummary', value)} placeholder="For example: Appointments available after hours" placeholderTextColor={colors.muted} style={styles.input} />
         </Field>
@@ -616,16 +556,6 @@ const styles = StyleSheet.create({
   outlineButtonText: { color: colors.tealDark, fontSize: 12, fontWeight: '700' },
   removeButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.sm },
   removeText: { color: colors.danger, fontSize: 12, fontWeight: '700' },
-  hoursList: { marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
-  hoursRow: { paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
-  dayRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  dayLabel: { color: colors.navy, fontSize: 13, fontWeight: '700' },
-  closedToggle: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  closedText: { color: colors.muted, fontSize: 10, fontWeight: '600' },
-  timeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
-  timeInput: { flex: 1, minWidth: 0, minHeight: 44, textAlign: 'center' },
-  timeTo: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  timePickerRow: { width: '100%', marginTop: spacing.sm },
   messageError: { marginBottom: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: '#fff0f0' },
   messageErrorText: { color: colors.danger, fontSize: 12, lineHeight: 18, fontWeight: '600' },
   messageSuccess: { marginBottom: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: '#eaf7ed' },

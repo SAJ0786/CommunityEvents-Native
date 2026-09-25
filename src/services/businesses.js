@@ -12,6 +12,7 @@ import {
 } from '@react-native-firebase/firestore';
 import { httpsCallable } from '@react-native-firebase/functions';
 import { db, ensureFirebaseSession, functions } from '../firebase/firebase';
+import { cleanBusinessHours as cleanHours, validateBusinessHours } from '../utils/businessHours';
 
 const COLLECTION_NAME = 'businesses';
 const PUBLIC_COLLECTION_NAME = 'publicBusinesses';
@@ -93,14 +94,6 @@ function cleanUrl(value) {
   return /^https?:\/\//i.test(url) ? url : `https://${url}`;
 }
 
-function cleanHours(hours = {}) {
-  return Object.fromEntries(Object.entries(hours).map(([day, value]) => [day, {
-    closed: Boolean(value?.closed),
-    open: clean(value?.open),
-    close: clean(value?.close),
-  }]));
-}
-
 export function validateBusinessPayload(payload = {}) {
   const errors = {};
   const contact = payload.contact || {};
@@ -121,6 +114,8 @@ export function validateBusinessPayload(payload = {}) {
     errors.location = 'Select the full Australian address from Google suggestions.';
   }
   if (payload.listingDeclarationAccepted !== true) errors.declaration = 'Accept the business listing declaration.';
+  const hoursError = validateBusinessHours(payload.hours);
+  if (hoursError) errors.hours = hoursError;
   if (clean(referrer.name).length < 2) errors.referrerName = 'Enter the community referrer’s name.';
   const referrerPhone = clean(referrer.phone).replace(/\D/g, '').replace(/^61/, '0');
   if (!/^04\d{8}$/.test(referrerPhone)) errors.referrerPhone = 'Enter the referrer’s Australian mobile number.';

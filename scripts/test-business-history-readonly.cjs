@@ -28,6 +28,7 @@ const firestore = {
   writeBatch: () => { writes++; return { update() {}, set() {}, delete() {}, commit: async () => {} }; },
 };
 const services = load('src/services/businesses.js', {
+  '../utils/businessHours': load('src/utils/businessHours.js', {}),
   '@react-native-firebase/firestore': firestore,
   '@react-native-firebase/functions': { httpsCallable: () => async () => { calls++; return { data: {} }; } },
   '../firebase/firebase': { db: {}, functions: {}, ensureFirebaseSession: async () => ({ uid: 'owner', isAnonymous: false }) },

@@ -1,3 +1,4 @@
+import { BUSINESS_DAYS, formatBusinessDay } from '../utils/businessHours';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import ScrollView from '../components/KeyboardAwareScrollView';
@@ -69,11 +70,11 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
     return (business?.subcategoryIds || []).map(value => String(value).split('-').map(word => word ? word[0].toUpperCase() + word.slice(1) : '').join(' '));
   }, [business?.subcategories, business?.subcategoryIds]);
   const hoursRows = useMemo(() => {
-    const days = [['mon', 'Monday'], ['tue', 'Tuesday'], ['wed', 'Wednesday'], ['thu', 'Thursday'], ['fri', 'Friday'], ['sat', 'Saturday'], ['sun', 'Sunday']];
+    const days = BUSINESS_DAYS;
     if (!business?.hours || !Object.keys(business.hours).length) return [];
     return days.map(([key, label]) => {
       const row = business.hours[key] || {};
-      return [label, row.closed ? 'Closed' : [row.open, row.close].filter(Boolean).join(' – ') || 'Hours not supplied'];
+      return [label, formatBusinessDay(row)];
     });
   }, [business?.hours]);
   useEffect(() => {

@@ -41,6 +41,7 @@ import { listenBusinessCategories } from '../services/businessCategoryAdmin';
 import { trackBusinessInteraction } from '../services/businessAnalytics';
 import NativeBackButton from '../components/NativeBackButton';
 import MemberPageHeader from '../components/MemberPageHeader';
+import { businessOpenState } from '../utils/businessHours';
 
 function SectionHeading({ title, subtitle, actionLabel, onAction }) {
   return (
@@ -75,21 +76,6 @@ function CardGrid({ businesses, savedIds, onOpen, onToggleSaved }) {
       {row.length === 1 ? <View style={styles.cardSpacer} /> : null}
     </View>
   ));
-}
-
-function businessOpenState(hours = {}) {
-  const keys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-  const row = hours?.[keys[new Date().getDay()]];
-  if (!row) return null;
-  if (row.closed) return false;
-  if (!/^\d{2}:\d{2}$/.test(row.open || '') || !/^\d{2}:\d{2}$/.test(row.close || '')) return null;
-  const now = new Date();
-  const current = now.getHours() * 60 + now.getMinutes();
-  const [openHour, openMinute] = row.open.split(':').map(Number);
-  const [closeHour, closeMinute] = row.close.split(':').map(Number);
-  const open = openHour * 60 + openMinute;
-  const close = closeHour * 60 + closeMinute;
-  return close < open ? current >= open || current <= close : current >= open && current <= close;
 }
 
 function distanceKm(from, to) {

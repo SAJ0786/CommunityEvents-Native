@@ -49,6 +49,7 @@ async function testBusinessApproval() {
     },
   };
   const api = load('src/services/businesses.js', {
+    '../utils/businessHours': load('src/utils/businessHours.js', {}),
     '@react-native-firebase/firestore': firestore,
     '@react-native-firebase/functions': { httpsCallable: () => async () => ({ data: { verified: true } }) },
     '../firebase/firebase': { db: {}, functions: {}, ensureFirebaseSession: async () => nativeUser },
