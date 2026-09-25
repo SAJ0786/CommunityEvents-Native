@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { register, adminEmails, buildEmail, APP_CATEGORIES } = require('../backend/functions-business-workflow/support-workflow');
 const records = new Map(), sent = [];
 let rejectEmail = false;
-const snapshot = ref => ({ ref, exists: records.has(ref.path), data: () => records.get(ref.path), createTime: { toDate: () => new Date('2026-09-13T00:00:00Z') } });
+const snapshot = ref => ({ ref, id: ref.id, exists: records.has(ref.path), data: () => records.get(ref.path), createTime: { toDate: () => new Date('2026-09-13T00:00:00Z') } });
 const ref = path => ({
   path, id: path.split('/').at(-1), get: async () => snapshot(ref(path)),
   collection: name => col(path + '/' + name),
@@ -49,6 +49,8 @@ async function main() {
   const job = records.get('supportEmailOutbox/' + report.reference);
   assert.deepEqual(job.recipients, ['city@example.test', 'super@example.test'], 'routing is from trusted business city');
   assert.equal(job.city, 'sydney');
+  const adminNotices = [...records.values()].filter(value => value.type === 'business.reported');
+  assert.deepEqual(adminNotices.map(value => value.recipientUid).sort(), ['admin0','admin2','admin3']);
   const email = buildEmail({ ...job, message: '<img src=x onerror=alert(1)>' }, report.reference);
   assert.ok(email.html.includes('&lt;img'));
   assert.ok(!email.html.includes('<script>'));
@@ -76,7 +78,7 @@ async function main() {
     return [...records.entries()].filter(([k,v]) => k.startsWith('supportEmailOutbox/') && v.kind === 'business-enquiry').at(-1)[1];
   };
   assert.deepEqual((await enquiry('first')).recipients, ['official@example.test']);
-  const notices = () => [...records.entries()].filter(([k]) => k.startsWith('userNotifications/'));
+  const notices = () => [...records.entries()].filter(([k,v]) => k.startsWith('userNotifications/') && ['business-enquiry','business-reply'].includes(v.type));
   assert.equal(notices().length, 1);
   const [noticePath, notice] = notices()[0];
   assert.equal(notice.recipientUid, 'owner', 'enquiry notification belongs only to the business owner');
@@ -101,6 +103,35 @@ async function main() {
   await funcs.queueBusinessEnquiryEmail({ data: snapshot(ref(replyPath)), params: { threadId: 'thread', messageId: 'owner-reply' } });
   assert.equal(notices().length, 2, 'owner replies are not new enquiries to the same owner');
   assert.ok(notices().every(([, value]) => value.recipientUid === 'owner'), 'no admin or unrelated recipient copies');
+  records.set('businessContactRoutes/biz', { active: true, ownerUid: 'owner' });
+  records.set('users/customer', { email: 'customer@example.test', businessNotificationsEnabled: false, emailNotificationsEnabled: false, pushNotificationsEnabled: false });
+  records.set('users/owner', { email: 'private-owner@example.test', businessNotificationsEnabled: false, emailNotificationsEnabled: false });
+  const replyEvent = id => {
+    const p = 'businessMessageThreads/thread/messages/' + id;
+    records.set(p, { kind: 'text', senderUid: 'owner', text: 'Reply with private details' });
+    return { data: snapshot(ref(p)), params: { threadId: 'thread', messageId: id } };
+  };
+  const reply = replyEvent('actual-reply');
+  await funcs.queueBusinessEnquiryEmail(reply);
+  const replyNotice = notices().find(([, value]) => value.type === 'business-reply')[1];
+  assert.equal(replyNotice.recipientUid, 'customer', 'reply notification goes to customer despite opt-outs');
+  assert.ok(!replyNotice.body.includes('private details'), 'lock-screen payload must not contain message text');
+  const [replyJobPath, replyJob] = [...records.entries()].find(([k,v]) => k.startsWith('supportEmailOutbox/') && v.kind === 'business-reply' && v.status === 'queued');
+  assert.deepEqual(replyJob.recipients, ['customer@example.test']);
+  assert.notEqual(replyJob.senderEmail, 'private-owner@example.test', 'do not leak owner personal email');
+  await funcs.queueBusinessEnquiryEmail(reply);
+  assert.equal(notices().filter(([,value]) => value.type === 'business-reply').length, 1);
+  await funcs.deliverSupportEmail(event(replyJobPath.split('/').at(-1)));
+  assert.equal(sent.at(-1).to, 'customer@example.test');
+  assert.match(sent.at(-1).subject, /New reply from business/);
+  records.set('users/customer', {});
+  await funcs.queueBusinessEnquiryEmail(replyEvent('no-customer-email'));
+  assert.ok([...records.values()].some(job => job.skipReason === 'no-customer-email'));
+  assert.equal(notices().filter(([,value]) => value.type === 'business-reply').length, 2, 'no-email recipient still has a bell notification');
+  records.set('users/customer', { email: 'customer@example.test', accountStatus: 'banned' });
+  await funcs.queueBusinessEnquiryEmail(replyEvent('inactive-customer'));
+  assert.equal(notices().filter(([,value]) => value.type === 'business-reply').length, 2);
+  assert.ok(notices().every(([,value]) => ['owner','customer'].includes(value.recipientUid)), 'never copy private messages to admins');
   assert.equal([...records.keys()].some(k => k.startsWith('adminFeedbackThreads/')), false);
   console.log('PASS support: categories, validation, private routing, trusted city, idempotency, rate limit, escaped email, retries, exhausted delivery, official email only and transfer privacy.');
 }

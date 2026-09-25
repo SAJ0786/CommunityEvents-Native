@@ -102,6 +102,18 @@ async function main() {
   assert.equal(JSON.stringify(businessListener.query[1]), JSON.stringify(['participantUids', 'array-contains', 'tester']));
   businessListener.success({ docs: businessRows.map(row => ({ id: row.id, data: () => row })) });
   assert.equal(JSON.stringify(businessResult.map(row => row.id)), JSON.stringify(['own-enquiry', 'sent-enquiry']));
+  const activityRows = [
+    { ...businessRows[0], businessName: 'My business', senderName: 'Customer', updatedAt: { seconds: 100 }, unreadBy: { tester: 1 } },
+    { ...businessRows[1], businessName: 'Phoenix Hub', updatedAt: { seconds: 200 }, lastSenderUid: 'other-owner', unreadBy: { tester: 2 } },
+  ];
+  const publishActivity = () => businessListener.success({ docs: activityRows.map(row => ({ id: row.id, data: () => row })) });
+  publishActivity();
+  assert.equal(JSON.stringify(businessResult.map(row => row.id)), JSON.stringify(['sent-enquiry', 'own-enquiry']), 'owner reply brings customer enquiry to the top');
+  activityRows[0].updatedAt = { toMillis: () => 300000 };
+  activityRows[0].lastSenderUid = 'tester';
+  publishActivity();
+  assert.equal(JSON.stringify(businessResult.map(row => row.id)), JSON.stringify(['own-enquiry', 'sent-enquiry']), 'your reply also brings the same conversation to the top');
+  const sortedConversations = businessResult;
   stopBusiness();
   businessResult = null;
   businessListener.success({ docs: businessRows.map(row => ({ id: row.id, data: () => row })) });
@@ -109,10 +121,9 @@ async function main() {
   messaging.listenBusinessThreads('', rows => { businessResult = rows; });
   assert.equal(businessResult.length, 0, 'signed-out inbox clears immediately');
 
-  // Render the actual inbox with synthetic participant records. Received is
-  // the default and must not display messages the owner sent elsewhere.
+  // Render the actual unified list. Both roles share the listener's activity order.
   let hookIndex = 0;
-  const state = [businessRows.slice(0, 2), 'received', null, [], '', '', false, '', 0, false, ''];
+  const state = [sortedConversations, null, [], '', '', false, '', 0, false, ''];
   const react = {
     createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat() }),
     useState: initial => { const i = hookIndex++; if (state[i] === undefined) state[i] = initial; return [state[i], value => { state[i] = typeof value === 'function' ? value(state[i]) : value; }]; },
@@ -133,21 +144,35 @@ async function main() {
   const flatten = node => node && typeof node === 'object' ? [node, ...(node.children || []).flatMap(flatten)] : [];
   const renderInbox = () => { hookIndex = 0; return flatten(inboxExports.default({ user: { uid: 'tester' }, profile: { role: 'user' } })); };
   let inboxTree = renderInbox();
-  assert.ok(inboxTree.some(node => node.type === 'MemberPageHeader' && node.props.title === 'Business messaging'));
-  assert.ok(inboxTree.some(node => node.children.includes('Inbox')));
-  assert.ok(inboxTree.some(node => node.children.includes('Sent messages')));
+  assert.ok(inboxTree.some(node => node.type === 'MemberPageHeader' && node.props.title === 'Business Inbox'));
+  assert.ok(!inboxTree.some(node => node.children.includes('Inbox') || node.children.includes('Sent messages')));
+  assert.ok(!inboxTree.some(node => node.props.accessibilityRole === 'tab'));
   assert.ok(inboxTree.some(node => node.props.key === 'own-enquiry'));
-  assert.ok(!inboxTree.some(node => node.props.key === 'sent-enquiry'));
-  assert.match(read('src/components/AccountMenuSheet.js'), /label: 'Business messaging'/);
-  inboxTree.find(node => node.props.key === 'sent').props.onPress();
-  inboxTree = renderInbox();
   assert.ok(inboxTree.some(node => node.props.key === 'sent-enquiry'));
-  assert.ok(!inboxTree.some(node => node.props.key === 'own-enquiry'));
-  inboxTree.find(node => node.props.key === 'received').props.onPress();
+  assert.deepEqual(inboxTree.filter(node => node.type === 'Pressable' && node.props.key).map(node => node.props.key), ['own-enquiry', 'sent-enquiry']);
+  assert.ok(inboxTree.some(node => node.children.includes(2)), 'received reply keeps its unread badge in the combined list');
+  assert.match(read('src/components/AccountMenuSheet.js'), /label: 'Business Inbox'/);
+  inboxTree.find(node => node.props.key === 'sent-enquiry').props.onPress();
+  inboxTree = renderInbox();
+  const conversationHeader = inboxTree.find(node => node.type === 'MemberPageHeader');
+  assert.equal(conversationHeader.props.title, 'Phoenix Hub');
+  assert.equal(conversationHeader.props.subtitle, 'Your enquiry to this business');
+  assert.equal(conversationHeader.props.backAccessibilityLabel, 'Back to conversations');
+  conversationHeader.props.onBack();
+  inboxTree = renderInbox();
+  inboxTree.find(node => node.props.key === 'own-enquiry').props.onPress();
+  inboxTree = renderInbox();
+  assert.equal(inboxTree.find(node => node.type === 'MemberPageHeader').props.subtitle, 'Enquiry from Customer');
+  inboxTree.find(node => node.type === 'MemberPageHeader').props.onBack();
   state[0] = [businessRows[1]];
   inboxTree = renderInbox();
-  assert.ok(inboxTree.some(node => node.children.includes('No enquiries received yet')));
+  assert.ok(inboxTree.some(node => node.props.key === 'sent-enquiry'), 'customer does not need to change a folder');
+  state[0] = businessRows.slice(2);
+  inboxTree = renderInbox();
+  assert.ok(inboxTree.some(node => node.children.includes('No conversations yet')));
   assert.ok(!inboxTree.some(node => node.props.key === 'sent-enquiry'));
+  assert.ok(!inboxTree.some(node => node.props.key === 'unrelated-enquiry' || node.props.key === 'invalid-participant'));
+  assert.doesNotMatch(read('src/business/BusinessDetailsScreen.js'), /Sent messages/);
   await messaging.sendFeedbackMessage({ user, profile, text: 'First contact' });
   assert.equal(callableRequest.name, 'submitSupportRequest');
   assert.equal(callableRequest.data.kind, 'app-feedback');

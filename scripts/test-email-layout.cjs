@@ -50,6 +50,7 @@ async function main() {
   ).map(node => workflow.slice(node.start, node.end)).join('\n');
   const sent = [];
   const context = {
+    ...require('../backend/functions-business-workflow/notification-policy'),
     buildWorkflowEmail, sender: () => 'support@siza.info',
     buildTransporter: () => ({ sendMail: async email => { sent.push(email); return { messageId: 'synthetic' }; } }),
     db: { batch: () => ({ set() {}, commit: async () => {} }), collection: () => ({ doc: () => ({}) }) },

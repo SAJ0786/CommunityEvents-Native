@@ -48,6 +48,13 @@ export async function ensureUserProfile(uid, defaults = {}) {
       savedEvents: [],
       isActive: true,
       accountStatus: 'active',
+      pushNotificationsEnabled: true,
+      emailNotificationsEnabled: true,
+      eventNotificationsEnabled: true,
+      businessNotificationsEnabled: true,
+      prayerRemindersEnabled: true,
+      reminderEmailEnabled: true,
+      adminAlertEmailEnabled: true,
       ...createDefaults,
     }, { merge: true });
   }

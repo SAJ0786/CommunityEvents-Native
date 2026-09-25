@@ -1,6 +1,7 @@
 'use strict';
 const { createHash } = require('node:crypto');
 const { renderEmail, detailRows, escapeHtml, emailBrand } = require('./email-template');
+const { isActiveRecipient } = require('./notification-policy');
 const SUPPORT = 'support@siza.info';
 const APP_CATEGORIES = ['App feedback / suggestion', 'Technical problem', 'Account / login issue', 'Privacy enquiry', 'Other'];
 const BUSINESS_CATEGORIES = ['Incorrect information', 'Misleading or unsafe conduct', 'Suspected fraud or impersonation', 'Inappropriate content', 'Business closed', 'Other'];
@@ -17,21 +18,23 @@ function adminEmails(users, city) {
 }
 
 function buildEmail(job, reference) {
-  const title = job.kind === 'business-report' ? 'Business problem report' : job.kind === 'business-enquiry' ? 'New business enquiry' : 'App feedback / problem report';
+  const title = job.kind === 'business-report' ? 'Business problem report' : job.kind === 'business-enquiry' ? 'New business enquiry' : job.kind === 'business-reply' ? 'New reply from business' : 'App feedback / problem report';
   const details = [
     ['Reference', reference], ['Business', job.businessName], ['Business ID', job.businessId], ['City', job.city],
     ['Reporter / sender', job.senderName], ['Email', job.senderEmail || 'Not supplied'],
     ['Email verification', job.senderEmailVerified ? 'Verified account email' : 'User-provided / profile email'],
     ['Category', job.category], ['Submitted', job.submittedAt],
   ].filter(([, value]) => value);
-  const module = ['business-report', 'business-enquiry'].includes(job.kind) ? 'directory' : undefined;
+  const module = ['business-report', 'business-enquiry', 'business-reply'].includes(job.kind) ? 'directory' : undefined;
   const subjectTitle = `${title}${job.businessName ? `: ${clean(job.businessName).replace(/[\r\n]/g, ' ').slice(0, 120)}` : ''}`;
+  const replyHint = ['business-enquiry', 'business-reply'].includes(job.kind)
+    ? 'Open Business Inbox in the app to reply. Replying to this email contacts support@siza.info, not the other participant.' : '';
   return {
     from: { name: emailBrand(module), address: SUPPORT }, replyTo: SUPPORT,
     subject: `${subjectTitle} [${reference.slice(0, 12)}]`,
     ...renderEmail({ module, title: subjectTitle,
-      bodyText: `${details.map(([k, v]) => `${k}: ${v}`).join('\n')}\n\nMessage:\n${job.message}`,
-      bodyHtml: `${detailRows(details)}<h2 style="margin:20px 0 8px;font-size:18px;line-height:1.4">Message</h2><div style="white-space:pre-wrap;padding:16px;background:#f2f8f7;border-radius:8px;overflow-wrap:anywhere">${escapeHtml(job.message)}</div>`,
+      bodyText: `${details.map(([k, v]) => `${k}: ${v}`).join('\n')}\n\nMessage:\n${job.message}${replyHint ? `\n\n${replyHint}` : ''}`,
+      bodyHtml: `${detailRows(details)}<h2 style="margin:20px 0 8px;font-size:18px;line-height:1.4">Message</h2><div style="white-space:pre-wrap;padding:16px;background:#f2f8f7;border-radius:8px;overflow-wrap:anywhere">${escapeHtml(job.message)}</div>${replyHint ? `<p>${escapeHtml(replyHint)}</p>` : ''}`,
     }),
     headers: { 'Auto-Submitted': 'auto-generated', 'X-Auto-Response-Suppress': 'All' },
   };
@@ -54,6 +57,7 @@ function register({ admin, db, onCall, onDocumentCreated, HttpsError, REGION, EM
     const existing = await record.get();
     if (existing.exists) return { reference, status: existing.data().status || 'queued' };
     let businessId = '', businessName = '', city = cityOf(profile.defaultCity), recipients = [SUPPORT];
+    let reportAdmins = [];
     if (kind === 'business-report') {
       businessId = clean(data.businessId);
       if (!businessId || businessId.length > 160 || businessId.includes('/')) throw new HttpsError('invalid-argument', 'Invalid business reference.');
@@ -64,6 +68,8 @@ function register({ admin, db, onCall, onDocumentCreated, HttpsError, REGION, EM
       city = cityOf(value.location?.city || value.metroArea || value.city);
       const admins = await db.collection('users').where('role', 'in', ['admin', 'superAdmin']).get();
       recipients = adminEmails(admins.docs.map(doc => doc.data()), city);
+      reportAdmins = admins.docs.map(doc => ({ ...doc.data(), uid: doc.id })).filter(user => isActiveRecipient(user)
+        && (user.role === 'superAdmin' || (user.role === 'admin' && cityOf(user.adminCity || user.defaultCity) === city)));
       // An unstaffed city must not silently lose a safety report.
       if (!recipients.length) recipients = [SUPPORT];
     }
@@ -77,6 +83,11 @@ function register({ admin, db, onCall, onDocumentCreated, HttpsError, REGION, EM
       if (Number(rate.data()?.lastAt || 0) > Date.now() - 30000) throw new HttpsError('resource-exhausted', 'Please wait 30 seconds before submitting another report.');
       tx.create(record, payload);
       tx.create(db.collection('supportEmailOutbox').doc(reference), { ...payload, recipients, attempts: 0, submissionId: reference });
+      reportAdmins.forEach(user => tx.create(db.collection('userNotifications').doc(`business-report-${reference}-${user.uid}`), {
+        recipientUid: user.uid, type: 'business.reported', module: 'directory',
+        title: 'Business problem report', body: `A report about ${businessName || 'a business'} requires administrator review. Check your report email or contact support@siza.info.`,
+        businessId, entityId: businessId, entityType: 'business', read: false, createdAt: timestamp(),
+      }));
       tx.set(limit, { lastAt: Date.now() });
     });
     return { reference, status: 'queued' };
@@ -86,41 +97,48 @@ function register({ admin, db, onCall, onDocumentCreated, HttpsError, REGION, EM
     const message = event.data?.data();
     if (!message || message.kind !== 'text') return;
     const thread = (await db.collection('businessMessageThreads').doc(event.params.threadId).get()).data();
-    if (!thread || message.senderUid !== thread.senderUid) return;
+    const fromCustomer = message.senderUid === thread?.senderUid;
+    const fromOwner = message.senderUid === thread?.ownerUid;
+    if (!thread || (!fromCustomer && !fromOwner) || thread.senderUid === thread.ownerUid
+      || !thread.participantUids?.includes(thread.senderUid) || !thread.participantUids?.includes(thread.ownerUid)) return;
     const business = (await db.collection('businesses').doc(thread.businessId).get()).data() || {};
-    // Never expose an old private conversation to a replacement business owner.
     const route = (await db.collection('businessContactRoutes').doc(thread.businessId).get()).data() || {};
-    const address = clean(business.contact?.email);
     const ownerMatches = clean(route.active === true ? route.ownerUid : business.ownerId) === thread.ownerUid;
+    const recipientUid = fromCustomer ? thread.ownerUid : thread.senderUid;
+    const recipient = (await db.collection('users').doc(recipientUid).get()).data() || {};
     const sender = (await db.collection('users').doc(message.senderUid).get()).data() || {};
+    const eligible = ownerMatches && isActiveRecipient(recipient);
+    const address = clean(fromCustomer ? business.contact?.email : recipient.email);
+    const kind = fromCustomer ? 'business-enquiry' : 'business-reply';
+    // Keep the existing stable key so redeployment cannot duplicate old enquiries.
     const reference = digest(`enquiry:${event.params.threadId}:${event.params.messageId}`);
-    // A notification is independent of email availability. Use the message's
-    // stable reference so trigger retries do not duplicate or reset read state.
-    // Never copy enquiries to admins or a replacement business owner.
-    if (ownerMatches && clean(thread.ownerUid) && thread.ownerUid !== message.senderUid
-      && thread.participantUids?.includes(thread.ownerUid)
-      && thread.participantUids?.includes(message.senderUid)) {
+    if (eligible) {
       try {
         await db.collection('userNotifications').doc(`business-enquiry-${reference}`).create({
-          recipientUid: thread.ownerUid,
-          type: 'business-enquiry', module: 'directory',
-          title: 'New business enquiry',
-          body: `${clean(sender.fullName || message.senderName) || 'A customer'} sent an enquiry about ${clean(thread.businessName) || 'your business'}. Open Business messaging → Inbox to read and reply.`,
-          icon: 'message-text-outline',
-          businessId: thread.businessId, threadId: event.params.threadId,
+          recipientUid, type: kind, module: 'directory',
+          title: fromCustomer ? 'New business enquiry' : 'New reply from business',
+          body: fromCustomer
+            ? `${clean(sender.fullName || message.senderName) || 'A customer'} sent a message about ${clean(thread.businessName) || 'your business'}. Open Business Inbox to read and reply.`
+            : `${clean(thread.businessName) || 'The business'} replied to your enquiry. Open Business Inbox to read and reply.`,
+          icon: 'message-text-outline', businessId: thread.businessId, threadId: event.params.threadId,
           read: false, createdAt: timestamp(),
         });
       } catch (error) { if (error.code !== 6 && error.code !== 'already-exists') throw error; }
     }
     try {
       await db.collection('supportEmailOutbox').doc(reference).create({
-        kind: 'business-enquiry', category: 'Contact Business', businessId: thread.businessId, businessName: thread.businessName,
-        city: cityOf(business.location?.city || business.metroArea), senderUid: message.senderUid,
-        senderName: clean(sender.fullName || message.senderName), senderEmail: clean(sender.email),
+        kind, category: fromCustomer ? 'Contact Business' : 'Business reply',
+        businessId: thread.businessId, businessName: thread.businessName, threadId: event.params.threadId, recipientUid,
+        ownerUid: thread.ownerUid, city: cityOf(business.location?.city || business.metroArea),
+        senderUid: message.senderUid,
+        senderName: fromCustomer ? clean(sender.fullName || message.senderName) : clean(thread.businessName),
+        // Do not disclose the owner's private account email to a customer.
+        senderEmail: clean(fromCustomer ? sender.email : business.contact?.email),
         message: clean(message.text), submittedAt: event.data.createTime.toDate().toISOString(),
-        recipients: ownerMatches && validEmail(address) ? [address] : [],
-        status: ownerMatches && validEmail(address) ? 'queued' : 'skipped',
-        skipReason: !ownerMatches ? 'ownership-changed' : validEmail(address) ? '' : 'no-recorded-business-email',
+        recipients: eligible && validEmail(address) ? [address] : [],
+        status: eligible && validEmail(address) ? 'queued' : 'skipped',
+        skipReason: !ownerMatches ? 'ownership-changed' : !eligible ? 'inactive-recipient'
+          : validEmail(address) ? '' : fromCustomer ? 'no-recorded-business-email' : 'no-customer-email',
         attempts: 0, createdAt: timestamp(),
       });
     } catch (error) { if (error.code !== 6 && error.code !== 'already-exists') throw error; }
@@ -143,6 +161,17 @@ function register({ admin, db, onCall, onDocumentCreated, HttpsError, REGION, EM
     });
     if (!job) return;
     try {
+      if (job.threadId && ['business-enquiry', 'business-reply'].includes(job.kind)) {
+        const business = (await db.collection('businesses').doc(job.businessId).get()).data() || {};
+        const route = (await db.collection('businessContactRoutes').doc(job.businessId).get()).data() || {};
+        const recipient = (await db.collection('users').doc(job.recipientUid).get()).data() || {};
+        const address = clean(job.kind === 'business-enquiry' ? business.contact?.email : recipient.email);
+        if (clean(route.active === true ? route.ownerUid : business.ownerId) !== job.ownerUid
+          || !isActiveRecipient(recipient) || !job.recipients.includes(address)) {
+          await ref.update({ status: 'skipped', skipReason: 'recipient-or-ownership-changed', leaseUntil: 0 });
+          return;
+        }
+      }
       const transporter = buildTransporter();
       if (!transporter) throw new Error('SMTP unavailable');
       const email = buildEmail(job, event.params.reference);

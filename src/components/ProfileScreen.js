@@ -213,7 +213,7 @@ export default function ProfileScreen({
         const allowed = await ensureDeviceNotificationsEnabled();
         setDeviceNotificationsAllowed(allowed);
         if (!allowed) {
-          throw new Error('Phone notifications are blocked in Android settings. Enable them before saving push notifications or reminders.');
+          throw new Error('Phone notifications are blocked in device settings. Enable them before saving push notifications or reminders.');
         }
       }
       await setPrayerRemindersEnabled(prayerReminders, getPrayerLocation(defaultCity));
@@ -515,7 +515,7 @@ export default function ProfileScreen({
 
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Notifications</Text>
-            <Text style={styles.sectionHint}>Control how Events and Business Directory updates reach you.</Text>
+            <Text style={styles.sectionHint}>Updates default to on. You can turn optional updates off below. Business enquiries, replies and administrative decisions (including approvals, requested changes and listing closures) remain enabled as service notifications. Phone notification permission is still required for push alerts.</Text>
             {[
               ['Push notifications', pushEnabled, setPushEnabled],
               ['SMS notifications', smsEnabled, setSmsEnabled],
@@ -528,7 +528,7 @@ export default function ProfileScreen({
             ))}
             {deviceNotificationsAllowed === false ? (
               <View style={styles.notificationWarning}>
-                <Text style={styles.notificationWarningText}>Android is blocking notifications for this app. The switches above cannot deliver alerts until phone permission is enabled.</Text>
+                <Text style={styles.notificationWarningText}>Your phone is blocking notifications for this app. The switches above cannot deliver push alerts until phone permission is enabled.</Text>
                 <Pressable onPress={() => openDeviceNotificationSettings()} style={styles.notificationSettingsButton}>
                   <Text style={styles.notificationSettingsButtonText}>Open Phone Settings</Text>
                 </Pressable>

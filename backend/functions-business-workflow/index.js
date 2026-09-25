@@ -7,6 +7,7 @@ const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 const { buildWorkflowEmail, emailBrand } = require('./email-template');
+const { isActiveRecipient, allowsNotification } = require('./notification-policy');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -96,11 +97,13 @@ Object.assign(exports, require('./support-workflow').register({
   admin, db, onCall, onDocumentCreated, HttpsError, REGION, EMAIL_SECRETS, buildTransporter, logger,
 }));
 
+Object.assign(exports, require('./push-delivery').register({ admin, db, onDocumentCreated, REGION, logger }));
+
 async function getAdminRecipients(cities, actorUid = '') {
   const citySet = new Set((Array.isArray(cities) ? cities : [cities]).filter(Boolean).map(normalizeCity));
   const snapshot = await db.collection('users').where('role', 'in', ['admin', 'superAdmin']).get();
-  return snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() })).filter(user => {
-    if (user.uid === actorUid || user.active === false || user.businessNotificationsEnabled === false) return false;
+  return snapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id })).filter(user => {
+    if (user.uid === actorUid || !isActiveRecipient(user)) return false;
     if (user.role === 'superAdmin') return true;
     return citySet.has(normalizeCity(user.adminCity || user.defaultCity));
   });
@@ -110,8 +113,8 @@ async function getOwnerRecipient(ownerId, actorUid = '') {
   if (!ownerId || ownerId === actorUid) return [];
   const snapshot = await db.collection('users').doc(ownerId).get();
   if (!snapshot.exists) return [];
-  const user = { uid: snapshot.id, ...snapshot.data() };
-  return user.businessNotificationsEnabled === false ? [] : [user];
+  const user = { ...snapshot.data(), uid: snapshot.id };
+  return isActiveRecipient(user) ? [user] : [];
 }
 
 function uniqueRecipients(recipients) {
@@ -119,7 +122,7 @@ function uniqueRecipients(recipients) {
 }
 
 async function deliver(recipients, notification) {
-  const unique = uniqueRecipients(recipients);
+  const unique = uniqueRecipients(recipients).filter(user => allowsNotification(user, notification.type));
   if (!unique.length) return;
   const batch = db.batch();
   unique.forEach(recipient => {
@@ -139,66 +142,15 @@ async function deliver(recipients, notification) {
   });
   await batch.commit();
 
-  const pushRecipients = unique.filter(recipient => recipient.pushNotificationsEnabled !== false);
-  const tokenOwners = [];
-  pushRecipients.forEach(recipient => {
-    const tokens = Array.isArray(recipient.fcmTokens) ? recipient.fcmTokens : [];
-    tokens.filter(Boolean).forEach(token => tokenOwners.push({ uid: recipient.uid, token: clean(token) }));
-  });
-  const uniqueTokenOwners = [...new Map(tokenOwners.map(item => [item.token, item])).values()];
-  for (let offset = 0; offset < uniqueTokenOwners.length; offset += 500) {
-    const chunk = uniqueTokenOwners.slice(offset, offset + 500);
-    try {
-      const response = await admin.messaging().sendEachForMulticast({
-        tokens: chunk.map(item => item.token),
-        notification: {
-          title: notification.title,
-          body: notification.body,
-        },
-        data: {
-          module: 'directory',
-          type: notification.type,
-          entityId: notification.entityId || '',
-          entityType: notification.entityType || '',
-          screen: 'business-notifications',
-        },
-        android: {
-          priority: 'high',
-          notification: {
-            channelId: 'business-alerts',
-            sound: 'default',
-          },
-        },
-      });
-      const staleByUid = new Map();
-      response.responses.forEach((result, index) => {
-        if (result.success) return;
-        const code = clean(result.error?.code);
-        if (!['messaging/registration-token-not-registered', 'messaging/invalid-registration-token'].includes(code)) {
-          logger.error('Business workflow push failed', { code, uid: chunk[index]?.uid });
-          return;
-        }
-        const owner = chunk[index];
-        if (!staleByUid.has(owner.uid)) staleByUid.set(owner.uid, []);
-        staleByUid.get(owner.uid).push(owner.token);
-      });
-      await Promise.all([...staleByUid.entries()].map(([uid, tokens]) => (
-        db.collection('users').doc(uid).update({
-          fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokens),
-        })
-      )));
-    } catch (error) {
-      logger.error('Business workflow push delivery failed', { error: error?.message });
-    }
-  }
-
+  // Push is sent by deliverBusinessPush from the notification document, for
+  // both workflow alerts and private messages. Do not send a second push here.
   const transporter = buildTransporter();
   if (!transporter) {
     logger.warn('Business workflow email skipped because SMTP is not configured.');
     return;
   }
   const from = sender();
-  const emailRecipients = unique.filter(recipient => recipient.emailNotificationsEnabled !== false && clean(recipient.email));
+  const emailRecipients = unique.filter(recipient => allowsNotification(recipient, notification.type, 'email') && clean(recipient.email));
   const results = await Promise.allSettled(emailRecipients.map(recipient => transporter.sendMail({
     from,
     replyTo: SUPPORT_EMAIL,
@@ -304,6 +256,23 @@ async function notifyPromotionDecision(promotion, promotionId, approved) {
   });
 }
 
+
+async function notifyBusinessClosed(business, businessId) {
+  const city = businessCity(business);
+  const actorUid = clean(business.status === 'deleted' ? business.deletedBy : business.archivedBy);
+  const recipients = [
+    ...(await getOwnerRecipient(business.ownerId, actorUid)),
+    ...(await getAdminRecipients(city, actorUid)),
+  ];
+  await deliver(recipients, {
+    type: business.status === 'deleted' ? 'business.deleted' : 'business.archived',
+    icon: 'store-alert-outline',
+    title: business.status === 'deleted' ? 'Business listing removed' : 'Business listing closed by administrator',
+    body: `${clean(business.name) || 'Your business'} is no longer publicly listed. Open Notifications for details or contact support@siza.info.`,
+    city, entityId: businessId, entityType: 'business',
+  });
+}
+
 exports.nativeBusinessSubmissionCreated = onDocumentCreated(
   { document: 'businesses/{businessId}', region: REGION, secrets: EMAIL_SECRETS },
   event => notifyBusinessSubmitted(event.data.data(), event.params.businessId, false)
@@ -314,6 +283,7 @@ exports.nativeBusinessSubmissionUpdated = onDocumentUpdated(
   async event => {
     const before = event.data.before.data();
     const after = event.data.after.data();
+    if (before.status !== after.status && ['archived', 'deleted'].includes(after.status)) return notifyBusinessClosed(after, event.params.businessId);
     if (before.status !== 'approved' && after.status === 'approved') return notifyBusinessDecision(after, event.params.businessId, true);
     if (before.status !== 'rejected' && after.status === 'rejected') return notifyBusinessDecision(after, event.params.businessId, false);
     if (after.status === 'pending' && !sameValue(before.submittedAt, after.submittedAt)) return notifyBusinessSubmitted(after, event.params.businessId, true);
@@ -376,6 +346,22 @@ exports.nativeBusinessProfileUpdated = onDocumentUpdated(
       city: normalizeCity(after.adminCity || after.defaultCity || before.adminCity || before.defaultCity),
       entityId: event.params.userId,
       entityType: 'user',
+    });
+  }
+);
+
+// Non-takedown moderation outcomes also require an owner notification.
+// Takedown already changes the listing to archived and uses notifyBusinessClosed.
+exports.nativeBusinessModerationNoticeCreated = onDocumentCreated(
+  { document: 'businessModerationNotices/{noticeId}', region: REGION, secrets: EMAIL_SECRETS },
+  async event => {
+    const notice = event.data.data();
+    if (notice.decision === 'takedown') return null;
+    const recipients = await getOwnerRecipient(notice.ownerUid);
+    return deliver(recipients, {
+      type: 'business.moderated', title: 'Business moderation update', icon: 'shield-alert-outline',
+      body: `There is an administrative decision for ${clean(notice.businessName) || 'your business'}. Open Notifications to review it.`,
+      entityId: notice.businessId || '', entityType: 'business',
     });
   }
 );

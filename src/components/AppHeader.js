@@ -42,7 +42,7 @@ const BUSINESS_AUTH_ITEMS = [
   { key: 'business-home', label: 'Business Directory Home', icon: '\u{1F3EA}' },
   { key: 'business-favourites', label: 'Favourite Businesses', icon: '\u2764\uFE0F', group: 'Saved' },
   { key: 'business-admin', label: 'Business Settings', icon: '\u2699\uFE0F', group: 'Business Management', adminOnly: true },
-  { key: 'business-inbox', label: 'Business messaging', icon: '\u{1F4E5}', group: 'Messages' },
+  { key: 'business-inbox', label: 'Business Inbox', icon: '\u{1F4E5}', group: 'Messages' },
   { key: 'business-feedback', label: 'Business Feedback', icon: '\u{1F4CB}', group: 'Messages' },
   { key: 'business-report', label: 'Report a Business', icon: '\u{1F6A9}', group: 'Support' },
   { key: 'business-contact', label: 'Contact Us', icon: '\u{1F4AC}', group: 'Support' },

@@ -22,6 +22,7 @@
       "icon": "./assets/icon-store-1024.png",
       "googleServicesFile": "./GoogleService-Info.plist",
       "entitlements": {
+        "aps-environment": "production",
         "com.apple.developer.devicecheck.appattest-environment": "production"
       },
       "infoPlist": {
@@ -99,6 +100,7 @@
       "@react-native-firebase/app-check",
       "@react-native-firebase/auth",
       "@react-native-firebase/crashlytics",
+      "@react-native-firebase/messaging",
       [
         "expo-calendar",
         {

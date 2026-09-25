@@ -62,7 +62,7 @@ import { compareEventsByDateTime, createEventSubmission, createRecurringEventSer
 import { uploadEventPoster } from './src/services/images';
 import { deleteMyAccountAndEvents, ensureUserProfile, migratePhoneAccount, toggleSavedEvent, updateUserPreferences } from './src/services/users';
 import { cancelFavouriteReminder, initializeDefaultPrayerReminders, scheduleFavouriteReminder } from './src/services/reminders';
-import { listenForDevicePushTokenChanges, registerDevicePushNotifications } from './src/services/pushNotifications';
+import { listenForDevicePushTokenChanges, registerDevicePushNotifications, unregisterDevicePushNotifications, listenForBusinessPushOpens } from './src/services/pushNotifications';
 import { getPrayerLocation } from './src/utils/prayerLocations';
 import { EVENT_TYPE_GROUPS } from './src/utils/eventOptions';
 import { canArrangeEventNiaz, matchesEventPeriod } from './src/utils/eventBrowseOptions';
@@ -378,11 +378,11 @@ function MainApp() {
     if (!currentUser?.uid || currentUser.isAnonymous || !profile) return undefined;
     let cancelled = false;
     let registrationPromise = null;
-    const pushEnabled = profile.pushNotificationsEnabled !== false
-      && profile.businessNotificationsEnabled !== false;
+    // Keep registration for essential service notifications. Optional-channel
+    // preferences are enforced by the server, not by deleting the device token.
     const registerPushToken = () => {
-      if (!pushEnabled || cancelled || registrationPromise) return;
-      registrationPromise = registerDevicePushNotifications(currentUser.uid)
+      if (cancelled || registrationPromise) return;
+      registrationPromise = registerDevicePushNotifications(currentUser.uid, () => !cancelled)
         .catch(error => {
           if (!cancelled) recordNonFatalError(error, {
             feature: 'notifications',
@@ -405,9 +405,9 @@ function MainApp() {
           });
         });
     }
-    const removeTokenListener = pushEnabled
-      ? listenForDevicePushTokenChanges(currentUser.uid)
-      : () => {};
+    const removeTokenListener = listenForDevicePushTokenChanges(currentUser.uid, error => {
+      if (!cancelled) recordNonFatalError(error, { feature: 'notifications', operation: 'refresh_push_token' });
+    });
     const appStateSubscription = AppState.addEventListener('change', state => {
       if (state === 'active') registerPushToken();
     });
@@ -423,6 +423,7 @@ function MainApp() {
     profile?.defaultCity,
     profile?.prayerRemindersEnabled,
     profile?.pushNotificationsEnabled,
+    Boolean(profile),
     selectedCity,
   ]);
 
@@ -714,6 +715,7 @@ function MainApp() {
     setAuthBusy(true);
     setProfileError('');
     try {
+      await unregisterDevicePushNotifications(auth.currentUser?.uid);
       await signOut(auth);
       setGuestAccessGranted(false);
     } catch (err) {
@@ -1187,6 +1189,15 @@ function MainApp() {
     }
     navigate();
   }, [appModule, businessListingOpen, isGuest, requestSignIn, requestTabChange]);
+
+  const pushNavigationRef = useRef(handleHeaderNavigate);
+  pushNavigationRef.current = handleHeaderNavigate;
+  useEffect(() => {
+    if (!currentUser?.uid || currentUser.isAnonymous) return undefined;
+    return listenForBusinessPushOpens(currentUser.uid, screen => pushNavigationRef.current(screen), error => {
+      recordNonFatalError(error, { feature: 'notifications', operation: 'open_business_push' });
+    });
+  }, [currentUser?.uid, currentUser?.isAnonymous]);
 
   const openEventsProfile = useCallback(() => {
     setAppModule('events');
