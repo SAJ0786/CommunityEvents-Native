@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "check": "node scripts/verify-source.js",
     "test:registration": "node scripts/test-member-registration.cjs",
+    "test:promotion-email": "node --test scripts/test-promotion-email.cjs",
     "test:business-hours": "node scripts/test-business-hours.cjs",
     "test:business-notifications": "node scripts/test-business-push.cjs && node scripts/test-support-workflow.cjs && node scripts/test-messaging-notifications.cjs && node scripts/test-email-layout.cjs",
     "test:regressions": "node scripts/test-event-picker-business-approval.cjs && node scripts/test-event-card-actions.cjs && node scripts/test-stream-lifecycle.cjs && node scripts/test-whatsapp-number.cjs && node scripts/test-messaging-notifications.cjs && node scripts/test-drawer-motion.cjs && node scripts/test-support-workflow.cjs && node scripts/test-admin-layout.cjs && node scripts/test-member-page-header.cjs && node scripts/test-page-header-standard.cjs && node scripts/test-panel-typography-hierarchy.cjs && node scripts/test-email-layout.cjs && node scripts/test-events-email.cjs && node scripts/test-community-message-image.cjs",

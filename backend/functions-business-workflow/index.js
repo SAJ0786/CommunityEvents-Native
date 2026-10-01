@@ -98,6 +98,7 @@ Object.assign(exports, require('./support-workflow').register({
 }));
 
 Object.assign(exports, require('./push-delivery').register({ admin, db, onDocumentCreated, REGION, logger }));
+Object.assign(exports, require('./promotion-email').register({ admin, db, onDocumentUpdated, onDocumentCreated, REGION, EMAIL_SECRETS, buildTransporter, sender, logger }));
 
 async function getAdminRecipients(cities, actorUid = '') {
   const citySet = new Set((Array.isArray(cities) ? cities : [cities]).filter(Boolean).map(normalizeCity));

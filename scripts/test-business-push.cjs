@@ -87,6 +87,7 @@ async function testWorkflow() {
     './notification-policy': require('../backend/functions-business-workflow/notification-policy'),
     './email-template': require('../backend/functions-business-workflow/email-template'),
     './support-workflow': { register: () => ({}) }, './push-delivery': { register: () => ({}) },
+    './promotion-email': { register: () => ({}) },
   };
   vm.runInNewContext(read('backend/functions-business-workflow/index.js'), { exports, require: name => { assert.ok(name in mocks, name); return mocks[name]; }, console });
   const off = { businessNotificationsEnabled: false, emailNotificationsEnabled: false, pushNotificationsEnabled: false };
