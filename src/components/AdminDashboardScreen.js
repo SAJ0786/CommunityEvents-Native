@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import ScrollView from './KeyboardAwareScrollView';
+import { memberJoinedLabel, memberJoinedMillis, newestMembersFirst } from '../utils/memberProfile';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -691,11 +692,7 @@ export default function AdminDashboardScreen({
       });
   }, [duplicateUserEmails, scopedUsers, userCalendarSyncedOnly, userCityFilter, userQuery, userRoleFilter, userSummaryFilter]);
   const sortedFilteredUsers = useMemo(
-    () => filteredUsers.slice().sort((a, b) => {
-      const left = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || Date.parse(a.createdAt || a.joinedAt || '') || 0;
-      const right = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || Date.parse(b.createdAt || b.joinedAt || '') || 0;
-      return right - left || String(a.fullName || a.email || '').localeCompare(String(b.fullName || b.email || ''));
-    }),
+    () => filteredUsers.slice().sort(newestMembersFirst),
     [filteredUsers]
   );
   const adminEventSource = adminEventView === 'archived' ? archivedAdminEvents : adminEvents;
@@ -703,7 +700,7 @@ export default function AdminDashboardScreen({
   const exportUsersCsv = async () => {
     const escapeCsv = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
     const rows = [['Name', 'Email', 'Phone', 'Role', 'City', 'Calendar Synced', 'Date Joined'], ...sortedFilteredUsers.map(item => [
-      item.fullName || item.displayName || '', item.email || '', item.phone || item.phoneNumber || '', item.role || 'user', cityLabel(normalizeCity(item.defaultCity || DEFAULT_CITY)), item.calendarSynced === true || item.calendarSyncEnabled === true ? 'Yes' : 'No', item.createdAt?.toDate?.()?.toISOString?.() || item.createdAt || item.joinedAt || '',
+      item.fullName || item.displayName || '', item.email || '', item.phone || item.phoneNumber || '', item.role || 'user', item.defaultCity ? cityLabel(normalizeCity(item.defaultCity)) : 'No default city', item.calendarSynced === true || item.calendarSyncEnabled === true ? 'Yes' : 'No', memberJoinedMillis(item) ? new Date(memberJoinedMillis(item)).toISOString() : '',
     ])];
     await Share.share({ title: 'Community Events users CSV', message: rows.map(row => row.map(escapeCsv).join(',')).join('\n') });
   };
@@ -2139,16 +2136,15 @@ export default function AdminDashboardScreen({
                           {userRecord.fullName || userRecord.displayName || 'Unnamed user'}{isCurrentUser ? ' (you)' : ''}
                         </Text>
                         <Text style={styles.userContact}>{userRecord.email || 'No email'}</Text>
-                        {userRecord.phone || userRecord.phoneNumber ? (
-                          <Text style={styles.userContact}>{userRecord.phone || userRecord.phoneNumber}</Text>
-                        ) : null}
+                        <Text style={styles.userContact}>{userRecord.phone || userRecord.phoneNumber || 'No phone recorded'}</Text>
+                        <Text style={styles.userContact}>Joined {memberJoinedLabel(userRecord)}</Text>
                         <View style={styles.rowWrap}>
                           {userRecord.calendarSynced === true || userRecord.calendarSyncEnabled === true ? <Text style={styles.userSynced}>Calendar synced</Text> : null}
                         </View>
                       </View>
                       <View style={styles.userBadges}>
-                        <View accessibilityLabel={cityLabel(userCity)} style={styles.statusPill}>
-                          <Text style={styles.statusPillText}>{cityCode(userCity)}</Text>
+                        <View accessibilityLabel={userRecord.defaultCity ? cityLabel(userCity) : 'No default city'} style={styles.statusPill}>
+                          <Text style={styles.statusPillText}>{userRecord.defaultCity ? cityCode(userCity) : 'No city'}</Text>
                         </View>
                         {isInactiveUserProfile(userRecord) ? (
                           <View style={styles.statusPill}>

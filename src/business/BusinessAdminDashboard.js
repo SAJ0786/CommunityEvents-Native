@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import ScrollView from '../components/KeyboardAwareScrollView';
+import { memberJoinedLabel, newestMembersFirst } from '../utils/memberProfile';
 import { formatAbn, isValidAbn, listenBusinessesForAdmin, listenBusinessPromotionsForAdmin } from '../services/businesses';
 import { getDiagnosticSessionId } from '../services/diagnostics';
 import { listUsers } from '../services/users';
@@ -26,18 +27,8 @@ const CATEGORY_ICONS = [
   '📸', '✈️', '🏋️', '💇', '🧵', '💐', '🐾', '☕', '🕌', '🤝',
 ];
 
-function timestampMillis(value) {
-  if (!value) return 0;
-  if (typeof value.toMillis === 'function') return value.toMillis();
-  if (typeof value.toDate === 'function') return value.toDate().getTime();
-  const parsed = new Date(value).getTime();
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function joinedDate(user = {}) {
-  const value = user.createdAt || user.joinedAt || user.registeredAt || user.createdOn;
-  const millis = timestampMillis(value);
-  return millis ? new Date(millis).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Date unavailable';
+  return memberJoinedLabel(user);
 }
 
 function PanelHeader({ title, subtitle, onBack }) {
@@ -116,14 +107,14 @@ export default function BusinessAdminDashboard({ user, profile, categories = [] 
     return users
       .filter(item => userScope === 'users' || businessOwnerIds.has(item.id))
       .filter(item => !query || [item.fullName, item.email, item.phone, item.phoneNumber, item.defaultCity].some(value => String(value || '').toLowerCase().includes(query)))
-      .sort((a, b) => timestampMillis(b.createdAt || b.joinedAt || b.registeredAt) - timestampMillis(a.createdAt || a.joinedAt || a.registeredAt));
+      .sort(newestMembersFirst);
   }, [businesses, userQuery, userScope, users]);
 
   if (panel === 'approvals') return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView contentContainerStyle={styles.keyboardContent} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets><BusinessApprovalPanel mode="approvals" profile={profile} onBack={() => setPanel('overview')} /></ScrollView></KeyboardAvoidingView>;
   if (panel === 'businesses') return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView contentContainerStyle={styles.keyboardContent} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets><BusinessApprovalPanel mode="management" profile={profile} onBack={() => setPanel('overview')} /></ScrollView></KeyboardAvoidingView>;
   if (panel === 'statistics') return <BusinessStatisticsScreen businesses={businesses} categories={categories} profile={profile} onBack={() => setPanel('overview')} />;
 
-  if (panel === 'users') return <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets><PanelHeader title="Directory Users" subtitle="Newest accounts first. Business Owners includes anyone who has submitted a listing, regardless of approval or visibility." onBack={() => setPanel('overview')} /><TextInput value={userQuery} onChangeText={setUserQuery} placeholder="Search name, email, phone or city" placeholderTextColor={colors.muted} style={styles.input} /><View style={styles.scopeTabs}><Pressable onPress={() => setUserScope('users')} style={[styles.scopeTab, userScope === 'users' && styles.scopeTabActive]}><Text style={[styles.scopeText, userScope === 'users' && styles.scopeTextActive]}>Users</Text></Pressable><Pressable onPress={() => setUserScope('owners')} style={[styles.scopeTab, userScope === 'owners' && styles.scopeTabActive]}><Text style={[styles.scopeText, userScope === 'owners' && styles.scopeTextActive]}>Business Owners</Text></Pressable></View><Text style={styles.resultCount}>{visibleUsers.length} {userScope === 'owners' ? 'BUSINESS OWNERS' : 'USERS'} · NEWEST FIRST</Text>{visibleUsers.map(item => <View key={item.id} style={styles.userCard}><View style={styles.userAvatar}><Text style={styles.userAvatarText}>{String(item.fullName || item.email || 'U').charAt(0).toUpperCase()}</Text></View><View style={styles.userCopy}><Text style={styles.userName}>{item.fullName || 'Unnamed user'}</Text><Text style={styles.userMeta}>{item.email || item.phone || item.phoneNumber || 'No contact detail'}</Text><Text style={styles.userMeta}>{item.defaultCity || 'No default city'} · {item.role || 'user'}</Text><Text style={styles.userJoined}>Joined {joinedDate(item)}</Text></View></View>)}</ScrollView>;
+  if (panel === 'users') return <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets><PanelHeader title="Directory Users" subtitle="Newest accounts first. Business Owners includes anyone who has submitted a listing, regardless of approval or visibility." onBack={() => setPanel('overview')} /><TextInput value={userQuery} onChangeText={setUserQuery} placeholder="Search name, email, phone or city" placeholderTextColor={colors.muted} style={styles.input} /><View style={styles.scopeTabs}><Pressable onPress={() => setUserScope('users')} style={[styles.scopeTab, userScope === 'users' && styles.scopeTabActive]}><Text style={[styles.scopeText, userScope === 'users' && styles.scopeTextActive]}>Users</Text></Pressable><Pressable onPress={() => setUserScope('owners')} style={[styles.scopeTab, userScope === 'owners' && styles.scopeTabActive]}><Text style={[styles.scopeText, userScope === 'owners' && styles.scopeTextActive]}>Business Owners</Text></Pressable></View><Text style={styles.resultCount}>{visibleUsers.length} {userScope === 'owners' ? 'BUSINESS OWNERS' : 'USERS'} · NEWEST FIRST</Text>{visibleUsers.map(item => <View key={item.id} style={styles.userCard}><View style={styles.userAvatar}><Text style={styles.userAvatarText}>{String(item.fullName || item.email || 'U').charAt(0).toUpperCase()}</Text></View><View style={styles.userCopy}><Text style={styles.userName}>{item.fullName || 'Unnamed user'}</Text><Text style={styles.userMeta}>{item.email || 'No email'}</Text><Text style={styles.userMeta}>{item.phone || item.phoneNumber || 'No phone recorded'}</Text><Text style={styles.userMeta}>{item.defaultCity || 'No default city'} · {item.role || 'user'}</Text><Text style={styles.userJoined}>Joined {joinedDate(item)}</Text></View></View>)}</ScrollView>;
 
   if (panel === 'troubleshooting') return <ScrollView contentContainerStyle={styles.content}><PanelHeader title="Business Troubleshooting" subtitle="Business diagnostics and support details." onBack={() => setPanel('overview')} /><View style={styles.infoCard}><Text style={styles.infoLabel}>DIAGNOSTIC SESSION</Text><Text selectable style={styles.infoValue}>{getDiagnosticSessionId()}</Text></View><View style={styles.infoCard}><Text style={styles.infoLabel}>DATA STATUS</Text><Text style={styles.infoValue}>{businesses.length} private listings · {promotions.length} promotions</Text><Text style={styles.infoText}>Crash reports exclude typed form contents, ABNs, phone numbers, email addresses and exact private addresses.</Text></View></ScrollView>;
 

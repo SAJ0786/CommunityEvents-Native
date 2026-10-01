@@ -31,6 +31,8 @@ import useMenuNavigationInset from './src/components/useMenuNavigationInset';
 import { isPublicPlayableLiveEvent } from './src/utils/liveVideo';
 import AppErrorBoundary from './src/components/AppErrorBoundary';
 import ModuleEntryScreen from './src/components/ModuleEntryScreen';
+import CompleteProfileScreen from './src/components/CompleteProfileScreen';
+import { memberEntryState } from './src/utils/memberProfile';
 import AuthDiagnosticReportButton from './src/components/AuthDiagnosticReportButton';
 import AdminDashboardScreen from './src/components/AdminDashboardScreen';
 import AzaanPlaybackController from './src/components/AzaanPlaybackController';
@@ -60,7 +62,7 @@ import { listenUserNotifications } from './src/services/businessNotifications';
 import { auth, confirmPhoneVerification, ensureFirebaseSession, sendPhoneVerification, setNativeDisplayName } from './src/firebase/firebase';
 import { compareEventsByDateTime, createEventSubmission, createRecurringEventSeries, getFutureSeriesEvents, prepareFutureSeriesEdit, deleteEventSeries, deleteEventSubmission, getPublicEvents, getUserEventSubmissions, listenActiveEvents, prepareHomeEvents, setEventVisibility, updateEventSeries, updateEventSubmission } from './src/services/events';
 import { uploadEventPoster } from './src/services/images';
-import { deleteMyAccountAndEvents, ensureUserProfile, migratePhoneAccount, toggleSavedEvent, updateUserPreferences } from './src/services/users';
+import { completeMemberProfile, deleteMyAccountAndEvents, ensureUserProfile, migratePhoneAccount, toggleSavedEvent, updateUserPreferences } from './src/services/users';
 import { cancelFavouriteReminder, initializeDefaultPrayerReminders, scheduleFavouriteReminder } from './src/services/reminders';
 import { listenForDevicePushTokenChanges, registerDevicePushNotifications, unregisterDevicePushNotifications, listenForBusinessPushOpens } from './src/services/pushNotifications';
 import { getPrayerLocation } from './src/utils/prayerLocations';
@@ -254,6 +256,8 @@ function MainApp() {
   const [guestAccessGranted, setGuestAccessGranted] = useState(false);
   const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [profileRetry, setProfileRetry] = useState(0);
+  const profileRequestRef = useRef(0);
   const [profileError, setProfileError] = useState('');
   const [savingEventId, setSavingEventId] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
@@ -309,9 +313,8 @@ function MainApp() {
   }, [currentUser?.isAnonymous, currentUser?.uid]);
 
   useEffect(() => {
-    let requestId = 0;
     const unsubscribe = onIdTokenChanged(auth, user => {
-      const activeRequest = ++requestId;
+      const activeRequest = ++profileRequestRef.current;
       setCurrentUser(user);
       setAuthResolved(true);
       setProfile(null);
@@ -342,23 +345,23 @@ function MainApp() {
 
       profilePromise
         .then(value => {
-          if (activeRequest === requestId) setProfile(value);
+          if (activeRequest === profileRequestRef.current) setProfile(value);
         })
         .catch(err => {
-          if (activeRequest === requestId) {
+          if (activeRequest === profileRequestRef.current) {
           setProfileError(friendlyError(err, 'Could not initialize your profile.'));
           }
         })
         .finally(() => {
-          if (activeRequest === requestId) setProfileLoading(false);
+          if (activeRequest === profileRequestRef.current) setProfileLoading(false);
         });
     });
 
     return () => {
-      requestId += 1;
+      profileRequestRef.current += 1;
       unsubscribe();
     };
-  }, []);
+  }, [profileRetry]);
 
   useEffect(() => {
     let active = true;
@@ -724,6 +727,24 @@ function MainApp() {
       setAuthBusy(false);
     }
   }, []);
+
+  const handleCompleteMemberProfile = useCallback(async details => {
+    const uid = auth.currentUser?.uid;
+    setProfileBusy(true);
+    setProfileError('');
+    try {
+      const saved = await completeMemberProfile(details);
+      if (auth.currentUser?.uid !== uid) return;
+      profileRequestRef.current += 1;
+      setProfile(saved);
+      setProfileLoading(false);
+      setAppModule(preferredModule);
+    } catch (err) {
+      if (auth.currentUser?.uid === uid) setProfileError(friendlyError(err, 'Could not save your profile. Please retry.'));
+    } finally {
+      setProfileBusy(false);
+    }
+  }, [preferredModule]);
 
   const handleContinueAsGuest = useCallback(async () => {
     setAuthBusy(true);
@@ -1317,6 +1338,16 @@ function MainApp() {
         </View>
       </SafeAreaView>
     );
+  }
+
+  const entryState = memberEntryState(currentUser, profile, profileLoading || authBusy);
+  if (!['guest', 'ready'].includes(entryState)) {
+    return <SafeAreaView style={styles.safeArea}>
+      <ExpoStatusBar style="dark" />
+      <CompleteProfileScreen key={`${currentUser?.uid}:${entryState}`} user={currentUser} profile={profile} state={entryState}
+        busy={profileBusy || authBusy} error={profileError} onSave={handleCompleteMemberProfile}
+        onRetry={() => setProfileRetry(value => value + 1)} onSignOut={handleSignOut} />
+    </SafeAreaView>;
   }
 
   if (isGuest && !guestAccessGranted) {

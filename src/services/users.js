@@ -85,6 +85,16 @@ export async function ensureUserProfile(uid, defaults = {}) {
   return current;
 }
 
+export async function completeMemberProfile(details) {
+  const user = auth.currentUser;
+  if (!user || user.isAnonymous) throw new Error('Sign in with your mobile number first.');
+  await httpsCallable(functions, 'completeMemberRegistration')(details);
+  if (auth.currentUser?.uid !== user.uid) throw new Error('Your session changed. Please sign in again.');
+  const profile = await getUserProfile(user.uid);
+  if (!profile) throw new Error('Profile could not be confirmed. Please retry.');
+  return profile;
+}
+
 export async function toggleSavedEvent(uid, eventId, shouldSave) {
   if (!uid || !eventId) return null;
   const ref = doc(db, 'users', uid);

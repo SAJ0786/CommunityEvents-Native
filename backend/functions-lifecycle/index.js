@@ -1,11 +1,19 @@
 const admin = require('firebase-admin');
 const { isFutureSeriesEvent } = require('./seriesScope');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { createMemberRegistrationHandlers } = require('./memberRegistration');
 
 admin.initializeApp();
 const db = admin.firestore();
 const REGION = 'australia-southeast1';
 const DEFAULT_CITY = 'sydney';
+
+const memberRegistration = createMemberRegistrationHandlers({
+  db, auth: admin.auth(), serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(), HttpsError,
+});
+exports.completeMemberRegistration = onCall({ region: REGION }, memberRegistration.complete);
+exports.recordMemberRegistrationDate = onDocumentCreated({ region: REGION, document: 'users/{uid}', retry: true }, memberRegistration.recordCreated);
 
 function city(value) {
   return String(value || DEFAULT_CITY).trim().toLowerCase();

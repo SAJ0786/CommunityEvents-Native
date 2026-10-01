@@ -1,5 +1,6 @@
 ﻿export const colors = {
   blue: '#2563eb',
+  onPrimary: '#ffffff',
   blueDark: '#1d4ed8',
   blueSoft: '#e8f0ff',
   purple: '#7c53bd',

@@ -40,7 +40,8 @@ service cloud.firestore {
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
           'role', 'isActive', 'accountStatus', 'archivedAt', 'archivedBy',
           'accountDeletedAt', 'bannedAt', 'bannedBy',
-          'adminCity', 'permissions', 'security'
+          'adminCity', 'permissions', 'security',
+          'registeredAt', 'profileCompletedAt', 'legalAcceptedAt'
         ])
         && (
           role() != 'admin'
