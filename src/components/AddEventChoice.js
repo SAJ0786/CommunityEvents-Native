@@ -3,11 +3,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, shadow, spacing } from '../theme';
 import MemberPageHeader from './MemberPageHeader';
 
-export default function AddEventChoice({ canCreateRecurring, onChoose }) {
+export default function AddEventChoice({ canCreateRecurring, onChoose, registrationPreviewEnabled = false }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.card}>
-        <MemberPageHeader title="Add Event" subtitle="Choose the same event setup style you use in the PWA." icon="calendar-plus-outline" tone="teal" />
+        <MemberPageHeader title="Add Event" subtitle="Choose how people will attend your event." icon="calendar-plus-outline" tone="teal" />
 
         <Pressable onPress={() => onChoose('single')} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
           <View style={styles.choiceIconWrap}>
@@ -15,7 +15,7 @@ export default function AddEventChoice({ canCreateRecurring, onChoose }) {
           </View>
           <View style={styles.choiceText}>
             <Text style={styles.choiceEyebrow}>One-time event</Text>
-            <Text style={styles.choiceTitle}>Single Event</Text>
+            <Text style={styles.choiceTitle}>Open Single Event</Text>
             <Text style={styles.choiceDescription}>Create one event for one date and time.</Text>
             <Text style={styles.choiceMeta}>Best for majlis, lectures, programs and one-off gatherings.</Text>
           </View>
@@ -35,7 +35,7 @@ export default function AddEventChoice({ canCreateRecurring, onChoose }) {
           </View>
           <View style={styles.choiceText}>
             <Text style={[styles.choiceEyebrow, !canCreateRecurring && styles.disabledText]}>Repeating schedule</Text>
-            <Text style={[styles.choiceTitle, !canCreateRecurring && styles.disabledText]}>Recurring Event</Text>
+            <Text style={[styles.choiceTitle, !canCreateRecurring && styles.disabledText]}>Open Recurring Event</Text>
             <Text style={[styles.choiceDescription, !canCreateRecurring && styles.disabledText]}>
               Repeat by day, week, month or year with a preview before saving.
             </Text>
@@ -43,6 +43,11 @@ export default function AddEventChoice({ canCreateRecurring, onChoose }) {
             {!canCreateRecurring ? <Text style={styles.adminOnly}>Admin only</Text> : null}
           </View>
         </Pressable>
+        {registrationPreviewEnabled && <Pressable accessibilityRole="button" onPress={() => onChoose('registration-preview')} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
+          <View style={styles.choiceIconWrap}><Text style={styles.choiceIcon}>📋</Text></View>
+          <View style={styles.choiceText}><Text style={styles.choiceEyebrow}>Development preview</Text><Text style={styles.choiceTitle}>Registration Required Event</Text><Text style={styles.choiceDescription}>Choose your questions, limit places and preview registration.</Text><Text style={styles.choiceMeta}>Demo only. No live event or booking will be created.</Text></View>
+        </Pressable>}
+        <Text style={styles.choiceMeta}>Open means registration is not required. Event visibility remains a separate setting.</Text>
       </View>
     </ScrollView>
   );
@@ -83,7 +88,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  disabledChoice: { backgroundColor: '#f3f4f6', opacity: 0.72 },
+  disabledChoice: { backgroundColor: colors.background, opacity: 0.72 },
   choiceIconWrap: {
     width: 56,
     height: 56,
@@ -94,7 +99,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tealSoft,
   },
   disabledChoiceIconWrap: {
-    backgroundColor: '#e5e7eb',
+    backgroundColor: colors.border,
   },
   choiceIcon: {
     fontSize: 28,
@@ -105,6 +110,6 @@ const styles = StyleSheet.create({
   choiceDescription: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: 4 },
   choiceMeta: { color: colors.text, fontSize: 13, lineHeight: 18, marginTop: 8 },
   adminOnly: { color: colors.muted, fontSize: 13, fontWeight: '700', marginTop: 10 },
-  disabledText: { color: '#9ca3af' },
+  disabledText: { color: colors.muted },
   pressed: { opacity: 0.72 },
 });

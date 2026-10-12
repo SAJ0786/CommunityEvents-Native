@@ -40,6 +40,7 @@ import NotificationsDrawer from './src/components/NotificationsDrawer';
 import BottomNavigation from './src/components/BottomNavigation';
 import BulkShareScreen from './src/components/BulkShareScreen';
 import AddEventChoice from './src/components/AddEventChoice';
+import RegistrationPrototypeScreen from './src/components/RegistrationPrototypeScreen';
 import CalendarScreen from './src/components/CalendarScreen';
 import CreateEventForm from './src/components/CreateEventForm';
 import CitySelector from './src/components/CitySelector';
@@ -1516,9 +1517,12 @@ function MainApp() {
         />
       ) : activeTab === 'create' && !editingEvent && !createMode ? (
         <AddEventChoice
+          registrationPreviewEnabled={__DEV__}
           canCreateRecurring={profile?.role === 'admin' || profile?.role === 'superAdmin'}
           onChoose={setCreateMode}
         />
+      ) : __DEV__ && activeTab === 'create' && createMode === 'registration-preview' ? (
+        <RegistrationPrototypeScreen onBack={() => setCreateMode('')} />
       ) : activeTab === 'create' && createMode === 'recurring' && (!editingEvent || editingEvent.__editSeries) ? (
         <RecurringEventForm
           key={editingEvent?.seriesId || editingEvent?.recurringSeriesId || 'new-recurring-series'}
