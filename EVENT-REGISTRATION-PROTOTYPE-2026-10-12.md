@@ -24,6 +24,8 @@ The user approved prototype screens first, then backend wiring and testing. Web 
 
 From a normal Windows terminal, run `community-events-deployer/preview-registration.cmd`, then open http://127.0.0.1:5196/.
 
+Alternatively open `community-events-deployer/.qa-registration-preview/registration-preview.html` in a normal browser. The build exports this self-contained offline file; no server is needed. The agent's browser cannot open file URLs and loopback requests time out, so visual acceptance is still unverified. Review this prototype before the server integration milestone.
+
 Review: choose Registration Required Event; set a date; build and reorder questions; save/use a session template; preview and submit fictional attendee details; inspect the organiser response. Reload clears all demo data.
 
 The native screen requires a development runtime containing the current source. It is not present in installed release binaries; no new binary was made.
@@ -45,3 +47,9 @@ Production rollout must prevent older clients from reading private data or overw
 Only native changes and separately owned prototype files are included in this work. The separate web chat is actively modifying the shared PWA checkout and was notified with user approval. Its existing files must not be bundled into a prototype commit without coordination. The PWA prototype currently depends on that chat's uncommitted shared token stylesheet.
 
 GitHub authentication is currently blocked in this session by a Windows MSYS/credential-manager access error. A successful local commit is not a successful remote push.
+
+Local native commits: `d3ddf12` contains the prototype; `5ff295a` contains the timezone/horizontal-scroll changes. A direct push to `origin main` was attempted and failed at credential-manager authentication. No remote update is claimed.
+
+## Remaining next-release queue
+
+The user also approved implementing the wider code backlog. This checkpoint does not complete it. Remaining items are Android system-navigation insets, server-managed city catalogue and consumers, owner/admin promotion-audience controls and safe national targeting, admin bulk-share availability review, and the pre-existing streaming lifecycle regression. Member profile completion and newest-first admin sorting are already coded but still need deployment/device compatibility acceptance. All production-affecting Firebase deployment holds remain in place.

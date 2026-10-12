@@ -83,4 +83,3 @@ function isCalendarDate(value) {
   const parsed = new Date(value + 'T12:00:00Z');
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
-
