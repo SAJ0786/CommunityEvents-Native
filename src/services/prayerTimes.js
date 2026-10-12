@@ -66,19 +66,24 @@ function timeZoneForAddress(address = {}) {
   return 'Australia/Sydney';
 }
 
-function timeZoneOffsetHours(dateStr, timeZone) {
+export function timeZoneOffsetHours(dateStr, timeZone) {
   try {
     const date = new Date(`${dateStr}T12:00:00Z`);
-    const part = new Intl.DateTimeFormat('en-AU', {
-      timeZone,
-      timeZoneName: 'shortOffset',
-    }).formatToParts(date).find(item => item.type === 'timeZoneName')?.value || '';
-    const match = part.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
-    if (!match) return 10;
-    const sign = match[1] === '-' ? -1 : 1;
-    return sign * (Number(match[2]) + Number(match[3] || 0) / 60);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== dateStr) return null;
+    // Numeric zoned components work even where Hermes returns AEDT/AEST
+    // instead of GMT+11/GMT+10, or does not support shortOffset at all.
+    const parts = new Intl.DateTimeFormat('en-GB-u-ca-gregory-nu-latn', {
+      timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.filter(item => item.type !== 'literal').map(item => [item.type, Number(item.value)]));
+    if (!['year', 'month', 'day', 'hour', 'minute', 'second'].every(key => Number.isFinite(values[key]))) return null;
+    const zonedAsUtc = Date.UTC(values.year, values.month - 1, values.day, values.hour % 24, values.minute, values.second);
+    const offset = (zonedAsUtc - date.getTime()) / 3600000;
+    return Number.isFinite(offset) && Math.abs(offset) <= 14 ? offset : null;
   } catch {
-    return 10;
+    // Do not silently give every city Sydney's winter offset.
+    return null;
   }
 }
 
@@ -111,6 +116,7 @@ export function calculatePrayerTimes(dateStr, address = {}) {
   const longitude = Number(address.longitude);
   const timeZone = timeZoneForAddress(address);
   const offset = timeZoneOffsetHours(dateStr, timeZone);
+  if (offset === null) return null;
   const julian = dateToJulian(year, month, day) - longitude / (15 * 24);
   const sun = sunPosition(julian);
   const noon = fixHour(12 + offset - longitude / 15 - sun.equation);

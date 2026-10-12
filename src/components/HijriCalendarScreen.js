@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Alert,
   Pressable,
   StyleSheet,
@@ -97,7 +98,13 @@ function getNextObservance(observances, overrides) {
 export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
   const { width, fontScale } = useWindowDimensions();
   const compactLayout = width / Math.max(fontScale, 1) < 360;
-  const todayIso = useMemo(() => toIsoDate(new Date()), []);
+  const [todayIso, setTodayIso] = useState(() => toIsoDate(new Date()));
+  useEffect(() => {
+    const refreshDate = () => setTodayIso(toIsoDate(new Date()));
+    const subscription = AppState.addEventListener('change', state => { if (state === 'active') refreshDate(); });
+    const timer = setInterval(refreshDate, 30000);
+    return () => { subscription.remove(); clearInterval(timer); };
+  }, []);
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState({ overrides: [] });
   const [observances, setObservances] = useState(DEFAULT_HIJRI_OBSERVANCES);
@@ -150,7 +157,7 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
     loadReminders
       .then(value => setPrayerReminderKeys(value.enabledKeys || []))
       .catch(() => setPrayerReminderKeys([]));
-  }, [prayerCity, profile?.prayerRemindersEnabled]);
+  }, [prayerCity, profile?.prayerRemindersEnabled, todayIso]);
 
   useEffect(() => {
     getAzaanAlarmSettings()
@@ -159,11 +166,11 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
         : value)
       .then(value => setAzaanAlarmKeys(value.enabledKeys || []))
       .catch(() => setAzaanAlarmKeys([]));
-  }, [prayerCity]);
+  }, [prayerCity, todayIso]);
 
   const overrides = settings.overrides || [];
   const todayHijri = getHijriDisplay(todayIso, overrides);
-  const nextObservance = useMemo(() => getNextObservance(observances, overrides), [observances, overrides]);
+  const nextObservance = useMemo(() => getNextObservance(observances, overrides), [observances, overrides, todayIso]);
   const todayPrayerTimes = useMemo(
     () => calculatePrayerTimes(todayIso, getPrayerLocation(prayerCity)),
     [prayerCity, todayIso]

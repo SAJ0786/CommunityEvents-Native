@@ -10,6 +10,7 @@ const REMINDER_STORAGE_KEY = '@community-events/event-reminders';
 const REMINDER_CHANNEL_ID = 'event-reminders';
 const PRAYER_REMINDER_CHANNEL_ID = 'prayer-reminders';
 const PRAYER_REMINDER_STORAGE_KEY = '@community-events/prayer-reminders';
+const PRAYER_CALCULATION_VERSION = 'numeric-timezone-2026-10';
 const AZAAN_ALARM_CHANNEL_ID = 'azaan-alarms-v2';
 const AZAAN_ALARM_STORAGE_KEY = '@community-events/azaan-alarms-v1';
 const AZAAN_SOUND_FILE = Platform.OS === 'ios' ? 'azan_mashad.wav' : 'azan_mashad.mp3';
@@ -163,6 +164,7 @@ async function readPrayerReminderSettings() {
       location: value.location || null,
       initialized: value.initialized === true,
       refreshedAt: value.refreshedAt || '',
+      calculationVersion: value.calculationVersion || '',
     };
   } catch {
     return { enabledKeys: [], notificationIds: [], location: null, initialized: false, refreshedAt: '' };
@@ -346,7 +348,7 @@ async function schedulePrayerReminderKeys(keys, location, currentSettings) {
     }
   }
 
-  const next = { enabledKeys, notificationIds, location: scheduleLocation, initialized: true, refreshedAt: new Date().toISOString() };
+  const next = { enabledKeys, notificationIds, location: scheduleLocation, initialized: true, refreshedAt: new Date().toISOString(), calculationVersion: PRAYER_CALCULATION_VERSION };
   await AsyncStorage.setItem(PRAYER_REMINDER_STORAGE_KEY, JSON.stringify(next));
   return next;
 }
@@ -371,7 +373,7 @@ export async function initializeDefaultPrayerReminders(location) {
   const enabledKeys = current.enabledKeys.length
     ? current.enabledKeys
     : DEFAULT_PRAYER_REMINDER_KEYS;
-  if (locationChanged || scheduleIsStale || !current.notificationIds.length || !current.enabledKeys.length) {
+  if (locationChanged || scheduleIsStale || current.calculationVersion !== PRAYER_CALCULATION_VERSION || !current.notificationIds.length || !current.enabledKeys.length) {
     return schedulePrayerReminderKeys(enabledKeys, location, current);
   }
   return current;

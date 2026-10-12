@@ -19,6 +19,8 @@ export function EventPresetStrip({ filters, nearby = false, onNearbyChange, onPr
   return (
     <View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        directionalLockEnabled alwaysBounceVertical={false} contentInsetAdjustmentBehavior="never"
+        style={{ flexGrow: 0, flexShrink: 0, minHeight: 44 }}
         accessibilityLabel="Customised event filters" contentContainerStyle={styles.choiceRow}>
         {EVENT_BROWSE_PRESETS.map(({ label, field, value }) => {
           const selected = field === 'nearby' ? nearby : field ? filters[field] === value : !filters.period && !filters.eventType && !nearby;

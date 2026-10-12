@@ -1,0 +1,30 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const babel = require('@babel/core');
+const source = fs.readFileSync(path.resolve(__dirname, '../src/components/KeyboardAwareScrollView.js'), 'utf8');
+const { code } = babel.transformSync(source, { configFile: false, babelrc: false, plugins: [require.resolve('@babel/plugin-transform-react-jsx'), require.resolve('@babel/plugin-transform-modules-commonjs')] });
+function render(horizontal) {
+  const listeners = []; const timers = []; const cleanups = []; const refs = [];
+  const React = { forwardRef: fn => fn, useCallback: fn => fn, useEffect: fn => { cleanups.push(fn()); }, useImperativeHandle: () => {}, useRef: value => { const ref = { current: value }; refs.push(ref); return ref; }, createElement: (type, props) => ({ type, props }) };
+  const native = { Keyboard: { addListener: (name, fn) => { listeners.push({ name, fn }); return { remove() {} }; } }, Platform: { OS: 'ios' }, ScrollView: 'ScrollView', TextInput: { State: { currentlyFocusedInput: () => ({}) } } };
+  const exports = {};
+  vm.runInNewContext(code, { exports, require: name => name === 'react' ? React : native, clearTimeout() {}, setTimeout: fn => { timers.push(fn); return timers.length; } });
+  let scrolled = false; const element = exports.default({ horizontal, onScroll: () => { scrolled = true; } }, null);
+  element.props.onFocus({ stopPropagation() {} });
+  element.props.onContentSizeChange(500, 50);
+  element.props.onScroll({ nativeEvent: { contentOffset: { x: 10, y: 100 } } });
+  return { element, listeners, timers, refs, scrolled, cleanups };
+}
+const horizontal = render(true);
+assert.equal(horizontal.listeners.length, 0); assert.equal(horizontal.timers.length, 0);
+assert.equal(horizontal.element.props.automaticallyAdjustKeyboardInsets, false);
+assert.equal(horizontal.element.props.alwaysBounceVertical, false);
+assert.equal(horizontal.element.props.contentInsetAdjustmentBehavior, 'never');
+assert.equal(horizontal.refs[1].current, 0); assert.equal(horizontal.scrolled, true);
+const vertical = render(false);
+assert.equal(vertical.listeners.length, 2); assert.equal(vertical.element.props.automaticallyAdjustKeyboardInsets, true);
+assert.equal(vertical.refs[1].current, 100); assert.ok(vertical.timers.length > 0);
+vertical.cleanups.filter(Boolean).forEach(fn => fn());
+console.log('Horizontal keyboard wrapper isolation and vertical keyboard behaviour passed. Swipe/device reproduction remains pending.');
