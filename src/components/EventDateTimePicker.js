@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Keyboard, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import SafeAreaView from './ModalSafeArea';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors, spacing } from '../theme';
 

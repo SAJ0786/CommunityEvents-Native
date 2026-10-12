@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import SafeAreaView from './ModalSafeArea';
 import { colors, radius, shadow, spacing } from '../theme';
 
 function normaliseOption(option) {

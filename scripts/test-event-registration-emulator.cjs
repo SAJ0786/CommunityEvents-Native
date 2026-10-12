@@ -1,0 +1,39 @@
+const assert = require('node:assert/strict');
+const { createRequire } = require('node:module');
+const path = require('node:path');
+const { createRegistrationHandlers } = require('../backend/functions-registration/registration');
+const dependency = createRequire(path.join(__dirname, '../backend/functions-lifecycle/package.json'));
+const admin = dependency('firebase-admin');
+const projectId = 'demo-registration-20261012';
+if (process.env.FIRESTORE_EMULATOR_HOST !== '127.0.0.1:8398' || process.env.GCLOUD_PROJECT !== projectId) throw Error('Only the isolated demo emulator is allowed.');
+class HttpsError extends Error { constructor(code, message) { super(message); this.code = code; } }
+const app = admin.initializeApp({ projectId });
+const db = app.firestore();
+const request = (uid, data) => ({ auth: uid ? { uid, token: { firebase: { sign_in_provider: 'phone' } } } : null, data });
+async function run() {
+  const handlers = createRegistrationHandlers({ db, HttpsError, enabled: () => true, now: () => new Date('2026-11-01T00:00:00Z') });
+  await Promise.all(['host', 'admin', 'alice', 'bob'].map(uid => db.doc(`users/${uid}`).set({ role: uid === 'admin' ? 'admin' : 'user', adminCity: 'sydney', fullName: 'Synthetic test', email: 'test@example.invalid', isActive: true })));
+  const draft = { title: 'Emulator only', eventType: 'Custom', customEventType: 'Workshop', date: '2026-12-01', suburb: 'Parramatta', address: '1 Synthetic Lane', capacity: 1, closes: '2026-11-30T12:00', allowCancellation: true, purpose: 'Test only', fields: [{ id: 'name', type: 'text', label: 'Name', required: true, options: [] }] };
+  const event = await handlers.saveRegistrationEvent(request('host', { city: 'sydney', createKey: 'create-one', draft }));
+  assert.deepEqual(await handlers.saveRegistrationEvent(request('host', { city: 'sydney', createKey: 'create-one', draft })), event);
+  await handlers.saveRegistrationTemplate(request('host', { templateId: 'template-one', name: 'My template', fields: draft.fields, purpose: draft.purpose }));
+  assert.equal((await handlers.listRegistrationTemplates(request('host', {}))).templates.length, 1);
+  assert.equal((await handlers.listRegistrationTemplates(request('alice', {}))).templates.length, 0, 'Templates must be account-scoped');
+  await handlers.approveRegistrationEvent(request('admin', { eventId: event.eventId, expectedRevision: 1 }));
+  const payload = { eventId: event.eventId, requestId: 'booking-1', expectedRevision: 0, places: 1, formVersion: 1, answers: { name: 'Fictional person' } };
+  const outcomes = await Promise.allSettled(['alice', 'bob'].map(uid => handlers.submitEventRegistration(request(uid, payload))));
+  assert.equal(outcomes.filter(result => result.status === 'fulfilled').length, 1, 'Firestore transactions must prevent overselling');
+  const winner = outcomes[0].status === 'fulfilled' ? 'alice' : 'bob'; const loser = winner === 'alice' ? 'bob' : 'alice';
+  await handlers.submitEventRegistration(request(winner, payload));
+  assert.equal((await db.doc(`registrationEvents/${event.eventId}`).get()).data().reservedPlaces, 1, 'Retry cannot double reserve');
+  const publicView = await handlers.getRegistrationEvent(request(null, { eventId: event.eventId }));
+  assert.equal(JSON.stringify(publicView).includes('Synthetic Lane'), false);
+  assert.equal((await handlers.getRegistrationEvent(request(loser, { eventId: event.eventId }))).privateDetails, undefined);
+  assert.equal((await handlers.getRegistrationEvent(request(winner, { eventId: event.eventId }))).privateDetails.address, draft.address);
+  await handlers.cancelEventRegistration(request(winner, { eventId: event.eventId, expectedRevision: 1 }));
+  assert.equal((await handlers.getRegistrationEvent(request(winner, { eventId: event.eventId }))).privateDetails, undefined);
+  const denied = await fetch(`http://127.0.0.1:8398/v1/projects/${projectId}/databases/(default)/documents/registrationEventPrivate/${event.eventId}`);
+  assert.equal(denied.status, 403, 'Direct unauthenticated private document read must fail');
+  console.log('PASS isolated Firestore emulator: concurrent last seat, retry, private projection, nonregistrant denial, cancellation revocation and direct rules denial. No production writes.');
+}
+run().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => app.delete());

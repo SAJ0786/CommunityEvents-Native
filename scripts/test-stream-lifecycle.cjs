@@ -103,14 +103,21 @@ async function testPipControls() {
   }
   mode(true); show(); assert.equal(timers.size,0,'No timer inside system PiP');
   mode(false); assert.equal(context.shown,true);
-  // End can happen while the native PiP permission/entry promise is outstanding.
-  let resolveEntry;
-  context.StreamingPip={enterPictureInPicture:()=>new Promise(resolve=>{resolveEntry=resolve;})};
-  context.setMinimized=()=>{throw Error('Ended stream must not minimise');};
-  const pending=run('minimiseStream')();
-  context.nativeStreamStartedRef.current=false;
-  resolveEntry(false);
-  await pending;
+  // Current minimisation is synchronous, preserving the native camera surface.
+  // The old test expected a removed asynchronous system-PiP permission request.
+  const minimised = [];
+  context.connectionStateRef = { current: true };
+  context.setStatus = () => {};
+  context.setMinimized = value => minimised.push(value);
+  run('minimiseStream')();
+  assert.deepEqual(minimised, [true], 'Active stream can minimise without resizing capture');
+  context.nativeStreamStartedRef.current = false;
+  run('minimiseStream')();
+  assert.equal(minimised.length, 1, 'Stopped stream cannot minimise even if React streaming state is stale');
+  context.nativeStreamStartedRef.current = true;
+  context.endingRef.current = true;
+  run('minimiseStream')();
+  assert.equal(minimised.length, 1, 'Ending stream cannot minimise');
 }
 
 function testClosedParent() {

@@ -31,6 +31,7 @@ async function main() {
 
   const react = { createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat() }), Fragment: 'Fragment', useState: value => [value, () => {}], useMemo: fn => fn() };
   const select = load('src/components/CompactSelect.js', {
+    './ModalSafeArea': 'SafeAreaView',
     react,
     'react-native': { Modal: 'Modal', Pressable: 'Pressable', SafeAreaView: 'SafeAreaView', ScrollView: 'ScrollView', Text: 'Text', View: 'View', StyleSheet: { create: value => value, absoluteFillObject: {} } },
     '../theme': { colors: {}, radius: {}, shadow: {}, spacing: {} },

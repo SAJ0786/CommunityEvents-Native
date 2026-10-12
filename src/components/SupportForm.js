@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import SafeAreaView from './ModalSafeArea';
 import ScrollView from './KeyboardAwareScrollView';
 import NativeBackButton from './NativeBackButton';
 import { APP_SUPPORT_CATEGORIES, BUSINESS_REPORT_CATEGORIES, newSupportReference, submitSupportRequest } from '../services/support';

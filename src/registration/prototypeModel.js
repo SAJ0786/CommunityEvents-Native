@@ -16,19 +16,40 @@ export const STANDARD_FIELDS = [
   { id: 'age', label: 'Age', type: 'number', required: false },
   { id: 'consent', label: 'I agree to the event registration terms', type: 'consent', required: true },
 ];
+export const TERMS_LIMIT = 1000;
+export const NOTES_LIMIT = 5000;
+export const FORM_TEMPLATES = [
+  { name: 'Basic registration', ids: ['name', 'email', 'phone'] },
+  { name: 'Community meal', ids: ['name', 'email', 'phone', 'diet', 'access'] },
+  { name: 'Family activity', ids: ['name', 'email', 'phone', 'guardian', 'age', 'access'] },
+];
+export function templateFields(template) {
+  return STANDARD_FIELDS.filter(field => template.ids.includes(field.id)).map(field => ({ ...field, description: '', options: [] }));
+}
+export function consentLast(fields) {
+  return [...fields.filter(field => field.type !== 'consent'), ...fields.filter(field => field.type === 'consent')];
+}
+export function resolvedEventType(draft) {
+  return draft.eventType === 'Custom' ? draft.customEventType.trim() : draft.eventType;
+}
+// This projection is for the demo only. Production must never send private data to public clients.
+export function publicEvent(draft) {
+  return { title: draft.title, eventType: resolvedEventType(draft), date: draft.date, suburb: draft.suburb, notes: draft.notes, capacity: Number(draft.capacity), closes: draft.closes };
+}
 export function createDraft() {
-  return { title: 'Community family workshop', eventType: 'Workshop', date: '', suburb: 'Parramatta',
+  return { title: 'Community family workshop', eventType: 'Custom', customEventType: 'Workshop', date: '', suburb: '', address: '', notes: '', poster: null,
     capacity: 30, closes: '', allowCancellation: true,
     purpose: 'Your answers will be used by the organiser to arrange this event.',
     fields: STANDARD_FIELDS.filter(f => ['name', 'email', 'phone'].includes(f.id)).map(f => ({ ...f, description: '', options: [] })) };
 }
 export function makeField(type, id) {
-  return { id, type, label: 'New question', description: '', required: false,
+  return { id, type, label: type === 'consent' ? 'I agree to the event registration terms' : 'New question', description: '', terms: '', required: type === 'consent',
     options: ['select', 'radio', 'checkboxes'].includes(type) ? ['Option 1', 'Option 2'] : [] };
 }
 export function moveField(fields, index, direction) {
   const target = index + direction;
   if (index < 0 || index >= fields.length || target < 0 || target >= fields.length) return fields;
+  if (fields[index].type === 'consent' || fields[target].type === 'consent') return fields;
   const next = [...fields];
   [next[index], next[target]] = [next[target], next[index]];
   return next;
@@ -37,29 +58,37 @@ export function validateDraft(draft) {
   const errors = [];
   if (!draft.title.trim()) errors.push('Enter an event title.');
   if (!isCalendarDate(draft.date)) errors.push('Choose a valid event date.');
+  if (!draft.eventType?.trim() || (draft.eventType === 'Custom' && !draft.customEventType?.trim())) errors.push('Select an event type or enter a custom event type.');
+  if (!draft.address?.trim() || draft.address.length > 500) errors.push('Enter the full event address (up to 500 characters).');
   if (!draft.suburb.trim()) errors.push('Enter a suburb.');
+  if ((draft.notes || '').length > NOTES_LIMIT) errors.push(`Detailed notes must not exceed ${NOTES_LIMIT} characters.`);
+  if (draft.closes && (!isCalendarDate(draft.closes.slice(0, 10)) || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(draft.closes) || draft.closes.slice(0, 10) >= draft.date)) errors.push('Registration closing date must be before the event date, not the same day.');
   if (!Number.isSafeInteger(Number(draft.capacity)) || Number(draft.capacity) < 1 || Number(draft.capacity) > 10000) errors.push('Capacity must be between 1 and 10,000 places.');
   if (!draft.purpose.trim()) errors.push('Explain why you are collecting these answers.');
   if (!draft.fields.length) errors.push('Add at least one question.');
   if (draft.fields.length > 30) errors.push('Use no more than 30 questions in this prototype.');
   const ids = new Set();
   for (const field of draft.fields) {
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(field.id) || ['__proto__', 'prototype', 'constructor'].includes(field.id)) errors.push('Question IDs must be safe, stable identifiers.');
     if (ids.has(field.id)) errors.push('Question IDs must be unique.');
     ids.add(field.id);
     if (!field.label.trim() || field.label.length > 200) errors.push('Question labels must contain 1–200 characters.');
     if (!FIELD_TYPES.some(([type]) => type === field.type)) errors.push('Choose a supported question type.');
+    if (field.type === 'consent' && (!field.terms?.trim() || field.terms.length > TERMS_LIMIT)) errors.push(`Write the terms registrants must agree to (1–${TERMS_LIMIT} characters).`);
+    if (field.type === 'consent' && !field.required) errors.push('Agreement must be required when included.');
     if (['select', 'radio', 'checkboxes'].includes(field.type)) {
       const options = field.options.map(o => o.trim());
       if (options.length < 2 || options.length > 20 || options.some(o => !o || o.length > 100) || new Set(options).size !== options.length) errors.push('Choice questions need 2–20 different, non-empty options.');
     }
   }
+  if (draft.fields.some((field, index) => field.type === 'consent' && draft.fields.slice(index + 1).some(next => next.type !== 'consent'))) errors.push('Keep agreement fields at the end of the form.');
   return [...new Set(errors)];
 }
 export function validateAnswers(fields, answers, places, capacity) {
   const errors = {};
   if (!Number.isSafeInteger(Number(places)) || Number(places) < 1 || Number(places) > Number(capacity)) errors.places = 'Choose a whole number of places within capacity.';
   for (const field of fields) {
-    const value = answers[field.id];
+    const value = Object.prototype.hasOwnProperty.call(answers, field.id) ? answers[field.id] : undefined;
     const empty = value == null || value === false || (typeof value === 'string' && !value.trim()) || (Array.isArray(value) && !value.length);
     if (empty) { if (field.required) errors[field.id] = 'This answer is required.'; continue; }
     if (field.type === 'consent' && value !== true) errors[field.id] = 'Select this checkbox to agree.';

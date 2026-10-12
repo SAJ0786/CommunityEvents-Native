@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { Animated, BackHandler, Pressable, SafeAreaView, StyleSheet, View } from 'react-native';
+import { Animated, BackHandler, Pressable, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import BusinessNotificationsScreen from '../business/BusinessNotificationsScreen';
 import useMenuDrawerMotion from './useMenuDrawerMotion';
 import DrawerDragZone from './DrawerDragZone';

@@ -234,6 +234,10 @@ export default function BulkShareScreen({ events = [], profile, user }) {
     } catch {}
   };
 
+  if (!user?.uid || !['admin', 'superAdmin'].includes(profile?.role) || profile?.isActive === false) {
+    return <View style={styles.content}><Text>Administrator access is required for bulk sharing.</Text></View>;
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.card}>

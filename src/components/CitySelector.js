@@ -3,12 +3,12 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import SafeAreaView from './ModalSafeArea';
 import * as Location from 'expo-location';
 import { CITY_OPTIONS, cityCode, cityLabel, classifyMetroArea } from '../utils/cities';
 import { colors, radius, shadow, spacing } from '../theme';

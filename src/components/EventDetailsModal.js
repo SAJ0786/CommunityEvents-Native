@@ -8,13 +8,13 @@ import {
   Linking,
   Platform,
   Pressable,
-  SafeAreaView,
   Share,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import useMenuDrawerMotion from './useMenuDrawerMotion';
 import DrawerDragZone from './DrawerDragZone';
 import ScrollView from './KeyboardAwareScrollView';

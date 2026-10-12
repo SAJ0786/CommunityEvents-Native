@@ -8,7 +8,6 @@ import {
   Alert,
   Platform,
   Pressable,
-  SafeAreaView,
   Share,
   ScrollView,
   StatusBar,
@@ -18,6 +17,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { appVersion, appBuild } from './src/services/appVersion';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -1684,7 +1684,7 @@ export default function App() {
 
   return (
     <AppErrorBoundary>
-      <MainApp />
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}><MainApp /></SafeAreaProvider>
     </AppErrorBoundary>
   );
 }

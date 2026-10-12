@@ -90,6 +90,7 @@ function testPicker() {
   };
   const native = Object.fromEntries(['Modal', 'Pressable', 'SafeAreaView', 'ScrollView', 'Text', 'View'].map(name => [name, name]));
   const Picker = load('src/components/EventDateTimePicker.js', {
+    './ModalSafeArea': 'SafeAreaView',
     react,
     'react-native': { ...native, Platform: platform, Keyboard: { dismiss: () => dismissals++ }, StyleSheet: { create: x => x, absoluteFillObject: {} } },
     '@react-native-community/datetimepicker': 'NativePicker',
