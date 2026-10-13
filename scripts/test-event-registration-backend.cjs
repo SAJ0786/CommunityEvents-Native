@@ -42,6 +42,21 @@ test('private address is separated and unauthorised users cannot read pending ev
   await f.submit(event);
   assert.equal((await f.handlers.getRegistrationEvent(f.request('member', { eventId: event.eventId }))).privateDetails.address, '1 Synthetic Lane');
 });
+test('server rejects address leakage and filters previously stored public notes', async () => {
+  const f = fixture();
+  for (const notes of ['1 Synthetic Lane', 'Meet at 1 SYNTHETIC LANE, please.']) {
+    await assert.rejects(f.handlers.saveRegistrationEvent(f.request('host', { city: 'sydney', createKey: 'unsafe', draft: { ...f.draft, notes } })), { code: 'invalid-argument' });
+  }
+  const event = await f.create(); await f.approve(event);
+  const record = f.records.get(`registrationEvents/${event.eventId}`);
+  record.notes = '1 Synthetic Lane';
+  const result = await f.handlers.getRegistrationEvent(f.request(null, { eventId: event.eventId }));
+  assert.equal(result.event.notes, '');
+  assert.equal(result.event.suburb, 'Parramatta');
+  assert.equal(result.privateDetails, undefined);
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('host', { eventId: event.eventId }))).privateDetails.address, '1 Synthetic Lane');
+});
+
 test('retrying event creation returns the same event without duplicate records', async () => {
   const f = fixture(); const first = await f.create(); assert.deepEqual(await f.create(), first);
   assert.equal([...f.records.keys()].filter(key => /^registrationEvents\/[^/]+$/.test(key)).length, 1);

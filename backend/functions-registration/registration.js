@@ -166,9 +166,10 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const registered = own?.status === 'registered';
       if (event.status !== 'approved' && !manager && !registered) fail('not-found', 'Event not available.');
       const form = await tx.get(formRef(event.id));
-      const result = { event: { ...(await model).publicEvent(event), id: event.id, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
+      const details = await tx.get(privateRef(event.id));
+      const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), id: event.id, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
       if (manager) result.event.registrationCount = event.registrationCount;
-      if (manager || registered) { const details = await tx.get(privateRef(event.id)); result.privateDetails = { address: details.data()?.address || '', hasPoster: Boolean(details.data()?.posterPath) }; }
+      if (manager || registered) result.privateDetails = { address: details.data()?.address || '', hasPoster: Boolean(details.data()?.posterPath) };
       return result;
     });
   }

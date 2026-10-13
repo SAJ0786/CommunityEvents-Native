@@ -32,9 +32,30 @@ export function consentLast(fields) {
 export function resolvedEventType(draft) {
   return draft.eventType === 'Custom' ? draft.customEventType.trim() : draft.eventType;
 }
-// This projection is for the demo only. Production must never send private data to public clients.
+export function closingDateError(draft) {
+  if (!draft.closes) return '';
+  if (!isCalendarDate(draft.closes.slice(0, 10)) || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(draft.closes)) return 'Enter a valid registration closing date and time.';
+  if (!isCalendarDate(draft.date)) return 'Choose the event date before setting the registration closing date.';
+  return draft.closes.slice(0, 10) >= draft.date ? 'Registration closing date must be before the event date, not the same day.' : '';
+}
+// Defensive checks, not a general personal-data detector. Hosts must review public text.
+const normaliseAddressText = value => String(value || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+export function containsPrivateAddress(value, address = '') {
+  const text = normaliseAddressText(value);
+  const fragments = [address, String(address).split(/[,\n]/)[0]].map(normaliseAddressText).filter(part => part.length >= 6);
+  if (fragments.some(part => (` ${text} `).includes(` ${part} `))) return true;
+  return /\b\d+[a-z]?(?:\s+\d+[a-z]?)?\s+(?:[\p{L}]+\s+){1,6}(?:street|st|road|rd|drive|dr|avenue|ave|lane|ln|court|ct|crescent|cres|place|pl|parade|pde|terrace|tce|way|close|circuit|boulevard|blvd)\b/iu.test(text);
+}
+export function publicSuburbError(draft) {
+  if (!draft.suburb?.trim()) return 'Enter a suburb.';
+  return /[\d\r\n,/:]/u.test(draft.suburb) || containsPrivateAddress(draft.suburb, draft.address) ? 'Enter only the public suburb, not a street address.' : '';
+}
+export function publicNotesError(draft) {
+  return containsPrivateAddress(draft.notes, draft.address) ? 'Move the street address out of public notes. Keep it only in Full address — private.' : '';
+}
+// Allowlisted public projection. Never include private venue, coordinates or poster.
 export function publicEvent(draft) {
-  return { title: draft.title, eventType: resolvedEventType(draft), date: draft.date, suburb: draft.suburb, notes: draft.notes, capacity: Number(draft.capacity), closes: draft.closes };
+  return { title: draft.title, eventType: resolvedEventType(draft), date: draft.date, suburb: publicSuburbError(draft) ? '' : draft.suburb, notes: publicNotesError(draft) ? '' : draft.notes, capacity: Number(draft.capacity), closes: draft.closes };
 }
 export function createDraft() {
   return { title: 'Community family workshop', eventType: 'Custom', customEventType: 'Workshop', date: '', suburb: '', address: '', notes: '', poster: null,
@@ -60,9 +81,10 @@ export function validateDraft(draft) {
   if (!isCalendarDate(draft.date)) errors.push('Choose a valid event date.');
   if (!draft.eventType?.trim() || (draft.eventType === 'Custom' && !draft.customEventType?.trim())) errors.push('Select an event type or enter a custom event type.');
   if (!draft.address?.trim() || draft.address.length > 500) errors.push('Enter the full event address (up to 500 characters).');
-  if (!draft.suburb.trim()) errors.push('Enter a suburb.');
+  if (publicSuburbError(draft)) errors.push(publicSuburbError(draft));
+  if (publicNotesError(draft)) errors.push(publicNotesError(draft));
   if ((draft.notes || '').length > NOTES_LIMIT) errors.push(`Detailed notes must not exceed ${NOTES_LIMIT} characters.`);
-  if (draft.closes && (!isCalendarDate(draft.closes.slice(0, 10)) || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(draft.closes) || draft.closes.slice(0, 10) >= draft.date)) errors.push('Registration closing date must be before the event date, not the same day.');
+  if (closingDateError(draft)) errors.push(closingDateError(draft));
   if (!Number.isSafeInteger(Number(draft.capacity)) || Number(draft.capacity) < 1 || Number(draft.capacity) > 10000) errors.push('Capacity must be between 1 and 10,000 places.');
   if (!draft.purpose.trim()) errors.push('Explain why you are collecting these answers.');
   if (!draft.fields.length) errors.push('Add at least one question.');
