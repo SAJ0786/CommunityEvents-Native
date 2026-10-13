@@ -77,6 +77,11 @@
         "ascAppId": "6807323350"
       }
     },
-    "production": {}
+    "production": {
+      "ios": {
+        "appleTeamId": "D36Y75H5BU",
+        "ascAppId": "6782770347"
+      }
+    }
   }
 }

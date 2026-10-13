@@ -672,6 +672,13 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // Public, non-sensitive store-release metadata. Operators publish via Admin SDK.
+    // Do not enable until the corresponding version is publicly available in store.
+    match /appReleases/{platform} {
+      allow get: if platform in ['ios', 'android'];
+      allow list, write: if false;
+    }
+
     // ── Edit OTPs — Cloud Function only ──────────────────────────────────────
     match /editOtps/{docId} {
       allow read, write: if false;

@@ -32,6 +32,7 @@ import { isPublicPlayableLiveEvent } from './src/utils/liveVideo';
 import AppErrorBoundary from './src/components/AppErrorBoundary';
 import ModuleEntryScreen from './src/components/ModuleEntryScreen';
 import CompleteProfileScreen from './src/components/CompleteProfileScreen';
+import StoreUpdateNotice from './src/components/StoreUpdateNotice';
 import { memberEntryState } from './src/utils/memberProfile';
 import AuthDiagnosticReportButton from './src/components/AuthDiagnosticReportButton';
 import AdminDashboardScreen from './src/components/AdminDashboardScreen';
@@ -1391,6 +1392,7 @@ function MainApp() {
         }}
       />
 
+      <StoreUpdateNotice visible={appModule === 'directory' ? directoryTab === 'home' && !selectedBusinessId && !businessListingOpen : activeTab === 'home' && !selectedEvent} />
       {appModule === 'directory' ? (
         <BusinessDirectoryModule
           activeTab={directoryTab}

@@ -16,6 +16,7 @@
       "**/*"
     ],
     "ios": {
+      "appleTeamId": "D36Y75H5BU",
       "bundleIdentifier": "info.siza.communityevents",
       "buildNumber": "1",
       "supportsTablet": false,
