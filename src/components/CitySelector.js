@@ -12,12 +12,14 @@ import SafeAreaView from './ModalSafeArea';
 import * as Location from 'expo-location';
 import { CITY_OPTIONS, cityCode, cityLabel, classifyMetroArea } from '../utils/cities';
 import { colors, radius, shadow, spacing } from '../theme';
+import { useCityCatalogueVersion } from '../services/cityCatalogue';
 
 export default function CitySelector({ selectedCity, onChange, onLocationResolved, allowCurrentLocation = false, compact = false }) {
+  const catalogueVersion = useCityCatalogueVersion();
   const [open, setOpen] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState('');
-  const selectedLabel = useMemo(() => cityLabel(selectedCity).replace(', Australia', ''), [selectedCity]);
+  const selectedLabel = useMemo(() => cityLabel(selectedCity).replace(', Australia', ''), [selectedCity, catalogueVersion]);
 
   const detectCurrentCity = async () => {
     setLocating(true);
@@ -38,6 +40,7 @@ export default function CitySelector({ selectedCity, onChange, onLocationResolve
         postcode: first.postalCode || '',
         fullAddress: [first.name, first.city, first.region, first.postalCode].filter(Boolean).join(', '),
       });
+      if (!CITY_OPTIONS.some(city => city.value === resolved)) throw new Error('This city is not currently available. Please choose an available city.');
       onChange?.(resolved);
       onLocationResolved?.({
         latitude: current.coords.latitude,

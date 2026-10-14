@@ -405,10 +405,11 @@ service cloud.firestore {
 
     // ── Settings ───────────────────────────────────────────────────────────────
     match /settings/{docId} {
-      allow read:  if signedIn();
-      allow write: if isSuperAdmin()
+      allow read:  if docId == 'cityCatalogue' || signedIn();
+      // Public configuration, updated only by a reviewed server-side operation.
+      allow write: if docId != 'cityCatalogue' && (isSuperAdmin()
                      || (isAdmin()
-                         && !(docId in ['hijriCalendar', 'hijriObservances']));
+                         && !(docId in ['hijriCalendar', 'hijriObservances'])));
     }
 
     // ── Calendar subscriptions ─────────────────────────────────────────────────

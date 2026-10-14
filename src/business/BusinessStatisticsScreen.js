@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useCityCatalogueVersion } from '../services/cityCatalogue';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import ScrollView from '../components/KeyboardAwareScrollView';
 import CompactSelect from '../components/CompactSelect';
@@ -26,6 +27,7 @@ function sumStatistics(rows = []) {
 }
 
 export default function BusinessStatisticsScreen({ businesses = [], categories = [], profile, onBack }) {
+  useCityCatalogueVersion();
   const [statistics, setStatistics] = useState([]);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');

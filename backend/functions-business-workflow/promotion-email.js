@@ -2,20 +2,21 @@
 const { createHash } = require('node:crypto');
 const { isActiveRecipient } = require('./notification-policy');
 const { buildWorkflowEmail } = require('./email-template');
+const catalogueModel = import('./cityCatalogue.mjs');
 const clean = value => String(value || '').trim();
 const hash = value => createHash('sha256').update(value).digest('hex');
 const ZONES = { sydney: 'Australia/Sydney', melbourne: 'Australia/Melbourne', brisbane: 'Australia/Brisbane',
   canberra: 'Australia/Sydney', adelaide: 'Australia/Adelaide', perth: 'Australia/Perth', hobart: 'Australia/Hobart', 'rest-of-australia': 'Australia/Sydney' };
-const cityOf = value => Object.hasOwn(ZONES, clean(value).toLowerCase()) ? clean(value).toLowerCase() : '';
-const businessCity = business => cityOf(business?.location?.city || business?.metroArea || business?.city);
+const cityOf = (value, zones = ZONES) => Object.hasOwn(zones, clean(value).toLowerCase()) ? clean(value).toLowerCase() : '';
+const businessCity = (business, zones = ZONES) => cityOf(business?.location?.city || business?.metroArea || business?.city, zones);
 const emailOf = user => clean(user?.email).toLowerCase();
 const emailKey = user => hash(emailOf(user));
 const revision = promotion => {
   const date = promotion?.approvedAt;
   return String(date?.toMillis?.() || (date?.seconds || date?._seconds || 0) * 1000 || '');
 };
-function localToday(city, now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-AU', { timeZone: ZONES[city] || ZONES.sydney, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+function localToday(city, now = new Date(), zones = ZONES) {
+  const parts = new Intl.DateTimeFormat('en-AU', { timeZone: zones[city], year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
   const get = type => parts.find(part => part.type === type).value;
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
@@ -24,17 +25,17 @@ function validDate(value) {
   const date = new Date(value + 'T00:00:00Z');
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
-function eligiblePromotion(promotion, business, now) {
-  const city = businessCity(business);
+function eligiblePromotion(promotion, business, now, zones = ZONES) {
+  const city = businessCity(business, zones);
   return Boolean(city && business?.status === 'approved' && business.hidden !== true
     && promotion?.status === 'active' && promotion.hidden !== true && revision(promotion)
     && validDate(promotion.startDate) && validDate(promotion.endDate)
-    && promotion.startDate <= promotion.endDate && promotion.endDate >= localToday(city, now));
+    && promotion.startDate <= promotion.endDate && promotion.endDate >= localToday(city, now, zones));
 }
-function eligibleRecipient(user, city) {
+function eligibleRecipient(user, city, zones = ZONES) {
   const email = emailOf(user);
   // Explicit enabled preferences: legacy/missing preferences do not imply consent.
-  return isActiveRecipient(user) && !user.migratedToUid && cityOf(user.defaultCity) === city
+  return isActiveRecipient(user) && !user.migratedToUid && Boolean(city) && cityOf(user.defaultCity, zones) === city
     && user.emailNotificationsEnabled === true && user.businessNotificationsEnabled === true
     && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -53,19 +54,28 @@ function messageFor(promotion, business, city) {
 
 function createHandlers({ admin, db, buildTransporter, sender, logger, now = () => new Date() }) {
   const stamp = () => admin.firestore.FieldValue.serverTimestamp();
+  async function cityZones() {
+    const snapshot = await db.collection('settings').doc('cityCatalogue').get();
+    if (!snapshot.exists) return ZONES; // Preserve legacy behaviour until catalogue activation.
+    const { validateCityCatalogue } = await catalogueModel;
+    const catalogue = validateCityCatalogue(snapshot.data());
+    if (!catalogue) throw new Error('Invalid city catalogue; no promotion emails attempted.');
+    return Object.fromEntries(catalogue.cities.filter(city => city.enabled).map(city => [city.id, city.timeZone || ZONES['rest-of-australia']]));
+  }
   async function queue(event) {
     const before = event.data?.before.data(), after = event.data?.after.data();
     if (!after || before?.status === 'active' || after.status !== 'active') return;
     if (!clean(after.businessId)) return;
+    const zones = await cityZones();
     const promotionId = event.params.promotionId;
     const businessSnapshot = await db.collection('businesses').doc(clean(after.businessId)).get();
     const business = businessSnapshot.data();
-    if (!eligiblePromotion(after, business, now())) return;
+    if (!eligiblePromotion(after, business, now(), zones)) return;
     const campaignRef = db.collection('promotionEmailCampaigns').doc(promotionId);
     // One campaign for the lifetime of a promotion, not one per approval event.
     await db.runTransaction(async tx => {
       if ((await tx.get(campaignRef)).exists) return;
-      tx.set(campaignRef, { status: 'queueing', city: businessCity(business), promotionId,
+      tx.set(campaignRef, { status: 'queueing', city: businessCity(business, zones), promotionId,
         businessId: after.businessId, approvalRevision: revision(after), promotion: {
           title: clean(after.title), discountText: clean(after.discountText), briefText: clean(after.briefText),
           fullDetails: clean(after.fullDetails).slice(0, 4000), startDate: after.startDate, endDate: after.endDate,
@@ -83,7 +93,7 @@ function createHandlers({ admin, db, buildTransporter, sender, logger, now = () 
       for (let offset = 0; offset < page.docs.length; offset += 10) {
         await Promise.all(page.docs.slice(offset, offset + 10).map(async userDoc => {
           const user = userDoc.data();
-          if (!eligibleRecipient(user, campaign.city)) return;
+          if (!eligibleRecipient(user, campaign.city, zones)) return;
           const ref = campaignRef.collection('recipients').doc(emailKey(user));
           await db.runTransaction(async tx => {
             if ((await tx.get(ref)).exists) return;
@@ -104,6 +114,7 @@ function createHandlers({ admin, db, buildTransporter, sender, logger, now = () 
     if (!event.data) return;
     const jobRef = event.data.ref;
     if ((await jobRef.get()).data()?.status !== 'pending') return;
+    const zones = await cityZones();
     const job = event.data.data();
     const campaign = (await db.collection('promotionEmailCampaigns').doc(event.params.promotionId).get()).data();
     if (!campaign) throw new Error('Promotion campaign missing; retry before delivery.');
@@ -113,8 +124,8 @@ function createHandlers({ admin, db, buildTransporter, sender, logger, now = () 
       db.collection('businesses').doc(campaign.businessId).get(),
     ]);
     const user = userDoc.data(), promotion = promotionDoc.data(), business = businessDoc.data();
-    if (!eligibleRecipient(user, campaign.city) || emailKey(user) !== job.emailHash
-      || !eligiblePromotion(promotion, business, now()) || businessCity(business) !== campaign.city
+    if (!eligibleRecipient(user, campaign.city, zones) || emailKey(user) !== job.emailHash
+      || !eligiblePromotion(promotion, business, now(), zones) || businessCity(business, zones) !== campaign.city
       || revision(promotion) !== campaign.approvalRevision) {
       await db.runTransaction(async tx => {
         if ((await tx.get(jobRef)).data()?.status === 'pending') {

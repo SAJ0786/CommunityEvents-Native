@@ -33,6 +33,7 @@ import AppErrorBoundary from './src/components/AppErrorBoundary';
 import ModuleEntryScreen from './src/components/ModuleEntryScreen';
 import CompleteProfileScreen from './src/components/CompleteProfileScreen';
 import StoreUpdateNotice from './src/components/StoreUpdateNotice';
+import { useCityCatalogueRefresh } from './src/services/cityCatalogue';
 import { memberEntryState } from './src/utils/memberProfile';
 import AuthDiagnosticReportButton from './src/components/AuthDiagnosticReportButton';
 import AdminDashboardScreen from './src/components/AdminDashboardScreen';
@@ -234,6 +235,7 @@ function EmptyState({ title, text }) {
 }
 
 function MainApp() {
+  const cityCatalogueVersion = useCityCatalogueRefresh();
   const menuLayout = useMenuNavigationInset();
   const { width: viewportWidth, fontScale } = useWindowDimensions();
   const compactEventsLayout = viewportWidth / Math.max(fontScale, 1) < 390;
@@ -430,6 +432,7 @@ function MainApp() {
     profile?.pushNotificationsEnabled,
     Boolean(profile),
     selectedCity,
+    cityCatalogueVersion,
   ]);
 
   useEffect(() => {
@@ -542,7 +545,7 @@ function MainApp() {
 
   const visibleEvents = useMemo(
     () => prepareHomeEvents(events, selectedCity).filter(event => event.isLive || event.eventDate >= localDateString()),
-    [events, selectedCity]
+    [events, selectedCity, cityCatalogueVersion]
   );
 
   const liveEventCount = useMemo(() => events.filter(isPublicPlayableLiveEvent).length, [events]);
@@ -1374,7 +1377,7 @@ function MainApp() {
   }
 
   return (
-    <SafeAreaView ref={menuLayout.rootRef} onLayout={menuLayout.measure} style={styles.safeArea}>
+    <SafeAreaView ref={menuLayout.rootRef} onLayout={menuLayout.measure} edges={['top', 'right', 'bottom', 'left']} style={styles.safeArea}>
       <ExpoStatusBar style="dark" />
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <AppHeader

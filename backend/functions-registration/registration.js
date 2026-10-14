@@ -1,6 +1,6 @@
 const { createHash } = require('node:crypto');
 const model = import('./formModel.mjs');
-const FALLBACK_ZONES = Object.freeze({ sydney: 'Australia/Sydney', melbourne: 'Australia/Melbourne', canberra: 'Australia/Sydney', brisbane: 'Australia/Brisbane', adelaide: 'Australia/Adelaide', hobart: 'Australia/Hobart', perth: 'Australia/Perth' });
+const catalogueModel = import('./cityCatalogue.mjs');
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 const clone = value => JSON.parse(JSON.stringify(value));
 function localMinute(now, timeZone) {
@@ -42,9 +42,10 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
   async function zone(city, transaction) {
     const ref = db.collection('settings').doc('cityCatalogue');
     const snapshot = transaction ? await transaction.get(ref) : await ref.get();
-    const rows = snapshot.exists ? snapshot.data().cities : null;
-    const entry = Array.isArray(rows) ? rows.find(row => row.id === city && row.enabled === true) : null;
-    const result = Array.isArray(rows) ? entry?.timeZone : FALLBACK_ZONES[city];
+    const { validateCityCatalogue, BUNDLED_CITY_CATALOGUE } = await catalogueModel;
+    const catalogue = snapshot.exists ? validateCityCatalogue(snapshot.data()) : BUNDLED_CITY_CATALOGUE;
+    if (!catalogue) fail('failed-precondition', 'City configuration needs administrator review.');
+    const result = catalogue.cities.find(row => row.id === city && row.enabled === true)?.timeZone;
     try { if (!result || !result.startsWith('Australia/')) throw Error(); localMinute(now(), result); } catch { fail('invalid-argument', 'Choose an enabled Australian event city with a valid timezone.'); }
     return result;
   }

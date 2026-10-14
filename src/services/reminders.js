@@ -230,6 +230,7 @@ async function scheduleAzaanAlarmKeys(keys, location, currentSettings) {
     return cleared;
   }
   if (!calculatePrayerTimes(localIsoDate(new Date()), scheduleLocation)) {
+    await AsyncStorage.setItem(AZAAN_ALARM_STORAGE_KEY, JSON.stringify({ ...current, notificationIds: [], location: scheduleLocation, refreshedAt: null }));
     throw new Error('Choose a supported Australian city before setting Azaan alarms.');
   }
   if (!(await ensureAzaanNotificationPermission())) {
@@ -302,6 +303,9 @@ async function schedulePrayerReminderKeys(keys, location, currentSettings) {
   const enabledKeys = [...new Set(keys)].filter(Boolean);
   const scheduleLocation = location || current.location;
   if (enabledKeys.length && !calculatePrayerTimes(localIsoDate(new Date()), scheduleLocation)) {
+    // Do not leave the previous city's alarms running after a city is unavailable.
+    await cancelPrayerNotificationIds(current.notificationIds);
+    await AsyncStorage.setItem(PRAYER_REMINDER_STORAGE_KEY, JSON.stringify({ ...current, notificationIds: [], location: scheduleLocation, refreshedAt: null }));
     throw new Error('Choose a supported Australian city before setting prayer-time reminders.');
   }
   await cancelPrayerNotificationIds(current.notificationIds);
@@ -358,7 +362,10 @@ export async function initializeDefaultPrayerReminders(location) {
   const savedLocation = current.location || {};
   const nextLocation = location || {};
   const locationChanged = String(savedLocation.city || savedLocation.suburb || '')
-    !== String(nextLocation.city || nextLocation.suburb || '');
+    !== String(nextLocation.city || nextLocation.suburb || '')
+    || savedLocation.latitude !== nextLocation.latitude
+    || savedLocation.longitude !== nextLocation.longitude
+    || savedLocation.timeZone !== nextLocation.timeZone;
   const refreshedAt = new Date(current.refreshedAt || 0).getTime();
   const scheduleIsStale = !Number.isFinite(refreshedAt)
     || refreshedAt < Date.now() - (12 * 60 * 60 * 1000);

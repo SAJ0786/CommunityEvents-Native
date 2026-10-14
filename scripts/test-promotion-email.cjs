@@ -69,6 +69,25 @@ test('explicit preferences, valid email, matching city and active account are re
   }
 });
 
+test('new server-managed city queues only matching members and disabled city blocks delivery', async () => {
+  const { BUNDLED_CITY_CATALOGUE } = await import('../backend/functions-business-workflow/cityCatalogue.mjs');
+  const catalogue = structuredClone(BUNDLED_CITY_CATALOGUE);
+  catalogue.cities.push({ id: 'darwin', label: 'Darwin, Australia', code: 'DRW', enabled: true, order: 9,
+    state: 'NT', timeZone: 'Australia/Darwin', latitude: -12.46, longitude: 130.84, aliases: ['Darwin'], postcodeRanges: [[800, 899]] });
+  const h = harness(); h.records.set('settings/cityCatalogue', catalogue);
+  h.records.set('businesses/business', { ...business, location: { city: 'darwin' } });
+  h.records.set('users/darwin', { ...member, defaultCity: 'darwin' });
+  h.records.set('users/sydney', { ...member, email: 'other@example.test' });
+  await h.queue(h.approval()); assert.equal(h.jobs().length, 1);
+  assert.equal(h.records.get('promotionEmailCampaigns/promo').city, 'darwin');
+  catalogue.cities.at(-1).enabled = false;
+  await h.deliver(h.delivery(h.jobs()[0]));
+  assert.equal(h.sent.length, 0); assert.equal(h.records.get(h.jobs()[0]).status, 'skipped');
+  const broken = harness(); broken.records.set('settings/cityCatalogue', { cities: [] });
+  await assert.rejects(broken.queue(broken.approval()), /Invalid city catalogue/);
+  assert.equal(broken.jobs().length, 0);
+});
+
 test('future offers are eligible immediately; invalid, expired, hidden or unapproved offers are not', () => {
   assert.ok(eligiblePromotion(promotion, business, NOW));
   for (const patch of [{ status: 'pending' }, { status: 'rejected' }, { hidden: true }, { approvedAt: undefined },

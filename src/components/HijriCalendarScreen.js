@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useCityCatalogueVersion } from '../services/cityCatalogue';
 import {
   ActivityIndicator,
   AppState,
@@ -96,6 +97,7 @@ function getNextObservance(observances, overrides) {
 }
 
 export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
+  const cityCatalogueVersion = useCityCatalogueVersion();
   const { width, fontScale } = useWindowDimensions();
   const compactLayout = width / Math.max(fontScale, 1) < 360;
   const [todayIso, setTodayIso] = useState(() => toIsoDate(new Date()));
@@ -157,7 +159,7 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
     loadReminders
       .then(value => setPrayerReminderKeys(value.enabledKeys || []))
       .catch(() => setPrayerReminderKeys([]));
-  }, [prayerCity, profile?.prayerRemindersEnabled, todayIso]);
+  }, [prayerCity, profile?.prayerRemindersEnabled, todayIso, cityCatalogueVersion]);
 
   useEffect(() => {
     getAzaanAlarmSettings()
@@ -166,14 +168,14 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
         : value)
       .then(value => setAzaanAlarmKeys(value.enabledKeys || []))
       .catch(() => setAzaanAlarmKeys([]));
-  }, [prayerCity, todayIso]);
+  }, [prayerCity, todayIso, cityCatalogueVersion]);
 
   const overrides = settings.overrides || [];
   const todayHijri = getHijriDisplay(todayIso, overrides);
   const nextObservance = useMemo(() => getNextObservance(observances, overrides), [observances, overrides, todayIso]);
   const todayPrayerTimes = useMemo(
     () => calculatePrayerTimes(todayIso, getPrayerLocation(prayerCity)),
-    [prayerCity, todayIso]
+    [prayerCity, todayIso, cityCatalogueVersion]
   );
   const sunPosition = useMemo(() => {
     const sunrise = timeMinutes(todayPrayerTimes?.sunrise);

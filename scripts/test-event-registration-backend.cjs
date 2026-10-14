@@ -42,6 +42,21 @@ test('private address is separated and unauthorised users cannot read pending ev
   await f.submit(event);
   assert.equal((await f.handlers.getRegistrationEvent(f.request('member', { eventId: event.eventId }))).privateDetails.address, '1 Synthetic Lane');
 });
+
+test('registration uses validated city catalogue timezone and refuses disabled or malformed configuration', async () => {
+  const { BUNDLED_CITY_CATALOGUE } = await import('../backend/functions-registration/cityCatalogue.mjs');
+  const catalogue = structuredClone(BUNDLED_CITY_CATALOGUE);
+  catalogue.cities.push({ id: 'darwin', label: 'Darwin, Australia', code: 'DRW', enabled: true, order: 9,
+    state: 'NT', timeZone: 'Australia/Darwin', latitude: -12.46, longitude: 130.84, aliases: ['Darwin'], postcodeRanges: [[800, 899]] });
+  const f = fixture(); f.records.set('settings/cityCatalogue', catalogue);
+  const data = { city: 'darwin', createKey: 'darwin-one', draft: f.draft };
+  const event = await f.handlers.saveRegistrationEvent(f.request('host', data));
+  assert.equal(f.records.get(`registrationEvents/${event.eventId}`).timeZone, 'Australia/Darwin');
+  catalogue.cities.at(-1).enabled = false;
+  await assert.rejects(f.handlers.saveRegistrationEvent(f.request('host', { ...data, createKey: 'darwin-two' })), { code: 'invalid-argument' });
+  f.records.set('settings/cityCatalogue', { cities: [] });
+  await assert.rejects(f.create(), { code: 'failed-precondition' });
+});
 test('server rejects address leakage and filters previously stored public notes', async () => {
   const f = fixture();
   for (const notes of ['1 Synthetic Lane', 'Meet at 1 SYNTHETIC LANE, please.']) {

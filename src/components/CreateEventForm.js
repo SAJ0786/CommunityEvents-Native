@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useCityCatalogueVersion } from '../services/cityCatalogue';
 import * as ImagePicker from 'expo-image-picker';
 import EventDateTimePicker from './EventDateTimePicker';
 import {
@@ -284,6 +285,7 @@ export default function CreateEventForm({
   canSubmit = true,
   allowUnchangedSubmit = false,
 }) {
+  const cityCatalogueVersion = useCityCatalogueVersion();
   const defaults = useMemo(() => ({
     hostName: defaultHostName,
     hostPhone: defaultHostPhone,
@@ -520,7 +522,7 @@ export default function CreateEventForm({
       left.group.localeCompare(right.group) || left.sortName.localeCompare(right.sortName)
     ));
     return [privateOption, ...organisations, otherOption];
-  }, [dynamicOrganisations]);
+  }, [dynamicOrganisations, cityCatalogueVersion]);
 
   const selectedOrganiserValue = useMemo(() => {
     if (form.organiserId && getDynamicOrganisationById(form.organiserId)) return `org:${form.organiserId}`;

@@ -7,6 +7,24 @@ const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 const app = read('App.js');
 assert.match(app, /import \{ SafeAreaProvider, SafeAreaView, initialWindowMetrics \} from 'react-native-safe-area-context'/);
 assert.match(app, /<SafeAreaProvider initialMetrics=\{initialWindowMetrics\}><MainApp \/><\/SafeAreaProvider>/);
+assert.match(app, /<SafeAreaView ref=\{menuLayout.rootRef\}[^>]*edges=\{\['top', 'right', 'bottom', 'left'\]\}/);
+for (const file of ['src/components/BottomNavigation.js', 'src/business/DirectoryBottomNavigation.js']) {
+  const navigation = read(file).match(/navigation:\s*\{([\s\S]*?)\n  \},/)[1];
+  assert.match(navigation, /flexShrink: 0/, `${file}: never squash the labels under the system bar`);
+  assert.doesNotMatch(navigation, /position:\s*['"]absolute|bottom:\s*-/, `${file}: footer must remain inside the root safe area`);
+  assert.doesNotMatch(read(file), /useSafeAreaInsets|paddingBottom:\s*insets/, 'Root owns the inset; do not double-pad the footer');
+}
+// Assert actual JSX ancestry, not just the presence of an unrelated safe-area import.
+const ast = babel.parseSync(app, { configFile: false, babelrc: false, parserOpts: { plugins: ['jsx'] } });
+const traverse = require('@babel/traverse').default;
+let footerCount = 0;
+traverse(ast, { JSXElement(nodePath) {
+  const name = nodePath.node.openingElement.name.name;
+  if (name !== 'BottomNavigation' && name !== 'BusinessDirectoryModule') return;
+  assert.ok(nodePath.findParent(parent => parent.isJSXElement() && parent.node.openingElement.name.name === 'SafeAreaView'), `${name} must be inside safe-area layout`);
+  footerCount++;
+} });
+assert.equal(footerCount, 2);
 for (const file of ['CompactSelect', 'CitySelector', 'EventDateTimePicker', 'SupportForm']) assert.match(read(`src/components/${file}.js`), /import SafeAreaView from '\.\/ModalSafeArea'/);
 const react = { createElement: (type, props, ...children) => ({ type, props, children }), forwardRef: render => render };
 const source = babel.transformSync(read('src/components/ModalSafeArea.js'), { configFile: false, babelrc: false, plugins: ['@babel/plugin-transform-react-jsx', '@babel/plugin-transform-modules-commonjs'] }).code;

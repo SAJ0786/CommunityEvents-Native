@@ -57,6 +57,9 @@ function asrTime(factor, latitude, declination) {
 }
 
 function timeZoneForAddress(address = {}) {
+  if (typeof address.timeZone === 'string' && address.timeZone.startsWith('Australia/')) {
+    try { new Intl.DateTimeFormat('en-AU', { timeZone: address.timeZone }).format(new Date()); return address.timeZone; } catch { /* resolve from state */ }
+  }
   const state = String(address.state || '').trim().toUpperCase();
   if (state === 'WA') return 'Australia/Perth';
   if (state === 'SA') return 'Australia/Adelaide';

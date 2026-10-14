@@ -63,6 +63,8 @@ export default function BottomNavigation({ activeTab, onChange, onOpenMenu, user
 
 const styles = StyleSheet.create({
   navigation: {
+    // The root safe area owns system-bar spacing; keep this footer in normal flow.
+    flexShrink: 0,
     flexDirection: 'row',
     minHeight: 66,
     marginHorizontal: 12,

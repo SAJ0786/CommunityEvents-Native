@@ -52,6 +52,8 @@ export default function DirectoryBottomNavigation({ activeTab, onChange, onOpenM
 
 const styles = StyleSheet.create({
   navigation: {
+    // The root safe area owns system-bar spacing; keep this footer in normal flow.
+    flexShrink: 0,
     minHeight: 66,
     marginHorizontal: 12,
     marginBottom: 7,
