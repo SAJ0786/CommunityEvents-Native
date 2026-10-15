@@ -3,6 +3,7 @@ const { isFutureSeriesEvent } = require('./seriesScope');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { createMemberRegistrationHandlers } = require('./memberRegistration');
+const cityModel = import('./cityCatalogue.mjs');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -90,8 +91,11 @@ exports.archiveFutureSeriesEvents = onCall({ region: REGION }, async request => 
   const snapshots = await Promise.all(['seriesId', 'recurringSeriesId'].map(field =>
     db.collection('events').where(field, '==', seriesId).get()));
   const docs = [...new Map(snapshots.flatMap(snapshot => snapshot.docs).map(item => [item.id, item])).values()];
+  const citySnapshot = await db.collection('settings').doc('cityCatalogue').get();
+  const model = await cityModel;
+  const catalogue = model.createCityResolver(citySnapshot.exists ? citySnapshot.data() : model.BUNDLED_CITY_CATALOGUE);
   const now = new Date();
-  const future = docs.filter(item => isFutureSeriesEvent(item.data(), now));
+  const future = docs.filter(item => isFutureSeriesEvent(item.data(), now, catalogue.cities));
   if (!future.length) throw new HttpsError('failed-precondition', 'No future events remain in this series.');
   if (future.length !== expectedIds.length || future.some(item => !expectedIds.includes(item.id))) {
     throw new HttpsError('failed-precondition', 'The remaining events have changed. Reopen Delete Series and confirm the new count.');
@@ -107,7 +111,7 @@ exports.archiveFutureSeriesEvents = onCall({ region: REGION }, async request => 
     const ids = await db.runTransaction(async transaction => {
       const current = await transaction.getAll(...chunk.map(item => item.ref));
       const checkedAt = new Date();
-      const eligible = current.filter(item => item.exists && isFutureSeriesEvent(item.data(), checkedAt));
+      const eligible = current.filter(item => item.exists && isFutureSeriesEvent(item.data(), checkedAt, catalogue.cities));
       eligible.forEach(item => {
         const data = item.data();
         if (data.seriesId !== seriesId && data.recurringSeriesId !== seriesId) throw new HttpsError('failed-precondition', 'Series membership changed. Refresh and try again.');

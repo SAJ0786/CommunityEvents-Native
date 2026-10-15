@@ -24,6 +24,7 @@ import RNShare from 'react-native-share';
 import { collection, getDocs, orderBy, query, where } from '@react-native-firebase/firestore';
 import { colors, radius, shadow, spacing } from '../theme';
 import NativeDateTimeField from './NativeDateTimeField';
+import CityManagementPanel from './CityManagementPanel';
 import {
   getHijriDisplay,
   getHijriParts,
@@ -1917,6 +1918,7 @@ export default function AdminDashboardScreen({
     >
       {panel === 'overview' ? (
         <>
+          <CityManagementPanel profile={profile} />
           <View style={styles.dashboardProfileCard}>
             <View style={styles.dashboardAvatar}>
               <Text style={styles.dashboardAvatarText}>{getInitials(adminDisplayName)}</Text>

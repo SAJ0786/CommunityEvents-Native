@@ -112,7 +112,7 @@ function inRanges(postcode, ranges) {
   return ranges.some(([start, end]) => postcode >= start && postcode <= end);
 }
 
-export function classifyMetroArea(address = {}) {
+export function classifyMetroArea(address = {}, catalogueCities = definitions) {
   const text = [
     address?.suburb,
     address?.city,
@@ -123,11 +123,11 @@ export function classifyMetroArea(address = {}) {
   const explicitPostcode = String(address?.postcode || '').match(/\b\d{4}\b/)?.[0] || '';
   const postcodeText = explicitPostcode || String(address?.fullAddress || '').match(/\b(NSW|VIC|ACT|QLD|SA|TAS|WA|NT)\s+(\d{4})\b/i)?.[2] || '';
   const postcode = Number.parseInt(postcodeText, 10);
-  for (const city of definitions) {
+  for (const city of catalogueCities) {
     if (Number.isFinite(postcode) && inRanges(postcode, city.postcodeRanges)) return city.id;
   }
   const searchText = ` ${text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ')} `;
-  for (const city of definitions) {
+  for (const city of catalogueCities) {
     if (city.aliases.some(alias => searchText.includes(` ${alias.replace(/[^\p{L}\p{N}]+/gu, ' ').trim()} `))) return city.id;
   }
   if (Number.isFinite(postcode)) {
@@ -153,9 +153,9 @@ export function classifyMetroArea(address = {}) {
   return 'rest-of-australia';
 }
 
-export function getEventMetroArea(event = {}) {
+export function getEventMetroArea(event = {}, catalogueCities = definitions) {
   if (event.metroArea) return normalizeCity(event.metroArea);
-  const classified = classifyMetroArea(event.address || event);
+  const classified = classifyMetroArea(event.address || event, catalogueCities);
   if (classified !== 'rest-of-australia') return classified;
   return classified;
 }
@@ -166,4 +166,21 @@ export function cityLabel(value) {
 
 export function cityCode(value) {
   return getCityDefinition(value)?.code || '—';
+}
+
+// Server callers need an immutable invocation-local view, never the mutable
+// installed native catalogue (Cloud Functions handle concurrent invocations).
+export function createCityResolver(data = BUNDLED_CITY_CATALOGUE) {
+  const validated = validateCityCatalogue(data);
+  if (!validated) throw new Error('Invalid city catalogue. No city-based operation was attempted.');
+  const cities = validated.cities;
+  const definition = value => cities.find(city => city.id === normalizeCity(value));
+  return Object.freeze({
+    cities, normalizeCity,
+    classifyMetroArea: address => classifyMetroArea(address, cities),
+    getEventMetroArea: event => getEventMetroArea(event, cities),
+    getUserCity: user => normalizeCity(user?.adminCity || user?.defaultCity || DEFAULT_CITY),
+    cityLabel: value => definition(value)?.label || `Unavailable city (${String(value || '').slice(0, 50)})`,
+    enabled: value => definition(value)?.enabled === true,
+  });
 }

@@ -1,6 +1,12 @@
 # Community Connect Australia — Copilot / next-agent handover
 
 Last checkpoint: 16 October 2026, Australia/Sydney. Work is in progress.
+Current city checkpoint (after bfa7a0e): server Events catalogue context and native/
+lifecycle recurrence now use validated city definitions. Added gated Super Admin
+Add City panel with Google city search, coordinate/timezone preview and server
+re-resolution before atomic save. See CITY-MANAGEMENT-2026-10-16.md. No deployment
+or flags enabled. 56 combined backend/city/registration tests passed and 124 source
+files parsed. Physical-device/provider and production-rule acceptance still pending.
 Read this file, root AGENTS.md and RELEASE-READINESS-2026-10-14.md before coding.
 This is a continuation brief, not permission to deploy or publish.
 

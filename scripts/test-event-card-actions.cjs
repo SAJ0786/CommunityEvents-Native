@@ -102,7 +102,7 @@ async function testRecurrenceReschedule() {
     '@react-native-firebase/firestore': firestore,
     '@react-native-firebase/functions': { httpsCallable: () => async () => ({ data: {} }) },
     '../firebase/firebase': { auth: { currentUser: { uid: 'owner', isAnonymous: false } }, db: {}, ensureFirebaseSession: async () => ({ uid: 'owner' }), functions: {} },
-    '../utils/cities': { getEventMetroArea: () => 'sydney' },
+    '../utils/cities': { getEventMetroArea: () => 'sydney', getCityDefinition: () => ({ id: 'sydney', timeZone: 'Australia/Sydney' }) },
     './prayerTimes': { applyPrayerOffset: value => value, calculatePrayerTimes: () => null, prayerLabel: value => value },
     './hijri': { getHijriDisplay: () => '', getHijriParts: () => ({}), hijriDisplayFromParts: () => '', hijriToGregorian: () => '' },
     '../utils/seriesScope': { isFutureSeriesEvent: (event, now) => require('../src/utils/seriesScope').isFutureSeriesEvent(event, now || new Date('2026-08-01T00:00:00Z')) },

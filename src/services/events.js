@@ -2,10 +2,13 @@ import { addDoc, collection, doc, getDocs, limit, onSnapshot, orderBy, query, ru
 import { httpsCallable } from '@react-native-firebase/functions';
 import { auth, db, ensureFirebaseSession, functions } from '../firebase/firebase';
 import { isFutureSeriesEvent } from '../utils/seriesScope';
-import { getEventMetroArea } from '../utils/cities';
+import { getEventMetroArea, getCityDefinition } from '../utils/cities';
 import { applyPrayerOffset, calculatePrayerTimes, prayerLabel } from './prayerTimes';
 import { getHijriDisplay, getHijriParts, hijriDisplayFromParts, hijriToGregorian } from './hijri';
 import { getOrganisations, resolveOrganisationLogo } from './organisations';
+
+const futureSeriesEvent = (event, now) => isFutureSeriesEvent(event, now,
+  [getCityDefinition(event.metroArea || event.city)].filter(Boolean));
 
 function toComparableTime(time = '') {
   const value = String(time || '').trim();
@@ -380,7 +383,7 @@ export async function getFutureSeriesEvents(sourceEvent) {
     getDocs(query(collection(db, 'events'), where(field, '==', seriesId)))));
   const now = new Date();
   return [...new Map(snapshots.flatMap(snapshot => snapshot.docs).map(item => [item.id, { ...item.data(), id: item.id }])).values()]
-    .filter(event => isFutureSeriesEvent(event, now)).sort(compareEventsByDateTime);
+    .filter(event => futureSeriesEvent(event, now)).sort(compareEventsByDateTime);
 }
 
 export async function prepareFutureSeriesEdit(sourceEvent) {
@@ -431,7 +434,7 @@ export async function updateEventSeries(sourceEvent, payload = {}, schedule = nu
     currentDocs.forEach((current, index) => {
       const before = futureEvents[index];
       const data = current.data();
-      if (!current.exists() || !isFutureSeriesEvent(data, now)
+      if (!current.exists() || !futureSeriesEvent(data, now)
         || data.eventDate !== before.eventDate || data.startTime !== before.startTime
         || (data.seriesId || data.recurringSeriesId) !== seriesId) {
         throw new Error('The remaining events have changed. Reopen Edit Series to refresh the schedule.');
@@ -457,7 +460,7 @@ export async function updateEventSeries(sourceEvent, payload = {}, schedule = nu
         } : {}),
         updatedAt: serverTimestamp(),
       };
-      if (!isFutureSeriesEvent({ ...currentDocs[index].data(), ...nextData }, now)) {
+      if (!futureSeriesEvent({ ...currentDocs[index].data(), ...nextData }, now)) {
         throw new Error('Every updated event must start in the future. Check the dates and start time.');
       }
       return { ref: refs[index], data: nextData };

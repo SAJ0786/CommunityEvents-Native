@@ -1,14 +1,20 @@
 // Kept identical in the app and lifecycle function; parity is regression-tested.
 const CITY_ZONES = { sydney: 'Australia/Sydney', melbourne: 'Australia/Melbourne', canberra: 'Australia/Sydney', brisbane: 'Australia/Brisbane', adelaide: 'Australia/Adelaide', hobart: 'Australia/Hobart', perth: 'Australia/Perth', darwin: 'Australia/Darwin' };
 const STATE_ZONES = { NSW: 'Australia/Sydney', VIC: 'Australia/Melbourne', ACT: 'Australia/Sydney', QLD: 'Australia/Brisbane', SA: 'Australia/Adelaide', TAS: 'Australia/Hobart', WA: 'Australia/Perth', NT: 'Australia/Darwin' };
-function isFutureSeriesEvent(event, now = new Date()) {
+function isFutureSeriesEvent(event, now = new Date(), catalogueCities = []) {
   if (!event || event.isLive === true || ['inactive', 'archived', 'deleted', 'cancelled'].includes(event.status)) return false;
   const date = String(event.eventDate || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const parsed = new Date(date + 'T00:00:00Z');
   if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return false;
-  const zone = CITY_ZONES[String(event.metroArea || event.city || '').toLowerCase()]
-    || STATE_ZONES[String(event.address?.state || '').toUpperCase()] || event.prayerTimeZone || 'Australia/Sydney';
+  const city = String(event.metroArea || event.city || '').toLowerCase();
+  const configured = catalogueCities.find(row => row.id === city);
+  // Unknown explicit cities must not be treated as Sydney in destructive series
+  // operations. Disabled city definitions still describe historical event times.
+  if (city && city !== 'rest-of-australia' && !configured && !CITY_ZONES[city]) return false;
+  const zone = configured?.timeZone || CITY_ZONES[city]
+    || STATE_ZONES[String(event.address?.state || '').toUpperCase()] || event.prayerTimeZone || (!city ? 'Australia/Sydney' : '');
+  if (!zone.startsWith('Australia/')) return false;
   try {
     const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
       timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',

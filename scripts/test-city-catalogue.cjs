@@ -94,7 +94,45 @@ test('offline cache, request deduplication, one-hour throttling and invalid-resp
 });
 test('server packages use the identical catalogue schema and classification implementation', () => {
   const source = read('src/utils/cities.js').replace(/\r\n/g, '\n').trim();
-  for (const codebase of ['functions-registration', 'functions-business-workflow']) {
+  for (const codebase of ['functions-registration', 'functions-business-workflow', 'functions-events', 'functions-lifecycle']) {
     assert.equal(read(`backend/${codebase}/cityCatalogue.mjs`).replace(/\r\n/g, '\n').trim(), source);
   }
+});
+
+test('server resolver preserves unknown IDs, uses new coordinates/aliases and rejects missing coordinates', () => {
+  const model = load('src/utils/cities.js'); const data = extended(model); const resolver = model.createCityResolver(data);
+  assert.equal(resolver.getUserCity({ defaultCity: 'darwin' }), 'darwin');
+  assert.equal(resolver.getUserCity({ defaultCity: 'future-city' }), 'future-city');
+  assert.equal(resolver.getEventMetroArea({ address: { suburb: 'Palmerston' } }), 'darwin');
+  assert.equal(resolver.cityLabel('darwin'), 'Darwin, Australia');
+  for (const latitude of [null, undefined, NaN, '', 0, -91]) {
+    const invalid = clone(data); invalid.cities.at(-1).latitude = latitude;
+    assert.throws(() => model.createCityResolver(invalid), /Invalid city catalogue/);
+  }
+  assert.equal(model.cityCode('darwin'), '—', 'resolver must not install global native state');
+});
+
+test('concurrent Events workers keep independent catalogue snapshots and fail closed on invalid configuration', async () => {
+  const model = load('src/utils/cities.js'); let data = extended(model);
+  const { createCityContext } = require('../backend/functions-events/cityContext');
+  const context = createCityContext({ collection: () => ({ doc: () => ({ get: async () => ({ exists: true, data: () => clone(data) }) }) }) });
+  let release; const pause = new Promise(resolve => { release = resolve; }); let started;
+  const entered = new Promise(resolve => { started = resolve; });
+  const first = context.run(async () => { started(); await pause; return context.cityLabel('darwin'); });
+  await entered; data.cities.at(-1).label = 'Updated Darwin';
+  const second = await context.run(async () => context.cityLabel('darwin'));
+  release(); assert.equal(await first, 'Darwin, Australia'); assert.equal(second, 'Updated Darwin');
+  data = { invalid: true }; let called = false;
+  await assert.rejects(context.run(() => { called = true; }), /Invalid city catalogue/);
+  assert.equal(called, false);
+});
+
+test('recurrence uses configured timezone and never substitutes Sydney for unknown explicit cities', () => {
+  const { isFutureSeriesEvent } = require('../src/utils/seriesScope');
+  assert.equal(read('src/utils/seriesScope.js').replace(/\r/g, ''), read('backend/functions-lifecycle/seriesScope.js').replace(/\r/g, ''));
+  const now = new Date('2026-10-15T14:00:00Z'); // Perth 22:00; Sydney already next day.
+  const event = { eventDate: '2026-10-15', startTime: '23:00', city: 'new-wa-city', status: 'active' };
+  assert.equal(isFutureSeriesEvent(event, now), false);
+  assert.equal(isFutureSeriesEvent(event, now, [{ id: 'new-wa-city', timeZone: 'Australia/Perth', enabled: false }]), true);
+  assert.equal(isFutureSeriesEvent(event, now, [{ id: 'new-wa-city', timeZone: 'invalid' }]), false);
 });

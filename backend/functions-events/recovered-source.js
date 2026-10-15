@@ -7,13 +7,17 @@ const fs         = require("fs");
 const path       = require("path");
 const sharp      = require("sharp");
 const { URL }    = require("url");
-const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
-const { onDocumentCreated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
-const { onSchedule }        = require("firebase-functions/v2/scheduler");
+const { onRequest: registerRequest, onCall: registerCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentCreated: registerCreated, onDocumentDeleted: registerDeleted } = require("firebase-functions/v2/firestore");
+const { onSchedule: registerSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret }      = require("firebase-functions/params");
 
 admin.initializeApp();
 const db = admin.firestore();
+const cityContext = require('./cityContext').createCityContext(db);
+const onRequest = cityContext.wrap(registerRequest), onCall = cityContext.wrap(registerCall);
+const onDocumentCreated = cityContext.wrap(registerCreated), onDocumentDeleted = cityContext.wrap(registerDeleted);
+const onSchedule = cityContext.wrap(registerSchedule);
 
 const REGION = "australia-southeast1";
 const SES_SNS_TOPIC_ARN = defineSecret("SES_SNS_TOPIC_ARN");
@@ -59,76 +63,7 @@ function invalidFcmTokenCodes(code) {
 }
 
 const DEFAULT_CITY = "sydney";
-const CITY_OPTIONS = [
-  "sydney",
-  "melbourne",
-  "canberra",
-  "brisbane",
-  "adelaide",
-  "hobart",
-  "perth",
-  "rest-of-australia",
-];
-const VALID_CITIES = new Set(CITY_OPTIONS);
-
-function normalizeCity(value) {
-  return VALID_CITIES.has(value) ? value : DEFAULT_CITY;
-}
-
-function cityLabel(value) {
-  const labels = {
-    sydney: "Sydney",
-    melbourne: "Melbourne",
-    canberra: "Canberra",
-    brisbane: "Brisbane",
-    adelaide: "Adelaide",
-    hobart: "Hobart",
-    perth: "Perth",
-    "rest-of-australia": "Rest of Australia",
-  };
-  return labels[normalizeCity(value)] || labels[DEFAULT_CITY];
-}
-
-function inPostcodeRanges(postcode, ranges) {
-  const value = Number(String(postcode || "").replace(/\D/g, ""));
-  if (!Number.isFinite(value)) return false;
-  return ranges.some(([from, to]) => value >= from && value <= to);
-}
-
-function classifyMetroArea(address = {}) {
-  const state = String(address.state || "").trim().toUpperCase();
-  const fullAddress = String(address.fullAddress || "").trim().toLowerCase();
-  const postcode = address.postcode || String(address.fullAddress || "").match(/\b\d{4}\b/)?.[0] || "";
-
-  if (inPostcodeRanges(postcode, [[2000, 2234], [2555, 2574], [2740, 2786]])) return "sydney";
-  if (inPostcodeRanges(postcode, [[3000, 3207], [3335, 3341], [3427, 3430], [3750, 3810], [3910, 3978]])) return "melbourne";
-  if (inPostcodeRanges(postcode, [[2600, 2620], [2900, 2920]])) return "canberra";
-  if (inPostcodeRanges(postcode, [[4000, 4207], [4300, 4305], [4500, 4520]])) return "brisbane";
-  if (inPostcodeRanges(postcode, [[5000, 5199], [5950, 5950]])) return "adelaide";
-  if (inPostcodeRanges(postcode, [[7000, 7055]])) return "hobart";
-  if (inPostcodeRanges(postcode, [[6000, 6214]])) return "perth";
-
-  if (state === "ACT" || fullAddress.includes(" act ")) return "canberra";
-  if (state === "VIC" || fullAddress.includes("vic")) return "melbourne";
-  if (state === "QLD" || fullAddress.includes("qld")) return "brisbane";
-  if (state === "SA" || fullAddress.includes(" sa ")) return "adelaide";
-  if (state === "TAS" || fullAddress.includes("tas")) return "hobart";
-  if (state === "WA" || fullAddress.includes(" wa ")) return "perth";
-  if (state === "NSW" || fullAddress.includes("nsw")) return "sydney";
-
-  return "rest-of-australia";
-}
-
-function getEventMetroArea(event = {}) {
-  if (VALID_CITIES.has(event.metroArea)) return event.metroArea;
-  const classified = classifyMetroArea(event.address || event);
-  if (classified !== "rest-of-australia") return classified;
-  return classified;
-}
-
-function getUserCity(user = {}) {
-  return normalizeCity(user.adminCity || user.defaultCity || DEFAULT_CITY);
-}
+const { normalizeCity, cityLabel, classifyMetroArea, getEventMetroArea, getUserCity } = cityContext;
 
 function normalizeRoleValue(role) {
   return String(role || "").trim().replace(/\s+/g, "").toLowerCase();
