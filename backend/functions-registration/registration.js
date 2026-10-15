@@ -1,4 +1,5 @@
 const { createHash, randomUUID } = require('node:crypto');
+const { enqueuePosterCleanup } = require('./posterMaintenance');
 const model = import('./formModel.mjs');
 const catalogueModel = import('./cityCatalogue.mjs');
 const venueModel = import('./privateVenue.mjs');
@@ -264,6 +265,20 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     // Unique objects ensure cleaning up a failed concurrent upload cannot delete
     // another request's committed poster, even when the bytes are identical.
     const path = `registration-private/${event.id}/${digest}-${randomUUID()}`;
+    // Enforce a per-member budget before writing any bytes. Stale revisions and
+    // revoked managers do not consume a slot. Quota + recovery intent are atomic.
+    await db.runTransaction(async tx => {
+      const currentActor = await actor(request, tx); const currentEvent = await readEvent(event.id, tx);
+      const rateRef = db.collection('registrationUploadLimits').doc(createHash('sha256').update(currentActor.uid).digest('hex'));
+      const rate = (await tx.get(rateRef)).data(); const time = now().getTime();
+      if (!manages(currentActor, currentEvent)) fail('permission-denied', 'You cannot change this poster.');
+      if (request.data.expectedRevision !== currentEvent.revision) fail('aborted', 'The event changed. Reload before updating its poster.');
+      const sameWindow = rate && Number.isFinite(rate.windowStart) && time >= rate.windowStart && time - rate.windowStart < 60 * 60 * 1000;
+      const count = sameWindow ? rate.count : 0;
+      if (count >= 10) fail('resource-exhausted', 'Too many poster uploads. Try again in an hour.');
+      tx.set(rateRef, { windowStart: sameWindow ? rate.windowStart : time, count: count + 1 });
+      enqueuePosterCleanup(db, tx, event.id, path, now());
+    });
     await bucket.file(path).save(bytes, { resumable: false, metadata: { contentType: mime, cacheControl: 'private, no-store' } });
     // Recheck role and revision after upload; never create a public/download-token URL.
     let previousPath; let nextRevision;
@@ -275,6 +290,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       previousPath = previous.data()?.posterPath; nextRevision = currentEvent.revision + 1;
       tx.set(privateRef(event.id), { posterPath: path, posterMime: mime }, { merge: true });
       tx.update(eventRef(event.id), { status: 'pending', revision: nextRevision });
+      if (previousPath && previousPath !== path) enqueuePosterCleanup(db, tx, event.id, previousPath, now());
     }); } catch (error) {
       await bucket.file(path).delete({ ignoreNotFound: true }).catch(() => {});
       throw error;
@@ -305,6 +321,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       previousPath = previous.data()?.posterPath; nextRevision = event.revision + 1;
       tx.set(privateRef(eventId), { posterPath: null, posterMime: null }, { merge: true });
       tx.update(eventRef(eventId), { revision: nextRevision, status: 'pending' });
+      if (previousPath) enqueuePosterCleanup(db, tx, eventId, previousPath, now());
     });
     if (previousPath?.startsWith(`registration-private/${eventId}/`)) await bucket.file(previousPath).delete({ ignoreNotFound: true }).catch(() => {});
     return { removed: true, revision: nextRevision, status: 'pending' };

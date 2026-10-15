@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "registrationPosterCleanup",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "state", "order": "ASCENDING" },
+        { "fieldPath": "notBefore", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

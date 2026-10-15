@@ -1,22 +1,24 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createRegistrationHandlers, localMinute } = require('../backend/functions-registration/registration');
+const { createPosterMaintenance, GRACE_MS } = require('../backend/functions-registration/posterMaintenance');
 class HttpsError extends Error { constructor(code, message) { super(message); this.code = code; } }
 function fixture() {
   const records = new Map(); let sequence = 0; let queue = Promise.resolve();
-  const files = new Map(); let onDownload;
+  const files = new Map(); let onDownload; let onDelete; let onSave;
+  let clock = Date.parse('2026-11-01T00:00:00Z');
   const bucket = { file: path => ({
-    save: async (bytes, options) => files.set(path, { bytes: Buffer.from(bytes), options }),
-    delete: async () => { files.delete(path); },
+    save: async (bytes, options) => { if (onSave) await onSave(); files.set(path, { bytes: Buffer.from(bytes), options }); },
+    delete: async () => { if (onDelete) await onDelete(); files.delete(path); },
     download: async () => { const bytes = files.get(path)?.bytes; if (onDownload) await onDownload(); if (!bytes) throw Error('No object'); return [bytes]; },
   }) };
-  const snap = ref => ({ exists: records.has(ref.path), id: ref.id, data: () => records.has(ref.path) ? structuredClone(records.get(ref.path)) : undefined });
-  const collection = (path, filters = [], maximum = Infinity, cursor = '') => ({
+  const snap = ref => ({ exists: records.has(ref.path), id: ref.id, ref, data: () => records.has(ref.path) ? structuredClone(records.get(ref.path)) : undefined });
+  const collection = (path, filters = [], maximum = Infinity, cursor = '', order = '__name__') => ({
     doc: value => reference(`${path}/${value || `auto-${++sequence}`}`),
-    where: (field, operator, value) => { assert.equal(operator, '=='); return collection(path, [...filters, [field, value]], maximum, cursor); },
-    orderBy: field => { assert.equal(field, '__name__'); return collection(path, filters, maximum, cursor); },
-    limit: value => collection(path, filters, value, cursor), startAfter: value => collection(path, filters, maximum, value),
-    get: async () => ({ docs: [...records.keys()].filter(key => key.startsWith(`${path}/`) && key.slice(path.length + 1).indexOf('/') === -1 && key.slice(path.length + 1) > cursor && filters.every(([field, value]) => records.get(key)[field] === value)).sort().slice(0, maximum).map(key => snap(reference(key))) }),
+    where: (field, operator, value) => { assert.ok(['==', '<='].includes(operator)); return collection(path, [...filters, [field, value, operator]], maximum, cursor, order); },
+    orderBy: field => collection(path, filters, maximum, cursor, field),
+    limit: value => collection(path, filters, value, cursor, order), startAfter: value => collection(path, filters, maximum, value, order),
+    get: async () => ({ docs: [...records.keys()].filter(key => key.startsWith(`${path}/`) && key.slice(path.length + 1).indexOf('/') === -1 && key.slice(path.length + 1) > cursor && filters.every(([field, value, op]) => op === '==' ? records.get(key)[field] === value : records.get(key)[field] <= value)).sort((a, b) => String(order === '__name__' ? a : records.get(a)[order]).localeCompare(String(order === '__name__' ? b : records.get(b)[order]))).slice(0, maximum).map(key => snap(reference(key))) }),
   });
   const reference = path => ({ path, id: path.split('/').at(-1), get: async () => snap(reference(path)), collection: name => collection(`${path}/${name}`) });
   const db = { collection, runTransaction(fn) {
@@ -26,20 +28,65 @@ function fixture() {
       const result = await fn({ get: async ref => { assert.equal(writing, false, 'all reads must precede writes'); return snap(ref); },
         set: (ref, data, options) => { writing = true; writes.push(() => records.set(ref.path, options?.merge ? { ...records.get(ref.path), ...structuredClone(data) } : structuredClone(data))); },
         update: (ref, data) => { writing = true; writes.push(() => records.set(ref.path, { ...records.get(ref.path), ...structuredClone(data) })); },
+        delete: ref => { writing = true; writes.push(() => records.delete(ref.path)); },
       });
       writes.forEach(write => write()); return result;
     });
     queue = promise.catch(() => {}); return promise;
   } };
   for (const [uid, role, city] of [['host','user','sydney'], ['member','user','sydney'], ['other','user','sydney'], ['admin','admin','sydney'], ['wrongadmin','admin','perth'], ['super','superAdmin','perth']]) records.set(`users/${uid}`, { fullName: 'Test User', email: 'test@example.com', isActive: true, accountStatus: 'active', role, adminCity: city });
-  const handlers = createRegistrationHandlers({ db, bucket, HttpsError, now: () => new Date('2026-11-01T00:00:00Z'), enabled: () => true });
+  const handlers = createRegistrationHandlers({ db, bucket, HttpsError, now: () => new Date(clock), enabled: () => true });
+  const sweep = createPosterMaintenance({ db, bucket, now: () => new Date(clock), enabled: () => true });
   const request = (uid, data) => ({ auth: uid ? { uid, token: { firebase: { sign_in_provider: 'phone' } } } : null, data });
   const draft = { title: 'Synthetic event', eventType: 'Custom', customEventType: 'Workshop', city: 'sydney', date: '2026-12-01', suburb: 'Parramatta', address: '1 Synthetic Lane', notes: 'Public notes', capacity: 3, closes: '2026-11-30T18:00', allowCancellation: true, purpose: 'Arrange attendance', fields: [{ id: 'name', type: 'text', label: 'Name', required: true, options: [], description: '' }, { id: 'consent', type: 'consent', label: 'I agree', terms: 'Arrive on time', required: true, options: [], description: '' }] };
   const create = () => handlers.saveRegistrationEvent(request('host', { city: 'sydney', createKey: 'create-one', draft }));
   const approve = event => handlers.approveRegistrationEvent(request('admin', { eventId: event.eventId, expectedRevision: event.revision }));
   const submit = (event, uid = 'member', overrides = {}) => handlers.submitEventRegistration(request(uid, { eventId: event.eventId, formVersion: 1, expectedRevision: 0, requestId: 'request-1', places: 2, answers: { name: 'Synthetic', consent: true }, ...overrides }));
-  return { records, files, onDownload: callback => { onDownload = callback; }, handlers, request, draft, create, approve, submit, db };
+  return { records, files, onDownload: callback => { onDownload = callback; }, onDelete: callback => { onDelete = callback; }, onSave: callback => { onSave = callback; }, advance: ms => { clock += ms; }, sweep, handlers, request, draft, create, approve, submit, db };
 }
+
+test('poster quota is atomic, private uploads have recovery intents and stale managers cannot spend quota', async () => {
+  const f = fixture(); const event = await f.create();
+  const data = { eventId: event.eventId, mime: 'image/jpeg', base64: Buffer.from([255,216,255,0]).toString('base64') };
+  for (let revision = 1; revision <= 10; revision++) await f.handlers.putRegistrationPoster(f.request('host', { ...data, expectedRevision: revision }));
+  await assert.rejects(f.handlers.putRegistrationPoster(f.request('host', { ...data, expectedRevision: 11 })), { code: 'resource-exhausted' });
+  assert.equal([...f.records.keys()].filter(key => key.startsWith('registrationPosterCleanup/')).length, 10);
+  assert.equal(f.files.size, 1);
+  f.advance(3600000);
+  await f.handlers.putRegistrationPoster(f.request('host', { ...data, expectedRevision: 11 }));
+  assert.equal([...f.records.values()].find(value => value.windowStart)?.count, 1);
+  await assert.rejects(f.handlers.putRegistrationPoster(f.request('host', { ...data, expectedRevision: 1 })), { code: 'aborted' });
+  assert.equal([...f.records.values()].find(value => value.windowStart)?.count, 1);
+});
+
+test('durable cleanup preserves referenced posters and retries failed deletes after replacement', async () => {
+  const f = fixture(); const event = await f.create();
+  const data = { eventId: event.eventId, mime: 'image/jpeg', base64: Buffer.from([255,216,255,0]).toString('base64') };
+  await f.handlers.putRegistrationPoster(f.request('host', { ...data, expectedRevision: 1 }));
+  assert.equal((await f.sweep()).examined, 0, 'grace window protects in-flight uploads');
+  f.advance(GRACE_MS + 1);
+  assert.equal((await f.sweep()).retained, 1); assert.equal(f.files.size, 1);
+  f.onDelete(() => { throw Error('Synthetic storage outage'); });
+  await f.handlers.putRegistrationPoster(f.request('host', { ...data, expectedRevision: 2 }));
+  assert.equal(f.files.size, 2, 'failed immediate cleanup remains queued');
+  f.advance(GRACE_MS + 1);
+  const failed = await f.sweep(); assert.equal(failed.deferred, 1); assert.equal(failed.retained, 1);
+  assert.equal(f.files.size, 2);
+  f.onDelete(null); f.advance(3600000);
+  assert.equal((await f.sweep()).removed, 1); assert.equal(f.files.size, 1);
+  assert.equal((await f.sweep()).examined, 0);
+});
+
+test('failed upload has a cleanup intent; malformed paths never delete outside private event prefix', async () => {
+  const f = fixture(); const event = await f.create();
+  f.onSave(() => { throw Error('Synthetic upload failure'); });
+  await assert.rejects(f.handlers.putRegistrationPoster(f.request('host', { eventId: event.eventId, expectedRevision: 1, mime: 'image/jpeg', base64: Buffer.from([255,216,255,0]).toString('base64') })), /upload failure/);
+  assert.equal([...f.records.keys()].filter(key => key.startsWith('registrationPosterCleanup/')).length, 1);
+  f.records.set('registrationPosterCleanup/bad', { eventId: event.eventId, path: 'public/keep', state: 'pending', notBefore: '2000-01-01T00:00:00Z' });
+  f.files.set('public/keep', {}); f.advance(GRACE_MS + 1);
+  const result = await f.sweep(); assert.equal(result.failed, 1); assert.equal(result.removed, 1); assert.equal(f.files.has('public/keep'), true);
+  assert.equal(f.records.get('registrationPosterCleanup/bad').state, 'failed');
+});
 
 test('discovery is city scoped, private-data free, paginated across filtered rows and review is authorised', async () => {
   const f = fixture(); const event = await f.create();

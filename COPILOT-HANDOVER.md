@@ -1,6 +1,6 @@
 # Community Connect Australia — Copilot / next-agent handover
 
-Last checkpoint: 15 October 2026, Australia/Sydney. Work is in progress.
+Last checkpoint: 16 October 2026, Australia/Sydney. Work is in progress.
 Read this file, root AGENTS.md and RELEASE-READINESS-2026-10-14.md before coding.
 This is a continuation brief, not permission to deploy or publish.
 
@@ -180,10 +180,25 @@ native binaries. Azaan currently refreshes when prayer panel opens; verify on up
   123-file source parse passed. Firestore emulator script
   passed as described above. Add `node --test scripts/test-registration-integration.cjs`
   to the command list. These are not mounted React Native interaction tests.
-- Asked user whether date/venue/form changes after bookings should require reapproval
-  plus attendee notification (recommended) or be locked. Await answer before changing
-  lifecycle policy. Current candidate already sets edits pending; notifications and
-  organiser cancellation are not complete. Consent boxes reset on attendee edit.
+- USER DECISION, 16 October: do not involve admins in organiser edits to an already
+  approved event. If registration fields change, email AND push all existing attendees
+  asking them to review/edit their registration. Initial approval remains unchanged.
+  This decision has been sent to the web chat. IMPLEMENTATION STILL REQUIRED:
+  current candidate sets edits/poster changes pending. Preserve approval for approved
+  edits, detect actual form changes, version forms accordingly, create durable
+  idempotent delivery jobs, recheck active registrations before sending, and add
+  notification deep links. Never include private answers/address in notifications.
+  Review editing after closing: an attendee must actually be able to respond to the
+  update request without reopening new registrations or increasing occupied seats.
+  Update host confirmation copy too. Consent boxes already reset on attendee edit.
+- Poster safety checkpoint: per-user 10 uploads/hour quota, durable cleanup intent
+  before upload, 24-hour grace, referenced-object protection, leased retries and
+  bounded cleanup batches implemented in candidate functions. Candidate composite
+  index is separate; merge only during approved release. No production deployment.
+  Storage operations remain mocked in these tests; real Storage acceptance pending.
+  Checkpoint verification: 39 combined backend/venue/city/promotion/integration
+  tests passed, candidate entry/maintenance syntax checks and git diff --check passed.
+- Last verified native baseline before this checkpoint: bf4e5d2142fbca8ad80c25e7b17b85149fad6ea1.
 - Next: production lifecycle/security (upload limits/cleanup, account deletion,
   host cancellation/re-consent policy), PWA parity, dynamic-city worker migration,
   nationwide promotions, then release/device acceptance. No builds/deployments.
