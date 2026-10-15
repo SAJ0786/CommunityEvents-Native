@@ -181,12 +181,43 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (event.status !== 'approved' && !manager && !registered) fail('not-found', 'Event not available.');
       const form = await tx.get(formRef(event.id));
       const details = await tx.get(privateRef(event.id));
-      const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), id: event.id, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
+      const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), id: event.id, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
+      result.canApprove = Boolean(caller && approves(caller, event));
+      result.canRegister = event.status === 'approved' && localMinute(now(), event.timeZone) < (event.closes || `${event.date}T00:00`);
+      result.canCancel = Boolean(registered && event.allowCancellation && localMinute(now(), event.timeZone).slice(0, 10) < event.date);
       result.retention = RETENTION;
       if (manager) result.event.registrationCount = event.registrationCount;
       if (manager || registered) result.privateDetails = { address: details.data()?.address || '', venue: (await venueModel).normalisePrivateVenue(details.data()?.venue), hasPoster: Boolean(details.data()?.posterPath) };
       return result;
     });
+  }
+  async function listRegistrationEvents(request) {
+    gate();
+    const scope = request.data?.scope || 'public';
+    if (!['public', 'mine', 'review'].includes(scope)) fail('invalid-argument', 'Choose a valid event list.');
+    const caller = scope === 'public' ? null : await actor(request);
+    const city = scope === 'mine' ? null : id(request.data?.city);
+    if (scope === 'review' && !approves(caller, { city })) fail('permission-denied', 'You cannot review this city.');
+    // One equality + document ID order uses a bounded page; filtering MUST NOT
+    // move the cursor to the last visible row or pending rows could cause loops.
+    let query = db.collection('registrationEvents').where(scope === 'mine' ? 'ownerUid' : 'city', '==', scope === 'mine' ? caller.uid : city).orderBy('__name__').limit(25);
+    if (request.data?.cursor) query = query.startAfter(id(request.data.cursor));
+    const page = await query.get(); const events = [];
+    for (const doc of page.docs) {
+      const event = doc.data();
+      if (scope === 'public' && (event.status !== 'approved' || event.date < localMinute(now(), event.timeZone).slice(0, 10))) continue;
+      if (scope === 'review' && event.status !== 'pending') continue;
+      // Re-read through the transactional detail policy to handle approval/access
+      // changes during pagination. Only the public allowlist leaves this endpoint.
+      try {
+        const result = await getRegistrationEvent({ ...request, data: { eventId: doc.id } });
+        if (scope === 'public' && result.event.status !== 'approved') continue;
+        if (scope === 'review' && (!result.canApprove || result.event.status !== 'pending')) continue;
+        const { registrationCount, ...publicCard } = result.event;
+        events.push(publicCard);
+      } catch (error) { if (error.code !== 'not-found') throw error; }
+    }
+    return { events, nextCursor: page.docs.length === 25 ? page.docs.at(-1).id : null };
   }
   async function listEventRegistrations(request) {
     const caller = await actor(request); const event = await readEvent(request.data?.eventId);
@@ -296,6 +327,6 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const snapshot = await query.get();
     return { templates: snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })), nextCursor: snapshot.docs.length === 50 ? snapshot.docs.at(-1).id : null };
   }
-  return { saveRegistrationEvent, approveRegistrationEvent, submitEventRegistration, cancelEventRegistration, getRegistrationEvent, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
+  return { saveRegistrationEvent, approveRegistrationEvent, submitEventRegistration, cancelEventRegistration, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
 }
 module.exports = { createRegistrationHandlers, localMinute, active, manages, approves };

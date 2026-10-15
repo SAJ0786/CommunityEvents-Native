@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, shadow, spacing } from '../theme';
 import MemberPageHeader from './MemberPageHeader';
 
-export default function AddEventChoice({ canCreateRecurring, onChoose, registrationPreviewEnabled = false }) {
+export default function AddEventChoice({ canCreateRecurring, onChoose, registrationPreviewEnabled = false, registrationEnabled = false }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.card}>
@@ -43,9 +43,9 @@ export default function AddEventChoice({ canCreateRecurring, onChoose, registrat
             {!canCreateRecurring ? <Text style={styles.adminOnly}>Admin only</Text> : null}
           </View>
         </Pressable>
-        {registrationPreviewEnabled && <Pressable accessibilityRole="button" onPress={() => onChoose('registration-preview')} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
+        {(registrationPreviewEnabled || registrationEnabled) && <Pressable accessibilityRole="button" onPress={() => onChoose(registrationEnabled ? 'registration' : 'registration-preview')} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
           <View style={styles.choiceIconWrap}><Text style={styles.choiceIcon}>📋</Text></View>
-          <View style={styles.choiceText}><Text style={styles.choiceEyebrow}>Development preview</Text><Text style={styles.choiceTitle}>Registration only events</Text><Text style={styles.choiceDescription}>Create an event that requires registration, customise your form and manage attendees.</Text><Text style={styles.choiceMeta}>Demo only. No live event or booking will be created.</Text></View>
+          <View style={styles.choiceText}><Text style={styles.choiceEyebrow}>{registrationEnabled ? 'Registration required' : 'Development preview'}</Text><Text style={styles.choiceTitle}>Registration only events</Text><Text style={styles.choiceDescription}>Create an event that requires registration, customise your form and manage attendees.</Text><Text style={styles.choiceMeta}>{registrationEnabled ? 'Full venue details and poster are private to registered attendees and authorised managers.' : 'Demo only. No live event or booking will be created.'}</Text></View>
         </Pressable>}
       </View>
     </ScrollView>

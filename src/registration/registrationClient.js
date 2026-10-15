@@ -7,6 +7,7 @@ export function createRegistrationClient(call, { enabled = false } = {}) {
     return response.data;
   }
   return Object.freeze({
+    list: ({ scope = 'public', city, cursor = null } = {}) => invoke('listRegistrationEvents', { scope, ...(city ? { city } : {}), cursor }),
     load: eventId => invoke('getRegistrationEvent', { eventId }),
     save: ({ eventId, city, expectedRevision, createKey, draft }) => {
       const { poster, ...details } = draft;

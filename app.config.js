@@ -55,6 +55,9 @@ export default ({ config }) => ({
   },
   extra: {
     ...(config.extra || {}),
+    // Opt in only for a reviewed test/release environment with deployed prerequisites.
+    // No EAS profile enables this while registration security/device gates are open.
+    eventRegistrationEnabled: process.env.EVENT_REGISTRATION_CLIENT_ENABLED === 'true',
     androidCertificateSha1,
     appCheckProvider,
     ...(appCheckDebugToken ? { appCheckDebugToken } : {}),

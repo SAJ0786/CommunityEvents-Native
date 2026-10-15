@@ -20,6 +20,11 @@ async function run() {
   assert.equal((await handlers.listRegistrationTemplates(request('host', {}))).templates.length, 1);
   assert.equal((await handlers.listRegistrationTemplates(request('alice', {}))).templates.length, 0, 'Templates must be account-scoped');
   await handlers.approveRegistrationEvent(request('admin', { eventId: event.eventId, expectedRevision: 1 }));
+  const discovery = await handlers.listRegistrationEvents(request(null, { scope: 'public', city: 'sydney' }));
+  assert.equal(discovery.events.length, 1);
+  assert.equal(JSON.stringify(discovery).includes('Synthetic Lane'), false);
+  assert.equal((await handlers.listRegistrationEvents(request('host', { scope: 'mine' }))).events.length, 1);
+  await assert.rejects(handlers.listRegistrationEvents(request('alice', { scope: 'review', city: 'sydney' })), { code: 'permission-denied' });
   const payload = { eventId: event.eventId, requestId: 'booking-1', expectedRevision: 0, places: 1, formVersion: 1, answers: { name: 'Fictional person' } };
   const outcomes = await Promise.allSettled(['alice', 'bob'].map(uid => handlers.submitEventRegistration(request(uid, payload))));
   assert.equal(outcomes.filter(result => result.status === 'fulfilled').length, 1, 'Firestore transactions must prevent overselling');

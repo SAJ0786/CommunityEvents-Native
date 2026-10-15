@@ -52,6 +52,14 @@ Only project `demo-registration-20261012` and emulator `127.0.0.1:8398` are acce
 
 ## Still required before rollout
 
+15 October: native RegistrationScreen/Editor now connect the adapter behind the
+disabled EVENT_REGISTRATION_CLIENT_ENABLED build flag. listRegistrationEvents is
+a bounded city/owner/scoped-review endpoint; public list cards omit private fields.
+New detail action flags are server-derived. Five native contract/view-model tests,
+16 backend tests and the isolated Firestore emulator script pass. Native UI/device,
+Storage/App Check and merged-rules acceptance remain pending. See COPILOT-HANDOVER.md
+for current commands and the Firebase CLI post-test update-check warning.
+
 1. Connect production host/attendee screens, discovery and event-card routing to the adapters. Current demo screens remain memory-only and native entry stays development-only.
 2. Complete address-autocomplete integration and shared dynamic Add Event options. The preview asks the host to confirm the public suburb separately.
 3. Verify poster remove/replacement cleanup against Storage emulator; finish orphan sweep/retry monitoring, upload rate limits, callable App Check/auth integration and organiser-controlled retention/account deletion.

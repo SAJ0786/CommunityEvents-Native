@@ -11,7 +11,13 @@ function fixture() {
     download: async () => { const bytes = files.get(path)?.bytes; if (onDownload) await onDownload(); if (!bytes) throw Error('No object'); return [bytes]; },
   }) };
   const snap = ref => ({ exists: records.has(ref.path), id: ref.id, data: () => records.has(ref.path) ? structuredClone(records.get(ref.path)) : undefined });
-  const collection = path => ({ doc: value => reference(`${path}/${value || `auto-${++sequence}`}`) });
+  const collection = (path, filters = [], maximum = Infinity, cursor = '') => ({
+    doc: value => reference(`${path}/${value || `auto-${++sequence}`}`),
+    where: (field, operator, value) => { assert.equal(operator, '=='); return collection(path, [...filters, [field, value]], maximum, cursor); },
+    orderBy: field => { assert.equal(field, '__name__'); return collection(path, filters, maximum, cursor); },
+    limit: value => collection(path, filters, value, cursor), startAfter: value => collection(path, filters, maximum, value),
+    get: async () => ({ docs: [...records.keys()].filter(key => key.startsWith(`${path}/`) && key.slice(path.length + 1).indexOf('/') === -1 && key.slice(path.length + 1) > cursor && filters.every(([field, value]) => records.get(key)[field] === value)).sort().slice(0, maximum).map(key => snap(reference(key))) }),
+  });
   const reference = path => ({ path, id: path.split('/').at(-1), get: async () => snap(reference(path)), collection: name => collection(`${path}/${name}`) });
   const db = { collection, runTransaction(fn) {
     // Serial execution models transaction retries: each concurrent request sees committed capacity.
@@ -34,6 +40,31 @@ function fixture() {
   const submit = (event, uid = 'member', overrides = {}) => handlers.submitEventRegistration(request(uid, { eventId: event.eventId, formVersion: 1, expectedRevision: 0, requestId: 'request-1', places: 2, answers: { name: 'Synthetic', consent: true }, ...overrides }));
   return { records, files, onDownload: callback => { onDownload = callback; }, handlers, request, draft, create, approve, submit, db };
 }
+
+test('discovery is city scoped, private-data free, paginated across filtered rows and review is authorised', async () => {
+  const f = fixture(); const event = await f.create();
+  const list = (uid, scope, city = 'sydney', cursor = null) => f.handlers.listRegistrationEvents(f.request(uid, { scope, city, cursor }));
+  assert.equal((await list(null, 'public')).events.length, 0);
+  assert.equal((await list('host', 'mine')).events.length, 1);
+  assert.equal((await list('other', 'mine')).events.length, 0);
+  assert.equal((await list('admin', 'review')).events.length, 1);
+  await assert.rejects(list('wrongadmin', 'review'), { code: 'permission-denied' });
+  await assert.rejects(list(null, 'mine'), { code: 'unauthenticated' });
+  await f.approve(event);
+  const publicPage = await list(null, 'public'); assert.equal(publicPage.events.length, 1);
+  assert.equal((await list(null, 'public', 'perth')).events.length, 0);
+  assert.equal(JSON.stringify(publicPage).includes('Synthetic Lane'), false);
+  assert.equal(publicPage.events[0].ownerUid, undefined);
+  assert.equal(publicPage.events[0].registrationCount, undefined);
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('admin', { eventId: event.eventId }))).canApprove, true);
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('host', { eventId: event.eventId }))).canApprove, false);
+  await f.submit(event);
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('member', { eventId: event.eventId }))).canCancel, true);
+  const row = f.records.get(`registrationEvents/${event.eventId}`);
+  for (let i = 0; i < 26; i++) f.records.set(`registrationEvents/000-${String(i).padStart(2, '0')}`, { ...row, status: 'pending' });
+  const first = await list(null, 'public'); assert.equal(first.events.length, 0); assert.equal(first.nextCursor, '000-24');
+  const second = await list(null, 'public', 'sydney', first.nextCursor); assert.equal(second.events.length, 1); assert.equal(second.nextCursor, null);
+});
 
 test('venue coordinates are private, validated, cleared on text-only edit and included in retry identity', async () => {
   const f = fixture();

@@ -43,6 +43,8 @@ import BottomNavigation from './src/components/BottomNavigation';
 import BulkShareScreen from './src/components/BulkShareScreen';
 import AddEventChoice from './src/components/AddEventChoice';
 import RegistrationPrototypeScreen from './src/components/RegistrationPrototypeScreen';
+import RegistrationScreen from './src/components/RegistrationScreen';
+import { REGISTRATION_ENABLED } from './src/registration/firebaseRegistration';
 import CalendarScreen from './src/components/CalendarScreen';
 import CreateEventForm from './src/components/CreateEventForm';
 import CitySelector from './src/components/CitySelector';
@@ -1249,6 +1251,7 @@ function MainApp() {
 
   const renderHeader = () => (
     <View style={[styles.contentHeader, compactEventsLayout && styles.contentHeaderCompact]}>
+      {REGISTRATION_ENABLED && <Pressable accessibilityRole="button" onPress={() => setActiveTab('registration')} style={{ padding: spacing.md, backgroundColor: colors.tealSoft, borderRadius: radius.md }}><Text style={{ color: colors.tealDark, fontWeight: '700' }}>Browse registration only events</Text></Pressable>}
       <View style={[styles.titleRow, compactEventsLayout && styles.titleRowCompact]}>
         <View style={styles.titleCopy}>
           <Text maxFontSizeMultiplier={1.08} style={styles.sectionEyebrow}>DISCOVER WHAT'S ON</Text>
@@ -1421,6 +1424,8 @@ function MainApp() {
           initialFilter={directoryFilter}
           onInitialFilterConsumed={() => setDirectoryFilter(null)}
         />
+      ) : REGISTRATION_ENABLED && activeTab === 'registration' ? (
+        <RegistrationScreen key={`${currentUser?.uid || 'guest'}-${selectedCity}`} enabled user={currentUser} profile={profile} city={selectedCity} onBack={() => setActiveTab('home')} onRequireSignIn={requestSignIn} />
       ) : activeTab === 'home' && homeViewMode === 'map' ? (
         <ScrollView contentContainerStyle={styles.mapScrollContent} nestedScrollEnabled>
           <View style={styles.mapHeader}>{renderHeader()}</View>
@@ -1523,9 +1528,12 @@ function MainApp() {
       ) : activeTab === 'create' && !editingEvent && !createMode ? (
         <AddEventChoice
           registrationPreviewEnabled={__DEV__}
+          registrationEnabled={REGISTRATION_ENABLED}
           canCreateRecurring={profile?.role === 'admin' || profile?.role === 'superAdmin'}
           onChoose={setCreateMode}
         />
+      ) : REGISTRATION_ENABLED && activeTab === 'create' && createMode === 'registration' ? (
+        <RegistrationScreen key={`${currentUser?.uid || 'guest'}-${selectedCity}`} enabled initialCreate user={currentUser} profile={profile} city={selectedCity} onBack={() => setCreateMode('')} onRequireSignIn={requestSignIn} />
       ) : __DEV__ && activeTab === 'create' && createMode === 'registration-preview' ? (
         <RegistrationPrototypeScreen onBack={() => setCreateMode('')} />
       ) : activeTab === 'create' && createMode === 'recurring' && (!editingEvent || editingEvent.__editSeries) ? (

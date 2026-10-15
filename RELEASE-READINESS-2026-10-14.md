@@ -2,6 +2,16 @@
 
 **Not yet ready for a test build. No build or production deployment started.**
 
+15 October checkpoint: see COPILOT-HANDOVER.md for the current continuation plan.
+Native registration callable-connected screens and bounded discovery/review list
+are now coded behind a disabled build gate, including address picker, private
+maps/poster, host/attendee confirmations, edits, cancellation, templates and response
+management. Not yet device-accepted or deployed. PWA integration remains separate.
+Java 21 was found in Android Studio JBR; the isolated Firestore test script passed
+with the latest erasure/discovery changes. CLI post-test update check failed; merged
+rules/Storage/App Check acceptance remain open. Older blockers below are historical
+where superseded here. Prayer timezone and naming checkpoint is in 6f062c4.
+
 Native repository: SAJ0786/CommunityEvents-Native, branch main. This checkout is
 the canonical native source; no additional source folder was created.
 
