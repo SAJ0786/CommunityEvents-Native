@@ -40,7 +40,7 @@ This is a continuation brief, not permission to deploy or publish.
 
 ## Verified baseline before this continuation
 
-Native local and GitHub main verified equal at `6f062c44560c534ba97354ed8d74e4accd34986a`.
+Baseline before the current lifecycle checkpoint: local/GitHub main equal at `5d870c38563640490f7d8af5ed5fee89370996b1`.
 No new native build or production deployment was made. Latest completed changes:
 
 - `db01c17`: mandatory full name/contact email completion; newest-first joining
@@ -119,9 +119,10 @@ integration, not a physical-device/UI acceptance pass or a finished release.
   edit/cancel/confirm, public discovery/cards, approval and response management.
 - [ ] Wire real private address picker/maps/navigation and poster lifecycle into UI;
   dynamic event-type inheritance; retention and re-consent notices.
-- [ ] Safe form/event changes after bookings, organiser cancellation and notifications;
-  upload rate limits, durable orphan cleanup/retries, complete account/privacy deletion.
-  These policies are not all final; ask for consequential product decisions.
+- [ ] Account/privacy deletion lifecycle. User confirmed organiser account deletion
+  must cancel upcoming events and notify attendees (16 October). Attendee
+  cancellation erasure, host event cancellation, change notices, upload rate limits
+  and durable orphan cleanup are coded; production/device acceptance is still open.
 - [ ] Complete dynamic-city consumers, especially recovered event-notification backend,
   recurrence and PWA. Old clients still have bundled lists. No live city activation yet.
 - [ ] Local vs Australia-wide promotion request/admin approval, preference-aware
@@ -183,14 +184,34 @@ native binaries. Azaan currently refreshes when prayer panel opens; verify on up
 - USER DECISION, 16 October: do not involve admins in organiser edits to an already
   approved event. If registration fields change, email AND push all existing attendees
   asking them to review/edit their registration. Initial approval remains unchanged.
-  This decision has been sent to the web chat. IMPLEMENTATION STILL REQUIRED:
-  current candidate sets edits/poster changes pending. Preserve approval for approved
-  edits, detect actual form changes, version forms accordingly, create durable
-  idempotent delivery jobs, recheck active registrations before sending, and add
-  notification deep links. Never include private answers/address in notifications.
-  Review editing after closing: an attendee must actually be able to respond to the
-  update request without reopening new registrations or increasing occupied seats.
-  Update host confirmation copy too. Consent boxes already reset on attendee edit.
+  Implemented in candidate code: edits/poster changes preserve approval; unchanged
+  forms preserve formVersion; actual field/purpose changes version the form. Atomic
+  registrationChanges outbox records form/date/venue changes without private data.
+  Worker fans out to registrationNoticeDeliveries with email/push per current member;
+  rechecks active account, cancelled/replaced booking and already-reviewed form.
+  Sending claims avoid duplicate retries; uncertain/interrupted provider outcomes
+  become review-required for operator follow-up rather than automatic resend.
+  SMTP delivery uses existing secret names; new candidate package lock adds nodemailer.
+  EVENT_REGISTRATION_NOTICES_ENABLED is an additional OFF-by-default gate. No sends
+  or deployments performed. Production indexes are candidates only, not merged.
+  Native push routes require correct recipient and feature gate, then load via callable.
+  Email provides My registrations instructions (no unverified universal-link URL).
+  Existing attendees can edit/reduce places until event day after closing; no new,
+  reopened or increased bookings. Form changes with attendees blocked on event day.
+  Host copy and attendee review notice updated; consent resets remain in place.
+- Host cancellation implemented: cancelRegistrationEvent with role/revision/explicit
+  confirmation, idempotent result, non-reopenable cancelled status, released places,
+  no attendee private-venue/poster access and cancellation email/push outbox. Answers
+  remain until organiser/attendee deletes them. Attendees may erase answers even
+  after event cancellation. New list scope attending uses server-only per-member
+  index registrationMemberEvents/{uid}/events; returns public projection only.
+  Native My registrations exposes those events even when no longer publicly listed.
+- Lifecycle checkpoint verification: 26 backend / 46 combined tests passed, 123-file source parse
+  passed. Before adding host cancellation, all 14 regressions
+  passed. Real isolated Firestore test passed approved-edit and concurrent outbox
+  checks with MOCK email/push. Firebase CLI wrapper still fails its update check
+  AFTER test success. Actual SMTP/FCM, Node 22 runtime, Storage and device acceptance
+  remain required; local test runtime was Node 24. No production writes.
 - Poster safety checkpoint: per-user 10 uploads/hour quota, durable cleanup intent
   before upload, 24-hour grace, referenced-object protection, leased retries and
   bounded cleanup batches implemented in candidate functions. Candidate composite
@@ -199,6 +220,6 @@ native binaries. Azaan currently refreshes when prayer panel opens; verify on up
   Checkpoint verification: 39 combined backend/venue/city/promotion/integration
   tests passed, candidate entry/maintenance syntax checks and git diff --check passed.
 - Last verified native baseline before this checkpoint: bf4e5d2142fbca8ad80c25e7b17b85149fad6ea1.
-- Next: production lifecycle/security (upload limits/cleanup, account deletion,
-  host cancellation/re-consent policy), PWA parity, dynamic-city worker migration,
+- Next: production lifecycle/security (account deletion, delivery operational review,
+  merged rules/Storage/App Check), PWA parity, dynamic-city worker migration,
   nationwide promotions, then release/device acceptance. No builds/deployments.

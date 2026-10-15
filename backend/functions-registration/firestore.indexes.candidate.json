@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "registrationNoticeDeliveries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "state", "order": "ASCENDING" },
+        { "fieldPath": "startedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "registrationPosterCleanup",
       "queryScope": "COLLECTION",
       "fields": [

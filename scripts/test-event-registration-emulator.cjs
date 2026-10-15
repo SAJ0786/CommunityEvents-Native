@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { createRequire } = require('node:module');
 const path = require('node:path');
 const { createRegistrationHandlers } = require('../backend/functions-registration/registration');
+const { createChangeNotifications } = require('../backend/functions-registration/changeNotifications');
 const dependency = createRequire(path.join(__dirname, '../backend/functions-lifecycle/package.json'));
 const admin = dependency('firebase-admin');
 const projectId = 'demo-registration-20261012';
@@ -35,6 +36,14 @@ async function run() {
   assert.equal(JSON.stringify(publicView).includes('Synthetic Lane'), false);
   assert.equal((await handlers.getRegistrationEvent(request(loser, { eventId: event.eventId }))).privateDetails, undefined);
   assert.equal((await handlers.getRegistrationEvent(request(winner, { eventId: event.eventId }))).privateDetails.address, draft.address);
+  await db.doc(`users/${winner}`).update({ fcmTokens: ['synthetic-token'] });
+  const edited = await handlers.saveRegistrationEvent(request('host', { eventId: event.eventId, expectedRevision: 1, city: 'sydney', draft: { ...draft, purpose: 'Updated emulator purpose' } }));
+  assert.equal(edited.status, 'approved');
+  const delivered = [];
+  const notices = createChangeNotifications({ db, enabled: () => true, now: () => new Date('2026-11-01T00:00:01Z'),
+    sendEmail: async () => delivered.push('email'), sendPush: async () => delivered.push('push') });
+  await Promise.all([notices.tick(), notices.tick()]); await notices.tick();
+  assert.deepEqual(delivered.sort(), ['email', 'push'], 'Concurrent worker runs cannot duplicate deliveries');
   await handlers.cancelEventRegistration(request(winner, { eventId: event.eventId, expectedRevision: 1 }));
   const cancelled = (await db.doc(`registrationEvents/${event.eventId}/registrations/${winner}`).get()).data();
   assert.equal(cancelled.answers, undefined, 'Cancellation must erase submitted form entries');
@@ -42,6 +51,6 @@ async function run() {
   assert.equal((await handlers.getRegistrationEvent(request(winner, { eventId: event.eventId }))).privateDetails, undefined);
   const denied = await fetch(`http://127.0.0.1:8398/v1/projects/${projectId}/databases/(default)/documents/registrationEventPrivate/${event.eventId}`);
   assert.equal(denied.status, 403, 'Direct unauthenticated private document read must fail');
-  console.log('PASS isolated Firestore emulator: concurrent last seat, retry, private projection, nonregistrant denial, cancellation revocation and direct rules denial. No production writes.');
+  console.log('PASS isolated Firestore emulator: concurrent last seat, retry, private projection, approved edits, concurrent notification outbox, cancellation revocation and direct rules denial. Mock delivery only; no production writes.');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => app.delete());

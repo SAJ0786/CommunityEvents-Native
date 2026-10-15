@@ -15,7 +15,7 @@ import { cityLabel } from '../utils/cities';
 import { colors } from '../theme';
 
 const newReference = () => `r-${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
-export default function RegistrationScreen({ enabled = false, user, profile, city, initialCreate = false, onBack, onRequireSignIn, transport }) {
+export default function RegistrationScreen({ enabled = false, user, profile, city, initialCreate = false, initialEventId = null, onBack, onRequireSignIn, transport }) {
   const api = useMemo(() => transport || firebaseRegistration({ enabled }), [enabled, transport]);
   const [stage, setStage] = useState('list'); const [scope, setScope] = useState('public');
   const [items, setItems] = useState([]); const [cursor, setCursor] = useState(null);
@@ -71,7 +71,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
   };
   useEffect(() => {
     if (!enabled) return undefined;
-    if (initialCreate && member) edit(true); else list('public');
+    if (initialEventId && member) open(initialEventId); else if (initialCreate && member) edit(true); else list('public');
     return () => { epoch.current++; busyRef.current = false; };
   }, [enabled]); // Parent keys this screen by account and selected city.
   useEffect(() => {
@@ -98,7 +98,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     }
     const fresh = await api.load(result.eventId);
     if (!valid()) return;
-    setDetail(fresh); setStage('host-confirmation'); setDraft(null); setNotice(posterError || 'Saved for administrator review. The event is not public until approved.');
+    setDetail(fresh); setStage('host-confirmation'); setDraft(null); setNotice(posterError || (fresh.event.status === 'approved' ? 'Changes saved. Your event remains approved. Attendee notices are queued when registration questions, date or venue change.' : 'Saved for administrator review. The event is not public until approved.'));
   });
   const startEntry = () => {
     if (!requireMember()) return;
@@ -156,7 +156,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     {notice ? <Text accessibilityRole="alert" style={styles.error}>{notice}</Text> : null}
     <View pointerEvents={busy ? 'none' : 'auto'}>
     {stage === 'list' && <View style={styles.group}>
-      <View style={styles.row}><Action primary={scope === 'public'} onPress={() => list('public')}>Browse events</Action>{member && <Action primary={scope === 'mine'} onPress={() => list('mine')}>My hosted events</Action>}{admin && <Action primary={scope === 'review'} onPress={() => list('review')}>Review city events</Action>}<Action onPress={() => edit(true)}>Create registration event</Action></View>
+      <View style={styles.row}><Action primary={scope === 'public'} onPress={() => list('public')}>Browse events</Action>{member && <><Action primary={scope === 'attending'} onPress={() => list('attending')}>My registrations</Action><Action primary={scope === 'mine'} onPress={() => list('mine')}>My hosted events</Action></>}{admin && <Action primary={scope === 'review'} onPress={() => list('review')}>Review city events</Action>}<Action onPress={() => edit(true)}>Create registration event</Action></View>
       {!items.length && <Text style={styles.muted}>No events on this page.{cursor ? ' Load the next page to continue.' : ''}</Text>}
       {items.map(event => <View key={event.id} style={styles.panel}><Text style={styles.title}>{event.title}</Text><Text style={styles.text}>{event.eventType} · {event.date} · {event.suburb}</Text><Text style={styles.muted}>{event.status} · Registration required</Text><Action onPress={() => open(event.id)}>View event</Action></View>)}
       {cursor && <Action onPress={() => list(scope, cursor)}>Load more events</Action>}
@@ -166,16 +166,23 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     })} />}
     {detail && stage === 'card' && <View style={styles.panel}>
       <Text style={styles.title}>{detail.event.title}</Text><Text style={styles.text}>{detail.event.eventType} · {detail.event.date} · {detail.event.suburb}</Text>
-      <Text style={styles.muted}>{detail.ownRegistration?.status === 'registered' ? 'Registered' : 'Registration required'} · {detail.event.status}</Text><Text style={styles.text}>{detail.event.notes}</Text>
+      <Text style={styles.muted}>{detail.event.status === 'cancelled' ? 'Event cancelled — no places reserved' : detail.ownRegistration?.status === 'registered' ? 'Registered' : 'Registration required'} · {detail.event.status}</Text><Text style={styles.text}>{detail.event.notes}</Text>
       {detail.privateDetails && <><Text style={styles.label}>Private venue</Text><Text style={styles.text}>{detail.privateDetails.address}</Text>{links && <View style={styles.row}><Action onPress={() => run(() => Linking.openURL(links.map))}>View map</Action><Action onPress={() => run(() => Linking.openURL(links.directions))}>Directions</Action></View>}
         {detail.privateDetails.hasPoster && <Action onPress={() => run(async valid => { const result = await api.poster(detail.event.id); if (valid()) setPoster(`data:${result.mime};base64,${result.base64}`); })}>View private poster</Action>}
         {poster && <Image source={{ uri: poster }} style={styles.poster} resizeMode="contain" />}
       </>}
-      {!detail.privateDetails && <Text style={styles.muted}>The full address and poster are available after confirmed registration.</Text>}
+      {!detail.privateDetails && <Text style={styles.muted}>{detail.event.status === 'cancelled' ? 'The private venue and poster are no longer available for this cancelled event.' : 'The full address and poster are available after confirmed registration.'}</Text>}
+      {detail.canManage && detail.event.status !== 'cancelled' && <Action onPress={() => Alert.alert('Cancel this event?', 'All attendees will be notified. Reserved places will be released. Answers remain until you or the attendee deletes them. This cannot be undone.', [
+        { text: 'Keep event', style: 'cancel' }, { text: 'Cancel event', style: 'destructive', onPress: () => run(async valid => {
+          await api.cancelEvent(detail.event.id, detail.event.revision, 'CANCEL EVENT'); const fresh = await api.load(detail.event.id);
+          if (valid()) { setDetail(fresh); setPoster(null); setNotice('Event cancelled. Attendee notifications are queued.'); }
+        }) },
+      ])}>Cancel whole event</Action>}
       {detail.canManage && <><Action onPress={() => edit()}>Edit event or registration form</Action><Action onPress={() => responsePage()}>Registrations ({detail.event.registrationCount || 0})</Action>{detail.privateDetails?.hasPoster && <Action onPress={() => posterChange(true)}>Remove private poster</Action>}{pendingPoster && <Action onPress={() => posterChange(false)}>Retry selected poster upload</Action>}</>}
       {detail.canApprove && detail.event.status === 'pending' && <Action primary onPress={() => run(async valid => { await api.approve(detail.event.id, detail.event.revision); const fresh = await api.load(detail.event.id); if (valid()) { setDetail(fresh); setNotice('Approved.'); } })}>Approve event after reviewing details</Action>}
-      {detail.canRegister && <Action primary onPress={startEntry}>{detail.ownRegistration?.status === 'registered' ? 'Edit registration' : 'Register for event'}</Action>}
-      {!detail.canRegister && <Text style={styles.muted}>Registration is closed or awaiting approval.</Text>}
+      {detail.registrationNeedsReview && <Text style={styles.muted}>The registration form has changed. Please review your answers and agree to the current terms.</Text>}
+      {(detail.canRegister || detail.canEditRegistration) && <Action primary onPress={startEntry}>{detail.ownRegistration?.status === 'registered' ? 'Edit registration' : 'Register for event'}</Action>}
+      {!detail.canRegister && <Text style={styles.muted}>{detail.canEditRegistration ? 'New registrations are closed. You can still update answers or reduce your places until event day.' : 'Registration is closed or awaiting approval.'}</Text>}
       {detail.canCancel && <Action onPress={cancel}>Delete my registration and answers</Action>}
     </View>}
     {detail && stage === 'entry' && <View style={styles.panel}>

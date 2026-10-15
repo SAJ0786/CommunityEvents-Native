@@ -101,17 +101,19 @@ export async function unregisterDevicePushNotifications(uid) {
   await deleteToken(messaging);
 }
 
-export function listenForBusinessPushOpens(uid, onOpen, onError = () => {}) {
+export function listenForBusinessPushOpens(uid, onOpen, onError = () => {}, { registrationEnabled = false } = {}) {
   if (!uid || !['ios', 'android'].includes(Platform.OS)) return () => {};
   let active = true;
   const seen = new Set();
   const open = data => {
-    if (!active || auth.currentUser?.uid !== uid || data?.module !== 'directory'
+    const registration = registrationEnabled && data?.module === 'registration' && data.type === 'registration.changed'
+      && typeof data.eventId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(data.eventId) && data.recipientUid === uid;
+    if (!active || auth.currentUser?.uid !== uid || (data?.module !== 'directory' && !registration)
       || (data.recipientUid && data.recipientUid !== uid)) return;
     const key = data.notificationId;
     if (key && seen.has(key)) return;
     if (key) seen.add(key);
-    onOpen(data.threadId ? 'business-inbox' : 'business-notifications');
+    onOpen(registration ? 'registration' : data.threadId ? 'business-inbox' : 'business-notifications', registration ? data.eventId : null);
   };
   const messaging = getMessaging();
   const unsubscribe = onNotificationOpenedApp(messaging, message => open(message.data));

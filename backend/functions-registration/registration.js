@@ -97,21 +97,40 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (current && (!manages(caller, current) || !manages(caller, { ...current, city }))) fail('permission-denied', 'You cannot edit this event.');
       if (current && request.data.expectedRevision !== current.revision) fail('aborted', 'The event has changed. Reload before saving.');
       const timeZone = await zone(city, tx);
+      const previousForm = current ? (await tx.get(formRef(reference.id))).data() : null;
+      const previousVenue = current ? (await tx.get(privateRef(reference.id))).data() : null;
       if (draft.capacity < (current?.reservedPlaces || 0)) fail('failed-precondition', 'Capacity cannot be lower than existing registrations.');
       const revision = (current?.revision || 0) + 1;
+      const formChanged = !previousForm || JSON.stringify(previousForm.fields) !== JSON.stringify(draft.fields) || previousForm.purpose !== draft.purpose;
+      if (current?.registrationCount > 0 && formChanged && localMinute(now(), timeZone).slice(0, 10) >= draft.date) fail('failed-precondition', 'Registration questions cannot change on or after event day when attendees have registered.');
+      const formVersion = formChanged ? revision : previousForm.version;
+      const status = current?.status || 'pending';
+      const changes = current ? [
+        ...(formChanged ? ['form'] : []),
+        ...(current.date !== draft.date ? ['date'] : []),
+        ...(current.city !== city || previousVenue?.address !== draft.address || JSON.stringify(previousVenue?.venue || null) !== JSON.stringify(venue) ? ['venue'] : []),
+      ] : [];
       const publicData = { ...(await model).publicEvent(draft), city, timeZone, ownerUid: current?.ownerUid || caller.uid, revision,
-        formVersion: revision, status: 'pending', reservedPlaces: current?.reservedPlaces || 0, registrationCount: current?.registrationCount || 0,
+        formVersion, status, reservedPlaces: current?.reservedPlaces || 0, registrationCount: current?.registrationCount || 0,
         createdAt: current?.createdAt || now().toISOString(), updatedAt: now().toISOString(), allowCancellation: draft.allowCancellation, creationFingerprint: current?.creationFingerprint || fingerprint };
+      if (current?.approvedAt) { publicData.approvedAt = current.approvedAt; publicData.approvedBy = current.approvedBy; }
       tx.set(reference, publicData);
       tx.set(privateRef(reference.id), { address: draft.address, venue }, { merge: true });
-      tx.set(formRef(reference.id), { version: revision, fields: draft.fields, purpose: draft.purpose });
-      return { eventId: reference.id, revision, status: 'pending' };
+      tx.set(formRef(reference.id), { version: formVersion, fields: draft.fields, purpose: draft.purpose });
+      // Atomic outbox: no private venue, questions or answers copied into delivery jobs.
+      if (status === 'approved' && current?.registrationCount > 0 && changes.length) {
+        tx.set(db.collection('registrationChanges').doc(`${reference.id}-${revision}`), {
+          eventId: reference.id, revision, formVersion, changes, createdAt: now().toISOString(), state: 'pending', cursor: null,
+        });
+      }
+      return { eventId: reference.id, revision, status };
     });
   }
   async function approveRegistrationEvent(request) {
     return db.runTransaction(async tx => {
       const caller = await actor(request, tx); const event = await readEvent(request.data?.eventId, tx);
       if (!approves(caller, event)) fail('permission-denied', 'An authorised city admin or super admin must approve this event.');
+      if (event.status === 'cancelled') fail('failed-precondition', 'A cancelled event cannot be reopened. Create a new event instead.');
       if (request.data.expectedRevision !== event.revision) fail('aborted', 'Review the latest event before approval.');
       if (localMinute(now(), event.timeZone) >= (event.closes || `${event.date}T00:00`)) fail('failed-precondition', 'The registration closing time has passed.');
       tx.update(eventRef(event.id), { status: 'approved', approvedBy: caller.uid, approvedAt: now().toISOString() });
@@ -127,10 +146,14 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const receiptRef = eventRef(eventId).collection('operations').doc(operationId);
       const receipt = await tx.get(receiptRef);
       if (receipt.exists) { if (receipt.data().hash !== hash) fail('already-exists', 'This submission reference was already used.'); return receipt.data().result; }
-      checkOpen(event);
       const formSnap = await tx.get(formRef(eventId)); const form = formSnap.data();
       if (!form || request.data.formVersion !== form.version) fail('failed-precondition', 'The form changed. Reload and review the latest questions and terms.');
       const ref = bookingRef(eventId, caller.uid); const previousSnap = await tx.get(ref); const previous = previousSnap.exists ? previousSnap.data() : null;
+      // Existing attendees can correct answers until event day, even after closing.
+      // Closing still blocks new/reopened bookings and any increase in places.
+      const editing = event.status === 'approved' && previous?.status === 'registered' && localMinute(now(), event.timeZone).slice(0, 10) < event.date;
+      if (!editing) checkOpen(event);
+      if (editing && localMinute(now(), event.timeZone) >= (event.closes || `${event.date}T00:00`) && Number(request.data.places) > previous.places) fail('failed-precondition', 'Registration has closed. You may update answers or reduce places, but cannot add places.');
       if ((request.data.expectedRevision || 0) !== (previous?.revision || 0)) fail('aborted', 'Your registration changed. Reload before editing.');
       const rawAnswers = request.data.answers;
       if (!rawAnswers || typeof rawAnswers !== 'object' || Array.isArray(rawAnswers)) fail('invalid-argument', 'Answers are required.');
@@ -147,7 +170,8 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const reservedPlaces = event.reservedPlaces - previousPlaces + places;
       if (reservedPlaces > event.capacity) fail('resource-exhausted', 'Not enough places remain. Choose fewer places or try another event.');
       const result = { eventId, registrationId: caller.uid, revision: (previous?.revision || 0) + 1, status: 'registered', places, formVersion: form.version };
-      tx.set(ref, { ...result, uid: caller.uid, answers: clone(answers), fields: clone(form.fields), retentionPolicy: RETENTION.policy, submittedAt: previous?.submittedAt || now().toISOString(), updatedAt: now().toISOString() });
+      tx.set(ref, { ...result, uid: caller.uid, answers: clone(answers), fields: clone(form.fields), retentionPolicy: RETENTION.policy, submittedAt: previous?.status === 'registered' ? previous.submittedAt : now().toISOString(), updatedAt: now().toISOString() });
+      tx.set(db.collection('registrationMemberEvents').doc(caller.uid).collection('events').doc(eventId), { eventId });
       tx.update(eventRef(eventId), { reservedPlaces, registrationCount: event.registrationCount + (previous?.status === 'registered' ? 0 : 1) });
       tx.set(receiptRef, { uid: caller.uid, hash, result, createdAt: now().toISOString() });
       return result;
@@ -158,7 +182,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const caller = await actor(request, tx); const event = await readEvent(request.data?.eventId, tx);
       const ref = bookingRef(event.id, caller.uid); const snapshot = await tx.get(ref); const booking = snapshot.data();
       if (!booking || booking.status === 'cancelled') return { status: 'cancelled' };
-      if (!event.allowCancellation || localMinute(now(), event.timeZone).slice(0, 10) >= event.date) fail('failed-precondition', 'Cancellation is not available. Contact the organiser.');
+      if (event.status !== 'cancelled' && (!event.allowCancellation || localMinute(now(), event.timeZone).slice(0, 10) >= event.date)) fail('failed-precondition', 'Cancellation is not available. Contact the organiser.');
       if (request.data.expectedRevision !== booking.revision) fail('aborted', 'Reload your registration before cancelling.');
       // Do not retain form entries in cancelled bookings. Replace (not merge)
       // with a minimal tombstone for revision/idempotency; no question snapshots,
@@ -166,8 +190,24 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       tx.set(ref, { eventId: event.id, registrationId: caller.uid, uid: caller.uid,
         status: 'cancelled', revision: booking.revision + 1, places: 0,
         cancelledAt: now().toISOString(), answersDeletedAt: now().toISOString() });
-      tx.update(eventRef(event.id), { reservedPlaces: event.reservedPlaces - booking.places, registrationCount: event.registrationCount - 1 });
+      tx.delete(db.collection('registrationMemberEvents').doc(caller.uid).collection('events').doc(event.id));
+      tx.update(eventRef(event.id), { reservedPlaces: event.status === 'cancelled' ? 0 : event.reservedPlaces - booking.places, registrationCount: event.registrationCount - 1 });
       return { status: 'cancelled', revision: booking.revision + 1 };
+    });
+  }
+  async function cancelRegistrationEvent(request) {
+    if (request.data?.confirmation !== 'CANCEL EVENT') fail('invalid-argument', 'Confirm that you want to cancel the whole event.');
+    return db.runTransaction(async tx => {
+      const caller = await actor(request, tx); const event = await readEvent(request.data?.eventId, tx);
+      if (!manages(caller, event)) fail('permission-denied', 'You cannot cancel this event.');
+      if (event.status === 'cancelled') return { eventId: event.id, revision: event.revision, status: 'cancelled' };
+      if (request.data.expectedRevision !== event.revision) fail('aborted', 'Reload the event before cancelling.');
+      const revision = event.revision + 1; const timestamp = now().toISOString();
+      tx.update(eventRef(event.id), { status: 'cancelled', revision, reservedPlaces: 0, cancelledAt: timestamp, cancelledBy: caller.uid });
+      if (event.registrationCount > 0) tx.set(db.collection('registrationChanges').doc(`${event.id}-${revision}`), {
+        eventId: event.id, revision, formVersion: event.formVersion, changes: ['cancelled'], createdAt: timestamp, state: 'pending', cursor: null,
+      });
+      return { eventId: event.id, revision, status: 'cancelled' };
     });
   }
   async function getRegistrationEvent(request) {
@@ -185,18 +225,34 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), id: event.id, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
       result.canApprove = Boolean(caller && approves(caller, event));
       result.canRegister = event.status === 'approved' && localMinute(now(), event.timeZone) < (event.closes || `${event.date}T00:00`);
-      result.canCancel = Boolean(registered && event.allowCancellation && localMinute(now(), event.timeZone).slice(0, 10) < event.date);
+      result.canEditRegistration = Boolean(registered && event.status === 'approved' && localMinute(now(), event.timeZone).slice(0, 10) < event.date);
+      result.registrationNeedsReview = Boolean(registered && own.formVersion !== event.formVersion);
+      result.canCancel = Boolean(registered && (event.status === 'cancelled' || (event.allowCancellation && localMinute(now(), event.timeZone).slice(0, 10) < event.date)));
       result.retention = RETENTION;
       if (manager) result.event.registrationCount = event.registrationCount;
-      if (manager || registered) result.privateDetails = { address: details.data()?.address || '', venue: (await venueModel).normalisePrivateVenue(details.data()?.venue), hasPoster: Boolean(details.data()?.posterPath) };
+      if (manager || (registered && event.status !== 'cancelled')) result.privateDetails = { address: details.data()?.address || '', venue: (await venueModel).normalisePrivateVenue(details.data()?.venue), hasPoster: Boolean(details.data()?.posterPath) };
       return result;
     });
   }
   async function listRegistrationEvents(request) {
     gate();
     const scope = request.data?.scope || 'public';
-    if (!['public', 'mine', 'review'].includes(scope)) fail('invalid-argument', 'Choose a valid event list.');
+    if (!['public', 'mine', 'review', 'attending'].includes(scope)) fail('invalid-argument', 'Choose a valid event list.');
     const caller = scope === 'public' ? null : await actor(request);
+    if (scope === 'attending') {
+      let query = db.collection('registrationMemberEvents').doc(caller.uid).collection('events').orderBy('__name__').limit(25);
+      if (request.data?.cursor) query = query.startAfter(id(request.data.cursor));
+      const page = await query.get(); const events = [];
+      for (const entry of page.docs) {
+        try {
+          const detail = await getRegistrationEvent({ ...request, data: { eventId: entry.id } });
+          if (detail.ownRegistration?.status !== 'registered') continue;
+          const { registrationCount, ...publicData } = detail.event;
+          events.push(publicData);
+        } catch (error) { if (error.code !== 'not-found') throw error; }
+      }
+      return { events, nextCursor: page.docs.length === 25 ? page.docs.at(-1).id : null };
+    }
     const city = scope === 'mine' ? null : id(request.data?.city);
     if (scope === 'review' && !approves(caller, { city })) fail('permission-denied', 'You cannot review this city.');
     // One equality + document ID order uses a bounded page; filtering MUST NOT
@@ -281,22 +337,23 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     });
     await bucket.file(path).save(bytes, { resumable: false, metadata: { contentType: mime, cacheControl: 'private, no-store' } });
     // Recheck role and revision after upload; never create a public/download-token URL.
-    let previousPath; let nextRevision;
+    let previousPath; let nextRevision; let nextStatus;
     try { await db.runTransaction(async tx => {
       const currentActor = await actor(request, tx); const currentEvent = await readEvent(event.id, tx);
       const previous = await tx.get(privateRef(event.id));
       if (!manages(currentActor, currentEvent)) fail('permission-denied', 'You cannot change this poster.');
       if (request.data.expectedRevision !== currentEvent.revision) fail('aborted', 'The event changed. Reload before updating its poster.');
       previousPath = previous.data()?.posterPath; nextRevision = currentEvent.revision + 1;
+      nextStatus = currentEvent.status;
       tx.set(privateRef(event.id), { posterPath: path, posterMime: mime }, { merge: true });
-      tx.update(eventRef(event.id), { status: 'pending', revision: nextRevision });
+      tx.update(eventRef(event.id), { revision: nextRevision });
       if (previousPath && previousPath !== path) enqueuePosterCleanup(db, tx, event.id, previousPath, now());
     }); } catch (error) {
       await bucket.file(path).delete({ ignoreNotFound: true }).catch(() => {});
       throw error;
     }
     if (previousPath && previousPath !== path && previousPath.startsWith(`registration-private/${event.id}/`)) await bucket.file(previousPath).delete({ ignoreNotFound: true }).catch(() => {});
-    return { uploaded: true, revision: nextRevision, status: 'pending' };
+    return { uploaded: true, revision: nextRevision, status: nextStatus };
   }
   async function getRegistrationPoster(request) {
     const details = await getRegistrationEvent(request);
@@ -311,7 +368,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     return { mime: data.posterMime, base64: bytes.toString('base64') };
   }
   async function removeRegistrationPoster(request) {
-    let previousPath; let nextRevision;
+    let previousPath; let nextRevision; let nextStatus;
     const eventId = id(request.data?.eventId);
     await db.runTransaction(async tx => {
       const caller = await actor(request, tx); const event = await readEvent(eventId, tx);
@@ -319,12 +376,13 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (!manages(caller, event)) fail('permission-denied', 'You cannot change this poster.');
       if (request.data.expectedRevision !== event.revision) fail('aborted', 'The event changed. Reload before removing its poster.');
       previousPath = previous.data()?.posterPath; nextRevision = event.revision + 1;
+      nextStatus = event.status;
       tx.set(privateRef(eventId), { posterPath: null, posterMime: null }, { merge: true });
-      tx.update(eventRef(eventId), { revision: nextRevision, status: 'pending' });
+      tx.update(eventRef(eventId), { revision: nextRevision });
       if (previousPath) enqueuePosterCleanup(db, tx, eventId, previousPath, now());
     });
     if (previousPath?.startsWith(`registration-private/${eventId}/`)) await bucket.file(previousPath).delete({ ignoreNotFound: true }).catch(() => {});
-    return { removed: true, revision: nextRevision, status: 'pending' };
+    return { removed: true, revision: nextRevision, status: nextStatus };
   }
   async function saveRegistrationTemplate(request) {
     const caller = await actor(request);
@@ -344,6 +402,6 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const snapshot = await query.get();
     return { templates: snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })), nextCursor: snapshot.docs.length === 50 ? snapshot.docs.at(-1).id : null };
   }
-  return { saveRegistrationEvent, approveRegistrationEvent, submitEventRegistration, cancelEventRegistration, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
+  return { saveRegistrationEvent, approveRegistrationEvent, submitEventRegistration, cancelEventRegistration, cancelRegistrationEvent, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
 }
 module.exports = { createRegistrationHandlers, localMinute, active, manages, approves };

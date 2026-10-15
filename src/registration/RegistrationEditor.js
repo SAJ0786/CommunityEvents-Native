@@ -82,7 +82,7 @@ export default function RegistrationEditor({ initialDraft, eventTypes, savedTemp
         if (type === 'consent') setError(`Write your own terms and conditions (up to ${TERMS_LIMIT} characters). The agreement remains at the end.`);
       }}>{label}</Action>)}</View></View>
       <View style={styles.panel}><Input label="Save reusable template as" value={templateName} maxLength={80} onChangeText={setTemplateName} /><Action disabled={!templateName.trim()} onPress={() => onSaveTemplate({ name: templateName, fields: draft.fields, purpose: draft.purpose })}>Save template (no venue or answers)</Action></View>
-      <Text style={styles.muted}>Saving submits the event for administrator review. It does not publish automatically.</Text>
+      <Text style={styles.muted}>New events require administrator approval. Edits to approved events do not need another approval. Changes to questions, date or venue notify existing attendees; changed questions ask them to review their registration.</Text>
       <Action primary onPress={save}>Save event and registration form</Action>
     </>}
   </View>;

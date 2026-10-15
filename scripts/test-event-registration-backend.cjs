@@ -2,6 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createRegistrationHandlers, localMinute } = require('../backend/functions-registration/registration');
 const { createPosterMaintenance, GRACE_MS } = require('../backend/functions-registration/posterMaintenance');
+const { createChangeNotifications } = require('../backend/functions-registration/changeNotifications');
+const { createNotificationTransport } = require('../backend/functions-registration/notificationTransport');
 class HttpsError extends Error { constructor(code, message) { super(message); this.code = code; } }
 function fixture() {
   const records = new Map(); let sequence = 0; let queue = Promise.resolve();
@@ -42,7 +44,7 @@ function fixture() {
   const create = () => handlers.saveRegistrationEvent(request('host', { city: 'sydney', createKey: 'create-one', draft }));
   const approve = event => handlers.approveRegistrationEvent(request('admin', { eventId: event.eventId, expectedRevision: event.revision }));
   const submit = (event, uid = 'member', overrides = {}) => handlers.submitEventRegistration(request(uid, { eventId: event.eventId, formVersion: 1, expectedRevision: 0, requestId: 'request-1', places: 2, answers: { name: 'Synthetic', consent: true }, ...overrides }));
-  return { records, files, onDownload: callback => { onDownload = callback; }, onDelete: callback => { onDelete = callback; }, onSave: callback => { onSave = callback; }, advance: ms => { clock += ms; }, sweep, handlers, request, draft, create, approve, submit, db };
+  return { records, files, now: () => new Date(clock), onDownload: callback => { onDownload = callback; }, onDelete: callback => { onDelete = callback; }, onSave: callback => { onSave = callback; }, advance: ms => { clock += ms; }, sweep, handlers, request, draft, create, approve, submit, db };
 }
 
 test('poster quota is atomic, private uploads have recovery intents and stale managers cannot spend quota', async () => {
@@ -265,7 +267,114 @@ test('server rejects forged role and ownership; form changes retain response sna
   await assert.rejects(f.handlers.saveRegistrationEvent(f.request('other', { eventId: event.eventId, expectedRevision: 1, city: 'sydney', draft: f.draft, role: 'superAdmin', ownerUid: 'other' })), { code: 'permission-denied' });
   await f.handlers.saveRegistrationEvent(f.request('host', { eventId: event.eventId, expectedRevision: 1, city: 'sydney', draft: { ...f.draft, fields: f.draft.fields.map(field => ({ ...field, label: 'Changed label' })) } }));
   assert.equal(f.records.get(`registrationEvents/${event.eventId}/registrations/member`).fields[0].label, 'Name');
-  assert.equal(f.records.get(`registrationEvents/${event.eventId}`).status, 'pending');
+  assert.equal(f.records.get(`registrationEvents/${event.eventId}`).status, 'approved');
+});
+
+test('approved edits preserve approval, stable forms keep versions and material changes create private-safe outbox', async () => {
+  const f = fixture(); const event = await f.create(); await f.approve(event); await f.submit(event);
+  const save = (revision, draft) => f.handlers.saveRegistrationEvent(f.request('host', { eventId: event.eventId, expectedRevision: revision, city: 'sydney', draft }));
+  await save(1, { ...f.draft, title: 'New title' });
+  const stored = f.records.get(`registrationEvents/${event.eventId}`);
+  assert.equal(stored.status, 'approved'); assert.equal(stored.approvedBy, 'admin'); assert.equal(stored.formVersion, 1);
+  assert.equal([...f.records.keys()].filter(key => key.startsWith('registrationChanges/')).length, 0);
+  await save(2, { ...f.draft, purpose: 'Updated purpose' });
+  const change = f.records.get(`registrationChanges/${event.eventId}-3`);
+  assert.deepEqual(change.changes, ['form']); assert.equal(change.formVersion, 3);
+  assert.equal(JSON.stringify(change).includes('Synthetic Lane'), false); assert.equal(change.fields, undefined);
+  await assert.rejects(save(2, f.draft), { code: 'aborted' });
+  assert.equal([...f.records.keys()].filter(key => key.startsWith('registrationChanges/')).length, 1);
+  const data = { eventId: event.eventId, expectedRevision: 3, mime: 'image/jpeg', base64: Buffer.from([255,216,255,0]).toString('base64') };
+  assert.equal((await f.handlers.putRegistrationPoster(f.request('host', data))).status, 'approved');
+  assert.equal((await f.handlers.removeRegistrationPoster(f.request('host', { eventId: event.eventId, expectedRevision: 4 }))).status, 'approved');
+});
+
+test('after closing, existing attendees can review answers but cannot add seats or reopen cancelled bookings', async () => {
+  const f = fixture(); const event = await f.create(); await f.approve(event); await f.submit(event);
+  f.advance(Date.parse('2026-11-30T08:00:00Z') - f.now().getTime()); // Sydney 19:00, closed at 18:00.
+  await f.handlers.saveRegistrationEvent(f.request('host', { eventId: event.eventId, expectedRevision: 1, city: 'sydney', draft: { ...f.draft, purpose: 'Updated purpose' } }));
+  const detail = await f.handlers.getRegistrationEvent(f.request('member', { eventId: event.eventId }));
+  assert.equal(detail.canRegister, false); assert.equal(detail.canEditRegistration, true); assert.equal(detail.registrationNeedsReview, true);
+  await assert.rejects(f.submit(event, 'other', { formVersion: 2 }), { code: 'failed-precondition' });
+  await assert.rejects(f.submit(event, 'member', { formVersion: 2, expectedRevision: 1, places: 3, requestId: 'extra' }), { code: 'failed-precondition' });
+  await f.submit(event, 'member', { formVersion: 2, expectedRevision: 1, requestId: 'review' });
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('member', { eventId: event.eventId }))).registrationNeedsReview, false);
+  await f.handlers.cancelEventRegistration(f.request('member', { eventId: event.eventId, expectedRevision: 2 }));
+  await assert.rejects(f.submit(event, 'member', { formVersion: 2, expectedRevision: 3, requestId: 'reopen' }), { code: 'failed-precondition' });
+});
+
+async function noticeFixture() {
+  const f = fixture(); const event = await f.create(); await f.approve(event); await f.submit(event);
+  f.records.get('users/member').fcmTokens = ['synthetic-token']; f.advance(1000);
+  await f.handlers.saveRegistrationEvent(f.request('host', { eventId: event.eventId, expectedRevision: 1, city: 'sydney', draft: { ...f.draft, purpose: 'Updated purpose' } }));
+  const changeRef = f.db.collection('registrationChanges').doc(`${event.eventId}-2`);
+  const sent = [];
+  const worker = createChangeNotifications({ db: f.db, now: f.now, enabled: () => true,
+    sendEmail: async (to, notice) => sent.push({ channel: 'email', to, notice }), sendPush: async (to, notice) => sent.push({ channel: 'push', to, notice }) });
+  return { ...f, event, changeRef, sent, worker };
+}
+
+test('change notices fan out email and push once under concurrent retries with no private content', async () => {
+  const f = await noticeFixture(); await Promise.all([f.worker.tick(), f.worker.tick()]); await f.worker.tick();
+  assert.deepEqual(f.sent.map(row => row.channel).sort(), ['email', 'push']);
+  assert.equal(JSON.stringify(f.sent).includes('Synthetic Lane'), false);
+  assert.equal(JSON.stringify(f.sent).includes('Updated purpose'), false);
+  assert.equal(f.records.get(f.changeRef.path).state, 'queued');
+  assert.equal([...f.records.values()].filter(value => value.state === 'sent').length, 2);
+});
+
+test('notice delivery rechecks cancellation, account status and already-reviewed form; later attendees excluded', async () => {
+  for (const action of ['cancel', 'ban', 'review']) {
+    const f = await noticeFixture(); await f.worker.expand(f.changeRef);
+    if (action === 'cancel') await f.handlers.cancelEventRegistration(f.request('member', { eventId: f.event.eventId, expectedRevision: 1 }));
+    if (action === 'ban') f.records.get('users/member').accountStatus = 'banned';
+    if (action === 'review') await f.submit(f.event, 'member', { formVersion: 2, expectedRevision: 1, requestId: 'review' });
+    await f.worker.tick(); assert.equal(f.sent.length, 0, action);
+  }
+  const f = await noticeFixture(); f.advance(1000); await f.submit(f.event, 'other', { formVersion: 2, places: 1 });
+  await f.worker.tick(); assert.equal(f.sent.length, 2);
+  assert.equal([...f.records.values()].some(value => value.channel && value.uid === 'other'), false);
+});
+
+test('ambiguous email failure is not automatically retried; interrupted claims need operator review', async () => {
+  const f = await noticeFixture(); let attempts = 0;
+  const worker = createChangeNotifications({ db: f.db, now: f.now, enabled: () => true,
+    sendEmail: async () => { attempts++; throw Error('Ambiguous SMTP result'); }, sendPush: async () => ({}) });
+  await worker.tick(); await worker.tick(); assert.equal(attempts, 1);
+  assert.equal([...f.records.values()].find(value => value.channel === 'email').state, 'review-required');
+  f.records.set('registrationNoticeDeliveries/interrupted', { state: 'sending', startedAt: '2020-01-01T00:00:00Z' });
+  await worker.tick(); assert.equal(f.records.get('registrationNoticeDeliveries/interrupted').state, 'review-required');
+  assert.deepEqual(await createChangeNotifications({ db: f.db }).tick(), { disabled: true });
+});
+
+test('notice transport addresses only chosen attendee and provides validated routing payload, no private fields', async () => {
+  const mail = []; const pushes = [];
+  const transport = createNotificationTransport({ mailer: { sendMail: async payload => mail.push(payload) },
+    messaging: { sendEachForMulticast: async payload => { pushes.push(payload); return { failureCount: 0 }; } }, from: 'test@example.com' });
+  const notice = { title: 'Review registration', body: 'Review answers', eventId: 'event-1', noticeId: 'job-1', recipientUid: 'member' };
+  await transport.sendEmail('member@example.com', notice); await transport.sendPush(['one'], notice);
+  assert.equal(mail[0].to, 'member@example.com'); assert.equal(pushes[0].data.module, 'registration');
+  assert.equal(pushes[0].data.eventId, 'event-1'); assert.equal(pushes[0].data.recipientUid, 'member');
+});
+
+test('organiser cancellation is authorised and idempotent, sends notices, revokes venue and allows answer erasure', async () => {
+  const f = await noticeFixture();
+  const cancel = uid => f.handlers.cancelRegistrationEvent(f.request(uid, { eventId: f.event.eventId, expectedRevision: 2, confirmation: 'CANCEL EVENT' }));
+  await assert.rejects(cancel('other'), { code: 'permission-denied' });
+  await assert.rejects(cancel('wrongadmin'), { code: 'permission-denied' });
+  assert.deepEqual(await cancel('host'), await cancel('host'));
+  const detail = await f.handlers.getRegistrationEvent(f.request('member', { eventId: f.event.eventId }));
+  assert.equal(detail.event.status, 'cancelled'); assert.equal(detail.privateDetails, undefined); assert.equal(detail.canCancel, true);
+  assert.equal(f.records.get(`registrationEvents/${f.event.eventId}`).reservedPlaces, 0);
+  assert.equal(f.records.get(`registrationEvents/${f.event.eventId}/registrations/member`).answers.name, 'Synthetic');
+  await assert.rejects(f.handlers.approveRegistrationEvent(f.request('admin', { eventId: f.event.eventId, expectedRevision: 3 })), { code: 'failed-precondition' });
+  await f.worker.tick(); assert.equal(f.sent.length, 2); assert.ok(f.sent.every(row => row.notice.title.includes('cancelled')));
+  const list = await f.handlers.listRegistrationEvents(f.request('member', { scope: 'attending' }));
+  assert.equal(list.events.length, 1); assert.equal(JSON.stringify(list).includes('Synthetic Lane'), false);
+  assert.equal((await f.handlers.listRegistrationEvents(f.request('other', { scope: 'attending' }))).events.length, 0);
+  await f.handlers.cancelEventRegistration(f.request('member', { eventId: f.event.eventId, expectedRevision: 1 }));
+  assert.equal((await f.handlers.listRegistrationEvents(f.request('member', { scope: 'attending' }))).events.length, 0);
+  assert.equal(f.records.get(`registrationEvents/${f.event.eventId}`).reservedPlaces, 0);
+  assert.equal(f.records.get(`registrationEvents/${f.event.eventId}/registrations/member`).answers, undefined);
 });
 test('timezone calculation follows daylight saving and feature defaults to off', async () => {
   assert.equal(localMinute(new Date('2026-10-03T16:00:00Z'), 'Australia/Sydney'), '2026-10-04T03:00');

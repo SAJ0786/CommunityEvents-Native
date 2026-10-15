@@ -257,6 +257,7 @@ function MainApp() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [streamEvent, setStreamEvent] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
+  const [registrationTarget, setRegistrationTarget] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [authResolved, setAuthResolved] = useState(false);
   const [guestAccessGranted, setGuestAccessGranted] = useState(false);
@@ -1222,9 +1223,14 @@ function MainApp() {
   pushNavigationRef.current = handleHeaderNavigate;
   useEffect(() => {
     if (!currentUser?.uid || currentUser.isAnonymous) return undefined;
-    return listenForBusinessPushOpens(currentUser.uid, screen => pushNavigationRef.current(screen), error => {
+    return listenForBusinessPushOpens(currentUser.uid, (screen, eventId) => {
+      if (screen === 'registration' && REGISTRATION_ENABLED) {
+        setRegistrationTarget({ eventId, uid: currentUser.uid, nonce: Date.now() });
+        setAppModule('events'); setActiveTab('registration');
+      } else pushNavigationRef.current(screen);
+    }, error => {
       recordNonFatalError(error, { feature: 'notifications', operation: 'open_business_push' });
-    });
+    }, { registrationEnabled: REGISTRATION_ENABLED });
   }, [currentUser?.uid, currentUser?.isAnonymous]);
 
   const openEventsProfile = useCallback(() => {
@@ -1425,7 +1431,7 @@ function MainApp() {
           onInitialFilterConsumed={() => setDirectoryFilter(null)}
         />
       ) : REGISTRATION_ENABLED && activeTab === 'registration' ? (
-        <RegistrationScreen key={`${currentUser?.uid || 'guest'}-${selectedCity}`} enabled user={currentUser} profile={profile} city={selectedCity} onBack={() => setActiveTab('home')} onRequireSignIn={requestSignIn} />
+        <RegistrationScreen key={`${currentUser?.uid || 'guest'}-${selectedCity}-${registrationTarget?.nonce || ''}`} enabled initialEventId={registrationTarget?.uid === currentUser?.uid ? registrationTarget.eventId : null} user={currentUser} profile={profile} city={selectedCity} onBack={() => { setRegistrationTarget(null); setActiveTab('home'); }} onRequireSignIn={requestSignIn} />
       ) : activeTab === 'home' && homeViewMode === 'map' ? (
         <ScrollView contentContainerStyle={styles.mapScrollContent} nestedScrollEnabled>
           <View style={styles.mapHeader}>{renderHeader()}</View>
