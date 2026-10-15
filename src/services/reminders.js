@@ -4,13 +4,13 @@ import * as Notifications from 'expo-notifications';
 import * as IntentLauncher from 'expo-intent-launcher';
 import Constants from 'expo-constants';
 import { getEventSuburb, getEventTitle } from './events';
-import { calculatePrayerTimes, prayerLabel } from './prayerTimes';
+import { calculatePrayerTimes, prayerLabel, prayerDateAt, prayerTimeInstant } from './prayerTimes';
 
 const REMINDER_STORAGE_KEY = '@community-events/event-reminders';
 const REMINDER_CHANNEL_ID = 'event-reminders';
 const PRAYER_REMINDER_CHANNEL_ID = 'prayer-reminders';
 const PRAYER_REMINDER_STORAGE_KEY = '@community-events/prayer-reminders';
-const PRAYER_CALCULATION_VERSION = 'numeric-timezone-2026-10';
+const PRAYER_CALCULATION_VERSION = 'location-instant-2026-10-15';
 const AZAAN_ALARM_CHANNEL_ID = 'azaan-alarms-v2';
 const AZAAN_ALARM_STORAGE_KEY = '@community-events/azaan-alarms-v1';
 const AZAAN_SOUND_FILE = Platform.OS === 'ios' ? 'azan_mashad.wav' : 'azan_mashad.mp3';
@@ -229,7 +229,7 @@ async function scheduleAzaanAlarmKeys(keys, location, currentSettings) {
     await AsyncStorage.setItem(AZAAN_ALARM_STORAGE_KEY, JSON.stringify(cleared));
     return cleared;
   }
-  if (!calculatePrayerTimes(localIsoDate(new Date()), scheduleLocation)) {
+  if (!calculatePrayerTimes(prayerDateAt(scheduleLocation), scheduleLocation)) {
     await AsyncStorage.setItem(AZAAN_ALARM_STORAGE_KEY, JSON.stringify({ ...current, notificationIds: [], location: scheduleLocation, refreshedAt: null }));
     throw new Error('Choose a supported Australian city before setting Azaan alarms.');
   }
@@ -241,16 +241,16 @@ async function scheduleAzaanAlarmKeys(keys, location, currentSettings) {
   // iOS retains at most 64 pending local notifications per app. A seven-day
   // horizon leaves room for event reminders while still covering every prayer.
   const scheduleDays = Platform.OS === 'ios' ? 7 : 21;
+  const scheduleNow = new Date();
   for (let dayOffset = 0; dayOffset < scheduleDays; dayOffset += 1) {
-    const day = new Date();
-    day.setDate(day.getDate() + dayOffset);
-    const times = calculatePrayerTimes(localIsoDate(day), scheduleLocation);
+    const isoDate = prayerDateAt(scheduleLocation, scheduleNow, dayOffset);
+    const times = calculatePrayerTimes(isoDate, scheduleLocation);
     if (!times) continue;
     for (const key of enabledKeys) {
       const match = String(times[key] || '').match(/^(\d{2}):(\d{2})$/);
       if (!match) continue;
-      const triggerDate = new Date(day);
-      triggerDate.setHours(Number(match[1]), Number(match[2]), 0, 0);
+      const triggerDate = prayerTimeInstant(isoDate, times[key], times.timeZone);
+      if (!triggerDate) continue;
       if (triggerDate.getTime() <= Date.now()) continue;
       const notificationId = await scheduleVerifiedNotification({
         content: {
@@ -288,12 +288,6 @@ export async function refreshAzaanAlarms(location) {
   return scheduleAzaanAlarmKeys(current.enabledKeys, location || current.location, current);
 }
 
-function localIsoDate(date) {
-  const value = new Date(date);
-  value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
-  return value.toISOString().slice(0, 10);
-}
-
 export async function getPrayerReminderSettings() {
   return readPrayerReminderSettings();
 }
@@ -302,7 +296,7 @@ async function schedulePrayerReminderKeys(keys, location, currentSettings) {
   const current = currentSettings || await readPrayerReminderSettings();
   const enabledKeys = [...new Set(keys)].filter(Boolean);
   const scheduleLocation = location || current.location;
-  if (enabledKeys.length && !calculatePrayerTimes(localIsoDate(new Date()), scheduleLocation)) {
+  if (enabledKeys.length && !calculatePrayerTimes(prayerDateAt(scheduleLocation), scheduleLocation)) {
     // Do not leave the previous city's alarms running after a city is unavailable.
     await cancelPrayerNotificationIds(current.notificationIds);
     await AsyncStorage.setItem(PRAYER_REMINDER_STORAGE_KEY, JSON.stringify({ ...current, notificationIds: [], location: scheduleLocation, refreshedAt: null }));
@@ -323,17 +317,16 @@ async function schedulePrayerReminderKeys(keys, location, currentSettings) {
   // Leave room within iOS's pending-local-notification limit for event
   // reminders and optional Azaan alarms.
   const scheduleDays = Platform.OS === 'ios' ? 7 : 21;
+  const scheduleNow = new Date();
   for (let dayOffset = 0; dayOffset < scheduleDays; dayOffset += 1) {
-    const day = new Date();
-    day.setDate(day.getDate() + dayOffset);
-    const isoDate = localIsoDate(day);
+    const isoDate = prayerDateAt(scheduleLocation, scheduleNow, dayOffset);
     const times = calculatePrayerTimes(isoDate, scheduleLocation);
     if (!times) continue;
     for (const key of enabledKeys) {
       const match = String(times[key] || '').match(/^(\d{2}):(\d{2})$/);
       if (!match) continue;
-      const triggerDate = new Date(day);
-      triggerDate.setHours(Number(match[1]), Number(match[2]), 0, 0);
+      const triggerDate = prayerTimeInstant(isoDate, times[key], times.timeZone);
+      if (!triggerDate) continue;
       if (triggerDate.getTime() <= Date.now()) continue;
       const id = await scheduleVerifiedNotification({
         content: {

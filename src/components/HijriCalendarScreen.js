@@ -29,7 +29,7 @@ import {
   getHijriObservances,
   sortHijriObservances,
 } from '../services/hijriObservances';
-import { calculatePrayerTimes, PRAYER_OPTIONS } from '../services/prayerTimes';
+import { calculatePrayerTimes, PRAYER_OPTIONS, prayerDateAt, zonedPrayerClock } from '../services/prayerTimes';
 import { getAzaanAlarmSettings, getPrayerReminderSettings, initializeDefaultPrayerReminders, refreshAzaanAlarms, setAzaanAlarm, setPrayerReminder } from '../services/reminders';
 import { DEFAULT_CITY, cityLabel, normalizeCity } from '../utils/cities';
 import { getPrayerLocation } from '../utils/prayerLocations';
@@ -101,8 +101,9 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
   const { width, fontScale } = useWindowDimensions();
   const compactLayout = width / Math.max(fontScale, 1) < 360;
   const [todayIso, setTodayIso] = useState(() => toIsoDate(new Date()));
+  const [prayerNow, setPrayerNow] = useState(() => new Date());
   useEffect(() => {
-    const refreshDate = () => setTodayIso(toIsoDate(new Date()));
+    const refreshDate = () => { const now = new Date(); setTodayIso(toIsoDate(now)); setPrayerNow(now); };
     const subscription = AppState.addEventListener('change', state => { if (state === 'active') refreshDate(); });
     const timer = setInterval(refreshDate, 30000);
     return () => { subscription.remove(); clearInterval(timer); };
@@ -124,6 +125,7 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
   const [azaanAlarmBusy, setAzaanAlarmBusy] = useState('');
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const prayerCity = normalizeCity(selectedCity || profile?.defaultCity || DEFAULT_CITY);
+  const prayerDate = prayerDateAt(getPrayerLocation(prayerCity), prayerNow);
 
   useEffect(() => {
     let active = true;
@@ -159,7 +161,7 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
     loadReminders
       .then(value => setPrayerReminderKeys(value.enabledKeys || []))
       .catch(() => setPrayerReminderKeys([]));
-  }, [prayerCity, profile?.prayerRemindersEnabled, todayIso, cityCatalogueVersion]);
+  }, [prayerCity, profile?.prayerRemindersEnabled, prayerDate, cityCatalogueVersion]);
 
   useEffect(() => {
     getAzaanAlarmSettings()
@@ -168,27 +170,27 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
         : value)
       .then(value => setAzaanAlarmKeys(value.enabledKeys || []))
       .catch(() => setAzaanAlarmKeys([]));
-  }, [prayerCity, todayIso, cityCatalogueVersion]);
+  }, [prayerCity, prayerDate, cityCatalogueVersion]);
 
   const overrides = settings.overrides || [];
   const todayHijri = getHijriDisplay(todayIso, overrides);
   const nextObservance = useMemo(() => getNextObservance(observances, overrides), [observances, overrides, todayIso]);
   const todayPrayerTimes = useMemo(
-    () => calculatePrayerTimes(todayIso, getPrayerLocation(prayerCity)),
-    [prayerCity, todayIso, cityCatalogueVersion]
+    () => calculatePrayerTimes(prayerDate, getPrayerLocation(prayerCity)),
+    [prayerCity, prayerDate, cityCatalogueVersion]
   );
   const sunPosition = useMemo(() => {
     const sunrise = timeMinutes(todayPrayerTimes?.sunrise);
     const sunset = timeMinutes(todayPrayerTimes?.sunset);
     if (!Number.isFinite(sunrise) || !Number.isFinite(sunset) || sunset <= sunrise) return { left: '50%', top: 8 };
-    const now = new Date();
-    const current = now.getHours() * 60 + now.getMinutes();
+    const current = timeMinutes(zonedPrayerClock(prayerNow, todayPrayerTimes.timeZone)?.time);
+    if (!Number.isFinite(current)) return { left: '50%', top: 8 };
     const progress = Math.max(0, Math.min(1, (current - sunrise) / (sunset - sunrise)));
     return {
       left: `${4 + progress * 92}%`,
       top: 28 - Math.sin(Math.PI * progress) * 20,
     };
-  }, [todayPrayerTimes]);
+  }, [todayPrayerTimes, prayerNow]);
   const currentHijriYear = getCurrentHijriYear(overrides) || Number(hYear) || 1448;
   const visibleObservances = useMemo(() => {
     const query = search.trim().toLowerCase();

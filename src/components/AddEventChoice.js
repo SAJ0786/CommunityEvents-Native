@@ -15,7 +15,7 @@ export default function AddEventChoice({ canCreateRecurring, onChoose, registrat
           </View>
           <View style={styles.choiceText}>
             <Text style={styles.choiceEyebrow}>One-time event</Text>
-            <Text style={styles.choiceTitle}>Open Single Event</Text>
+            <Text style={styles.choiceTitle}>Single Event</Text>
             <Text style={styles.choiceDescription}>Create one event for one date and time.</Text>
             <Text style={styles.choiceMeta}>Best for majlis, lectures, programs and one-off gatherings.</Text>
           </View>
@@ -35,7 +35,7 @@ export default function AddEventChoice({ canCreateRecurring, onChoose, registrat
           </View>
           <View style={styles.choiceText}>
             <Text style={[styles.choiceEyebrow, !canCreateRecurring && styles.disabledText]}>Repeating schedule</Text>
-            <Text style={[styles.choiceTitle, !canCreateRecurring && styles.disabledText]}>Open Recurring Event</Text>
+            <Text style={[styles.choiceTitle, !canCreateRecurring && styles.disabledText]}>Recurring Event</Text>
             <Text style={[styles.choiceDescription, !canCreateRecurring && styles.disabledText]}>
               Repeat by day, week, month or year with a preview before saving.
             </Text>
@@ -45,9 +45,8 @@ export default function AddEventChoice({ canCreateRecurring, onChoose, registrat
         </Pressable>
         {registrationPreviewEnabled && <Pressable accessibilityRole="button" onPress={() => onChoose('registration-preview')} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
           <View style={styles.choiceIconWrap}><Text style={styles.choiceIcon}>📋</Text></View>
-          <View style={styles.choiceText}><Text style={styles.choiceEyebrow}>Development preview</Text><Text style={styles.choiceTitle}>Registration Required Event</Text><Text style={styles.choiceDescription}>Choose your questions, limit places and preview registration.</Text><Text style={styles.choiceMeta}>Demo only. No live event or booking will be created.</Text></View>
+          <View style={styles.choiceText}><Text style={styles.choiceEyebrow}>Development preview</Text><Text style={styles.choiceTitle}>Registration only events</Text><Text style={styles.choiceDescription}>Create an event that requires registration, customise your form and manage attendees.</Text><Text style={styles.choiceMeta}>Demo only. No live event or booking will be created.</Text></View>
         </Pressable>}
-        <Text style={styles.choiceMeta}>Open means registration is not required. Event visibility remains a separate setting.</Text>
       </View>
     </ScrollView>
   );

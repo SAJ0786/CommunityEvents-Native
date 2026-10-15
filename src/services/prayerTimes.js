@@ -56,7 +56,7 @@ function asrTime(factor, latitude, declination) {
   return hourAngle(angle, latitude, declination);
 }
 
-function timeZoneForAddress(address = {}) {
+export function timeZoneForAddress(address = {}) {
   if (typeof address.timeZone === 'string' && address.timeZone.startsWith('Australia/')) {
     try { new Intl.DateTimeFormat('en-AU', { timeZone: address.timeZone }).format(new Date()); return address.timeZone; } catch { /* resolve from state */ }
   }
@@ -66,13 +66,22 @@ function timeZoneForAddress(address = {}) {
   if (state === 'NT') return 'Australia/Darwin';
   if (state === 'QLD') return 'Australia/Brisbane';
   if (state === 'TAS') return 'Australia/Hobart';
+  if (state === 'VIC') return 'Australia/Melbourne';
   return 'Australia/Sydney';
 }
 
 export function timeZoneOffsetHours(dateStr, timeZone) {
+  const date = new Date(`${dateStr}T12:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== dateStr) return null;
+  return zonedPrayerClock(date, timeZone)?.offsetHours ?? null;
+}
+
+// Calendar fields belong to the selected location, never the device timezone.
+export function zonedPrayerClock(instant, timeZone) {
   try {
-    const date = new Date(`${dateStr}T12:00:00Z`);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== dateStr) return null;
+    if (!timeZone) return null;
+    const date = new Date(instant);
+    if (!Number.isFinite(date.getTime())) return null;
     // Numeric zoned components work even where Hermes returns AEDT/AEST
     // instead of GMT+11/GMT+10, or does not support shortOffset at all.
     const parts = new Intl.DateTimeFormat('en-GB-u-ca-gregory-nu-latn', {
@@ -82,12 +91,42 @@ export function timeZoneOffsetHours(dateStr, timeZone) {
     const values = Object.fromEntries(parts.filter(item => item.type !== 'literal').map(item => [item.type, Number(item.value)]));
     if (!['year', 'month', 'day', 'hour', 'minute', 'second'].every(key => Number.isFinite(values[key]))) return null;
     const zonedAsUtc = Date.UTC(values.year, values.month - 1, values.day, values.hour % 24, values.minute, values.second);
-    const offset = (zonedAsUtc - date.getTime()) / 3600000;
-    return Number.isFinite(offset) && Math.abs(offset) <= 14 ? offset : null;
+    const offset = (zonedAsUtc - Math.floor(date.getTime() / 1000) * 1000) / 3600000;
+    if (!Number.isFinite(offset) || Math.abs(offset) > 14) return null;
+    const pad = value => String(value).padStart(2, '0');
+    return { date: `${values.year}-${pad(values.month)}-${pad(values.day)}`,
+      time: `${pad(values.hour % 24)}:${pad(values.minute)}`, offsetHours: offset };
   } catch {
     // Do not silently give every city Sydney's winter offset.
     return null;
   }
+}
+
+export function prayerDateAt(address, instant = new Date(), dayOffset = 0) {
+  if (!address || !hasPrayerLocation(address)) return null;
+  const clock = zonedPrayerClock(instant, timeZoneForAddress(address));
+  if (!clock || !Number.isInteger(dayOffset)) return null;
+  const day = new Date(`${clock.date}T12:00:00Z`);
+  day.setUTCDate(day.getUTCDate() + dayOffset);
+  return day.toISOString().slice(0, 10);
+}
+
+// Convert a location's wall-clock time exactly once for native notification APIs.
+// Reject nonexistent/ambiguous clock-change times rather than guess an instant.
+export function prayerTimeInstant(dateStr, time, timeZone) {
+  if (!/^\d{2}:\d{2}$/.test(time || '') || timeZoneOffsetHours(dateStr, timeZone) === null) return null;
+  const [hour, minute] = time.split(':').map(Number);
+  if (hour > 23 || minute > 59) return null;
+  const wall = Date.parse(`${dateStr}T${time}:00Z`);
+  const candidates = new Set();
+  for (const delta of [-86400000, 0, 86400000]) {
+    const offset = zonedPrayerClock(new Date(wall + delta), timeZone)?.offsetHours;
+    if (offset === undefined) continue;
+    const value = wall - offset * 3600000;
+    const check = zonedPrayerClock(new Date(value), timeZone);
+    if (check?.date === dateStr && check.time === time) candidates.add(value);
+  }
+  return candidates.size === 1 ? new Date([...candidates][0]) : null;
 }
 
 function decimalToTime(value) {

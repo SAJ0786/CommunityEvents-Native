@@ -56,7 +56,7 @@ export default function RegistrationPrototypeScreen({ onBack, eventTypes = EVENT
   const canSeePrivate = ['host', 'admin'].includes(viewer) || (viewer === 'registered' && Boolean(booking));
   return <KeyboardAwareScrollView ref={scroll} contentContainerStyle={styles.content}>
     <Text style={styles.warning}>PROTOTYPE ONLY · Fictional details only. No real event, booking, email or Firebase connection. Drafts reset when you leave.</Text>
-    <MemberPageHeader title={titles[stage]} subtitle="Registration Required Event · Single date" icon="clipboard-text-outline" tone="teal" />
+    <MemberPageHeader title={titles[stage]} subtitle="Registration only events · Single date" icon="clipboard-text-outline" tone="teal" />
     <View style={styles.row}><Action text="Back" onPress={() => stage === 0 ? onBack() : go(({ 1: 5, 5: 0, 2: 7, 3: 2, 4: 7, 6: 1, 7: published ? 6 : 0 })[stage])} /><Text style={styles.muted}>Event registration</Text></View>
     {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
     {stage === 0 && <View style={styles.panel}>
