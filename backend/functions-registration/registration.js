@@ -1,6 +1,8 @@
-const { createHash } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 const model = import('./formModel.mjs');
 const catalogueModel = import('./cityCatalogue.mjs');
+const venueModel = import('./privateVenue.mjs');
+const RETENTION = Object.freeze({ policy: 'until-organiser-deletes-or-attendee-cancels', notice: 'Your registration answers are kept until the organiser deletes them or you cancel/delete your registration. Cancelling deletes your answers and releases your places. Organiser answer deletion alone does not cancel your booking. Account deletion and privacy requests are handled separately.' });
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 const clone = value => JSON.parse(JSON.stringify(value));
 function localMinute(now, timeZone) {
@@ -76,9 +78,14 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
   };
   async function saveRegistrationEvent(request) {
     gate(); const draft = await cleanDraft(request.data?.draft);
+    // The legacy prototype has no coordinates. New production clients supply a
+    // selected venue; reject partial/tampered coordinates rather than retaining a stale pin.
+    const suppliedVenue = request.data?.draft?.venue;
+    const venue = suppliedVenue == null ? null : (await venueModel).normalisePrivateVenue(suppliedVenue);
+    if (suppliedVenue != null && (!venue || venue.fullAddress !== draft.address || venue.suburb !== draft.suburb)) fail('invalid-argument', 'Select the full address again and confirm its public suburb.');
     const city = id(request.data?.city);
     const createKey = request.data?.eventId ? null : id(request.data?.createKey);
-    const fingerprint = createHash('sha256').update(JSON.stringify({ draft, city })).digest('hex');
+    const fingerprint = createHash('sha256').update(JSON.stringify({ draft, city, venue })).digest('hex');
     const reference = request.data?.eventId ? eventRef(request.data.eventId) : eventRef(createHash('sha256').update(`${request.auth?.uid}:${createKey}`).digest('hex'));
     return db.runTransaction(async tx => {
       const caller = await actor(request, tx); const currentSnap = await tx.get(reference); const current = currentSnap.exists ? currentSnap.data() : null;
@@ -95,7 +102,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         formVersion: revision, status: 'pending', reservedPlaces: current?.reservedPlaces || 0, registrationCount: current?.registrationCount || 0,
         createdAt: current?.createdAt || now().toISOString(), updatedAt: now().toISOString(), allowCancellation: draft.allowCancellation, creationFingerprint: current?.creationFingerprint || fingerprint };
       tx.set(reference, publicData);
-      tx.set(privateRef(reference.id), { address: draft.address }, { merge: true });
+      tx.set(privateRef(reference.id), { address: draft.address, venue }, { merge: true });
       tx.set(formRef(reference.id), { version: revision, fields: draft.fields, purpose: draft.purpose });
       return { eventId: reference.id, revision, status: 'pending' };
     });
@@ -115,7 +122,8 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const hash = createHash('sha256').update(JSON.stringify({ answers: request.data.answers, places: request.data.places, formVersion: request.data.formVersion, expectedRevision: request.data.expectedRevision })).digest('hex');
     return db.runTransaction(async tx => {
       const caller = await actor(request, tx); const event = await readEvent(eventId, tx);
-      const receiptRef = eventRef(eventId).collection('operations').doc(`${caller.uid}_${requestId}`);
+      const operationId = createHash('sha256').update(JSON.stringify([caller.uid, requestId])).digest('hex');
+      const receiptRef = eventRef(eventId).collection('operations').doc(operationId);
       const receipt = await tx.get(receiptRef);
       if (receipt.exists) { if (receipt.data().hash !== hash) fail('already-exists', 'This submission reference was already used.'); return receipt.data().result; }
       checkOpen(event);
@@ -138,9 +146,9 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const reservedPlaces = event.reservedPlaces - previousPlaces + places;
       if (reservedPlaces > event.capacity) fail('resource-exhausted', 'Not enough places remain. Choose fewer places or try another event.');
       const result = { eventId, registrationId: caller.uid, revision: (previous?.revision || 0) + 1, status: 'registered', places, formVersion: form.version };
-      tx.set(ref, { ...result, uid: caller.uid, answers: clone(answers), fields: clone(form.fields), submittedAt: previous?.submittedAt || now().toISOString(), updatedAt: now().toISOString() });
+      tx.set(ref, { ...result, uid: caller.uid, answers: clone(answers), fields: clone(form.fields), retentionPolicy: RETENTION.policy, submittedAt: previous?.submittedAt || now().toISOString(), updatedAt: now().toISOString() });
       tx.update(eventRef(eventId), { reservedPlaces, registrationCount: event.registrationCount + (previous?.status === 'registered' ? 0 : 1) });
-      tx.set(receiptRef, { hash, result, createdAt: now().toISOString() });
+      tx.set(receiptRef, { uid: caller.uid, hash, result, createdAt: now().toISOString() });
       return result;
     });
   }
@@ -151,7 +159,12 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (!booking || booking.status === 'cancelled') return { status: 'cancelled' };
       if (!event.allowCancellation || localMinute(now(), event.timeZone).slice(0, 10) >= event.date) fail('failed-precondition', 'Cancellation is not available. Contact the organiser.');
       if (request.data.expectedRevision !== booking.revision) fail('aborted', 'Reload your registration before cancelling.');
-      tx.update(ref, { status: 'cancelled', revision: booking.revision + 1, cancelledAt: now().toISOString() });
+      // Do not retain form entries in cancelled bookings. Replace (not merge)
+      // with a minimal tombstone for revision/idempotency; no question snapshots,
+      // contact answers or other submitted values remain here or in operation receipts.
+      tx.set(ref, { eventId: event.id, registrationId: caller.uid, uid: caller.uid,
+        status: 'cancelled', revision: booking.revision + 1, places: 0,
+        cancelledAt: now().toISOString(), answersDeletedAt: now().toISOString() });
       tx.update(eventRef(event.id), { reservedPlaces: event.reservedPlaces - booking.places, registrationCount: event.registrationCount - 1 });
       return { status: 'cancelled', revision: booking.revision + 1 };
     });
@@ -169,8 +182,9 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const form = await tx.get(formRef(event.id));
       const details = await tx.get(privateRef(event.id));
       const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), id: event.id, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
+      result.retention = RETENTION;
       if (manager) result.event.registrationCount = event.registrationCount;
-      if (manager || registered) result.privateDetails = { address: details.data()?.address || '', hasPoster: Boolean(details.data()?.posterPath) };
+      if (manager || registered) result.privateDetails = { address: details.data()?.address || '', venue: (await venueModel).normalisePrivateVenue(details.data()?.venue), hasPoster: Boolean(details.data()?.posterPath) };
       return result;
     });
   }
@@ -182,28 +196,60 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const snapshots = await query.get();
     return { registrations: snapshots.docs.map(doc => doc.data()), nextCursor: snapshots.docs.length === 50 ? snapshots.docs.at(-1).id : null };
   }
+  async function deleteRegistrationAnswers(request) {
+    if (request.data?.confirmation !== 'DELETE ANSWERS') fail('invalid-argument', 'Confirm that you want to permanently delete these answers.');
+    return db.runTransaction(async tx => {
+      const caller = await actor(request, tx); const event = await readEvent(request.data?.eventId, tx);
+      if (!manages(caller, event)) fail('permission-denied', 'Only the organiser or authorised admins may delete responses.');
+      const ref = bookingRef(event.id, request.data?.registrationId); const snapshot = await tx.get(ref);
+      if (!snapshot.exists) fail('not-found', 'Registration not found.');
+      const booking = snapshot.data();
+      if (booking.answersDeletedAt) return { deleted: true, revision: booking.revision };
+      if (request.data.expectedRevision !== booking.revision) fail('aborted', 'The attendee changed their response. Review it again before deleting.');
+      const revision = booking.revision + 1;
+      // Retain only booking metadata needed for capacity/access/retry safety. No
+      // answers or question snapshots remain; cancellation is a separate action.
+      const metadata = { eventId: event.id, registrationId: ref.id, uid: ref.id, revision,
+        status: booking.status, places: booking.places, formVersion: booking.formVersion,
+        submittedAt: booking.submittedAt, updatedAt: now().toISOString(),
+        answers: {}, fields: [], answersDeletedAt: now().toISOString(), answersDeletedBy: caller.uid,
+        retentionPolicy: RETENTION.policy };
+      tx.set(ref, metadata);
+      return { deleted: true, revision };
+    });
+  }
   async function putRegistrationPoster(request) {
     const caller = await actor(request); const event = await readEvent(request.data?.eventId);
     if (!manages(caller, event)) fail('permission-denied', 'You cannot change this poster.');
     const base64 = request.data.base64; const mime = request.data.mime;
     if (typeof base64 !== 'string' || base64.length > 7 * 1024 * 1024 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) fail('invalid-argument', 'Invalid image.');
     const bytes = Buffer.from(base64, 'base64');
+    if (bytes.toString('base64') !== base64) fail('invalid-argument', 'Invalid image encoding.');
     const isImage = (mime === 'image/png' && bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])))
       || (mime === 'image/jpeg' && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255)
       || (mime === 'image/webp' && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP');
     if (!isImage || bytes.length > 5 * 1024 * 1024) fail('invalid-argument', 'Use a JPEG, PNG or WebP image up to 5 MB.');
     const digest = createHash('sha256').update(bytes).digest('hex');
-    const path = `registration-private/${event.id}/${digest}`;
+    // Unique objects ensure cleaning up a failed concurrent upload cannot delete
+    // another request's committed poster, even when the bytes are identical.
+    const path = `registration-private/${event.id}/${digest}-${randomUUID()}`;
     await bucket.file(path).save(bytes, { resumable: false, metadata: { contentType: mime, cacheControl: 'private, no-store' } });
     // Recheck role and revision after upload; never create a public/download-token URL.
-    await db.runTransaction(async tx => {
+    let previousPath; let nextRevision;
+    try { await db.runTransaction(async tx => {
       const currentActor = await actor(request, tx); const currentEvent = await readEvent(event.id, tx);
+      const previous = await tx.get(privateRef(event.id));
       if (!manages(currentActor, currentEvent)) fail('permission-denied', 'You cannot change this poster.');
       if (request.data.expectedRevision !== currentEvent.revision) fail('aborted', 'The event changed. Reload before updating its poster.');
+      previousPath = previous.data()?.posterPath; nextRevision = currentEvent.revision + 1;
       tx.set(privateRef(event.id), { posterPath: path, posterMime: mime }, { merge: true });
-      tx.update(eventRef(event.id), { status: 'pending', revision: currentEvent.revision + 1 });
-    });
-    return { uploaded: true };
+      tx.update(eventRef(event.id), { status: 'pending', revision: nextRevision });
+    }); } catch (error) {
+      await bucket.file(path).delete({ ignoreNotFound: true }).catch(() => {});
+      throw error;
+    }
+    if (previousPath && previousPath !== path && previousPath.startsWith(`registration-private/${event.id}/`)) await bucket.file(previousPath).delete({ ignoreNotFound: true }).catch(() => {});
+    return { uploaded: true, revision: nextRevision, status: 'pending' };
   }
   async function getRegistrationPoster(request) {
     const details = await getRegistrationEvent(request);
@@ -211,7 +257,26 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const snapshot = await privateRef(details.event.id).get(); const data = snapshot.data();
     if (!data?.posterPath) fail('not-found', 'No poster has been uploaded.');
     const [bytes] = await bucket.file(data.posterPath).download();
+    // Download may take time: cancellation or removal must revoke subsequent delivery.
+    const current = await getRegistrationEvent(request);
+    const latest = await privateRef(details.event.id).get();
+    if (!current.privateDetails || latest.data()?.posterPath !== data.posterPath) fail('permission-denied', 'Poster access changed. Reload the event.');
     return { mime: data.posterMime, base64: bytes.toString('base64') };
+  }
+  async function removeRegistrationPoster(request) {
+    let previousPath; let nextRevision;
+    const eventId = id(request.data?.eventId);
+    await db.runTransaction(async tx => {
+      const caller = await actor(request, tx); const event = await readEvent(eventId, tx);
+      const previous = await tx.get(privateRef(eventId));
+      if (!manages(caller, event)) fail('permission-denied', 'You cannot change this poster.');
+      if (request.data.expectedRevision !== event.revision) fail('aborted', 'The event changed. Reload before removing its poster.');
+      previousPath = previous.data()?.posterPath; nextRevision = event.revision + 1;
+      tx.set(privateRef(eventId), { posterPath: null, posterMime: null }, { merge: true });
+      tx.update(eventRef(eventId), { revision: nextRevision, status: 'pending' });
+    });
+    if (previousPath?.startsWith(`registration-private/${eventId}/`)) await bucket.file(previousPath).delete({ ignoreNotFound: true }).catch(() => {});
+    return { removed: true, revision: nextRevision, status: 'pending' };
   }
   async function saveRegistrationTemplate(request) {
     const caller = await actor(request);
@@ -231,6 +296,6 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const snapshot = await query.get();
     return { templates: snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })), nextCursor: snapshot.docs.length === 50 ? snapshot.docs.at(-1).id : null };
   }
-  return { saveRegistrationEvent, approveRegistrationEvent, submitEventRegistration, cancelEventRegistration, getRegistrationEvent, listEventRegistrations, putRegistrationPoster, getRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
+  return { saveRegistrationEvent, approveRegistrationEvent, submitEventRegistration, cancelEventRegistration, getRegistrationEvent, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
 }
 module.exports = { createRegistrationHandlers, localMinute, active, manages, approves };

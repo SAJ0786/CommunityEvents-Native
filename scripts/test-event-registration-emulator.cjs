@@ -31,6 +31,9 @@ async function run() {
   assert.equal((await handlers.getRegistrationEvent(request(loser, { eventId: event.eventId }))).privateDetails, undefined);
   assert.equal((await handlers.getRegistrationEvent(request(winner, { eventId: event.eventId }))).privateDetails.address, draft.address);
   await handlers.cancelEventRegistration(request(winner, { eventId: event.eventId, expectedRevision: 1 }));
+  const cancelled = (await db.doc(`registrationEvents/${event.eventId}/registrations/${winner}`).get()).data();
+  assert.equal(cancelled.answers, undefined, 'Cancellation must erase submitted form entries');
+  assert.equal(cancelled.fields, undefined, 'Cancellation must erase the question snapshot');
   assert.equal((await handlers.getRegistrationEvent(request(winner, { eventId: event.eventId }))).privateDetails, undefined);
   const denied = await fetch(`http://127.0.0.1:8398/v1/projects/${projectId}/databases/(default)/documents/registrationEventPrivate/${event.eventId}`);
   assert.equal(denied.status, 403, 'Direct unauthenticated private document read must fail');

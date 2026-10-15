@@ -16,8 +16,10 @@ export function createRegistrationClient(call, { enabled = false } = {}) {
     submit: submission => invoke('submitEventRegistration', submission),
     cancel: (eventId, expectedRevision) => invoke('cancelEventRegistration', { eventId, expectedRevision }),
     responses: (eventId, cursor = null) => invoke('listEventRegistrations', { eventId, cursor }),
+    deleteAnswers: (eventId, registrationId, expectedRevision, confirmation) => invoke('deleteRegistrationAnswers', { eventId, registrationId, expectedRevision, confirmation }),
     poster: eventId => invoke('getRegistrationPoster', { eventId }),
     uploadPoster: (eventId, expectedRevision, mime, base64) => invoke('putRegistrationPoster', { eventId, expectedRevision, mime, base64 }),
+    removePoster: (eventId, expectedRevision) => invoke('removeRegistrationPoster', { eventId, expectedRevision }),
     saveTemplate: template => invoke('saveRegistrationTemplate', template),
     templates: (cursor = null) => invoke('listRegistrationTemplates', { cursor }),
   });
@@ -37,7 +39,7 @@ export function registrationsCsv(registrations) {
     return `"${text.replace(/"/g, '""')}"`;
   };
   const rows = [['Registration', 'Status', 'Places', 'Form version', 'Submitted at', 'Question', 'Answer']];
-  for (const registration of registrations) for (const field of registration.fields) {
+  for (const registration of registrations) for (const field of registration.fields || []) {
     const answer = registration.answers[field.id];
     rows.push([registration.registrationId, registration.status, registration.places, registration.formVersion, registration.submittedAt, field.label, Array.isArray(answer) ? answer.join('; ') : answer === true ? 'Agreed' : answer ?? '']);
   }
