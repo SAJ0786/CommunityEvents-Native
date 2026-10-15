@@ -9,7 +9,7 @@ const promotion = { businessId: 'business', status: 'active', title: 'Future off
   fullDetails: '<script>alert(1)</script>', startDate: '2026-10-20', endDate: '2026-10-31', approvedAt: { seconds: 100 } };
 const member = { email: 'member@example.test', defaultCity: 'sydney', emailNotificationsEnabled: true, businessNotificationsEnabled: true };
 
-function harness() {
+function harness(options = {}) {
   const records = new Map(), sent = [], logs = [];
   let transactionChain = Promise.resolve(), failUpdate, smtp = 'ok', failQuery = 0, queries = 0;
   const snap = ref => ({ ref, id: ref.id, exists: records.has(ref.path), data: () => records.get(ref.path) });
@@ -49,6 +49,7 @@ function harness() {
       return { accepted: smtp === 'rejected' ? [] : [email.to], messageId: 'test-id' };
     } },
   };
+  Object.assign(deps, options);
   const handlers = createHandlers(deps);
   records.set('businesses/business', { ...business });
   records.set('businessPromotions/promo', { ...promotion });
@@ -66,6 +67,50 @@ test('explicit preferences, valid email, matching city and active account are re
     { businessNotificationsEnabled: undefined }, { active: false }, { isActive: false }, { accountStatus: 'banned' },
     { accountStatus: 'deleted' }, { accountStatus: 'archived' }, { migratedToUid: 'new-user' }]) {
     assert.equal(eligibleRecipient({ ...member, ...patch }, 'sydney'), false, JSON.stringify(patch));
+  }
+});
+
+test('Australia-wide requires trusted approval, and each channel respects explicit preferences', async () => {
+  const h = harness({ audienceEnabled: () => true });
+  const nationwide = { ...promotion, requestedAudience: 'australia', approvedAudience: 'australia' };
+  h.records.set('businessPromotions/promo', nationwide);
+  h.records.set('promotionAudienceApprovals/promo', { audience: 'australia', city: 'sydney', approvalRevision: '100000' });
+  h.records.set('users/perth', { ...member, defaultCity: 'perth', pushNotificationsEnabled: true, fcmTokens: ['test-token'] });
+  h.records.set('users/emailOnly', { ...member, email: 'second@example.test', defaultCity: 'melbourne', pushNotificationsEnabled: false });
+  h.records.set('users/pushOnly', { ...member, email: '', defaultCity: 'adelaide', emailNotificationsEnabled: false, pushNotificationsEnabled: true, fcmTokens: ['second-token'] });
+  h.records.set('users/optout', { ...member, businessNotificationsEnabled: false });
+  const pushes = []; h.deps.admin.messaging = () => ({ sendEachForMulticast: async payload => { pushes.push(payload); return { failureCount: 0 }; } });
+  await h.queue(h.approval({ status: 'pending' }, nationwide));
+  assert.equal(h.jobs().length, 4);
+  await Promise.all(h.jobs().map(path => h.deliver(h.delivery(path))));
+  assert.equal(h.sent.length, 2); assert.equal(pushes.length, 2);
+  assert.match(h.sent[0].subject, /Australia-wide/);
+  await Promise.all(h.jobs().map(path => h.deliver(h.delivery(path))));
+  assert.equal(pushes.length, 2);
+  for (const proof of [undefined, { audience: 'australia', city: 'perth', approvalRevision: '100000' },
+    { audience: 'australia', city: 'sydney', approvalRevision: 'wrong' }]) {
+    const noProof = harness({ audienceEnabled: () => true });
+    noProof.records.set('users/perth', { ...member, defaultCity: 'perth' });
+    if (proof) noProof.records.set('promotionAudienceApprovals/promo', proof);
+    await noProof.queue(noProof.approval({ status: 'pending' }, nationwide));
+    assert.equal(noProof.jobs().length, 0, 'owner fields alone cannot broaden audience');
+  }
+});
+
+test('audience revocation and push opt-out are rechecked; uncertain FCM outcome is not resent', async () => {
+  for (const mode of ['revoked', 'optout', 'failure']) {
+    const h = harness({ audienceEnabled: () => true });
+    const p = { ...promotion, requestedAudience: 'australia' };
+    h.records.set('businessPromotions/promo', p);
+    h.records.set('promotionAudienceApprovals/promo', { audience: 'australia', city: 'sydney', approvalRevision: '100000' });
+    h.records.set('users/perth', { ...member, defaultCity: 'perth', emailNotificationsEnabled: false, pushNotificationsEnabled: true, fcmTokens: ['t'] });
+    let attempts = 0; h.deps.admin.messaging = () => ({ sendEachForMulticast: async () => { attempts++; throw new Error('uncertain'); } });
+    await h.queue(h.approval({ status: 'pending' }, p));
+    if (mode === 'revoked') h.records.delete('promotionAudienceApprovals/promo');
+    if (mode === 'optout') h.records.get('users/perth').pushNotificationsEnabled = false;
+    const job = h.jobs()[0]; await h.deliver(h.delivery(job)); await h.deliver(h.delivery(job));
+    assert.equal(attempts, mode === 'failure' ? 1 : 0);
+    assert.equal(h.records.get(job).status, mode === 'failure' ? 'review-required' : 'skipped');
   }
 });
 

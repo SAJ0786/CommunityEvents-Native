@@ -9,6 +9,8 @@ function register({ admin, db, onDocumentCreated, REGION, logger }) {
   const deliverBusinessPush = onDocumentCreated({ document: 'userNotifications/{notificationId}', region: REGION, retry: true, timeoutSeconds: 120 }, async event => {
     const notice = event.data?.data();
     if (!notice || notice.module !== 'directory' || !notice.recipientUid) return;
+    // Promotion campaign worker owns claims, consent rechecks and delivery.
+    if (notice.type === 'promotion.announcement') return;
     const userRef = db.collection('users').doc(notice.recipientUid);
     const jobRef = db.collection('businessPushDeliveries').doc(event.params.notificationId);
     const claimed = await db.runTransaction(async tx => {

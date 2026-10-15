@@ -8,6 +8,8 @@ import {
 } from '../services/businesses';
 import { friendlyError } from '../utils/errors';
 import { colors, radius, shadow, spacing } from '../theme';
+import Constants from 'expo-constants';
+import CompactSelect from '../components/CompactSelect';
 
 const FILTERS = [
   { value: 'pending', label: 'Pending' },
@@ -18,6 +20,8 @@ const FILTERS = [
 
 function PromotionCard({ promotion, business, busy, onApprove, onReject }) {
   const [expanded, setExpanded] = useState(false);
+  const [audience, setAudience] = useState('local');
+  const audienceEnabled = Constants.expoConfig?.extra?.promotionAudienceEnabled === true;
   const [boosted, setBoosted] = useState(Boolean(promotion.boosted));
   const [reason, setReason] = useState(promotion.rejectionReason || '');
 
@@ -28,10 +32,10 @@ function PromotionCard({ promotion, business, busy, onApprove, onReject }) {
 
   const approve = () => Alert.alert(
     promotion.status === 'active' ? 'Update promotion?' : 'Approve promotion?',
-    `${promotion.title} will appear publicly for ${business?.name || 'the linked business'}.`,
+    `${promotion.title} will appear publicly for ${business?.name || 'the linked business'}.${audienceEnabled ? ` Notification audience: ${audience === 'australia' ? 'Australia-wide' : 'business local city'}. Eligible opted-in members are notified immediately on first approval, including future-dated offers. Reapproval does not send another campaign.` : ''}`,
     [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Approve', onPress: () => onApprove?.(promotion, { boosted }) },
+      { text: 'Approve', onPress: () => onApprove?.(promotion, { boosted, audience }) },
     ]
   );
 
@@ -61,6 +65,13 @@ function PromotionCard({ promotion, business, busy, onApprove, onReject }) {
         <View style={styles.body}>
           <Text style={styles.offer}>{promotion.discountText || promotion.briefText}</Text>
           <Text style={styles.details}>{promotion.fullDetails}</Text>
+          {audienceEnabled && <View>
+            <Text style={styles.details}>Requested audience: {promotion.requestedAudience === 'australia' ? 'Australia-wide' : 'Local city'}</Text>
+            <CompactSelect value={audience} onChange={setAudience} options={[
+              { value: 'local', label: 'Approve local city only' },
+              ...(promotion.requestedAudience === 'australia' ? [{ value: 'australia', label: 'Approve Australia-wide' }] : []),
+            ]} />
+          </View>}
           <View style={styles.metaGrid}>
             <View style={styles.meta}><Text style={styles.metaLabel}>START</Text><Text style={styles.metaValue}>{promotion.startDate}</Text></View>
             <View style={styles.meta}><Text style={styles.metaLabel}>END</Text><Text style={styles.metaValue}>{promotion.endDate}</Text></View>

@@ -1,6 +1,6 @@
 'use strict';
 const { createHash } = require('node:crypto');
-const { isActiveRecipient } = require('./notification-policy');
+const { isActiveRecipient, fcmTokens } = require('./notification-policy');
 const { buildWorkflowEmail } = require('./email-template');
 const catalogueModel = import('./cityCatalogue.mjs');
 const clean = value => String(value || '').trim();
@@ -32,28 +32,36 @@ function eligiblePromotion(promotion, business, now, zones = ZONES) {
     && validDate(promotion.startDate) && validDate(promotion.endDate)
     && promotion.startDate <= promotion.endDate && promotion.endDate >= localToday(city, now, zones));
 }
-function eligibleRecipient(user, city, zones = ZONES) {
+function eligibleRecipient(user, city, zones = ZONES, audience = 'local', channel = 'email') {
   const email = emailOf(user);
   // Explicit enabled preferences: legacy/missing preferences do not imply consent.
-  return isActiveRecipient(user) && !user.migratedToUid && Boolean(city) && cityOf(user.defaultCity, zones) === city
-    && user.emailNotificationsEnabled === true && user.businessNotificationsEnabled === true
-    && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  return isActiveRecipient(user) && !user.migratedToUid && Boolean(city)
+    && Boolean(cityOf(user.defaultCity, zones)) && (audience === 'australia' || cityOf(user.defaultCity, zones) === city)
+    && user.businessNotificationsEnabled === true
+    && (channel === 'push' ? user.pushNotificationsEnabled === true && fcmTokens(user).length > 0
+      : user.emailNotificationsEnabled === true && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
 }
-function messageFor(promotion, business, city) {
-  const title = `New local offer: ${clean(promotion.title).replace(/[\r\n]/g, ' ').slice(0, 150) || 'Business promotion'}`;
+function messageFor(promotion, business, city, audience = 'local') {
+  const title = `New ${audience === 'australia' ? 'Australia-wide' : 'local'} offer: ${clean(promotion.title).replace(/[\r\n]/g, ' ').slice(0, 150) || 'Business promotion'}`;
   return { title, body: [
-    `${clean(business.name) || 'A local business'} has a newly approved promotion for ${city}.`,
+    `${clean(business.name) || 'A local business'} has a newly approved promotion for ${audience === 'australia' ? 'Australia-wide customers' : city}.`,
     clean(promotion.title), clean(promotion.discountText || promotion.briefText),
     `Starts: ${promotion.startDate}\nEnds: ${promotion.endDate}`,
     clean(promotion.fullDetails).slice(0, 4000),
     'An upcoming offer may not be available until its start date. Check the business listing for details and conditions.',
     'Open Community Connect Australia → Business Directory → Promotions. Download/open the app: https://download.communityconnect.siza.info',
-    'You are receiving this local-city announcement because business and email notifications are enabled in your profile. To stop these emails, turn off either preference in the app, or reply to support@siza.info with “Unsubscribe from promotion emails”.',
+    'You are receiving this promotion announcement because business and email notifications are enabled in your profile. To stop these emails, turn off either preference in the app, or reply to support@siza.info with “Unsubscribe from promotion emails”.',
   ].filter(Boolean).join('\n\n') };
 }
 
-function createHandlers({ admin, db, buildTransporter, sender, logger, now = () => new Date() }) {
+function createHandlers({ admin, db, buildTransporter, sender, logger, now = () => new Date(), audienceEnabled = () => process.env.PROMOTION_AUDIENCE_ENABLED === 'true' }) {
   const stamp = () => admin.firestore.FieldValue.serverTimestamp();
+  async function approvedAudience(id, promotion, city) {
+    if (!audienceEnabled()) return 'local';
+    const proof = (await db.collection('promotionAudienceApprovals').doc(id).get()).data();
+    return proof?.audience === 'australia' && promotion?.requestedAudience === 'australia'
+      && proof.approvalRevision === revision(promotion) && proof.city === city ? 'australia' : 'local';
+  }
   async function cityZones() {
     const snapshot = await db.collection('settings').doc('cityCatalogue').get();
     if (!snapshot.exists) return ZONES; // Preserve legacy behaviour until catalogue activation.
@@ -71,11 +79,12 @@ function createHandlers({ admin, db, buildTransporter, sender, logger, now = () 
     const businessSnapshot = await db.collection('businesses').doc(clean(after.businessId)).get();
     const business = businessSnapshot.data();
     if (!eligiblePromotion(after, business, now(), zones)) return;
+    const audience = await approvedAudience(promotionId, after, businessCity(business, zones));
     const campaignRef = db.collection('promotionEmailCampaigns').doc(promotionId);
     // One campaign for the lifetime of a promotion, not one per approval event.
     await db.runTransaction(async tx => {
       if ((await tx.get(campaignRef)).exists) return;
-      tx.set(campaignRef, { status: 'queueing', city: businessCity(business, zones), promotionId,
+      tx.set(campaignRef, { status: 'queueing', city: businessCity(business, zones), audience, pushEnabled: audienceEnabled(), promotionId,
         businessId: after.businessId, approvalRevision: revision(after), promotion: {
           title: clean(after.title), discountText: clean(after.discountText), briefText: clean(after.briefText),
           fullDetails: clean(after.fullDetails).slice(0, 4000), startDate: after.startDate, endDate: after.endDate,
@@ -93,12 +102,14 @@ function createHandlers({ admin, db, buildTransporter, sender, logger, now = () 
       for (let offset = 0; offset < page.docs.length; offset += 10) {
         await Promise.all(page.docs.slice(offset, offset + 10).map(async userDoc => {
           const user = userDoc.data();
-          if (!eligibleRecipient(user, campaign.city, zones)) return;
-          const ref = campaignRef.collection('recipients').doc(emailKey(user));
-          await db.runTransaction(async tx => {
-            if ((await tx.get(ref)).exists) return;
-            tx.set(ref, { uid: userDoc.id, emailHash: emailKey(user), status: 'pending', createdAt: stamp() });
-          });
+          for (const channel of campaign.pushEnabled ? ['email', 'push'] : ['email']) {
+            if (!eligibleRecipient(user, campaign.city, zones, campaign.audience || 'local', channel)) continue;
+            const ref = campaignRef.collection('recipients').doc(channel === 'push' ? `push-${hash(userDoc.id)}` : emailKey(user));
+            await db.runTransaction(async tx => {
+              if ((await tx.get(ref)).exists) return;
+              tx.set(ref, { uid: userDoc.id, channel, emailHash: emailKey(user), status: 'pending', createdAt: stamp() });
+            });
+          }
         }));
       }
       if (page.docs.length < 100) {
@@ -124,7 +135,10 @@ function createHandlers({ admin, db, buildTransporter, sender, logger, now = () 
       db.collection('businesses').doc(campaign.businessId).get(),
     ]);
     const user = userDoc.data(), promotion = promotionDoc.data(), business = businessDoc.data();
-    if (!eligibleRecipient(user, campaign.city, zones) || emailKey(user) !== job.emailHash
+    const channel = job.channel || 'email';
+    const currentAudience = await approvedAudience(campaign.promotionId, promotion, campaign.city);
+    if ((campaign.audience || 'local') !== currentAudience || (channel === 'push' && !audienceEnabled())
+      || !eligibleRecipient(user, campaign.city, zones, campaign.audience || 'local', channel) || (channel === 'email' && emailKey(user) !== job.emailHash)
       || !eligiblePromotion(promotion, business, now(), zones) || businessCity(business, zones) !== campaign.city
       || revision(promotion) !== campaign.approvalRevision) {
       await db.runTransaction(async tx => {
@@ -134,11 +148,20 @@ function createHandlers({ admin, db, buildTransporter, sender, logger, now = () 
       });
       return;
     }
-    const transporter = buildTransporter();
-    if (!transporter) throw new Error('SMTP unavailable; no send attempted.');
+    const transporter = channel === 'email' ? buildTransporter() : null;
+    if (channel === 'email' && !transporter) throw new Error('SMTP unavailable; no send attempted.');
     const claimed = await db.runTransaction(async tx => {
       if ((await tx.get(jobRef)).data()?.status !== 'pending') return false;
       tx.update(jobRef, { status: 'sending', startedAt: stamp() });
+      if (channel === 'push') {
+        const notification = messageFor(campaign.promotion, { name: campaign.businessName }, campaign.city, campaign.audience);
+        tx.set(db.collection('userNotifications').doc(`promotion-${hash(campaign.promotionId + ':' + job.uid)}`), {
+          recipientUid: job.uid, module: 'directory', type: 'promotion.announcement',
+          title: notification.title, body: `${campaign.businessName}: ${campaign.promotion.briefText || campaign.promotion.discountText}. Starts ${campaign.promotion.startDate}.`,
+          businessId: campaign.businessId, entityId: campaign.promotionId, entityType: 'promotion',
+          createdAt: stamp(), read: false,
+        });
+      }
       return true;
     });
     if (!claimed) return;
@@ -146,7 +169,23 @@ function createHandlers({ admin, db, buildTransporter, sender, logger, now = () 
     // sending: a crash/timeout may occur after SMTP accepted the first message.
     // sending/review-required jobs need operator reconciliation, not replay.
     try {
-      const notification = messageFor(campaign.promotion, { name: campaign.businessName }, campaign.city);
+      const notification = messageFor(campaign.promotion, { name: campaign.businessName }, campaign.city, campaign.audience);
+      if (channel === 'push') {
+        const tokens = fcmTokens(user);
+        for (let offset = 0; offset < tokens.length; offset += 500) {
+          const result = await admin.messaging().sendEachForMulticast({ tokens: tokens.slice(offset, offset + 500),
+            notification: { title: notification.title, body: `${campaign.businessName}: ${campaign.promotion.briefText || campaign.promotion.discountText}. Starts ${campaign.promotion.startDate}.`.slice(0, 220) },
+            data: { module: 'directory', type: 'promotion.announcement', recipientUid: job.uid, businessId: campaign.businessId,
+              notificationId: `promotion-${hash(campaign.promotionId + ':' + job.uid)}`,
+              entityId: campaign.promotionId, entityType: 'promotion', screen: 'business-notifications' },
+            android: { notification: { channelId: 'business-alerts' } },
+            apns: { payload: { aps: { sound: 'default' } } },
+          });
+          if (result.failureCount > 0) throw new Error('Some push outcomes require review; do not resend successful devices.');
+        }
+        await jobRef.update({ status: 'accepted', acceptedAt: stamp() });
+        return;
+      }
       const result = await transporter.sendMail({ from: sender(), replyTo: 'support@siza.info',
         to: emailOf(user), subject: notification.title,
         headers: { 'List-Unsubscribe': '<mailto:support@siza.info?subject=Unsubscribe%20from%20promotion%20emails>' },

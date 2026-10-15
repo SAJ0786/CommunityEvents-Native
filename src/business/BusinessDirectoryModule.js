@@ -356,7 +356,7 @@ function PromotionsScreen({ city, businesses, promotions, ownerPromotions = [], 
     .filter(item => {
       if (!item.business) return false;
       const businessCity = item.business.city || item.business.location?.city;
-      return ownedActiveIds.has(item.id) || !selectedCity || !businessCity || normalizeCity(businessCity) === selectedCity;
+      return item.approvedAudience === 'australia' || ownedActiveIds.has(item.id) || !selectedCity || !businessCity || normalizeCity(businessCity) === selectedCity;
     })
     .sort((left, right) => Number(ownedActiveIds.has(right.id)) - Number(ownedActiveIds.has(left.id)) || Number(right.boosted) - Number(left.boosted));
   return (
@@ -374,6 +374,7 @@ function PromotionsScreen({ city, businesses, promotions, ownerPromotions = [], 
             </View>
             <View style={styles.promotionCopy}>
               <Text style={styles.promotionTitle}>{item.title}</Text>
+              {item.approvedAudience === 'australia' && <Text style={styles.promotionOffer}>Australia-wide</Text>}
               <Text style={styles.promotionOffer}>{item.discountText || item.briefText}</Text>
               <View style={styles.promotionFooter}>
                 <Text numberOfLines={1} style={styles.promotionBusiness}>{item.business.name}</Text>

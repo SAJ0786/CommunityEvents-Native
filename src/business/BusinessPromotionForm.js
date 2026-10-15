@@ -7,6 +7,7 @@ import NativeDateTimeField from '../components/NativeDateTimeField';
 import { validateBusinessPromotion } from '../services/businesses';
 import { colors, radius, shadow, spacing } from '../theme';
 import MemberPageHeader from '../components/MemberPageHeader';
+import Constants from 'expo-constants';
 
 function isoDate(offsetDays = 0) {
   const date = new Date();
@@ -37,6 +38,7 @@ export default function BusinessPromotionForm({
   const [localImage, setLocalImage] = useState(null);
   const [form, setForm] = useState({
     businessId: initialPromotion?.businessId || businesses[0]?.id || '',
+    requestedAudience: initialPromotion?.requestedAudience || 'local',
     title: initialPromotion?.title || '',
     briefText: initialPromotion?.briefText || '',
     discountText: initialPromotion?.discountText || '',
@@ -97,6 +99,12 @@ export default function BusinessPromotionForm({
         <Field label="Promotion title" error={attempted ? validation.title : ''}>
           <TextInput value={form.title} onChangeText={value => update('title', value)} maxLength={90} placeholder="For example: Community catering special" placeholderTextColor={colors.muted} style={styles.input} />
         </Field>
+        {Constants.expoConfig?.extra?.promotionAudienceEnabled === true && <Field label="Notification audience" error={attempted ? validation.requestedAudience : ''}>
+          <CompactSelect value={form.requestedAudience} onChange={value => update('requestedAudience', value)} options={[
+            { value: 'local', label: 'Local city (recommended)' }, { value: 'australia', label: 'Australia-wide' },
+          ]} />
+          <Text style={styles.sectionText}>Choose Australia-wide only if customers throughout Australia can use this offer. Admin will confirm the audience. Announcements respect notification preferences and are sent on approval, even for a future start date.</Text>
+        </Field>}
         <Field label="Short summary" error={attempted ? validation.briefText : ''}>
           <TextInput value={form.briefText} onChangeText={value => update('briefText', value)} maxLength={180} placeholder="A short line shown in the Promotions feed" placeholderTextColor={colors.muted} style={styles.input} />
         </Field>

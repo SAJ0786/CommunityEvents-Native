@@ -59,6 +59,7 @@ export default ({ config }) => ({
     // No EAS profile enables this while registration security/device gates are open.
     eventRegistrationEnabled: process.env.EVENT_REGISTRATION_CLIENT_ENABLED === 'true',
     cityManagementEnabled: process.env.CITY_MANAGEMENT_CLIENT_ENABLED === 'true',
+    promotionAudienceEnabled: process.env.PROMOTION_AUDIENCE_CLIENT_ENABLED === 'true',
     androidCertificateSha1,
     appCheckProvider,
     ...(appCheckDebugToken ? { appCheckDebugToken } : {}),

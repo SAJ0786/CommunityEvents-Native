@@ -50,6 +50,8 @@ async function testPush() {
   assert.equal(pushes.at(-1).data.screen, 'business-inbox');
   assert.equal(pushes.at(-1).data.recipientUid, 'member');
   const count = pushes.length;
+  await deliverBusinessPush(event('campaign-owned', 'member', 'promotion.announcement'));
+  assert.equal(pushes.length, count, 'campaign announcements must not use generic push delivery');
   await deliverBusinessPush(event('reply'));
   assert.equal(pushes.length, count, 'completed push trigger replay must not re-send');
   await deliverBusinessPush(event('optional', 'member', 'profile.updated'));
@@ -88,6 +90,7 @@ async function testWorkflow() {
     './email-template': require('../backend/functions-business-workflow/email-template'),
     './support-workflow': { register: () => ({}) }, './push-delivery': { register: () => ({}) },
     './promotion-email': { register: () => ({}) },
+    './cityManagement': { register: () => ({}) }, './promotionAudience': { register: () => ({}) },
   };
   vm.runInNewContext(read('backend/functions-business-workflow/index.js'), { exports, require: name => { assert.ok(name in mocks, name); return mocks[name]; }, console });
   const off = { businessNotificationsEnabled: false, emailNotificationsEnabled: false, pushNotificationsEnabled: false };

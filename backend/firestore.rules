@@ -247,7 +247,8 @@ service cloud.firestore {
     }
 
     function validPromotion(data) {
-      return data.title is string
+      return (!('requestedAudience' in data) || data.requestedAudience in ['local', 'australia'])
+        && data.title is string
         && data.title.size() >= 3
         && data.briefText is string
         && data.briefText.size() >= 10
@@ -262,7 +263,7 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'title', 'briefText', 'discountText', 'fullDetails',
         'startDate', 'endDate', 'imageUrl', 'imagePath', 'status',
-        'hidden', 'rejectionReason', 'lastSubmittedBy', 'updatedAt', 'submittedAt'
+        'hidden', 'rejectionReason', 'lastSubmittedBy', 'updatedAt', 'submittedAt', 'requestedAudience'
       ]);
     }
 

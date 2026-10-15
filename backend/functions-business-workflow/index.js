@@ -99,6 +99,7 @@ Object.assign(exports, require('./support-workflow').register({
 
 Object.assign(exports, require('./push-delivery').register({ admin, db, onDocumentCreated, REGION, logger }));
 Object.assign(exports, require('./cityManagement').register({ db, onCall, HttpsError, REGION, apiKey: GOOGLE_PLACES_SERVER_API_KEY }));
+Object.assign(exports, require('./promotionAudience').register({ db, admin, onCall, HttpsError, REGION }));
 Object.assign(exports, require('./promotion-email').register({ admin, db, onDocumentUpdated, onDocumentCreated, REGION, EMAIL_SECRETS, buildTransporter, sender, logger }));
 
 async function getAdminRecipients(cities, actorUid = '') {

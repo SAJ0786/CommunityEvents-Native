@@ -31,6 +31,11 @@ test('preview displays resolved coordinates; add re-resolves and stores them, ig
   assert.equal(saved.latitude, preview.city.latitude);
   assert.equal(saved.timeZone, preview.city.timeZone);
   assert.equal(state.writes, 1);
+  for (const existing of result.catalogue.cities.filter(city => city.id !== 'rest-of-australia')) {
+    assert.equal(typeof existing.latitude, 'number');
+    assert.equal(typeof existing.longitude, 'number');
+    assert.match(existing.timeZone, /^Australia\//);
+  }
   await assert.rejects(api.add(req({ ...preview, code: 'DRW' })), { code: 'already-exists' });
   assert.equal(state.writes, 1);
 });

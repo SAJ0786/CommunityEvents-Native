@@ -1,6 +1,14 @@
 # Community Connect Australia — Copilot / next-agent handover
 
 Last checkpoint: 16 October 2026, Australia/Sydney. Work is in progress.
+Latest item 1 checkpoint: native local/Australia-wide promotion request and explicit
+admin approval, server-only audience proof, preference-aware email/push, and national
+feed visibility are coded behind disabled client/server gates. See
+PROMOTION-AUDIENCE-2026-10-16.md. 27 focused tests and 14 regressions passed, 124 source
+files parsed. Existing city coordinates use the same schema as new cities; saved
+initial catalogue contains them all. No live seeding/deployment. PWA chat is actively
+implementing items 2 and 3; do not claim them complete until its tested sync report.
+User explicitly deferred item 4 (combined security/release setup/deployment).
 Current city checkpoint (after bfa7a0e): server Events catalogue context and native/
 lifecycle recurrence now use validated city definitions. Added gated Super Admin
 Add City panel with Google city search, coordinate/timezone preview and server

@@ -11,6 +11,7 @@ import {
   writeBatch,
 } from '@react-native-firebase/firestore';
 import { httpsCallable } from '@react-native-firebase/functions';
+import Constants from 'expo-constants';
 import { db, ensureFirebaseSession, functions } from '../firebase/firebase';
 import { cleanBusinessHours as cleanHours, validateBusinessHours } from '../utils/businessHours';
 
@@ -767,6 +768,7 @@ export async function setBusinessVisibility(businessId, hidden) {
 
 function cleanPromotion(payload = {}) {
   return {
+    ...(Constants.expoConfig?.extra?.promotionAudienceEnabled === true ? { requestedAudience: payload.requestedAudience || 'local' } : {}),
     title: clean(payload.title),
     briefText: clean(payload.briefText),
     discountText: clean(payload.discountText),
@@ -799,6 +801,7 @@ function publicPromotionFields(promotion = {}, boosted = false) {
 export function validateBusinessPromotion(payload = {}) {
   const promotion = cleanPromotion(payload);
   const errors = {};
+  if (payload.requestedAudience && !['local', 'australia'].includes(payload.requestedAudience)) errors.requestedAudience = 'Choose local city or Australia-wide.';
   if (promotion.title.length < 3) errors.title = 'Enter a promotion title.';
   if (promotion.briefText.length < 10) errors.briefText = 'Add a short promotion summary.';
   if (promotion.fullDetails.length < 20) errors.fullDetails = 'Add complete promotion terms and details.';
@@ -929,6 +932,9 @@ export function listenBusinessPromotionsForAdmin(onPromotions, onError) {
 
 export async function approveBusinessPromotion(promotionId, options = {}) {
   const user = await requireAdminSession();
+  if (Constants.expoConfig?.extra?.promotionAudienceEnabled === true) {
+    return (await httpsCallable(functions, 'approvePromotionAudience')({ promotionId, audience: options.audience || 'local', confirmAudience: true, boosted: Boolean(options.boosted) })).data;
+  }
   const reference = doc(db, PROMOTIONS_COLLECTION, promotionId);
   const snapshot = await getDoc(reference);
   if (!snapshot.exists()) throw new Error('This promotion could not be found.');
