@@ -3,7 +3,7 @@ const { enqueuePosterCleanup } = require('./posterMaintenance');
 const model = import('./formModel.mjs');
 const catalogueModel = import('./cityCatalogue.mjs');
 const venueModel = import('./privateVenue.mjs');
-const RETENTION = Object.freeze({ policy: 'until-organiser-deletes-or-attendee-cancels', notice: 'Your registration answers are kept until the organiser deletes them or you cancel/delete your registration. Cancelling deletes your answers and releases your places. Organiser answer deletion alone does not cancel your booking. Account deletion and privacy requests are handled separately.' });
+const RETENTION = Object.freeze({ policy: 'until-organiser-deletes-or-attendee-cancels', notice: 'Your registration answers are kept until the organiser deletes them or you cancel/delete your registration. Cancelling deletes your answers and releases your places. Organiser answer deletion alone does not cancel your booking. Deleting your account queues removal of your registration answers and cancels upcoming events you organise, notifying attendees. Contact support for other privacy requests.' });
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 const clone = value => JSON.parse(JSON.stringify(value));
 function localMinute(now, timeZone) {

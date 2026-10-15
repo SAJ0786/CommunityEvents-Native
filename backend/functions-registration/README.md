@@ -1,5 +1,59 @@
 # Event registration backend candidate — NOT DEPLOYED
 
+## Current status — 16 October (supersedes historical notes below)
+
+- Initial events require scoped admin approval. Approved organiser edits and poster
+  changes remain approved. Stable forms preserve formVersion; changed questions,
+  terms or purpose require review of the new version.
+- Existing attendees may edit answers/reduce places after closing until event day.
+  New/reopened bookings and increased places remain blocked after closing.
+- Atomic form/date/venue outbox and bounded fan-out create email/push jobs. Delivery
+  rechecks active account, cancelled/replaced bookings and already-reviewed forms.
+  No answers, questions, exact venue or poster URLs appear in messages/outboxes.
+- Native push validates recipient/gate and reloads through the callable. Email gives
+  instructions for My registrations, not an unverified universal link.
+- Provider calls are claimed before sending. Uncertain/interrupted outcomes become
+  review-required for operator investigation, not automatic resend. Exactly-once
+  delivery by SMTP/FCM is not guaranteed. Missing email/tokens are recorded as skipped.
+- Organiser cancellation requires confirmation/revision, releases places, revokes
+  attendee private venue/poster access and queues notices. It cannot be reopened.
+- Organiser account deletion cancels upcoming events and queues notices. Past hosted
+  events remain unchanged. Deleted attendee accounts have their own answers and
+  question snapshots erased by a resumable worker, with capacity released once.
+  Their private templates are removed. Auth/non-registration deletion is unchanged.
+- Other attendees' answers remain under the agreed retention policy after a host
+  cancels or deletes their account; scoped admins retain management access. No new
+  automatic retention period is introduced. Further privacy requests go to support.
+- My registrations uses an account-scoped server index and includes cancelled/past
+  events. Native address picker, maps, poster, templates and response UI are wired
+  behind the disabled build flag, not merely prototype screens.
+- Poster upload quota (10/member/hour) and durable pre-upload recovery intent,
+  24-hour grace, reference checks and bounded leased cleanup are implemented.
+
+Additional internal collections: registrationMemberEvents (events subcollection),
+registrationChanges, registrationNoticeDeliveries, registrationAccountCleanup,
+registrationPosterCleanup and registrationUploadLimits. No direct client allow
+rules exist for these candidate paths. Merged authenticated-rule tests still needed.
+
+Release controls: EVENT_REGISTRATION_ENABLED and native
+EVENT_REGISTRATION_CLIENT_ENABLED remain off. EVENT_REGISTRATION_NOTICES_ENABLED
+is an additional delivery gate. EVENT_REGISTRATION_MAINTENANCE_ENABLED allows
+privacy cleanup if the main feature is disabled after launch. Do not stop cleanup
+when rolling back UI access. Existing SMTP secret names are used only by the notice
+worker. Merge candidate indexes only in the approved release window.
+
+Verification: 28 backend tests pass. Isolated Firestore script passes concurrent
+outbox/account cleanup with MOCK SMTP/FCM. CLI update check still fails after test
+success/shutdown. No live email, push, data writes, build or deployment.
+Still required: real Storage/App Check, merged rules, Node 22 runtime, approved
+SMTP/FCM acceptance, operational monitoring for review-required jobs, old-client
+compatibility, PWA parity and device acceptance. See COPILOT-HANDOVER.md.
+
+## Historical implementation notes (14–15 October)
+
+The older pending-edit and unfinished-screen statements below are superseded by
+the current status above; they are not the current implementation contract.
+
 Separate, feature-disabled codebase. Do not add to production firebase.json or deploy until release review. `EVENT_REGISTRATION_ENABLED` defaults off; callable exports require App Check.
 
 ## Implemented

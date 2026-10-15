@@ -3,6 +3,7 @@ const { createRequire } = require('node:module');
 const path = require('node:path');
 const { createRegistrationHandlers } = require('../backend/functions-registration/registration');
 const { createChangeNotifications } = require('../backend/functions-registration/changeNotifications');
+const { createAccountCleanup } = require('../backend/functions-registration/accountCleanup');
 const dependency = createRequire(path.join(__dirname, '../backend/functions-lifecycle/package.json'));
 const admin = dependency('firebase-admin');
 const projectId = 'demo-registration-20261012';
@@ -49,8 +50,18 @@ async function run() {
   assert.equal(cancelled.answers, undefined, 'Cancellation must erase submitted form entries');
   assert.equal(cancelled.fields, undefined, 'Cancellation must erase the question snapshot');
   assert.equal((await handlers.getRegistrationEvent(request(winner, { eventId: event.eventId }))).privateDetails, undefined);
+  await handlers.submitEventRegistration(request(loser, { ...payload, formVersion: 2 }));
+  const cleanup = createAccountCleanup({ db, enabled: () => true, now: () => new Date('2026-11-01T00:00:02Z') });
+  await db.doc('users/host').update({ accountStatus: 'deleted' });
+  await cleanup.enqueue('host');
+  for (let i = 0; i < 4; i++) await Promise.all([cleanup.tick(), cleanup.tick()]);
+  assert.equal((await db.doc(`registrationEvents/${event.eventId}`).get()).data().status, 'cancelled');
+  await db.doc(`users/${loser}`).update({ accountStatus: 'deleted' });
+  await cleanup.enqueue(loser);
+  for (let i = 0; i < 4; i++) await Promise.all([cleanup.tick(), cleanup.tick()]);
+  assert.equal((await db.doc(`registrationEvents/${event.eventId}/registrations/${loser}`).get()).data().answers, undefined);
   const denied = await fetch(`http://127.0.0.1:8398/v1/projects/${projectId}/databases/(default)/documents/registrationEventPrivate/${event.eventId}`);
   assert.equal(denied.status, 403, 'Direct unauthenticated private document read must fail');
-  console.log('PASS isolated Firestore emulator: concurrent last seat, retry, private projection, approved edits, concurrent notification outbox, cancellation revocation and direct rules denial. Mock delivery only; no production writes.');
+  console.log('PASS isolated Firestore emulator: concurrent last seat, retry, private projection, approved edits, concurrent notification outbox, account cleanup, cancellation revocation and direct rules denial. Mock delivery only; no production writes.');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => app.delete());

@@ -4,6 +4,7 @@ const { createRegistrationHandlers, localMinute } = require('../backend/function
 const { createPosterMaintenance, GRACE_MS } = require('../backend/functions-registration/posterMaintenance');
 const { createChangeNotifications } = require('../backend/functions-registration/changeNotifications');
 const { createNotificationTransport } = require('../backend/functions-registration/notificationTransport');
+const { createAccountCleanup } = require('../backend/functions-registration/accountCleanup');
 class HttpsError extends Error { constructor(code, message) { super(message); this.code = code; } }
 function fixture() {
   const records = new Map(); let sequence = 0; let queue = Promise.resolve();
@@ -375,6 +376,38 @@ test('organiser cancellation is authorised and idempotent, sends notices, revoke
   assert.equal((await f.handlers.listRegistrationEvents(f.request('member', { scope: 'attending' }))).events.length, 0);
   assert.equal(f.records.get(`registrationEvents/${f.event.eventId}`).reservedPlaces, 0);
   assert.equal(f.records.get(`registrationEvents/${f.event.eventId}/registrations/member`).answers, undefined);
+});
+
+test('account deletion cancels upcoming hosted events once and notifies attendees; history is preserved', async () => {
+  const f = await noticeFixture();
+  const old = { ...f.records.get(`registrationEvents/${f.event.eventId}`), date: '2020-01-01', title: 'Past event' };
+  f.records.set('registrationEvents/historical', old);
+  const cleanup = createAccountCleanup({ db: f.db, now: f.now, enabled: () => true });
+  await cleanup.enqueue('host'); assert.equal(f.records.has('registrationAccountCleanup/host'), false);
+  f.records.get('users/host').accountStatus = 'deleted';
+  f.records.set('registrationTemplates/host/items/private-template', { fields: [{ label: 'Private custom template' }] });
+  await Promise.all([cleanup.enqueue('host'), cleanup.enqueue('host')]);
+  for (let i = 0; i < 4; i++) await Promise.all([cleanup.tick(), cleanup.tick()]);
+  assert.equal(f.records.get(`registrationEvents/${f.event.eventId}`).status, 'cancelled');
+  assert.equal(f.records.get(`registrationEvents/${f.event.eventId}`).revision, 3);
+  assert.equal(f.records.get('registrationEvents/historical').status, 'approved');
+  assert.equal(f.records.get('registrationAccountCleanup/host').state, 'complete');
+  assert.equal(f.records.has('registrationTemplates/host/items/private-template'), false);
+  await f.worker.tick(); assert.equal(f.sent.length, 2); assert.ok(f.sent.every(row => row.notice.title.includes('cancelled')));
+});
+
+test('deleted attendee answers and snapshots are erased and capacity is released exactly once', async () => {
+  const f = await noticeFixture();
+  f.records.get('users/member').accountStatus = 'deleted';
+  const cleanup = createAccountCleanup({ db: f.db, now: f.now, enabled: () => true });
+  await cleanup.enqueue('member');
+  for (let i = 0; i < 4; i++) await Promise.all([cleanup.tick(), cleanup.tick()]);
+  const booking = f.records.get(`registrationEvents/${f.event.eventId}/registrations/member`);
+  assert.equal(booking.answers, undefined); assert.equal(booking.fields, undefined); assert.equal(booking.revision, 2);
+  assert.equal(f.records.get(`registrationEvents/${f.event.eventId}`).reservedPlaces, 0);
+  assert.equal(f.records.get(`registrationEvents/${f.event.eventId}`).registrationCount, 0);
+  await f.worker.tick(); assert.equal(f.sent.length, 0);
+  assert.deepEqual(await createAccountCleanup({ db: f.db }).tick(), { disabled: true });
 });
 test('timezone calculation follows daylight saving and feature defaults to off', async () => {
   assert.equal(localMinute(new Date('2026-10-03T16:00:00Z'), 'Australia/Sydney'), '2026-10-04T03:00');

@@ -119,10 +119,11 @@ integration, not a physical-device/UI acceptance pass or a finished release.
   edit/cancel/confirm, public discovery/cards, approval and response management.
 - [ ] Wire real private address picker/maps/navigation and poster lifecycle into UI;
   dynamic event-type inheritance; retention and re-consent notices.
-- [ ] Account/privacy deletion lifecycle. User confirmed organiser account deletion
-  must cancel upcoming events and notify attendees (16 October). Attendee
-  cancellation erasure, host event cancellation, change notices, upload rate limits
-  and durable orphan cleanup are coded; production/device acceptance is still open.
+- [ ] Verify registration account-deletion trigger/worker in approved environment.
+  User confirmed organiser account deletion must cancel upcoming events and notify
+  attendees (16 October); this is now coded, with the attendee's own answer erasure,
+  template cleanup and seat release. Existing non-registration account lifecycle
+  remains unchanged. No live deployment; production/device acceptance still open.
 - [ ] Complete dynamic-city consumers, especially recovered event-notification backend,
   recurrence and PWA. Old clients still have bundled lists. No live city activation yet.
 - [ ] Local vs Australia-wide promotion request/admin approval, preference-aware
@@ -220,6 +221,19 @@ native binaries. Azaan currently refreshes when prayer panel opens; verify on up
   Checkpoint verification: 39 combined backend/venue/city/promotion/integration
   tests passed, candidate entry/maintenance syntax checks and git diff --check passed.
 - Last verified native baseline before this checkpoint: bf4e5d2142fbca8ad80c25e7b17b85149fad6ea1.
+- Lifecycle/notice checkpoint synced and verified at aec098c11136e202ced6172ba7daf3b883805ebd.
+- Account deletion checkpoint adds accountCleanup.js: users deletion trigger creates
+  a durable registrationAccountCleanup job; bounded host/attendee/template phases
+  resume safely across concurrent retries. Upcoming hosted events cancel and queue
+  notices; past hosted events stay unchanged. Deleted attendee answers/snapshots
+  are removed and booked capacity decremented once; private templates are removed.
+  Other attendees' answers on cancelled hosted events retain the agreed policy and
+  scoped-admin management access. Main feature OR maintenance flag enables cleanup.
+  No production Firebase changes. 28 backend tests passed; isolated real Firestore
+  script also passed concurrent cleanup with mock delivery. CLI update-check warning
+  still occurs after successful script. Updated backend README supersedes old pending
+  reapproval/unfinished-screen descriptions. Non-registration privacy handling is
+  outside this worker; support remains the route for further erasure requests.
 - Next: production lifecycle/security (account deletion, delivery operational review,
   merged rules/Storage/App Check), PWA parity, dynamic-city worker migration,
   nationwide promotions, then release/device acceptance. No builds/deployments.

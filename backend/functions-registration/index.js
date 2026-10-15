@@ -2,6 +2,7 @@
 const admin = require('firebase-admin');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const logger = require('firebase-functions/logger');
 const { defineSecret } = require('firebase-functions/params');
 const nodemailer = require('nodemailer');
@@ -9,6 +10,7 @@ const { createChangeNotifications } = require('./changeNotifications');
 const { createNotificationTransport } = require('./notificationTransport');
 const { createRegistrationHandlers } = require('./registration');
 const { createPosterMaintenance } = require('./posterMaintenance');
+const { createAccountCleanup, deleted } = require('./accountCleanup');
 admin.initializeApp();
 const handlers = createRegistrationHandlers({ db: admin.firestore(), bucket: admin.storage().bucket(), HttpsError,
   enabled: () => process.env.EVENT_REGISTRATION_ENABLED === 'true' });
@@ -36,4 +38,12 @@ exports.deliverRegistrationChanges = onSchedule({ schedule: 'every 1 minutes', r
   const transport = createNotificationTransport({ mailer, messaging: admin.messaging(), from: { name: 'Community Connect Australia', address: 'support@siza.info' } });
   const worker = createChangeNotifications({ db: admin.firestore(), enabled: () => true, ...transport });
   logger.info('Registration change delivery summary', await worker.tick());
+});
+const accountCleanup = createAccountCleanup({ db: admin.firestore(),
+  enabled: () => process.env.EVENT_REGISTRATION_ENABLED === 'true' || process.env.EVENT_REGISTRATION_MAINTENANCE_ENABLED === 'true' });
+exports.queueRegistrationAccountCleanup = onDocumentWritten({ document: 'users/{uid}', region: 'australia-southeast1', retry: true }, async event => {
+  if (deleted(event.data?.after.data())) await accountCleanup.enqueue(event.params.uid);
+});
+exports.cleanupRegistrationAccounts = onSchedule({ schedule: 'every 1 minutes', region: 'australia-southeast1', maxInstances: 1 }, async () => {
+  logger.info('Registration account cleanup summary', await accountCleanup.tick());
 });
