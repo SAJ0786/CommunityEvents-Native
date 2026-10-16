@@ -180,6 +180,7 @@ exports.adminDeleteUser = onCall({ region: REGION }, async request => {
   if (!['admin', 'superAdmin'].includes(caller.role)) throw new HttpsError('permission-denied', 'Admin access required.');
   const targetUid = String(request.data?.targetUid || '').trim();
   const ban = request.data?.ban === true;
+  const permanent = request.data?.permanent === true && !ban;
   if (!targetUid || targetUid === request.auth.uid) throw new HttpsError('invalid-argument', 'Choose another user.');
   const targetDoc = await db.collection('users').doc(targetUid).get();
   if (!targetDoc.exists) throw new HttpsError('not-found', 'User not found.');
@@ -205,9 +206,14 @@ exports.adminDeleteUser = onCall({ region: REGION }, async request => {
   batch.set(db.collection('users').doc(targetUid), { accountStatus, isActive: false, archivedAt, archivedBy: request.auth.uid, updatedAt: archivedAt }, { merge: true });
   batch.set(db.collection('calendarSubscriptions').doc(targetUid), { active: false, accountStatus, archivedAt, updatedAt: archivedAt }, { merge: true });
   if (ban && target.email) batch.set(db.collection('bannedUsers').doc(target.email.toLowerCase().replace(/\./g, '_')), { email: target.email.toLowerCase(), bannedAt: archivedAt, bannedBy: request.auth.uid, reason: 'Admin archive with ban', active: true, fullName: target.fullName || '', uid: targetUid, role: target.role || 'user', phone: target.phone || '', phoneVerified: target.phoneVerified || false }, { merge: true });
+  if (permanent) {
+    batch.delete(db.collection('users').doc(targetUid));
+    batch.delete(db.collection('calendarSubscriptions').doc(targetUid));
+  }
   await batch.commit();
-  await admin.auth().updateUser(targetUid, { disabled: true }).catch(error => console.warn('Disable auth failed:', error.message));
-  return { archived: true, eventsArchived: events.size, banned: ban };
+  if (permanent) await admin.auth().deleteUser(targetUid).catch(error => { if (error.code !== 'auth/user-not-found') throw error; });
+  else await admin.auth().updateUser(targetUid, { disabled: true }).catch(error => console.warn('Disable auth failed:', error.message));
+  return { archived: true, deleted: permanent, eventsArchived: events.size, banned: ban };
 });
 
 exports.adminUnbanUser = onCall({ region: REGION }, async request => {
