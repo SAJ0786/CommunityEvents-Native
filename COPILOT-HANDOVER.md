@@ -56,7 +56,7 @@ builds based on historical instructions.**
   `/app`, `/businesses` return exact deployed artifact; signed-out 390/1440 layouts
   pass without overflow/browser errors. Thirteen empty-payload rejection probes
   pass (10 auth 401, 3 invalid-argument 400, NOT authenticated-flow acceptance).
-  Web handover/docs main `e24ae3f3d30e10fcb0d03e3dbae9c230d4d7fee7`.
+  Web handover/docs main `0a53ed2d13481f07bfd09069cb2bb77df20c6eeb`.
   Prior Hosting `97f9f2dedf9923d5` retained on
   `registration-pre-staged-20261017`. No default function change in this follow-up.
 
@@ -117,11 +117,54 @@ builds based on historical instructions.**
   Both explicitly keep unrelated city/promotion flags false. Ordinary profiles
   stay registration-disabled. No personal-test bundle/certificate substitution,
   no new signing identity or upload key, no debug token committed.
-- Build/distribution: prepared; no new artifacts queued yet. Use existing EAS
-  credentials with `--freeze-credentials`; surface missing/expired credentials or
-  Apple agreements rather than creating replacement identities. iOS upload is
-  TestFlight only, never App Store review/public release. Record exact build IDs,
-  source SHA, actual version/build/signing and TestFlight processing separately.
+- Tester source/config committed and pushed:
+  `05686cd4065f4bb274ef4de0e0503fdde510cf30`. Build source includes the full Native
+  staged-approval/form-parity implementation plus the dedicated tester profiles.
+- Android build **FINISHED**, version 2.1.1/build 97, completed
+  16 October 2026 19:42:53 UTC:
+  https://expo.dev/accounts/siza-apps/projects/community-events-australia-native/builds/c1b96322-25ce-49ca-a2e2-0214fa78e25f
+  Profile `registration-apk`, INTERNAL, exact source `05686cd`, existing remote
+  keystore `community-events-production-v1`. No duplicate builds or Play upload.
+  Effective config confirms registration true, city/promotion false, tester mode,
+  debug App Check and internal APK. Install artifact:
+  https://expo.dev/artifacts/eas/-Hrp4ReIrDwVyReXSm7TSzFg39rg4WD3TV8D4EaiFck.apk
+  Downloaded artifact verified: package `info.siza.communityevents.app`,
+  versionName `2.1.1`, versionCode `97`, target/compile SDK 36; APK Signature
+  Scheme v2 verifies, one RSA signer, existing SIZA Apps release certificate.
+  Signer SHA-256:
+  `a5ba88c1a81b75a7d8b5e7824a85685235130db51ae9ba55af5719294d5e6d24`.
+  APK SHA-256:
+  `95c7b199301923cd5cacb14300844bfedd9a175d7d0bcba3511e9ce9e28609f3`.
+  Packaged `assets/app.config` independently confirms registration true,
+  city/promotion false, debug App Check and version 2.1.1. No private key/debug
+  token was printed or committed. Physical installation/acceptance is NOT claimed.
+  This is not a Play release or automatically installed update.
+- iOS **BLOCKED BEFORE QUEUE**, not built/uploaded/processing/available to testers.
+  `build --platform ios --profile registration-testflight --freeze-credentials
+  --non-interactive --no-wait` failed: credentials not set up; interactive mode
+  required. EAS remote iOS buildNumber advanced 1 -> 2; no build ID was created.
+  Bounded interactive inventory found existing production certificate
+  `DZMB985S73`, team `D36Y75H5BU`, expiry 1 September 2027. Selected ONLY
+  "Distribution Certificate: Use an existing one"; no new certificate or revocation.
+  EAS then requested a matching provisioning profile and Apple Developer login
+  (`Apple ID` prompt). No authentication or profile creation completed.
+- User/authorized Apple owner must finish local Apple login/2FA or supply the
+  existing matching App Store provisioning profile. Never paste credentials into
+  chat/Git. Visible terminal "Native iOS existing signing inspection" is available.
+  Restart from this checkout if needed:
+
+      Set-Location 'C:\Users\sajja\.copilot\repos\CommunityEvents-Native'
+      $env:EXPO_NO_DOTENV='1'
+      npx.cmd --yes eas-cli@latest credentials --platform ios
+
+  Select `registration-testflight`, existing bundle `info.siza.communityevents`,
+  team `D36Y75H5BU`, certificate `DZMB985S73`; preserve production App Attest/APNs.
+  Do not select the personal-test app, generate/revoke a certificate or replace
+  Android keys. After valid provisioning is attached, retry the frozen iOS build.
+  On success inspect its identity/entitlements and upload that exact build ID:
+  `npx.cmd --yes eas-cli@latest submit --platform ios --profile production --id <verified-ios-build-id> --non-interactive`.
+  iOS submission here is TestFlight upload ONLY, never App Store review/public
+  release. Verify upload, Apple processing and tester availability separately.
 
 ### Verification and outstanding Codex tasks
 
@@ -133,9 +176,13 @@ builds based on historical instructions.**
   registration true, unrelated gates false, tester mode and remote auto-increment.
   Prior complete source checkpoint also passed prayer timezone fixtures.
 - Web reports 277 Node +18 React +95 responsive layouts and production build pass.
-- [ ] Complete 2.1.1 signed TestFlight build/upload and Android test APK; inspect
-  artifacts/version/gates/signing. Distinguish queued/build success/upload/
-  processing/tester availability from actual installed acceptance.
+- [x] Deploy staged registration backend and matching Web; verify metadata/source,
+  gates, protected-callable rejection and live Hosting artifacts.
+- [x] Build and distribute Android 2.1.1 test APK build 97; inspect actual package,
+  version, gates and signing. Available artifact is not physical-device acceptance.
+- [ ] Complete signed iOS 2.1.1 TestFlight build/upload after local Apple
+  authentication/provisioning above. Inspect artifact/version/gates/signing;
+  distinguish build success/upload/processing/tester availability from installation.
 - [ ] Physical iPhone/Android acceptance: host builder/save/reopen, staged approval
   and private poster/venue isolation, attendee edit/cancel/form re-consent,
   superAdmin approval shortcut, time/prayer/Hijri roundtrip, calendar/reminders,
