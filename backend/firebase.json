@@ -13,6 +13,10 @@
     {
   "source": "functions-events",
   "codebase": "events-email"
-}
+},
+    {
+      "source": "functions-registration",
+      "codebase": "registration"
+    }
   ]
 }
