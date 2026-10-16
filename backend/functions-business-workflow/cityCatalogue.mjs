@@ -42,6 +42,7 @@ let revision = 0;
 const subscribers = new Set();
 export const cityCatalogueRevision = () => revision;
 export const subscribeCityCatalogue = listener => { subscribers.add(listener); return () => subscribers.delete(listener); };
+export const getCityDefinitions = () => definitions.map(city => ({ ...city }));
 export const getCityDefinition = id => definitions.find(city => city.id === id) || null;
 export function validateCityCatalogue(data) {
   if (data?.schemaVersion !== 1 || !Array.isArray(data.cities) || !data.cities.length || data.cities.length > 100) return null;
@@ -184,4 +185,3 @@ export function createCityResolver(data = BUNDLED_CITY_CATALOGUE) {
     enabled: value => definition(value)?.enabled === true,
   });
 }
-
