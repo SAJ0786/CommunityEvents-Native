@@ -1,15 +1,16 @@
 import React, { useRef, useState } from 'react';
 import { Image, Switch, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import AddressAutocomplete from '../components/AddressAutocomplete';
+import CreateEventForm from '../components/CreateEventForm';
 import NativeDateTimeField from '../components/NativeDateTimeField';
 import { Action, Input, styles } from './RegistrationControls';
-import { FIELD_TYPES, FORM_TEMPLATES, NOTES_LIMIT, TERMS_LIMIT, closingDateError, consentLast, makeField, moveField, publicNotesError, publicSuburbError, templateFields, validateDraft } from './prototypeModel';
+import { FIELD_TYPES, FORM_TEMPLATES, TERMS_LIMIT, closingDateError, consentLast, makeField, moveField, publicNotesError, publicSuburbError, templateFields, validateDraft } from './prototypeModel';
 import { normalisePrivateVenue } from './privateVenue';
+import { normalEventFromRegistrationDraft, registrationDraftFromNormalEvent } from './registrationViewModel';
 
 // No local persistence: private venue and answers must not enter an unencrypted draft cache.
 export default function RegistrationEditor({
- initialDraft, eventTypes, savedTemplates, hasMoreTemplates, onMoreTemplates, busy, onSave, onSaveTemplate, onCancel, hasPoster = false, onRemovePoster, initialStep = 'event' }) {
+ initialDraft, eventId, city, defaultHostName = '', defaultHostPhone = '', savedTemplates, hasMoreTemplates, onMoreTemplates, busy, onSave, onSaveTemplate, onCancel, hasPoster = false, onRemovePoster, initialStep = 'event' }) {
   const [draft, setDraft] = useState(initialDraft);
   const [step, setStep] = useState(initialStep);
   const [error, setError] = useState('');
@@ -24,6 +25,13 @@ export default function RegistrationEditor({
     if (errors.length) { setError(errors.join('\n')); return; }
     setError(''); onSave(draft);
   };
+  const acceptEvent = event => {
+    const next = registrationDraftFromNormalEvent(draft, event);
+    const errors = [!next.title.trim() && 'Enter an event title.', publicSuburbError(next), publicNotesError(next)];
+    if (!normalisePrivateVenue(next.venue)) errors.push('Select a complete address from the suggestions to enable the private map and directions.');
+    if (errors.some(Boolean)) { setError(errors.filter(Boolean).join('\n')); return; }
+    setDraft(next); setError(''); setStep('settings');
+  };
   const selectPoster = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8, base64: true });
@@ -37,21 +45,15 @@ export default function RegistrationEditor({
   return <View style={styles.group} pointerEvents={busy ? 'none' : 'auto'}>
     <View style={styles.row}><Action onPress={onCancel}>Back to events</Action>{step !== 'event' && <Action onPress={() => setStep('event')}>Edit event details</Action>}</View>
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-    {step === 'event' && <View style={styles.panel}>
-      <Text style={styles.title}>Event details</Text>
+    {step === 'event' && <View>
       <Input label="Event title" value={draft.title} maxLength={160} onChangeText={value => update('title', value)} />
-      <Text style={styles.label}>Event type</Text><View style={styles.row}>{[...new Set([...eventTypes, 'Custom'])].map(type => <Action key={type} primary={draft.eventType === type} onPress={() => update('eventType', type)}>{type}</Action>)}</View>
-      {draft.eventType === 'Custom' && <Input label="Custom event type" value={draft.customEventType} maxLength={80} onChangeText={value => update('customEventType', value)} />}
-      <Text style={styles.label}>Event date</Text><NativeDateTimeField accessibilityLabel="Event date" value={draft.date} onChange={value => update('date', value)} />
-      <Text style={styles.label}>Start time (optional, event city time)</Text><NativeDateTimeField accessibilityLabel="Event start time" mode="time" value={draft.startTime} onChange={value => update('startTime', value)} />
-      {draft.startTime ? <><Action onPress={() => { update('startTime', ''); update('endTime', ''); }}>Clear event times</Action><Text style={styles.label}>End time (optional, event city time)</Text><NativeDateTimeField accessibilityLabel="Event end time" mode="time" value={draft.endTime} onChange={value => update('endTime', value)} />{draft.endTime ? <Action onPress={() => update('endTime', '')}>Clear end time</Action> : null}</> : null}
-      <Text style={styles.muted}>No time means a date-only calendar entry, not a scheduled start. Reminders require a start time. An end time earlier than the start means the following day. Daylight-saving gaps or ambiguous times must be corrected.</Text>
-      <Text style={styles.label}>Full address — private</Text>
-      <AddressAutocomplete value={draft.venue || { fullAddress: draft.address }} onChange={venue => setDraft(current => ({ ...current, venue, address: venue.fullAddress || '', suburb: venue.suburb || '' }))} />
-      <Text style={styles.muted}>Only confirmed registrants, the organiser and authorised admins can access the exact location and directions.</Text>
-      <Input label="Public suburb" value={draft.suburb} maxLength={100} error={draft.suburb ? publicSuburbError(draft) : ''} onChangeText={value => setDraft(current => ({ ...current, suburb: value, venue: current.venue ? { ...current.venue, suburb: value } : null }))} />
-      <Input label="Detailed notes — public" value={draft.notes} multiline maxLength={NOTES_LIMIT} error={publicNotesError(draft)} onChangeText={value => update('notes', value)} />
-      <Text style={styles.muted}>Do not include the full address or confidential information in public text.</Text>
+      <CreateEventForm registrationMode defaultCity={city} defaultHostName={defaultHostName} defaultHostPhone={defaultHostPhone}
+        initialEvent={normalEventFromRegistrationDraft(draft, eventId)} allowUnchangedSubmit submitting={busy}
+        title="Event details" subtitle="Registration event — private venue and poster" submitLabel="Continue to registration settings"
+        onSubmit={acceptEvent} onCancel={onCancel} />
+    </View>}
+    {step === 'settings' && <View style={styles.panel}>
+      <Text style={styles.title}>Registration settings</Text>
       <Text style={styles.label}>Registration closing date (optional)</Text><NativeDateTimeField accessibilityLabel="Registration closing date" value={draft.closes.slice(0, 10)} onChange={value => update('closes', `${value}T${draft.closes.slice(11) || '18:00'}`)} />
       {closingDateError(draft) ? <Text accessibilityRole="alert" style={styles.error}>{closingDateError(draft)}</Text> : null}
       {draft.closes && <><Text style={styles.label}>Closing time in event city</Text><NativeDateTimeField accessibilityLabel="Registration closing time" mode="time" value={draft.closes.slice(11)} onChange={value => update('closes', `${draft.closes.slice(0, 10)}T${value}`)} /><Action onPress={() => update('closes', '')}>Clear closing date</Action></>}
@@ -87,7 +89,7 @@ export default function RegistrationEditor({
         if (type === 'consent') setError(`Write your own terms and conditions (up to ${TERMS_LIMIT} characters). The agreement remains at the end.`);
       }}>{label}</Action>)}</View></View>
       <View style={styles.panel}><Input label="Save reusable template as" value={templateName} maxLength={80} onChangeText={setTemplateName} /><Action disabled={!templateName.trim()} onPress={() => onSaveTemplate({ name: templateName, fields: draft.fields, purpose: draft.purpose })}>Save template (no venue or answers)</Action></View>
-      <Text style={styles.muted}>New events require super administrator approval. Edits to approved events do not need another approval. Changes to questions, date or venue queue attendee updates; changed questions ask them to review their registration.</Text>
+      <Text style={styles.muted}>New events and changes to approved events require super administrator approval. While changes are reviewed, the published event and registration form remain live and unchanged. No notifications or emails are sent.</Text>
       <Action primary onPress={save}>Save event and registration form</Action>
     </>}
   </View>;

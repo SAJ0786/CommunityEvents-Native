@@ -1,5 +1,6 @@
 const { createHash, randomUUID } = require('node:crypto');
 const { enqueuePosterCleanup } = require('./posterMaintenance');
+const { eventMetadata } = require('./eventMetadata');
 const model = import('./formModel.mjs');
 const catalogueModel = import('./cityCatalogue.mjs');
 const venueModel = import('./privateVenue.mjs');
@@ -29,6 +30,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
   const eventRef = value => db.collection('registrationEvents').doc(id(value));
   const privateRef = value => db.collection('registrationEventPrivate').doc(id(value));
   const formRef = value => db.collection('registrationForms').doc(id(value));
+  const pendingRef = value => db.collection('registrationPendingChanges').doc(id(value));
   const bookingRef = (eventId, uid) => eventRef(eventId).collection('registrations').doc(id(uid));
   async function actor(request, transaction) {
     gate();
@@ -74,7 +76,8 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     if (/[\d\r\n,/:]/u.test(draft.suburb)) fail('invalid-argument', 'The public location must contain only a suburb name, not a street address.');
     const errors = (await model).validateDraft(draft);
     if (errors.length) fail('invalid-argument', errors.join(' '));
-    return draft;
+    try { return { ...draft, ...eventMetadata(raw) }; }
+    catch (error) { fail('invalid-argument', error.message); }
   }
   const checkOpen = event => {
     if (event.status !== 'approved' || localMinute(now(), event.timeZone) >= (event.closes || `${event.date}T00:00`)) fail('failed-precondition', 'Registration is closed or this event is not approved.');
@@ -100,43 +103,47 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (current?.status === 'cancelled' || current?.deletedAt) fail('failed-precondition', 'A cancelled or deleted event cannot be edited.');
       if (current && request.data.expectedRevision !== current.revision) fail('aborted', 'The event has changed. Reload before saving.');
       const timeZone = await zone(city, tx);
+      const pending = current ? (await tx.get(pendingRef(reference.id))).data() : null;
+      const editingEvent = pending?.event || current;
       let schedule;
       try {
         schedule = (await scheduleModel).registrationSchedule({
           date: draft.date, timeZone,
-          startTime: request.data.draft.startTime === undefined && request.data.draft.endTime === undefined ? current?.startTime || '' : draft.startTime,
-          endTime: request.data.draft.startTime === undefined && request.data.draft.endTime === undefined ? current?.endTime || '' : draft.endTime,
+          startTime: request.data.draft.startTime === undefined && request.data.draft.endTime === undefined ? editingEvent?.startTime || '' : draft.startTime,
+          endTime: request.data.draft.startTime === undefined && request.data.draft.endTime === undefined ? editingEvent?.endTime || '' : draft.endTime,
         });
       } catch (error) { fail('invalid-argument', error.message); }
       const previousForm = current ? (await tx.get(formRef(reference.id))).data() : null;
-      const previousVenue = current ? (await tx.get(privateRef(reference.id))).data() : null;
+      const publishedVenue = current ? (await tx.get(privateRef(reference.id))).data() : null;
+      const previousVenue = pending?.privateDetails || publishedVenue;
       if (draft.capacity < (current?.reservedPlaces || 0)) fail('failed-precondition', 'Capacity cannot be lower than existing registrations.');
       const revision = (current?.revision || 0) + 1;
       const formChanged = !previousForm || JSON.stringify(previousForm.fields) !== JSON.stringify(draft.fields) || previousForm.purpose !== draft.purpose;
       if (current?.registrationCount > 0 && formChanged && localMinute(now(), timeZone).slice(0, 10) >= draft.date) fail('failed-precondition', 'Registration questions cannot change on or after event day when attendees have registered.');
       const formVersion = formChanged ? revision : previousForm.version;
       const status = current?.status || 'pending';
-      const changes = current ? [
-        ...(formChanged ? ['form'] : []),
-        ...(current.date !== draft.date || (current.startTime || '') !== schedule.startTime || (current.endTime || '') !== schedule.endTime || current.timeZone !== timeZone ? ['date'] : []),
-        ...(current.city !== city || previousVenue?.address !== draft.address || JSON.stringify(previousVenue?.venue || null) !== JSON.stringify(venue) ? ['venue'] : []),
-      ] : [];
-      const publicData = { ...(await model).publicEvent(draft), ...schedule, city, timeZone, ownerUid: current?.ownerUid || caller.uid, revision,
+      const publicData = { ...(await model).publicEvent({ ...editingEvent, ...draft }), ...schedule, city, timeZone, ownerUid: current?.ownerUid || caller.uid, revision,
         formVersion, status, reservedPlaces: current?.reservedPlaces || 0, registrationCount: current?.registrationCount || 0,
         createdAt: current?.createdAt || now().toISOString(), updatedAt: now().toISOString(), allowCancellation: draft.allowCancellation, creationFingerprint: current?.creationFingerprint || fingerprint };
       if (current?.approvedAt) { publicData.approvedAt = current.approvedAt; publicData.approvedBy = current.approvedBy; }
       for (const key of ['isLive', 'liveUrl', 'liveWatchUrl', 'liveAppVisibility', 'liveSource', 'liveStartedAt', 'liveVideoRecordId', 'liveEndedAt', 'liveRoomCode', 'liveStartedBy']) {
         if (current && Object.hasOwn(current, key)) publicData[key] = current[key];
       }
-      tx.set(reference, publicData);
-      tx.set(privateRef(reference.id), { address: draft.address, venue }, { merge: true });
-      tx.set(formRef(reference.id), { version: formVersion, fields: draft.fields, purpose: draft.purpose });
-      // Atomic outbox: no private venue, questions or answers copied into delivery jobs.
-      if (status === 'approved' && current?.registrationCount > 0 && changes.length) {
-        tx.set(db.collection('registrationChanges').doc(`${reference.id}-${revision}`), {
-          eventId: reference.id, revision, formVersion, changes, createdAt: now().toISOString(), state: 'pending', cursor: null,
-        });
+      if (publicData.timeMode === 'prayer') publicData.prayerTimeZone = timeZone;
+      if (publicData.timeMode === 'prayer' && (!publicData.prayerName || !schedule.startAt)) fail('invalid-argument', 'Select a prayer and its calculated start time.');
+      const privateData = { ...previousVenue, address: draft.address, venue,
+        hostPhone: draft.hostPhone ?? previousVenue?.hostPhone ?? '',
+        hostContactOptional: draft.hostContactOptional ?? previousVenue?.hostContactOptional ?? '' };
+      const formData = { version: formVersion, fields: draft.fields, purpose: draft.purpose };
+      if (status === 'approved') {
+        tx.set(pendingRef(reference.id), { event: publicData, form: formData, privateDetails: privateData,
+          submittedAt: now().toISOString(), submittedBy: caller.uid });
+        tx.update(reference, { revision, hasPendingChanges: true });
+        return { eventId: reference.id, revision, status, hasPendingChanges: true };
       }
+      tx.set(reference, publicData);
+      tx.set(privateRef(reference.id), privateData);
+      tx.set(formRef(reference.id), formData);
       return { eventId: reference.id, revision, status };
     });
   }
@@ -144,8 +151,39 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     return db.runTransaction(async tx => {
       const caller = await actor(request, tx); const event = await readEvent(request.data?.eventId, tx);
       if (!approves(caller, event)) fail('permission-denied', 'Only a super admin can approve an event.');
-      if (event.status !== 'pending') fail('failed-precondition', 'Only a pending event can be approved.');
+      if (event.deletedAt || (event.status !== 'pending' && !(event.status === 'approved' && event.hasPendingChanges))) fail('failed-precondition', 'Only a pending event or submitted changes can be approved.');
       if (request.data.expectedRevision !== event.revision) fail('aborted', 'Review the latest event before approval.');
+      const pending = (await tx.get(pendingRef(event.id))).data();
+      const currentForm = (await tx.get(formRef(event.id))).data();
+      const currentPrivate = (await tx.get(privateRef(event.id))).data();
+      const target = event.hasPendingChanges ? pending?.event : event;
+      if (!target) fail('failed-precondition', 'The submitted changes are unavailable. Reload before approval.');
+      if (pending && event.hasPendingChanges) {
+        if (target.capacity < event.reservedPlaces) fail('failed-precondition', 'Capacity is below the places booked since these changes were submitted.');
+        if (await zone(target.city, tx) !== target.timeZone) fail('failed-precondition', 'The event city timezone changed. Resubmit the event schedule before approval.');
+        const formChanged = JSON.stringify(currentForm.fields) !== JSON.stringify(pending.form.fields) || currentForm.purpose !== pending.form.purpose;
+        if (event.registrationCount > 0 && formChanged && localMinute(now(), target.timeZone).slice(0, 10) >= target.date) fail('failed-precondition', 'Registration questions cannot change on or after event day when attendees have registered.');
+        if (localMinute(now(), target.timeZone).slice(0, 10) > target.date) fail('failed-precondition', 'A past event cannot be published.');
+        const revision = event.revision + 1;
+        const formVersion = formChanged ? revision : event.formVersion;
+        const changes = [
+          ...(formChanged ? ['form'] : []),
+          ...(event.date !== target.date || (event.startTime || '') !== target.startTime || (event.endTime || '') !== target.endTime || event.timeZone !== target.timeZone ? ['date'] : []),
+          ...(event.city !== target.city || currentPrivate?.address !== pending.privateDetails.address || JSON.stringify(currentPrivate?.venue || null) !== JSON.stringify(pending.privateDetails.venue || null) ? ['venue'] : []),
+        ];
+        // Promote editable content only; current capacity counters and live lifecycle win.
+        tx.update(eventRef(event.id), { ...(await model).publicEvent({ ...target, address: pending.privateDetails.address }), allowCancellation: target.allowCancellation,
+          city: target.city, timeZone: target.timeZone, formVersion, revision, hasPendingChanges: false,
+          approvedBy: caller.uid, approvedAt: now().toISOString() });
+        tx.set(formRef(event.id), { ...pending.form, version: formVersion });
+        tx.set(privateRef(event.id), pending.privateDetails);
+        tx.delete(pendingRef(event.id));
+        if (currentPrivate?.posterPath && currentPrivate.posterPath !== pending.privateDetails.posterPath) enqueuePosterCleanup(db, tx, event.id, currentPrivate.posterPath, now());
+        if (event.registrationCount > 0 && changes.length) tx.set(db.collection('registrationChanges').doc(`${event.id}-${revision}`), {
+          eventId: event.id, revision, formVersion, changes, createdAt: now().toISOString(), state: 'pending', cursor: null,
+        });
+        return { eventId: event.id, status: 'approved', revision, hasPendingChanges: false };
+      }
       if (localMinute(now(), event.timeZone) >= (event.closes || `${event.date}T00:00`)) fail('failed-precondition', 'The registration closing time has passed.');
       tx.update(eventRef(event.id), { status: 'approved', approvedBy: caller.uid, approvedAt: now().toISOString() });
       return { eventId: event.id, status: 'approved' };
@@ -216,8 +254,11 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (!manages(caller, event)) fail('permission-denied', 'You cannot cancel this event.');
       if (event.status === 'cancelled') return { eventId: event.id, revision: event.revision, status: 'cancelled' };
       if (request.data.expectedRevision !== event.revision) fail('aborted', 'Reload the event before cancelling.');
+      const pending = (await tx.get(pendingRef(event.id))).data();
       const revision = event.revision + 1; const timestamp = now().toISOString();
-      tx.update(eventRef(event.id), { status: 'cancelled', revision, reservedPlaces: 0, cancelledAt: timestamp, cancelledBy: caller.uid });
+      tx.update(eventRef(event.id), { status: 'cancelled', revision, reservedPlaces: 0, cancelledAt: timestamp, cancelledBy: caller.uid, hasPendingChanges: false });
+      tx.delete(pendingRef(event.id));
+      if (pending?.privateDetails.posterPath) enqueuePosterCleanup(db, tx, event.id, pending.privateDetails.posterPath, now());
       if (event.registrationCount > 0) tx.set(db.collection('registrationChanges').doc(`${event.id}-${revision}`), {
         eventId: event.id, revision, formVersion: event.formVersion, changes: ['cancelled'], createdAt: timestamp, state: 'pending', cursor: null,
       });
@@ -231,8 +272,11 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (!manages(caller, event)) fail('permission-denied', 'You cannot delete this event.');
       if (event.deletedAt) return { eventId: event.id, revision: event.revision, status: 'cancelled', deleted: true };
       if (request.data.expectedRevision !== event.revision) fail('aborted', 'Reload the event before deleting it.');
+      const pending = (await tx.get(pendingRef(event.id))).data();
       const revision = event.revision + 1; const timestamp = now().toISOString();
-      tx.update(eventRef(event.id), { status: 'cancelled', deletedAt: timestamp, deletedBy: caller.uid, revision, reservedPlaces: 0 });
+      tx.update(eventRef(event.id), { status: 'cancelled', deletedAt: timestamp, deletedBy: caller.uid, revision, reservedPlaces: 0, hasPendingChanges: false });
+      tx.delete(pendingRef(event.id));
+      if (pending?.privateDetails.posterPath) enqueuePosterCleanup(db, tx, event.id, pending.privateDetails.posterPath, now());
       if (event.registrationCount > 0) tx.set(db.collection('registrationChanges').doc(`${event.id}-${revision}`), {
         eventId: event.id, revision, formVersion: event.formVersion, changes: ['cancelled'], createdAt: timestamp, state: 'pending', cursor: null,
       });
@@ -251,6 +295,8 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (event.status !== 'approved' && !manager && !registered) fail('not-found', 'Event not available.');
       const form = await tx.get(formRef(event.id));
       const details = await tx.get(privateRef(event.id));
+      const pending = manager && event.hasPendingChanges && event.status === 'approved' && !event.deletedAt ? (await tx.get(pendingRef(event.id))).data() : null;
+      if (manager && event.hasPendingChanges && event.status === 'approved' && !event.deletedAt && !pending) fail('failed-precondition', 'The submitted changes are unavailable. Contact an administrator before editing.');
       const schedule = (await scheduleModel).registrationSchedule({ ...event, timeZone: event.timeZone });
       const live = event.status === 'approved' && !event.deletedAt ? {
         isLive: event.isLive === true,
@@ -262,14 +308,25 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         liveVideoRecordId: /^[A-Za-z0-9_-]{1,200}$/.test(event.liveVideoRecordId || '') ? event.liveVideoRecordId : null,
       } : { isLive: false };
       const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), ...schedule, ...live, id: event.id, ownerUid: event.ownerUid, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
-      result.canApprove = Boolean(caller && event.status === 'pending' && approves(caller, event));
+      result.canApprove = Boolean(caller && !event.deletedAt && (event.status === 'pending' || pending) && approves(caller, event));
       result.canRegister = event.status === 'approved' && localMinute(now(), event.timeZone) < (event.closes || `${event.date}T00:00`);
       result.canEditRegistration = Boolean(registered && event.status === 'approved' && localMinute(now(), event.timeZone).slice(0, 10) < event.date);
       result.registrationNeedsReview = Boolean(registered && own.formVersion !== event.formVersion);
       result.canCancel = Boolean(registered && (event.status === 'cancelled' || (event.allowCancellation && localMinute(now(), event.timeZone).slice(0, 10) < event.date)));
       result.retention = RETENTION;
-      if (manager) result.event.registrationCount = event.registrationCount;
-      if (manager || (registered && event.status !== 'cancelled')) result.privateDetails = { address: details.data()?.address || '', venue: (await venueModel).normalisePrivateVenue(details.data()?.venue), hasPoster: Boolean(details.data()?.posterPath) };
+      const { normalisePrivateVenue } = await venueModel;
+      const privateProjection = data => ({ address: data?.address || '', venue: normalisePrivateVenue(data?.venue), hasPoster: Boolean(data?.posterPath),
+        hostPhone: data?.hostPhone || '', hostContactOptional: data?.hostContactOptional || '' });
+      if (manager) { result.event.registrationCount = event.registrationCount; result.event.hasPendingChanges = Boolean(pending); }
+      if (pending) result.pendingChanges = {
+        event: { ...(await model).publicEvent({ ...pending.event, address: pending.privateDetails.address }),
+          id: event.id, city: pending.event.city, timeZone: pending.event.timeZone, status: 'approved',
+          ownerUid: event.ownerUid, revision: event.revision, formVersion: pending.form.version,
+          allowCancellation: pending.event.allowCancellation },
+        form: pending.form, privateDetails: privateProjection(pending.privateDetails),
+        submittedAt: pending.submittedAt, submittedBy: pending.submittedBy,
+      };
+      if (manager || (registered && event.status !== 'cancelled')) result.privateDetails = privateProjection(details.data());
       return result;
     });
   }
@@ -324,13 +381,13 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const event = doc.data();
       if (event.deletedAt) continue;
       if (scope === 'public' && (event.status !== 'approved' || event.date < localMinute(now(), event.timeZone).slice(0, 10))) continue;
-      if (scope === 'review' && event.status !== 'pending') continue;
+      if (scope === 'review' && event.status !== 'pending' && !(event.status === 'approved' && event.hasPendingChanges)) continue;
       // Re-read through the transactional detail policy to handle approval/access
       // changes during pagination. Only the public allowlist leaves this endpoint.
       try {
         const result = await getRegistrationEvent({ ...request, data: { eventId: doc.id } });
         if (scope === 'public' && (result.event.status !== 'approved' || result.event.date < localMinute(now(), result.event.timeZone).slice(0, 10))) continue;
-        if (scope === 'review' && (!result.canApprove || result.event.status !== 'pending')) continue;
+        if (scope === 'review' && !result.canApprove) continue;
         events.push(listRow(result));
       } catch (error) { if (error.code !== 'not-found') throw error; }
     }
@@ -388,6 +445,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const rateRef = db.collection('registrationUploadLimits').doc(createHash('sha256').update(currentActor.uid).digest('hex'));
       const rate = (await tx.get(rateRef)).data(); const time = now().getTime();
       if (!manages(currentActor, currentEvent)) fail('permission-denied', 'You cannot change this poster.');
+      if (currentEvent.status === 'cancelled' || currentEvent.deletedAt) fail('failed-precondition', 'A cancelled or deleted event cannot be edited.');
       if (request.data.expectedRevision !== currentEvent.revision) fail('aborted', 'The event changed. Reload before updating its poster.');
       const sameWindow = rate && Number.isFinite(rate.windowStart) && time >= rate.windowStart && time - rate.windowStart < 60 * 60 * 1000;
       const count = sameWindow ? rate.count : 0;
@@ -397,52 +455,79 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     });
     await bucket.file(path).save(bytes, { resumable: false, metadata: { contentType: mime, cacheControl: 'private, no-store' } });
     // Recheck role and revision after upload; never create a public/download-token URL.
-    let previousPath; let nextRevision; let nextStatus;
+    let previousPath; let nextRevision; let nextStatus; let staged = false;
     try { await db.runTransaction(async tx => {
       const currentActor = await actor(request, tx); const currentEvent = await readEvent(event.id, tx);
       const previous = await tx.get(privateRef(event.id));
+      const pending = (await tx.get(pendingRef(event.id))).data();
+      const form = (await tx.get(formRef(event.id))).data();
       if (!manages(currentActor, currentEvent)) fail('permission-denied', 'You cannot change this poster.');
+      if (currentEvent.status === 'cancelled' || currentEvent.deletedAt) fail('failed-precondition', 'A cancelled or deleted event cannot be edited.');
       if (request.data.expectedRevision !== currentEvent.revision) fail('aborted', 'The event changed. Reload before updating its poster.');
-      previousPath = previous.data()?.posterPath; nextRevision = currentEvent.revision + 1;
+      staged = currentEvent.status === 'approved';
+      previousPath = (staged ? pending?.privateDetails || previous.data() : previous.data())?.posterPath; nextRevision = currentEvent.revision + 1;
       nextStatus = currentEvent.status;
-      tx.set(privateRef(event.id), { posterPath: path, posterMime: mime }, { merge: true });
-      tx.update(eventRef(event.id), { revision: nextRevision });
+      if (staged) {
+        tx.set(pendingRef(event.id), { event: { ...(pending?.event || currentEvent), revision: nextRevision },
+          form: pending?.form || form, privateDetails: { ...(pending?.privateDetails || previous.data()), posterPath: path, posterMime: mime },
+          submittedAt: now().toISOString(), submittedBy: currentActor.uid });
+        tx.update(eventRef(event.id), { revision: nextRevision, hasPendingChanges: true });
+      } else {
+        tx.set(privateRef(event.id), { posterPath: path, posterMime: mime }, { merge: true });
+        tx.update(eventRef(event.id), { revision: nextRevision });
+      }
       if (previousPath && previousPath !== path) enqueuePosterCleanup(db, tx, event.id, previousPath, now());
     }); } catch (error) {
       await bucket.file(path).delete({ ignoreNotFound: true }).catch(() => {});
       throw error;
     }
-    if (previousPath && previousPath !== path && previousPath.startsWith(`registration-private/${event.id}/`)) await bucket.file(previousPath).delete({ ignoreNotFound: true }).catch(() => {});
-    return { uploaded: true, revision: nextRevision, status: nextStatus };
+    if (!staged && previousPath && previousPath !== path && previousPath.startsWith(`registration-private/${event.id}/`)) await bucket.file(previousPath).delete({ ignoreNotFound: true }).catch(() => {});
+    return { uploaded: true, revision: nextRevision, status: nextStatus, hasPendingChanges: staged };
   }
   async function getRegistrationPoster(request) {
+    if (request.data?.view !== undefined && !['published', 'pending'].includes(request.data.view)) fail('invalid-argument', 'Choose a published or pending poster.');
+    const staged = request.data?.view === 'pending';
     const details = await getRegistrationEvent(request);
     if (!details.privateDetails) fail('permission-denied', 'Register before viewing the poster.');
-    const snapshot = await privateRef(details.event.id).get(); const data = snapshot.data();
+    if (staged && !details.canManage) fail('permission-denied', 'Only managers can review a pending poster.');
+    const reference = staged ? pendingRef(details.event.id) : privateRef(details.event.id);
+    const snapshot = await reference.get(); const data = staged ? snapshot.data()?.privateDetails : snapshot.data();
     if (!data?.posterPath) fail('not-found', 'No poster has been uploaded.');
     const [bytes] = await bucket.file(data.posterPath).download();
     // Download may take time: cancellation or removal must revoke subsequent delivery.
     const current = await getRegistrationEvent(request);
-    const latest = await privateRef(details.event.id).get();
-    if (!current.privateDetails || latest.data()?.posterPath !== data.posterPath) fail('permission-denied', 'Poster access changed. Reload the event.');
+    const latest = await reference.get();
+    const latestData = staged ? latest.data()?.privateDetails : latest.data();
+    if (!current.privateDetails || (staged && !current.pendingChanges) || latestData?.posterPath !== data.posterPath) fail('permission-denied', 'Poster access changed. Reload the event.');
     return { mime: data.posterMime, base64: bytes.toString('base64') };
   }
   async function removeRegistrationPoster(request) {
-    let previousPath; let nextRevision; let nextStatus;
+    let previousPath; let nextRevision; let nextStatus; let staged = false;
     const eventId = id(request.data?.eventId);
     await db.runTransaction(async tx => {
       const caller = await actor(request, tx); const event = await readEvent(eventId, tx);
       const previous = await tx.get(privateRef(eventId));
+      const pending = (await tx.get(pendingRef(eventId))).data();
+      const form = (await tx.get(formRef(eventId))).data();
       if (!manages(caller, event)) fail('permission-denied', 'You cannot change this poster.');
+      if (event.status === 'cancelled' || event.deletedAt) fail('failed-precondition', 'A cancelled or deleted event cannot be edited.');
       if (request.data.expectedRevision !== event.revision) fail('aborted', 'The event changed. Reload before removing its poster.');
-      previousPath = previous.data()?.posterPath; nextRevision = event.revision + 1;
+      staged = event.status === 'approved';
+      previousPath = (staged ? pending?.privateDetails || previous.data() : previous.data())?.posterPath; nextRevision = event.revision + 1;
       nextStatus = event.status;
-      tx.set(privateRef(eventId), { posterPath: null, posterMime: null }, { merge: true });
-      tx.update(eventRef(eventId), { revision: nextRevision });
+      if (staged) {
+        tx.set(pendingRef(eventId), { event: { ...(pending?.event || event), revision: nextRevision },
+          form: pending?.form || form, privateDetails: { ...(pending?.privateDetails || previous.data()), posterPath: null, posterMime: null },
+          submittedAt: now().toISOString(), submittedBy: caller.uid });
+        tx.update(eventRef(eventId), { revision: nextRevision, hasPendingChanges: true });
+      } else {
+        tx.set(privateRef(eventId), { posterPath: null, posterMime: null }, { merge: true });
+        tx.update(eventRef(eventId), { revision: nextRevision });
+      }
       if (previousPath) enqueuePosterCleanup(db, tx, eventId, previousPath, now());
     });
-    if (previousPath?.startsWith(`registration-private/${eventId}/`)) await bucket.file(previousPath).delete({ ignoreNotFound: true }).catch(() => {});
-    return { removed: true, revision: nextRevision, status: nextStatus };
+    if (!staged && previousPath?.startsWith(`registration-private/${eventId}/`)) await bucket.file(previousPath).delete({ ignoreNotFound: true }).catch(() => {});
+    return { removed: true, revision: nextRevision, status: nextStatus, hasPendingChanges: staged };
   }
   async function saveRegistrationTemplate(request) {
     const caller = await actor(request);

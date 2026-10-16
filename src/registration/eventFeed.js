@@ -4,11 +4,11 @@ export function registrationEventCard(event) {
     registrationOnly: true,
     eventDate: event.date,
     eventTypeDisplay: event.eventType,
-    eventSubject: event.title,
+    eventSubject: event.eventSubject || event.title,
     createdByUserId: event.ownerUid,
     metroArea: event.city,
     city: event.city,
-    organiserType: 'private',
+    organiserType: event.organiserType || 'private',
     address: { suburb: event.suburb, city: event.city },
   };
 }

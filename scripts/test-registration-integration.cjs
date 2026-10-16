@@ -13,6 +13,10 @@ function load(file) {
 const view = load(path.join(root, 'src/registration/registrationViewModel.js'));
 const contract = load(path.join(root, 'src/registration/registrationClient.js'));
 const feed = load(path.join(root, 'src/registration/eventFeed.js'));
+function flatten(node) {
+  if (Array.isArray(node)) return node.flatMap(flatten);
+  return node && typeof node === 'object' && node.props ? [node, ...flatten(node.props.children)] : [];
+}
 test('client stays off by default and discovery uses the callable allowlist', async () => {
   let calls = [];
   const call = async (name, data) => { calls.push({ name, data }); return { data: { events: [] } }; };
@@ -67,7 +71,7 @@ test('registration feed consumes sparse pages, excludes pending publicly and map
     calls.push(request);
     if (!request.cursor) return { events: [{ id: 'pending', status: 'pending' }], nextCursor: 'page2' };
     if (request.cursor === 'page2') return { events: [], nextCursor: 'page3' };
-    return { events: [{ id: 'approved', status: 'approved', date: '2026-12-01', city: 'sydney', suburb: 'Parramatta', title: 'Workshop', hasPoster: false }], nextCursor: null };
+    return { events: [{ id: 'approved', status: 'approved', date: '2026-12-01', city: 'sydney', suburb: 'Parramatta', title: 'Workshop', eventSubject: 'Community subject', organiserType: 'centre', hostName: 'Centre host', hasPoster: false }], nextCursor: null };
   } }, 'public', 'sydney');
   assert.equal(calls.length, 3);
   assert.equal(rows.length, 1);
@@ -79,6 +83,9 @@ test('registration feed consumes sparse pages, excludes pending publicly and map
   assert.equal(rows[0].address.fullAddress, undefined);
   assert.equal(rows[0].address.latitude, undefined);
   assert.equal(rows[0].imageUrl, undefined);
+  assert.equal(rows[0].eventSubject, 'Community subject');
+  assert.equal(rows[0].organiserType, 'centre');
+  assert.equal(rows[0].hostName, 'Centre host');
 });
 test('management feed retains pending cards and prevents non-advancing pagination', async () => {
   const rows = await feed.registrationEventFeed({ list: async () => ({ events: [{ id: 'pending', status: 'pending', canManage: true }], nextCursor: null }) }, 'mine');
@@ -138,16 +145,18 @@ function detailsFixture(detail, isGuest = false) {
   };
   const api = {
     load: async id => { calls.push(['load', id]); return detail; },
-    poster: async id => { calls.push(['poster', id]); return { mime: 'image/png', base64: 'PRIVATE_BYTES' }; },
+    poster: async (id, view = 'published') => { calls.push(['poster', id, view]); return { mime: 'image/png', base64: view === 'pending' ? 'STAGED_BYTES' : 'PRIVATE_BYTES' }; },
     approve: async (...args) => { calls.push(['approve', ...args]); },
     cancel: async (...args) => { calls.push(['cancel', ...args]); },
   };
   const mocks = {
     react,
-    'react-native': { ActivityIndicator: 'ActivityIndicator', Modal: 'Modal', Pressable: 'Pressable', Text: 'Text', View: 'View',
+    'react-native': { ActivityIndicator: 'ActivityIndicator', Image: 'Image', Modal: 'Modal', Pressable: 'Pressable', Text: 'Text', View: 'View',
       AppState: { currentState: 'active', addEventListener: (_, callback) => { listeners.push(callback); return { remove() {} }; } },
       Alert: { alert: (...args) => alerts.push(args) } },
     './EventDetailsModal': { __esModule: true, default: 'NormalDetails' },
+    './KeyboardAwareScrollView': { __esModule: true, default: 'ScrollView' },
+    './MemberPageHeader': { __esModule: true, default: 'MemberPageHeader' },
     '../registration/firebaseRegistration': { firebaseRegistration: () => api, REGISTRATION_ENABLED: true },
     '../registration/eventFeed': feed,
   };
@@ -190,7 +199,7 @@ test('guest registration uses the normal modal, routes to sign-in and never requ
 });
 test('host normal modal fetches private poster, routes form/responses/edit and clears when inactive', async () => {
   const fixture = detailsFixture({ event: { id: 'event', status: 'pending', title: 'Private title', ownerUid: 'member', revision: 7 },
-    canManage: true, canApprove: true, privateDetails: { address: '1 Private Lane', hasPoster: true } });
+    canManage: true, canApprove: true, privateDetails: { address: '1 Private Lane', hasPoster: true }, form: { purpose: 'Attendance', fields: [] } });
   fixture.render(); await new Promise(setImmediate);
   const tree = fixture.render();
   assert.equal(tree.props.event.address.fullAddress, '1 Private Lane');
@@ -203,6 +212,10 @@ test('host normal modal fetches private poster, routes form/responses/edit and c
   assert.equal(fixture.calls.at(-1)[0], 'edit');
   assert.equal(tree.props.canManageStream, false, 'pending events cannot stream');
   tree.props.onApproveRegistration();
+  fixture.render(); await new Promise(setImmediate);
+  const review = fixture.render();
+  assert.match(JSON.stringify(review), /Attendance/);
+  flatten(review).find(node => node.type === 'Pressable' && JSON.stringify(node.props.children).includes('Approve reviewed event and form')).props.onPress();
   await fixture.alerts.at(-1)[2][1].onPress();
   assert.equal(fixture.calls.some(call => call[0] === 'approve' && call[1] === 'event' && call[2] === 7), true);
   fixture.listeners[0]('background');
@@ -272,4 +285,303 @@ test('My Events preserves attendee history without exposing host edit/delete con
   const hosted = JSON.stringify(list.props.renderItem({ item: { id: 'event', registrationOnly: true, status: 'pending', canManage: true } }));
   assert.match(hosted, /Edit Registration form/);
   assert.match(hosted, /Registration responses/);
+});
+
+function stagedDetail() {
+  return {
+    canManage: true, canApprove: true,
+    event: { id: 'event', revision: 19, status: 'approved', hasPendingChanges: true, city: 'sydney', title: 'Published title', eventType: 'Majlis', date: '2026-12-01', capacity: 50, allowCancellation: true },
+    form: { version: 2, purpose: 'Published purpose', fields: [{ id: 'old', type: 'text', label: 'Published question' }] },
+    privateDetails: { address: '1 Published Lane', hostPhone: 'published-phone', hasPoster: true },
+    pendingChanges: {
+      event: { revision: 1, title: 'Staged title', eventType: 'Majlis', date: '2026-12-02', capacity: 60, allowCancellation: false,
+        hostName: 'New host', organiserType: 'centre', organiserId: 'centre1', organiserName: 'Centre', organisationType: 'community', isOnBehalfOf: true,
+        eventSubject: 'New subject', audienceType: 'Family Event', speakerName: 'Speaker', reciters: [{ type: 'Custom', customType: 'Poetry', name: 'Reciter' }],
+        timeMode: 'prayer', prayerName: 'maghrib', prayerLabel: 'Maghrib', prayerOffsetMinutes: 30, prayerTimeZone: 'Australia/Sydney',
+        hijriDate: 'Hijri display', enteredAsHijri: true, hijriDay: 2, hijriMonth: 6, hijriYear: 1448 },
+      form: { version: 3, purpose: 'Staged purpose', fields: [{ id: 'new', type: 'select', label: 'Staged question', options: ['One', 'Two'], description: 'New help', required: true }, { id: 'terms', type: 'consent', label: 'Agreement', terms: 'Staged terms', required: true }] },
+      privateDetails: { address: '2 Staged Lane', venue: { fullAddress: '2 Staged Lane', suburb: 'Parramatta', state: 'NSW', latitude: -33.8, longitude: 151 }, hostPhone: 'private-phone', hostContactOptional: 'private@example.test', hasPoster: true },
+      submittedAt: '2026-10-16', submittedBy: 'organiser',
+    },
+  };
+}
+test('manager draft selects staging and roundtrips every normal-event metadata field without public poster paths', () => {
+  const detail = stagedDetail();
+  const draft = view.eventDraftFromDetail(detail, ['Majlis']);
+  assert.equal(draft.title, 'Staged title');
+  assert.equal(draft.address, '2 Staged Lane');
+  assert.equal(draft.hostPhone, 'private-phone');
+  assert.equal(draft.hostContactOptional, 'private@example.test');
+  assert.equal(draft.fields[0].label, 'Staged question');
+  assert.equal(draft.allowCancellation, false);
+  const normal = view.normalEventFromRegistrationDraft(draft);
+  assert.equal(normal.eventDate, '2026-12-02');
+  assert.equal(normal.address.latitude, -33.8);
+  assert.equal(normal.imageUrl, undefined);
+  const mapped = view.registrationDraftFromNormalEvent(draft, { ...normal, metroArea: 'perth', imageUrl: 'https://public.test/poster', imagePath: 'public/path', _localImageUri: 'file://public', address: { ...normal.address, fullAddress: '3 Changed Lane' } });
+  for (const key of Object.keys(detail.pendingChanges.event).filter(key => !['title', 'eventType', 'date', 'capacity', 'allowCancellation', 'revision'].includes(key))) {
+    assert.equal(JSON.stringify(mapped[key]), JSON.stringify(detail.pendingChanges.event[key]), key);
+  }
+  assert.equal(mapped.address, '3 Changed Lane');
+  assert.equal(mapped.venue.fullAddress, '3 Changed Lane');
+  assert.equal(mapped.city, undefined, 'normal form cannot change the selected event city');
+  assert.equal(mapped.imageUrl, undefined);
+  assert.equal(mapped.imagePath, undefined);
+  assert.equal(mapped._localImageUri, undefined);
+  assert.equal(detail.event.title, 'Published title');
+  assert.equal(detail.form.fields[0].label, 'Published question');
+  draft.fields[0].label = 'Local edit';
+  assert.equal(detail.pendingChanges.form.fields[0].label, 'Staged question');
+});
+test('attendee answer review uses published questions even when the host has staged changes', () => {
+  const detail = stagedDetail();
+  detail.ownRegistration = { fields: detail.form.fields, answers: { old: 'Published answer', new: 'Never copy staged answer' } };
+  assert.equal(view.answersForReview(detail).old, 'Published answer');
+  assert.equal(view.answersForReview(detail).new, undefined);
+});
+test('poster client distinguishes manager pending review without changing load arguments or published default', async () => {
+  const calls = [];
+  const api = contract.createRegistrationClient(async (name, data) => { calls.push({ name, data }); return { data: {} }; }, { enabled: true });
+  await api.load('event'); await api.poster('event'); await api.poster('event', 'pending');
+  assert.equal(JSON.stringify(calls[0]), JSON.stringify({ name: 'getRegistrationEvent', data: { eventId: 'event' } }));
+  assert.equal(JSON.stringify(calls[1].data), JSON.stringify({ eventId: 'event' }));
+  assert.equal(JSON.stringify(calls[2].data), JSON.stringify({ eventId: 'event', view: 'pending' }));
+});
+test('approved staged review displays submitted event, private venue, poster and full form before approval with published revision', async () => {
+  const detail = stagedDetail();
+  const fixture = detailsFixture(detail);
+  fixture.render(); await new Promise(setImmediate);
+  const published = fixture.render();
+  assert.equal(published.props.event.title, 'Published title');
+  assert.equal(published.props.event.address.fullAddress, '1 Published Lane');
+  assert.equal(published.props.event.imageUrl, 'data:image/png;base64,PRIVATE_BYTES');
+  assert.equal(published.props.event.hostPhone, undefined);
+  assert.equal(published.props.event.hostContactOptional, undefined);
+  assert.match(JSON.stringify(published.props.registrationNotice), /Review submitted changes/);
+  assert.equal(fixture.calls.some(call => call[0] === 'poster' && call[2] === 'pending'), false);
+  published.props.onApproveRegistration();
+  assert.equal(fixture.calls.some(call => call[0] === 'approve'), false);
+  fixture.render(); await new Promise(setImmediate);
+  const review = fixture.render();
+  for (const value of ['Staged title', '2 Staged Lane', 'private-phone', 'private@example.test', 'Staged purpose', 'Staged question', 'New help', 'One', 'Two', 'Staged terms', 'STAGED_BYTES', 'New host', 'Poetry: Reciter']) assert.ok(JSON.stringify(review).includes(value), value);
+  assert.equal(fixture.calls.some(call => call[0] === 'poster' && call[2] === 'pending'), true);
+  const approval = flatten(review).find(node => node.type === 'Pressable' && JSON.stringify(node.props.children).includes('Approve reviewed event and form'));
+  assert.equal(approval.props.disabled, false);
+  fixture.api.approve = async (...args) => {
+    fixture.calls.push(['approve', ...args]);
+    detail.event = { ...detail.pendingChanges.event, id: 'event', city: 'sydney', status: 'approved', revision: 28, hasPendingChanges: false };
+    detail.form = detail.pendingChanges.form; detail.privateDetails = detail.pendingChanges.privateDetails;
+    delete detail.pendingChanges;
+  };
+  const previousLoads = fixture.calls.filter(call => call[0] === 'load').length;
+  approval.props.onPress(); await fixture.alerts.at(-1)[2][1].onPress();
+  assert.equal(fixture.calls.some(call => JSON.stringify(call) === JSON.stringify(['approve', 'event', 19])), true, 'use published control revision, not staged revision');
+  fixture.render(); await new Promise(setImmediate);
+  assert.ok(fixture.calls.filter(call => call[0] === 'load').length > previousLoads, 'reload published state after approval; never predict its new revision');
+  const reloaded = fixture.render();
+  assert.equal(reloaded.type, 'NormalDetails');
+  assert.equal(reloaded.props.event.title, 'Staged title');
+  assert.equal(reloaded.props.event.revision, 28);
+});
+test('unreadable staged poster blocks approval and background clears the review', async () => {
+  const fixture = detailsFixture(stagedDetail());
+  fixture.render(); await new Promise(setImmediate);
+  fixture.render().props.onApproveRegistration();
+  fixture.api.poster = async () => { throw new Error('Cannot read submitted poster'); };
+  fixture.render(); await new Promise(setImmediate);
+  const review = fixture.render();
+  const approval = flatten(review).find(node => node.type === 'Pressable' && JSON.stringify(node.props.children).includes('Approve reviewed event and form'));
+  assert.equal(approval.props.disabled, true);
+  fixture.listeners[0]('background');
+  assert.equal(JSON.stringify(fixture.render()).includes('Staged title'), false);
+});
+test('staged poster removal never falls back to the still-published private poster', async () => {
+  const detail = stagedDetail();
+  detail.pendingChanges.privateDetails.hasPoster = false;
+  const fixture = detailsFixture(detail);
+  fixture.render(); await new Promise(setImmediate);
+  fixture.render().props.onApproveRegistration();
+  const previousPosters = fixture.calls.filter(call => call[0] === 'poster').length;
+  fixture.render(); await new Promise(setImmediate);
+  const review = fixture.render();
+  assert.match(JSON.stringify(review), /No poster in this submitted version/);
+  assert.doesNotMatch(JSON.stringify(review), /PRIVATE_BYTES|STAGED_BYTES/);
+  assert.equal(fixture.calls.filter(call => call[0] === 'poster').length, previousPosters);
+  const approval = flatten(review).find(node => node.type === 'Pressable' && JSON.stringify(node.props.children).includes('Approve reviewed event and form'));
+  assert.equal(approval.props.disabled, false);
+});
+test('denied pending poster rechecks authorization and drops stale manager venue and staged content', async () => {
+  const fixture = detailsFixture(stagedDetail());
+  fixture.render(); await new Promise(setImmediate);
+  fixture.render().props.onApproveRegistration();
+  fixture.api.poster = async () => { throw Error('No longer authorized'); };
+  let loads = 0;
+  fixture.api.load = async () => ++loads === 1 ? stagedDetail() : { event: { id: 'event', status: 'approved', title: 'Public title' }, canManage: false };
+  fixture.render(); await new Promise(setImmediate);
+  const reloaded = fixture.render();
+  assert.equal(reloaded.type, 'NormalDetails');
+  assert.equal(reloaded.props.event.registrationPrivate, false);
+  assert.equal(reloaded.props.onApproveRegistration, undefined);
+  assert.doesNotMatch(JSON.stringify(reloaded), /Staged Lane|Staged title|private-phone/);
+});
+
+function componentFixture(file, mocks, props) {
+  const hooks = [], effects = [];
+  let index = 0;
+  const changed = (previous, next) => !previous || next.some((value, i) => value !== previous[i]);
+  const react = {
+    createElement: (type, props, ...children) => ({ type, props: { ...props, children } }),
+    useState: initial => {
+      const i = index++;
+      if (!(i in hooks)) hooks[i] = typeof initial === 'function' ? initial() : initial;
+      return [hooks[i], next => { hooks[i] = typeof next === 'function' ? next(hooks[i]) : next; }];
+    },
+    useRef: initial => { const i = index++; return hooks[i] || (hooks[i] = { current: initial }); },
+    useMemo: (fn, deps) => {
+      const i = index++;
+      if (!hooks[i] || changed(hooks[i].deps, deps)) hooks[i] = { deps, value: fn() };
+      return hooks[i].value;
+    },
+    useEffect: (fn, deps) => {
+      const i = index++;
+      if (!hooks[i] || changed(hooks[i].deps, deps)) {
+        hooks[i] = { deps };
+        effects.push(fn);
+      }
+    },
+  };
+  const exports = {};
+  const code = babel.transformSync(fs.readFileSync(path.join(root, file), 'utf8'), {
+    configFile: false, babelrc: false, plugins: ['@babel/plugin-transform-react-jsx', '@babel/plugin-transform-modules-commonjs'],
+  }).code;
+  vm.runInNewContext(code, { exports, require: name => {
+    if (name === 'react') return react;
+    if (!(name in mocks)) throw Error(`Unexpected dependency: ${name}`);
+    return mocks[name];
+  } });
+  return { render: () => {
+    index = 0;
+    const tree = exports.default(props);
+    while (effects.length) effects.shift()();
+    return tree;
+  } };
+}
+function normalFormFixture(initialEvent, registrationMode) {
+  const submissions = [];
+  const native = Object.fromEntries(['ActivityIndicator', 'Image', 'Pressable', 'Switch', 'Text', 'TextInput', 'View'].map(name => [name, name]));
+  const fixture = componentFixture('src/components/CreateEventForm.js', {
+    'react-native': { ...native, StyleSheet: { create: value => value }, Alert: { alert() {} } },
+    'expo-image-picker': {},
+    './EventDateTimePicker': 'EventDateTimePicker',
+    './KeyboardAwareScrollView': 'ScrollView',
+    './MemberPageHeader': 'MemberPageHeader',
+    './AddressAutocomplete': 'AddressAutocomplete',
+    './CompactSelect': 'CompactSelect',
+    '../theme': { colors: {}, radius: {}, shadow: {}, spacing: {} },
+    '../services/cityCatalogue': { useCityCatalogueVersion: () => 0 },
+    '../services/hijri': { getHijriDisplay: () => '', getHijriParts: () => ({ day: 1, month: 1, year: 1448 }), HIJRI_MONTHS: [] },
+    '../services/prayerTimes': { calculatePrayerTimes: () => null },
+    '../services/settings': { getHijriSettings: async () => ({ overrides: [] }) },
+    '../services/organisations': { getOrganisations: async () => [], normalizeOrganisationType: value => value },
+    '../services/eventOptionsAdmin': { getDynamicEventOptions: async () => ({ eventTypes: [], reciterTypes: [] }) },
+    '../utils/cities': { cityLabel: value => value, classifyMetroArea: () => 'perth', normalizeCity: value => value },
+    '../utils/eventOptions': load(path.join(root, 'src/utils/eventOptions.js')),
+  }, { initialEvent, registrationMode, defaultCity: 'sydney', allowUnchangedSubmit: true, onSubmit: value => submissions.push(value) });
+  return { ...fixture, submissions };
+}
+test('actual shared form isolates registration date-only/overnight and private poster behavior from normal mode', async () => {
+  const base = { id: 'event', hostName: 'Host', eventType: 'Majlis', eventDate: '2027-12-01', notes: '', address: { fullAddress: 'Private address', suburb: 'Parramatta', state: 'NSW', latitude: -33.8, longitude: 151 } };
+  const send = fixture => {
+    const tree = fixture.render();
+    flatten(tree).find(node => node.type === 'Pressable' && node.props.onPress?.name === 'handleSubmit').props.onPress();
+    return tree;
+  };
+  const dateOnly = normalFormFixture(base, true);
+  const dateTree = send(dateOnly);
+  assert.equal(dateOnly.submissions.length, 1);
+  assert.equal(dateOnly.submissions[0].startTime, '');
+  assert.equal(flatten(dateTree).some(node => node.props.placeholder === 'https://example.com/poster.jpg'), false);
+  for (const key of ['imageUrl', 'imagePath', '_localImageUri', '_localImageMimeType']) assert.equal(key in dateOnly.submissions[0], false, key);
+  const overnight = normalFormFixture({ ...base, startTime: '23:30', endTime: '01:00' }, true);
+  send(overnight);
+  assert.equal(overnight.submissions[0].endTime, '01:00');
+  const same = normalFormFixture({ ...base, startTime: '23:30', endTime: '23:30' }, true);
+  send(same); assert.equal(same.submissions.length, 0);
+  const noStart = normalFormFixture({ ...base, endTime: '01:00' }, true);
+  send(noStart); assert.equal(noStart.submissions.length, 0);
+  const malformed = normalFormFixture({ ...base, startTime: '25:00' }, true);
+  send(malformed); assert.equal(malformed.submissions.length, 0);
+  const normalDateOnly = normalFormFixture(base);
+  const normalTree = send(normalDateOnly);
+  assert.equal(normalDateOnly.submissions.length, 0);
+  assert.equal(flatten(normalTree).some(node => node.props.placeholder === 'https://example.com/poster.jpg'), true);
+  const normalOvernight = normalFormFixture({ ...base, startTime: '23:30', endTime: '01:00' });
+  send(normalOvernight); assert.equal(normalOvernight.submissions.length, 0);
+  const normal = normalFormFixture({ ...base, startTime: '18:00', endTime: '19:00', imageUrl: 'https://public.test/poster' });
+  send(normal); assert.equal(normal.submissions[0].imageUrl, 'https://public.test/poster');
+  await new Promise(setImmediate);
+});
+test('editor renders the actual shared form in registration mode and keeps dedicated registration/poster controls', async () => {
+  const detail = stagedDetail();
+  const fixture = componentFixture('src/registration/RegistrationEditor.js', {
+    'react-native': { Image: 'Image', Switch: 'Switch', Text: 'Text', View: 'View' },
+    'expo-image-picker': {},
+    '../components/CreateEventForm': { __esModule: true, default: 'ActualCreateEventForm' },
+    '../components/NativeDateTimeField': 'DateTimeField',
+    './RegistrationControls': { Action: 'Action', Input: 'Input', styles: {} },
+    './prototypeModel': load(path.join(root, 'src/registration/prototypeModel.js')),
+    './privateVenue': load(path.join(root, 'src/registration/privateVenue.js')),
+    './registrationViewModel': view,
+  }, { initialDraft: view.eventDraftFromDetail(detail, ['Majlis']), eventId: 'event', city: 'sydney', savedTemplates: [], onCancel() {}, hasPoster: true });
+  const form = flatten(fixture.render()).find(node => node.type === 'ActualCreateEventForm');
+  assert.equal(form.props.registrationMode, true);
+  assert.equal(form.props.defaultCity, 'sydney');
+  assert.equal(form.props.initialEvent.hostPhone, 'private-phone');
+  form.props.onSubmit({ ...form.props.initialEvent, eventDate: '2027-12-02', startTime: '', endTime: '' });
+  const settings = fixture.render();
+  assert.match(JSON.stringify(settings), /Registration settings/);
+  assert.match(JSON.stringify(settings), /Select private poster/);
+  assert.match(JSON.stringify(settings), /Remove existing private poster/);
+  assert.match(JSON.stringify(settings), /Capacity \(places\)/);
+});
+test('host screen edits pending draft but self-registration stays on published form and revision', async () => {
+  const detail = stagedDetail();
+  const saved = [], submitted = [];
+  const transport = {
+    load: async () => detail,
+    templates: async () => ({ templates: [], nextCursor: null }),
+    save: async value => { saved.push(value); return { eventId: 'event', revision: 20 }; },
+    submit: async value => { submitted.push(value); },
+  };
+  const mocks = {
+    'react-native': { ActivityIndicator: 'ActivityIndicator', Alert: { alert() {} }, AppState: { addEventListener: () => ({ remove() {} }) }, Share: {}, Text: 'Text', View: 'View' },
+    './KeyboardAwareScrollView': 'ScrollView', './MemberPageHeader': 'MemberPageHeader',
+    '../registration/RegistrationEditor': { __esModule: true, default: 'Editor' },
+    '../registration/RegistrationControls': { Action: 'Action', Answer: 'Answer', Input: 'Input', styles: {} },
+    '../registration/firebaseRegistration': {}, '../registration/registrationClient': contract,
+    '../registration/registrationViewModel': view, '../registration/prototypeModel': load(path.join(root, 'src/registration/prototypeModel.js')),
+    '../utils/eventOptions': { EVENT_TYPES: ['Majlis'] }, '../services/eventOptionsAdmin': { getDynamicEventOptions: async () => ({ eventTypes: [] }) },
+    '../utils/cities': { cityLabel: value => value }, '../theme': { colors: {} },
+  };
+  const props = { enabled: true, user: { uid: 'host' }, city: 'perth', initialEventId: 'event', transport };
+  const editorFixture = componentFixture('src/components/RegistrationScreen.js', mocks, { ...props, initialAction: 'editor' });
+  editorFixture.render(); await new Promise(setImmediate);
+  const editor = flatten(editorFixture.render()).find(node => node.type === 'Editor');
+  assert.equal(editor.props.initialDraft.title, 'Staged title');
+  assert.equal(editor.props.city, 'sydney');
+  editor.props.onSave(editor.props.initialDraft); await new Promise(setImmediate);
+  assert.equal(saved[0].expectedRevision, 19);
+  assert.equal(saved[0].city, 'sydney');
+  assert.match(JSON.stringify(editorFixture.render()), /published event and form remain live and unchanged/);
+  const entryFixture = componentFixture('src/components/RegistrationScreen.js', mocks, { ...props, initialAction: 'entry' });
+  entryFixture.render(); await new Promise(setImmediate);
+  const entry = entryFixture.render();
+  assert.match(JSON.stringify(entry), /Published purpose/);
+  assert.doesNotMatch(JSON.stringify(entry), /Staged purpose|Staged question|Staged title/);
+  const answer = flatten(entry).find(node => node.type === 'Answer');
+  assert.equal(answer.props.field.id, 'old');
+  const submit = flatten(entry).find(node => node.type === 'Action' && JSON.stringify(node.props.children).includes('Submit registration'));
+  assert.ok(submit, 'published entry provides confirmation action');
+  submit.props.onPress(); await new Promise(setImmediate);
+  assert.equal(submitted[0].formVersion, 2);
 });

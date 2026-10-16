@@ -103,7 +103,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     }
     const fresh = await api.load(result.eventId);
     if (!valid()) return;
-    setDetail(fresh); setStage('host-confirmation'); setDraft(null); setNotice(posterError || (fresh.event.status === 'approved' ? 'Changes saved. Your event remains approved. Attendee changes are queued for delivery when notifications are enabled.' : 'Saved for super administrator review. The event is not public until approved.'));
+    setDetail(fresh); setStage('host-confirmation'); setDraft(null); setNotice(posterError || (fresh.event.hasPendingChanges ? 'Changes submitted for super administrator review. The published event and form remain live and unchanged.' : 'Saved for super administrator review. The event is not public until approved.'));
   });
   const startEntry = () => {
     if (!requireMember()) return;
@@ -134,12 +134,12 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       if (valid()) { setResponses(current => current.filter(item => item.registrationId !== row.registrationId)); setNotice('Answers deleted. Booking status and places are unchanged. Reload responses to see current metadata.'); }
     }) },
   ]);
-  const posterChange = remove => Alert.alert(remove ? 'Remove private poster?' : 'Retry poster upload?', 'This changes the private event poster.', [
+  const posterChange = remove => Alert.alert(remove ? 'Remove private poster?' : 'Retry poster upload?', 'For approved events, poster changes are staged for review. The published poster stays unchanged until approval.', [
     { text: 'Cancel', style: 'cancel' }, { text: 'Continue', onPress: () => run(async valid => {
       if (remove) await api.removePoster(detail.event.id, detail.event.revision);
       else await api.uploadPoster(detail.event.id, detail.event.revision, pendingPoster.mime, pendingPoster.base64);
       const fresh = await api.load(detail.event.id);
-      if (valid()) { setPendingPoster(null); setDetail(fresh); }
+      if (valid()) { setPendingPoster(null); setDetail(fresh); setNotice(fresh.event.hasPendingChanges ? 'Poster change submitted for review. The published poster remains unchanged until approval.' : 'Private poster updated.'); }
     }) },
   ]);
   if (!enabled) return <View style={styles.panel}><Text style={styles.text}>Registration is not enabled for this release.</Text><Action onPress={onBack}>Back</Action></View>;
@@ -150,7 +150,8 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     {busy && <ActivityIndicator color={colors.tealDark} />}
     {notice ? <Text accessibilityRole="alert" style={styles.error}>{notice}</Text> : null}
     <View pointerEvents={busy ? 'none' : 'auto'}>
-    {stage === 'editor' && draft && <RegistrationEditor initialDraft={draft} initialStep={initialAction === 'form' ? 'form' : 'event'} eventTypes={types} savedTemplates={templates} hasMoreTemplates={Boolean(templateCursor)} onMoreTemplates={() => run(valid => loadTemplates(valid, templateCursor))} busy={busy} onSave={save} onCancel={onBack} hasPoster={detail?.privateDetails?.hasPoster} onRemovePoster={() => posterChange(true)} onSaveTemplate={template => run(async valid => {
+    {stage === 'editor' && draft && <RegistrationEditor initialDraft={draft} eventId={detail?.event.id} city={detail?.event.city || city} defaultHostName={profile?.fullName || user?.displayName || ''} defaultHostPhone={profile?.phone || user?.phoneNumber || ''}
+      initialStep={initialAction === 'form' ? 'form' : 'event'} eventTypes={types} savedTemplates={templates} hasMoreTemplates={Boolean(templateCursor)} onMoreTemplates={() => run(valid => loadTemplates(valid, templateCursor))} busy={busy} onSave={save} onCancel={onBack} hasPoster={(detail?.pendingChanges || detail)?.privateDetails?.hasPoster} onRemovePoster={() => posterChange(true)} onSaveTemplate={template => run(async valid => {
       await api.saveTemplate({ ...template, templateId: newReference() }); await loadTemplates(valid); if (valid()) setNotice('Template saved to your account.');
     })} />}
     {detail && stage === 'entry' && <View style={styles.panel}>
@@ -164,7 +165,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     {detail && ['confirmation', 'host-confirmation'].includes(stage) && <View style={styles.panel}>
       <Text style={styles.title}>{stage === 'confirmation' ? 'Registration confirmed' : 'Event and form saved'}</Text>
       <Text style={styles.text}>{detail.event.title}</Text>
-      <Text style={styles.muted}>{stage === 'confirmation' ? `${detail.ownRegistration?.places || 0} places reserved.` : detail.event.status === 'pending' ? 'Awaiting super administrator approval. Your event appears in My Events until approved.' : 'Changes saved.'}</Text>
+      <Text style={styles.muted}>{stage === 'confirmation' ? `${detail.ownRegistration?.places || 0} places reserved.` : detail.event.hasPendingChanges ? 'Changes await super administrator approval. The published event and form remain unchanged.' : detail.event.status === 'pending' ? 'Awaiting super administrator approval. Your event appears in My Events until approved.' : 'Changes saved.'}</Text>
       <Action primary onPress={onBack}>Back to events</Action><Action onPress={() => stage === 'confirmation' ? startEntry() : edit()}>{stage === 'confirmation' ? 'Edit registration' : 'Edit event or form'}</Action>
       {pendingPoster && <Action onPress={() => posterChange(false)}>Retry selected poster upload</Action>}
     </View>}

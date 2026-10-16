@@ -1,5 +1,86 @@
 # Event registration backend and Native integration
 
+## Staged changes and normal-form parity — 17 October source update
+
+**Not deployed.** This section supersedes older statements that approved edits
+publish immediately. The user chose to keep the last approved version live
+while a separate submitted revision awaits superAdmin approval.
+
+`registrationEvents`, `registrationForms` and `registrationEventPrivate` always
+remain the published version. Approved saves write a complete snapshot to the
+callable-only `registrationPendingChanges/{eventId}` collection and increment
+the event's control `revision` / `hasPendingChanges`, but do not change published
+date, times, form, formVersion, capacity, venue, contacts or poster. Bookings,
+public feeds, `/cal`, stream metadata and active streams continue to use the
+published version. No public mirror, rules change, index or record migration
+is needed; unmatched Firestore collections are denied by the existing rules.
+
+### Client/review contract
+
+- `getRegistrationEvent({eventId})` top-level `event`, `form`, `privateDetails`
+  **always refer to published content**, even for a host registering themselves.
+  Managers additionally receive `event.hasPendingChanges` and, when present,
+  `pendingChanges:{event,form,privateDetails,submittedAt,submittedBy}`.
+  Only editor/review code selects `pendingChanges || detail`; attendee entry and
+  ordinary cards continue to use the top level. Pending private details use the
+  same safe projection (no Storage paths). Lists never include pending content.
+- `canApprove` is true only for superAdmins when the event is initially pending
+  or approved with submitted changes. `review` scope includes both. Ordinary
+  city admins may manage/edit/review content but cannot approve. `status` stays
+  `approved` while changes await approval, so it must not be the only approval
+  button condition.
+- Approved `saveRegistrationEvent` returns
+  `{eventId,revision,status:'approved',hasPendingChanges:true}`. Subsequent
+  saves replace the submitted snapshot, revision checked. Initial events keep
+  the existing pending workflow.
+- `approveRegistrationEvent({eventId,expectedRevision})` promotes the submitted
+  event/form/private details atomically, rechecks city validity, capacity against
+  the latest bookings and event-day form restrictions, and retains latest
+  booking counters and streaming fields. Promotion increments revision again;
+  changed forms use that version, stable forms retain their prior version.
+  Reload after approval; never predict revisions. Existing date/form/venue
+  outbox and attendee consent review begin **only on promotion**. Notices stay OFF.
+- Poster upload/removal on approved events stages the change too. Published
+  poster access is unchanged until approval. `getRegistrationPoster({eventId})`
+  defaults to published; `view:'pending'` selects a manager-only pending poster.
+  There is no pending-to-published fallback. Cleanup protects both referenced
+  versions, then retires replaced media after the existing grace period.
+  Cancellation/deletion/account cleanup discard staged drafts and queue orphan
+  media cleanup while preserving published booking history.
+
+### Normal-form field mapping
+
+Registration event editors reuse the normal Native/Web event form with a
+private-poster mode. Existing registration-specific capacity, closing date,
+cancellation setting, form questions/purpose and title remain. Explicit times
+remain optional; overnight and timezone conversion retain the schedule contract.
+Legacy events with no saved clocks remain date-only until a host enters times;
+there is no way to recover an unspecified clock safely.
+
+Additional flat draft/public descriptive fields: `hostName` (80),
+`organiserType` (100), `organiserId` (128), `organiserName` (160),
+`organisationType` (80), `isOnBehalfOf` (boolean), `eventSubject` (160),
+`audienceType` (80), `speakerName` (160), `reciters` (up to 20 entries with
+`type`/`customType` up to 80 and `name` up to 160), `timeMode` (`manual`/`prayer`),
+`prayerName` (40), `prayerLabel` (80), `prayerOffsetMinutes` (integer -360..360),
+`prayerTimeZone` (authoritative city zone in prayer mode), `hijriDate` (100),
+`enteredAsHijri` (boolean), `hijriDay` (1..30), `hijriMonth` (1..12),
+`hijriYear` (1300..1700); Hijri parts may be null. Normal forms calculate the
+explicit prayer HH:mm, and the backend derives exact UTC without guessing.
+Normal payload `eventDate` maps to registration `date`; normal address object
+maps to private `venue`, `address` string and public `suburb`.
+
+`hostPhone` (80) and `hostContactOptional` (254) are **private**, stored beside
+the venue and projected only in authorized `privateDetails`, never public
+event/list/calendar/stream data. Do not rename hostContactOptional to
+hostContactEmail. Omitted new fields preserve prior values for older clients;
+explicit empty strings/arrays clear them. Descriptive organisation selection
+does not grant ownership, admin permission or contact visibility.
+
+Release this source only with both pending-aware clients. Production remains
+at the previous deployed semantics until an explicitly authorized coordinated
+release. Native client flag, notice delivery and App Check settings are unchanged.
+
 ## Unified event discovery — 16 October implementation
 
 This section supersedes the older rollout notes below. The registration codebase

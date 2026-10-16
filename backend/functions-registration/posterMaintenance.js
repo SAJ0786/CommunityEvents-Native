@@ -29,7 +29,8 @@ function createPosterMaintenance({ db, bucket, now = () => new Date(), enabled =
         if (!data || data.state !== 'pending' || data.notBefore > now().toISOString()) return null;
         if (!validPath(data.eventId, data.path)) { tx.update(doc.ref, { state: 'failed', error: 'invalid-private-path' }); return { invalid: true }; }
         const venue = await tx.get(db.collection('registrationEventPrivate').doc(data.eventId));
-        if (venue.data()?.posterPath === data.path) { tx.delete(doc.ref); return { retained: true }; }
+        const pending = await tx.get(db.collection('registrationPendingChanges').doc(data.eventId));
+        if (venue.data()?.posterPath === data.path || pending.data()?.privateDetails?.posterPath === data.path) { tx.delete(doc.ref); return { retained: true }; }
         tx.update(doc.ref, { lease, attempts: (data.attempts || 0) + 1, notBefore: new Date(now().getTime() + 5 * 60 * 1000).toISOString() });
         return data;
       });

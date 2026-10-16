@@ -1,5 +1,6 @@
 'use strict';
 const { localMinute } = require('./registration');
+const { enqueuePosterCleanup } = require('./posterMaintenance');
 const deleted = profile => !profile || profile.accountStatus === 'deleted' || Boolean(profile.accountDeletedAt);
 // Bounded resumable cleanup for registration data only. The existing account
 // lifecycle remains responsible for Auth, legacy events and non-registration data.
@@ -30,9 +31,21 @@ function createAccountCleanup({ db, now = () => new Date(), enabled = () => fals
         if (!deleted((await tx.get(userRef)).data())) return;
         if (job.phase === 'hosted') {
           const event = (await tx.get(item.ref)).data();
-          if (!event || event.ownerUid !== uid || event.status === 'cancelled' || event.date < localMinute(now(), event.timeZone).slice(0, 10)) return;
+          if (!event || event.ownerUid !== uid) return;
+          const pendingRef = db.collection('registrationPendingChanges').doc(item.id);
+          const pending = (await tx.get(pendingRef)).data();
+          if (event.status === 'cancelled' || event.date < localMinute(now(), event.timeZone).slice(0, 10)) {
+            if (pending) {
+              tx.delete(pendingRef);
+              tx.update(item.ref, { hasPendingChanges: false });
+              if (pending.privateDetails.posterPath) enqueuePosterCleanup(db, tx, item.id, pending.privateDetails.posterPath, now());
+            }
+            return;
+          }
           const revision = event.revision + 1; const timestamp = now().toISOString();
-          tx.update(item.ref, { status: 'cancelled', revision, reservedPlaces: 0, cancelledAt: timestamp, cancellationReason: 'organiser-account-deleted' });
+          tx.update(item.ref, { status: 'cancelled', revision, reservedPlaces: 0, cancelledAt: timestamp, cancellationReason: 'organiser-account-deleted', hasPendingChanges: false });
+          tx.delete(pendingRef);
+          if (pending?.privateDetails.posterPath) enqueuePosterCleanup(db, tx, item.id, pending.privateDetails.posterPath, now());
           if (event.registrationCount > 0) tx.set(db.collection('registrationChanges').doc(`${item.id}-${revision}`), {
             eventId: item.id, revision, formVersion: event.formVersion, changes: ['cancelled'], createdAt: timestamp, state: 'pending', cursor: null,
           });

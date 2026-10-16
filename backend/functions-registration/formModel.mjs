@@ -55,7 +55,11 @@ export function publicNotesError(draft) {
 }
 // Allowlisted public projection. Never include private venue, coordinates or poster.
 export function publicEvent(draft) {
-  return { title: draft.title, eventType: resolvedEventType(draft), date: draft.date, startTime: draft.startTime || '', endTime: draft.endTime || '', startAt: draft.startAt || null, endAt: draft.endAt || null, suburb: publicSuburbError(draft) ? '' : draft.suburb, notes: publicNotesError(draft) ? '' : draft.notes, capacity: Number(draft.capacity), closes: draft.closes };
+  const metadata = {};
+  for (const key of ['hostName', 'organiserType', 'organiserId', 'organiserName', 'organisationType', 'isOnBehalfOf', 'eventSubject', 'audienceType', 'speakerName', 'reciters', 'timeMode', 'prayerName', 'prayerLabel', 'prayerOffsetMinutes', 'prayerTimeZone', 'hijriDate', 'enteredAsHijri', 'hijriDay', 'hijriMonth', 'hijriYear']) {
+    if (draft[key] !== undefined) metadata[key] = draft[key];
+  }
+  return { ...metadata, title: draft.title, eventType: resolvedEventType(draft), date: draft.date, startTime: draft.startTime || '', endTime: draft.endTime || '', startAt: draft.startAt || null, endAt: draft.endAt || null, suburb: publicSuburbError(draft) ? '' : draft.suburb, notes: publicNotesError(draft) ? '' : draft.notes, capacity: Number(draft.capacity), closes: draft.closes };
 }
 export function createDraft() {
   return { title: 'Community family workshop', eventType: 'Custom', customEventType: 'Workshop', date: '', suburb: '', address: '', notes: '', poster: null,

@@ -284,6 +284,7 @@ export default function CreateEventForm({
   success = '',
   canSubmit = true,
   allowUnchangedSubmit = false,
+  registrationMode = false,
 }) {
   const cityCatalogueVersion = useCityCatalogueVersion();
   const defaults = useMemo(() => ({
@@ -300,7 +301,7 @@ export default function CreateEventForm({
   const [dynamicOptions, setDynamicOptions] = useState({ eventTypes: [], reciterTypes: [] });
   const [nativePicker, setNativePicker] = useState('');
   const invalidDateTimeAlertRef = useRef('');
-  const enforceFutureStart = !initialEvent?.id;
+  const enforceFutureStart = !registrationMode && !initialEvent?.id;
 
   useEffect(() => {
     setForm(createFormState(initialEvent, defaultCity, defaults));
@@ -363,7 +364,7 @@ export default function CreateEventForm({
   const update = (field, value) => setForm(current => ({ ...current, [field]: value }));
   const reciterTypeOptions = useMemo(() => [...new Set([...RECITER_TYPES.filter(item => item !== 'Custom'), ...dynamicOptions.reciterTypes, 'Custom'])], [dynamicOptions.reciterTypes]);
   const eventTypeOptions = eventTypesForExistingEvent(dynamicOptions.eventTypes, initialEvent);
-  const showReligious = hasExistingReciterDetails(initialEvent, form.eventType) || RELIGIOUS_EVENT_TYPES.has(form.eventType) || getEventTypeCategory(form.eventType, dynamicOptions.eventTypeCategories) === 'faith' || Boolean(dynamicOptions.legacyEventTypes?.includes(form.eventType));
+  const showReligious = hasExistingReciterDetails(initialEvent, form.eventType) || (registrationMode && form.eventType === initialEvent?.eventType && Boolean(initialEvent?.speakerName || initialEvent?.reciters?.some(item => item.name))) || RELIGIOUS_EVENT_TYPES.has(form.eventType) || getEventTypeCategory(form.eventType, dynamicOptions.eventTypeCategories) === 'faith' || Boolean(dynamicOptions.legacyEventTypes?.includes(form.eventType));
   const prayerAddress = useMemo(() => ({
     fullAddress: form.fullAddress,
     street: form.street,
@@ -425,14 +426,15 @@ export default function CreateEventForm({
     else if (enforceFutureStart && pastEventSelection(form.eventDate, '')) errors.eventDate = 'The event date cannot be earlier than today.';
     if (form.timeMode === 'prayer' && !form.prayerName) {
       errors.startTime = 'Select the prayer time for this event.';
-    } else if (!isTime(form.startTime)) {
+    } else if ((!registrationMode || form.startTime) && !isTime(form.startTime)) {
       errors.startTime = 'Select the event start time.';
     } else if (enforceFutureStart && pastEventSelection(form.eventDate, form.startTime) === 'time') {
       errors.startTime = 'For an event today, select a start time later than now.';
     }
     if (form.endTime.trim() && !isTime(form.endTime)) errors.endTime = 'Use time format HH:MM (24-hour).';
-    if (isTime(form.startTime) && isTime(form.endTime) && form.endTime <= form.startTime) {
-      errors.endTime = 'End time must be later than start time.';
+    if (registrationMode && form.endTime && !form.startTime) errors.endTime = 'Select a start time or clear the end time.';
+    if (isTime(form.startTime) && isTime(form.endTime) && (registrationMode ? form.endTime === form.startTime : form.endTime <= form.startTime)) {
+      errors.endTime = registrationMode ? 'End time must differ from start time.' : 'End time must be later than start time.';
     }
     if (form.eventType === 'Custom' && !form.customEventType.trim()) {
       errors.customEventType = 'Enter the custom event type.';
@@ -452,9 +454,9 @@ export default function CreateEventForm({
     ) {
       errors.address = 'Select the full event address from the Google suggestions.';
     }
-    if (!isWebUrl(form.imageUrl)) errors.imageUrl = 'Enter a full http:// or https:// image URL.';
+    if (!registrationMode && !isWebUrl(form.imageUrl)) errors.imageUrl = 'Enter a full http:// or https:// image URL.';
     return errors;
-  }, [enforceFutureStart, form]);
+  }, [enforceFutureStart, form, registrationMode]);
 
   const baseline = useMemo(
     () => createFormState(initialEvent, defaultCity, defaults),
@@ -748,10 +750,10 @@ export default function CreateEventForm({
         }))
         : [],
       notes: form.notes.trim(),
-      imageUrl: form.imageUrl.trim(),
+      ...(!registrationMode ? { imageUrl: form.imageUrl.trim(),
       imagePath: form.imagePath,
       _localImageUri: localImage?.uri || '',
-      _localImageMimeType: localImage?.mimeType || 'image/jpeg',
+      _localImageMimeType: localImage?.mimeType || 'image/jpeg' } : {}),
       address: {
         fullAddress,
         street: form.street.trim(),
@@ -765,6 +767,7 @@ export default function CreateEventForm({
   };
 
   const choosePoster = async () => {
+    if (registrationMode) return;
     setPickerError('');
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -824,7 +827,7 @@ export default function CreateEventForm({
       ) : null}
 
       <View style={styles.card}>
-        <Field label="Upload Event Poster" optional error={attempted ? validation.imageUrl : ''}>
+        {!registrationMode && <Field label="Upload Event Poster" optional error={attempted ? validation.imageUrl : ''}>
           <Pressable onPress={choosePoster} style={({ pressed }) => [styles.posterDropZone, pressed && styles.pressed]}>
             {localImage?.uri || (isWebUrl(form.imageUrl) && form.imageUrl.trim()) ? (
               <Image source={{ uri: localImage?.uri || form.imageUrl.trim() }} resizeMode="cover" style={styles.posterPreview} />
@@ -859,7 +862,7 @@ export default function CreateEventForm({
             style={[styles.input, attempted && validation.imageUrl && styles.inputInvalid]}
           />
           <Text style={styles.helper}>Optional - if you do not add one, your organisation logo will be shown. Images must be smaller than 5 MB.</Text>
-        </Field>
+        </Field>}
 
         <View style={styles.switchRow}>
           <View style={styles.switchCopy}>
@@ -873,7 +876,7 @@ export default function CreateEventForm({
         </View>
 
         <Field label="Organiser Type">
-          <Text style={styles.helper}>Used to show the correct logo when no poster is uploaded.</Text>
+          <Text style={styles.helper}>{registrationMode ? 'Choose the event organiser. Registration posters remain private.' : 'Used to show the correct logo when no poster is uploaded.'}</Text>
           <CompactSelect title="Choose organiser" options={organiserOptions} value={selectedOrganiserValue} onChange={selectOrganiser} />
         </Field>
 
@@ -890,7 +893,7 @@ export default function CreateEventForm({
           <Text style={styles.counter}>{form.hostName.length}/{FIELD_LIMITS.hostName}</Text>
         </Field>
 
-        <Field label="Host Phone Number" optional>
+        <Field label={registrationMode ? 'Host Phone Number — private' : 'Host Phone Number'} optional>
           <TextInput
             keyboardType="phone-pad"
             value={form.hostPhone}
@@ -902,7 +905,7 @@ export default function CreateEventForm({
         </Field>
 
         {form.isOnBehalfOf ? (
-          <Field label="Host Contact Email" optional>
+          <Field label={registrationMode ? 'Host Contact Email — private' : 'Host Contact Email'} optional>
             <TextInput
               autoCapitalize="none"
               autoCorrect={false}
@@ -972,7 +975,7 @@ export default function CreateEventForm({
           )}
         </Field> : null}
 
-        <Text style={styles.sectionLabel}>Time Selection *</Text>
+        <Text style={styles.sectionLabel}>{registrationMode ? 'Time Selection (optional, event city time)' : 'Time Selection *'}</Text>
         <OptionGroup
           options={[
             { value: 'manual', label: 'Fixed Time' },
@@ -982,7 +985,16 @@ export default function CreateEventForm({
           onChange={setTimeMode}
         />
 
-        {form.timeMode === 'manual' ? (
+        {registrationMode && form.timeMode === 'manual' ? <View>
+          <Field label="Start Time" optional error={attempted ? validation.startTime : ''}>
+            <TextInput accessibilityLabel="Event start time" value={form.startTime} placeholder="HH:mm" onChangeText={value => update('startTime', value)} style={styles.input} />
+          </Field>
+          <Field label="End Time" optional error={attempted ? validation.endTime : ''}>
+            <TextInput accessibilityLabel="Event end time" value={form.endTime} placeholder="HH:mm" onChangeText={value => update('endTime', value)} style={styles.input} />
+          </Field>
+          <Pressable onPress={() => setForm(current => ({ ...current, startTime: '', endTime: '' }))}><Text style={styles.addButtonText}>Clear event times</Text></Pressable>
+          <Text style={styles.helper}>Use HH:mm in the selected event city's timezone. No time means a date-only calendar entry, not a scheduled start. An earlier end time means the following day. Daylight-saving gaps or ambiguous times must be corrected.</Text>
+        </View> : form.timeMode === 'manual' ? (
           <View style={styles.twoColumns}>
             <View style={styles.column}>
               <Field label="Start Time" error={attempted ? validation.startTime : ''}>
@@ -1004,7 +1016,7 @@ export default function CreateEventForm({
         ) : null}
 
         <Text style={styles.sectionLabel}>Address *</Text>
-        <Text style={styles.helper}>Start typing, then select the full Australian address from Google. Public cards show suburb-level location only.</Text>
+        <Text style={styles.helper}>{registrationMode ? 'Full address — private. Select from Google suggestions. Only confirmed registrants, the organiser and authorised admins can access the exact location and directions.' : 'Start typing, then select the full Australian address from Google. Public cards show suburb-level location only.'}</Text>
         <AddressAutocomplete
           invalid={Boolean(attempted && validation.address)}
           value={prayerAddress}
@@ -1057,6 +1069,7 @@ export default function CreateEventForm({
                 <Text style={[styles.pickerValue, !form.endTime && styles.pickerPlaceholder]}>{form.endTime || 'Choose end time'}</Text>
               </Pressable>
             </Field>
+            {registrationMode && form.endTime ? <Pressable onPress={() => update('endTime', '')}><Text style={styles.addButtonText}>Clear end time</Text></Pressable> : null}
           </View>
         ) : null}
 
@@ -1179,10 +1192,10 @@ export default function CreateEventForm({
           </View>
         ) : null}
 
-        <Field label="Notes" optional>
+        <Field label={registrationMode ? 'Detailed notes — public' : 'Notes'} optional>
           <TextInput
             multiline
-            maxLength={FIELD_LIMITS.notes}
+            maxLength={registrationMode ? 5000 : FIELD_LIMITS.notes}
             numberOfLines={4}
             textAlignVertical="top"
             value={form.notes}
@@ -1191,7 +1204,8 @@ export default function CreateEventForm({
             placeholderTextColor={colors.muted}
             style={[styles.input, styles.textArea]}
           />
-          <Text style={styles.counter}>{form.notes.length}/{FIELD_LIMITS.notes}</Text>
+          <Text style={styles.counter}>{form.notes.length}/{registrationMode ? 5000 : FIELD_LIMITS.notes}</Text>
+          {registrationMode ? <Text style={styles.helper}>Do not include the full address, host contact details or confidential information in public text.</Text> : null}
         </Field>
 
         {nativePicker ? (

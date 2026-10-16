@@ -32,14 +32,14 @@ export default function RegistrationManagementPanel({ user, profile, review = fa
   if (!REGISTRATION_ENABLED || (review && profile?.role !== 'superAdmin')) return null;
   const close = () => { setSelected(null); setRefresh(value => value + 1); };
   return <View style={{ gap: spacing.sm, marginVertical: spacing.md }}>
-    <Text style={{ color: colors.navy, fontSize: 18, fontWeight: '700' }}>{review ? 'Events pending approval' : 'Registration events'}</Text>
+    <Text style={{ color: colors.navy, fontSize: 18, fontWeight: '700' }}>{review ? 'Events and submitted changes awaiting approval' : 'Registration events'}</Text>
     {!review && profile?.role === 'superAdmin' && <CitySelector selectedCity={city} onChange={setCity} />}
     {busy && <ActivityIndicator />}
     {error ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{error}</Text> : null}
     <Pressable onPress={() => setRefresh(value => value + 1)}><Text style={{ color: colors.tealDark }}>Refresh registration events</Text></Pressable>
     {!busy && !error && events.length === 0 && <Text>{review ? 'No events pending approval.' : 'No registration events in this city.'}</Text>}
     {events.map(event => <EventCard key={event.id} event={event} onPress={() => setSelected(event)} />)}
-    <RegistrationEventDetails event={selected} user={user} profile={profile} isGuest={false} onClose={close}
+    <RegistrationEventDetails event={selected} user={user} profile={profile} isGuest={false} initialReview={review} onClose={close}
       onManageStream={event => { setSelected(null); setStreamEvent(event); }}
       onOperation={onOperation} onEdit={event => onOperation(event, 'editor')}
       onDelete={event => Alert.alert('Delete Event?', 'Hide this event and close registration, retaining participant history.', [
