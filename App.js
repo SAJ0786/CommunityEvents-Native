@@ -1683,6 +1683,7 @@ function MainApp() {
         onRequireSignIn={requestSignIn}
         onEdit={handleEditMyEvent}
         onDelete={event => { setSelectedEvent(null); handleDeleteMyEvent(event); }}
+        onManageStream={event => { setSelectedEvent(null); setStreamEvent(event); }}
         onOperation={(event, action) => { setSelectedEvent(null); setRegistrationTarget({ eventId: event.id, action, nonce: Date.now() }); setActiveTab('registration'); }}
       />
       <EventDetailsModal
@@ -1728,8 +1729,11 @@ function MainApp() {
           onStreamChanged={updatedEvent => {
             // A delayed callback must not reopen a dismissed streaming surface.
             setStreamEvent(current => current?.id === updatedEvent.id ? updatedEvent : current);
-            setEvents(current => current.map(item => item.id === updatedEvent.id ? { ...item, ...updatedEvent } : item));
-            setMyEvents(current => current.map(item => item.id === updatedEvent.id ? { ...item, ...updatedEvent } : item));
+            if (updatedEvent.registrationOnly) setRegistrationRefresh(value => value + 1);
+            else {
+              setEvents(current => current.map(item => item.id === updatedEvent.id ? { ...item, ...updatedEvent } : item));
+              setMyEvents(current => current.map(item => item.id === updatedEvent.id ? { ...item, ...updatedEvent } : item));
+            }
           }}
         /> : null}
         <AzaanPlaybackController

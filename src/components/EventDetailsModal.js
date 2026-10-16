@@ -442,9 +442,9 @@ export default function EventDetailsModal({
                     <ActionButton
                       icon={event.isLive && hasPlayableLiveUrl ? undefined : 'broadcast'}
                       iconNode={event.isLive && hasPlayableLiveUrl ? <FontAwesome name="youtube-play" size={22} color="#ffffff" /> : undefined}
-                      label={event.isLive && hasPlayableLiveUrl ? 'Watch on YouTube' : event.isLive ? 'Manage Live' : 'Go Live'}
+                      label={event.registrationOnly && event.isLive ? 'Manage Live' : event.isLive && hasPlayableLiveUrl ? 'Watch on YouTube' : event.isLive ? 'Manage Live' : 'Go Live'}
                       variant="live"
-                      onPress={event.isLive && hasPlayableLiveUrl ? openLiveVideo : () => onManageStream(event)}
+                      onPress={!event.registrationOnly && event.isLive && hasPlayableLiveUrl ? openLiveVideo : () => onManageStream(event)}
                     />
                   ) : null}
                   <ActionButton icon={reminder ? 'bell-check-outline' : 'alarm'} label={reminder ? 'Reminder Set' : 'Reminder'} onPress={() => { setReminderError(''); setReminderOpen(true); }} disabled={isGuest || (event.registrationOnly && (!event.startTime || event.status !== 'approved'))} />

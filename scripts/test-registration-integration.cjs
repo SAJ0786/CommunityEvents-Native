@@ -163,7 +163,8 @@ function detailsFixture(detail, isGuest = false) {
   const props = { event: { id: 'event' }, user: { uid: isGuest ? 'guest' : 'member' }, profile: { role: detail.canApprove ? 'superAdmin' : 'user' }, isGuest,
     onClose: () => calls.push(['close']), onRequireSignIn: () => calls.push(['sign-in']),
     onOperation: (event, action) => calls.push(['operation', event.id, action]),
-    onEdit: event => calls.push(['edit', event.id]), onDelete: event => calls.push(['delete', event.id]) };
+    onEdit: event => calls.push(['edit', event.id]), onDelete: event => calls.push(['delete', event.id]),
+    onManageStream: event => calls.push(['stream', event.id]) };
   return {
     calls, alerts, listeners, api,
     render: () => {
@@ -182,6 +183,7 @@ test('guest registration uses the normal modal, routes to sign-in and never requ
   assert.equal(tree.props.event.registrationPrivate, false);
   assert.equal(tree.props.event.address.fullAddress, undefined);
   assert.equal(tree.props.onEdit, undefined);
+  assert.equal(tree.props.canManageStream, false);
   tree.props.onRegister();
   assert.equal(fixture.calls.at(-1)[0], 'sign-in');
   assert.equal(fixture.calls.some(call => call[0] === 'poster'), false);
@@ -199,6 +201,7 @@ test('host normal modal fetches private poster, routes form/responses/edit and c
   assert.equal(fixture.calls.at(-1)[2], 'responses');
   tree.props.onEdit();
   assert.equal(fixture.calls.at(-1)[0], 'edit');
+  assert.equal(tree.props.canManageStream, false, 'pending events cannot stream');
   tree.props.onApproveRegistration();
   await fixture.alerts.at(-1)[2][1].onPress();
   assert.equal(fixture.calls.some(call => call[0] === 'approve' && call[1] === 'event' && call[2] === 7), true);
@@ -212,12 +215,21 @@ test('registered attendee edits own booking and cancellation sends latest bookin
     canCancel: true, ownRegistration: { status: 'registered', revision: 4 }, privateDetails: { address: '1 Private Lane', hasPoster: false } });
   fixture.render(); await new Promise(setImmediate);
   const tree = fixture.render();
+  assert.equal(tree.props.canManageStream, undefined);
   assert.equal(tree.props.registrationDetail.canEditRegistration, true);
   tree.props.onRegister();
   assert.equal(fixture.calls.at(-1)[2], 'entry');
   tree.props.onCancelRegistration();
   await fixture.alerts.at(-1)[2][1].onPress();
   assert.equal(fixture.calls.some(call => call[0] === 'cancel' && call[1] === 'event' && call[2] === 4), true);
+});
+test('approved managers receive streaming controls from normal registration details', async () => {
+  const fixture = detailsFixture({ event: { id: 'event', status: 'approved' }, canManage: true });
+  fixture.render(); await new Promise(setImmediate);
+  const tree = fixture.render();
+  assert.equal(tree.props.canManageStream, true);
+  tree.props.onManageStream(tree.props.event);
+  assert.equal(fixture.calls.at(-1)[0], 'stream');
 });
 test('poster access changes recheck detail and cannot retain an old private venue', async () => {
   const fixture = detailsFixture({ event: { id: 'event', status: 'approved' },

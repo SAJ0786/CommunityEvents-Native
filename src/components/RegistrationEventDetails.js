@@ -4,7 +4,7 @@ import EventDetailsModal from './EventDetailsModal';
 import { firebaseRegistration, REGISTRATION_ENABLED } from '../registration/firebaseRegistration';
 import { registrationEventCard } from '../registration/eventFeed';
 
-export default function RegistrationEventDetails({ event, user, profile, isGuest, onClose, onOperation, onRequireSignIn, onEdit, onDelete }) {
+export default function RegistrationEventDetails({ event, user, profile, isGuest, onClose, onOperation, onRequireSignIn, onEdit, onDelete, onManageStream }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState('');
   const [posterError, setPosterError] = useState('');
@@ -57,6 +57,8 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
   return <EventDetailsModal event={detail.card} visible onClose={onClose} user={user} profile={profile} isGuest={isGuest}
     registrationDetail={detail}
     registrationNotice={posterError}
+    canManageStream={!isGuest && detail.canManage && detail.event.status === 'approved' && Boolean(onManageStream)}
+    onManageStream={detail.canManage && detail.event.status === 'approved' ? onManageStream : undefined}
     onRegister={() => operation('entry')}
     onEditRegistrationForm={detail.canManage && detail.event.status !== 'cancelled' ? () => operation('form') : undefined}
     onRegistrationResponses={detail.canManage ? () => operation('responses') : undefined}

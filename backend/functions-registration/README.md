@@ -78,14 +78,31 @@ schedule/status changes; a device that remains offline cannot learn server edits
 Ordinary-event scheduling is unchanged.
 
 Contact Host uses the existing authorized thread path with the projected owner
-UID; registration IDs are not written to legacy event documents. Streaming parity
-is held pending the coordinated privacy decision and explicit collection-aware
-backend routing; registration cards do not call legacy-only streaming functions.
+UID; registration IDs are not written to legacy event documents. The user chose
+normal Public/Unlisted YouTube streaming. Approved managers receive Go Live /
+Manage Live from the normal details card, including Admin Event Management.
+Native start/resume/external-start/native-end/external-end calls carry
+`eventCollection:'registrationEvents'`; ordinary calls retain the legacy default.
+`getEventStream({eventId,eventCollection})` returns manager-only
+`{watchUrl,sessionId,source,appVisibility}` when reopening an external stream.
+No channel-URL fallback or direct client event writes are used.
+
+Registration public detail/list projections add `isLive`, `liveUrl` (session ID
+only), `liveWatchUrl` (validated YouTube URL only when visibility is public),
+`liveAppVisibility`, `liveSource`, `liveStartedAt`, `liveVideoRecordId`.
+Pending/deleted/cancelled streams are not exposed. Unlisted watch links are never
+projected, even to managers; host controls retrieve them separately. Approved
+event saves preserve only stored lifecycle fields, never client-supplied ones.
+Registration streaming skips legacy live notifications and private-link emails.
+Public/Unlisted links may be shared outside the app; this choice does not weaken
+private poster or venue authorization.
 The authoritative deployed `/cal` and streaming functions live in the Web repo's
 `functions/index.js`, not this repo's recovered email source. `/cal` registration
 support must ship there, limited to approved active public metadata/suburb and
 the same all-day/UTC schedule contract (no venue/poster/registration answers).
-No stream/notification/email behavior is enabled by this schedule slice.
+Coordinated release must include the Web-owned collection-aware streaming,
+health/cleanup/archive/thumbnail changes and getEventStream before enabling the
+Native registration client. No notification/email delivery is enabled here.
 
 No mirror is created in the legacy public `events` collection. Old clients
 therefore cannot receive pending/private registration payloads. The new scope,

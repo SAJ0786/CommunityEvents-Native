@@ -92,6 +92,43 @@ test('explicit event schedule is city-correct, optional, overnight-aware and pre
   assert.equal(f.records.get(`registrationEvents/${dateOnly.eventId}`).formVersion, 1);
 });
 
+test('live projections expose public video only, never unlisted links, credentials or pending streams', async () => {
+  const f = fixture();
+  const created = await f.create();
+  const record = f.records.get(`registrationEvents/${created.eventId}`);
+  Object.assign(record, { isLive: true, liveUrl: 'session-1', liveWatchUrl: 'https://www.youtube.com/watch?v=abc123',
+    liveAppVisibility: 'public', liveSource: 'native', liveStartedAt: '2026-12-01T07:30:00Z',
+    liveVideoRecordId: 'registration_event-1', liveRoomCode: 'PRIVATE_ROOM', liveStartedBy: 'host', rtmpUrl: 'SECRET', streamKey: 'SECRET' });
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('host', { eventId: created.eventId }))).event.isLive, false);
+  await f.approve(created);
+  const stored = f.records.get(`registrationEvents/${created.eventId}`);
+  const publicDetail = await f.handlers.getRegistrationEvent(f.request(null, { eventId: created.eventId }));
+  assert.equal(publicDetail.event.liveWatchUrl, record.liveWatchUrl);
+  assert.equal(publicDetail.event.liveUrl, 'session-1');
+  assert.equal(JSON.stringify(publicDetail).includes('SECRET'), false);
+  assert.equal(JSON.stringify(publicDetail).includes('PRIVATE_ROOM'), false);
+  stored.liveAppVisibility = 'private';
+  const page = await f.handlers.listRegistrationEvents(f.request(null, { scope: 'public', city: 'sydney' }));
+  assert.equal(page.events[0].liveWatchUrl, null);
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('host', { eventId: created.eventId }))).event.liveWatchUrl, null);
+  stored.liveUrl = 'https://private.invalid/secret';
+  assert.equal((await f.handlers.getRegistrationEvent(f.request(null, { eventId: created.eventId }))).event.liveUrl, null);
+  stored.liveUrl = 'session-1';
+  await f.handlers.saveRegistrationEvent(f.request('host', {
+    eventId: created.eventId, expectedRevision: created.revision, city: 'sydney', draft: f.draft,
+  }));
+  assert.equal(f.records.get(`registrationEvents/${created.eventId}`).liveUrl, 'session-1');
+  assert.equal(f.records.get(`registrationEvents/${created.eventId}`).liveAppVisibility, 'private');
+  assert.equal(f.records.get(`registrationEvents/${created.eventId}`).liveRoomCode, 'PRIVATE_ROOM');
+  assert.equal(f.records.get(`registrationEvents/${created.eventId}`).liveStartedBy, 'host');
+  await f.handlers.deleteRegistrationEvent(f.request('host', {
+    eventId: created.eventId, expectedRevision: 2, confirmation: 'DELETE EVENT',
+  }));
+  const deleted = await f.handlers.getRegistrationEvent(f.request('host', { eventId: created.eventId }));
+  assert.equal(deleted.event.isLive, false);
+  assert.equal(deleted.event.liveWatchUrl, undefined);
+});
+
 test('event schedule rejects invalid clocks, impossible DST times and overlaps before writing', async () => {
   const f = fixture();
   for (const fields of [

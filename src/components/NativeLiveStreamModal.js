@@ -26,6 +26,7 @@ import { logDiagnostic, recordNonFatalError } from '../services/diagnostics';
 import NativeBackButton from './NativeBackButton';
 import {
   endEventStream,
+  getManagedEventStream,
   notifyEventLive,
   sendPrivateStreamLink,
   splitRtmpDestination,
@@ -203,6 +204,15 @@ const minimiseStream = () => {
     nativeStreamStartedRef.current = false;
     connectionStateRef.current = false;
     pendingSessionRef.current = null;
+  }, [event?.id, visible]);
+
+  useEffect(() => {
+    if (!visible || !event?.registrationOnly || !event.isLive || event.liveSource !== 'external-youtube') return undefined;
+    let active = true;
+    getManagedEventStream(event).then(result => {
+      if (active) setWatchUrl(result.watchUrl || '');
+    }).catch(err => { if (active) setError(err.message || 'Could not retrieve the host stream controls. Reopen to retry.'); });
+    return () => { active = false; };
   }, [event?.id, visible]);
 
   useEffect(() => {
@@ -480,7 +490,7 @@ const minimiseStream = () => {
       setWatchUrl(result.watchUrl || '');
       setStep('external-live');
       setStatus('LIVE — the YouTube stream is connected to this event.');
-      notifyEventLive(event).catch(() => {});
+      if (!event.registrationOnly) notifyEventLive(event).catch(() => {});
       onStreamChanged?.({
         ...event,
         isLive: true,
@@ -630,7 +640,7 @@ const minimiseStream = () => {
                 const pending = pendingSessionRef.current;
                 if (pending && !pending.announced) {
                   pending.announced = true;
-                  if (!pending.resumeExistingSession) {
+                  if (!pending.resumeExistingSession && !event.registrationOnly) {
                     notifyEventLive(event).catch(() => {});
                     if (pending.privacyStatus === 'unlisted') sendPrivateStreamLink(pending.id).catch(() => {});
                   }

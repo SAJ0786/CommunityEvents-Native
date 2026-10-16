@@ -125,6 +125,9 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         formVersion, status, reservedPlaces: current?.reservedPlaces || 0, registrationCount: current?.registrationCount || 0,
         createdAt: current?.createdAt || now().toISOString(), updatedAt: now().toISOString(), allowCancellation: draft.allowCancellation, creationFingerprint: current?.creationFingerprint || fingerprint };
       if (current?.approvedAt) { publicData.approvedAt = current.approvedAt; publicData.approvedBy = current.approvedBy; }
+      for (const key of ['isLive', 'liveUrl', 'liveWatchUrl', 'liveAppVisibility', 'liveSource', 'liveStartedAt', 'liveVideoRecordId', 'liveEndedAt', 'liveRoomCode', 'liveStartedBy']) {
+        if (current && Object.hasOwn(current, key)) publicData[key] = current[key];
+      }
       tx.set(reference, publicData);
       tx.set(privateRef(reference.id), { address: draft.address, venue }, { merge: true });
       tx.set(formRef(reference.id), { version: formVersion, fields: draft.fields, purpose: draft.purpose });
@@ -249,7 +252,16 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const form = await tx.get(formRef(event.id));
       const details = await tx.get(privateRef(event.id));
       const schedule = (await scheduleModel).registrationSchedule({ ...event, timeZone: event.timeZone });
-      const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), ...schedule, id: event.id, ownerUid: event.ownerUid, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
+      const live = event.status === 'approved' && !event.deletedAt ? {
+        isLive: event.isLive === true,
+        liveUrl: /^[A-Za-z0-9_-]{1,128}$/.test(event.liveUrl || '') ? event.liveUrl : null,
+        liveWatchUrl: event.liveAppVisibility === 'public' && /^https:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[A-Za-z0-9_-]+$/.test(event.liveWatchUrl || '') ? event.liveWatchUrl : null,
+        liveAppVisibility: ['public', 'private'].includes(event.liveAppVisibility) ? event.liveAppVisibility : null,
+        liveSource: ['native', 'external-youtube'].includes(event.liveSource) ? event.liveSource : null,
+        liveStartedAt: typeof event.liveStartedAt === 'string' ? event.liveStartedAt : null,
+        liveVideoRecordId: /^[A-Za-z0-9_-]{1,200}$/.test(event.liveVideoRecordId || '') ? event.liveVideoRecordId : null,
+      } : { isLive: false };
+      const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), ...schedule, ...live, id: event.id, ownerUid: event.ownerUid, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
       result.canApprove = Boolean(caller && event.status === 'pending' && approves(caller, event));
       result.canRegister = event.status === 'approved' && localMinute(now(), event.timeZone) < (event.closes || `${event.date}T00:00`);
       result.canEditRegistration = Boolean(registered && event.status === 'approved' && localMinute(now(), event.timeZone).slice(0, 10) < event.date);

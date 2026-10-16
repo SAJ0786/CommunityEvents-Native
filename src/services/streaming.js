@@ -2,13 +2,13 @@ import { httpsCallable } from '@react-native-firebase/functions';
 import { functions } from '../firebase/firebase';
 import { getEventTitle } from './events';
 
-function requireSupportedStreamEvent(event) {
+function streamIdentity(event) {
   if (!event?.id) throw new Error('Event not found.');
-  if (event.registrationOnly) throw new Error('Streaming is not available for registration events until viewing privacy and backend support are configured.');
+  return { eventId: event.id, ...(event.registrationOnly ? { eventCollection: 'registrationEvents' } : {}) };
 }
 
 export async function startNativeEventStream(event, privacyStatus = 'public') {
-  requireSupportedStreamEvent(event);
+  const identity = streamIdentity(event);
   const fnName = event.isLive && event.liveUrl ? 'nativeStreamResume' : 'nativeStreamStart';
   const payload = fnName === 'nativeStreamResume'
     ? { eventId: event.id, sessionId: event.liveUrl, directNative: true }
@@ -22,7 +22,7 @@ export async function startNativeEventStream(event, privacyStatus = 'public') {
         protocolVersion: 2,
         directNative: true,
       };
-  const result = await httpsCallable(functions, fnName)(payload);
+  const result = await httpsCallable(functions, fnName)({ ...payload, ...identity });
   if (!result.data?.rtmpUrl || !result.data?.sessionId) {
     throw new Error('YouTube did not return a usable stream destination.');
   }
@@ -30,9 +30,9 @@ export async function startNativeEventStream(event, privacyStatus = 'public') {
 }
 
 export async function startExternalEventStream(event, youtubeUrl, privacyStatus = 'public') {
-  requireSupportedStreamEvent(event);
+  const identity = streamIdentity(event);
   const result = await httpsCallable(functions, 'startExternalYouTubeStream')({
-    eventId: event.id,
+    ...identity,
     youtubeUrl: String(youtubeUrl || '').trim(),
     privacyStatus,
   });
@@ -40,24 +40,33 @@ export async function startExternalEventStream(event, youtubeUrl, privacyStatus 
 }
 
 export async function endEventStream(event, sessionId = '') {
-  requireSupportedStreamEvent(event);
+  const identity = streamIdentity(event);
   const functionName = event.liveSource === 'external-youtube'
     ? 'endExternalYouTubeStream'
     : 'nativeStreamEndEvent';
   const result = await httpsCallable(functions, functionName)({
-    eventId: event.id,
+    ...identity,
     ...(functionName === 'nativeStreamEndEvent' ? { sessionId: sessionId || event.liveUrl || '' } : {}),
   });
   return result.data || {};
 }
 
 export function notifyEventLive(event) {
-  requireSupportedStreamEvent(event);
+  streamIdentity(event);
+  if (event.registrationOnly) throw new Error('Registration stream notifications are not enabled.');
   return httpsCallable(functions, 'notifyEventLive')({
     eventId: event.id,
     eventTitle: event.eventTypeDisplay || event.eventType || 'Event',
     hostName: event.hostName || '',
   });
+}
+
+export async function getManagedEventStream(event) {
+  const result = await httpsCallable(functions, 'getEventStream')(streamIdentity(event));
+  if (!/^https:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[A-Za-z0-9_-]+$/.test(result.data?.watchUrl || '')) {
+    throw new Error('The event stream link could not be retrieved. Reopen the host controls to retry.');
+  }
+  return result.data;
 }
 
 export function sendPrivateStreamLink(sessionId) {

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import EventCard from './EventCard';
 import RegistrationEventDetails from './RegistrationEventDetails';
+import NativeLiveStreamModal from './NativeLiveStreamModal';
 import CitySelector from './CitySelector';
 import { firebaseRegistration, REGISTRATION_ENABLED } from '../registration/firebaseRegistration';
 import { registrationEventFeed } from '../registration/eventFeed';
@@ -13,6 +14,7 @@ export default function RegistrationManagementPanel({ user, profile, review = fa
   const [city, setCity] = useState(profile?.adminCity || profile?.defaultCity || DEFAULT_CITY);
   const [events, setEvents] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [streamEvent, setStreamEvent] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
@@ -38,6 +40,7 @@ export default function RegistrationManagementPanel({ user, profile, review = fa
     {!busy && !error && events.length === 0 && <Text>{review ? 'No events pending approval.' : 'No registration events in this city.'}</Text>}
     {events.map(event => <EventCard key={event.id} event={event} onPress={() => setSelected(event)} />)}
     <RegistrationEventDetails event={selected} user={user} profile={profile} isGuest={false} onClose={close}
+      onManageStream={event => { setSelected(null); setStreamEvent(event); }}
       onOperation={onOperation} onEdit={event => onOperation(event, 'editor')}
       onDelete={event => Alert.alert('Delete Event?', 'Hide this event and close registration, retaining participant history.', [
         { text: 'Keep event', style: 'cancel' }, { text: 'Delete Event', style: 'destructive', onPress: async () => {
@@ -46,5 +49,7 @@ export default function RegistrationManagementPanel({ user, profile, review = fa
         } },
       ])}
     />
+    {streamEvent ? <NativeLiveStreamModal event={streamEvent} visible onClose={() => { setStreamEvent(null); setRefresh(value => value + 1); }}
+      onStreamChanged={updated => { setStreamEvent(current => current?.id === updated.id ? updated : current); setRefresh(value => value + 1); }} /> : null}
   </View>;
 }
