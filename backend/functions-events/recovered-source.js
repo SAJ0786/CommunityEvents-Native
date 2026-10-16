@@ -4639,6 +4639,23 @@ exports.sendPrivateStreamLinkEmail = onCall(
     if (!sessionSnap.exists) throw new HttpsError('not-found', 'Stream session not found.');
     const session = sessionSnap.data();
 
+    if (session.eventCollection === 'registrationEvents') {
+      const userSnap = await db.collection('users').doc(request.auth.uid).get();
+      const profile = userSnap.data();
+      const active = profile && profile.isActive !== false && !profile.bannedAt && !profile.archivedAt && !profile.accountDeletedAt
+        && !['inactive', 'banned', 'deleted', 'archived', 'suspended'].includes(profile.accountStatus);
+      if (!active) throw new HttpsError('permission-denied', 'An active member account is required.');
+      if (session.uid !== request.auth.uid) {
+        const eventSnap = session.eventId ? await db.collection('registrationEvents').doc(session.eventId).get() : null;
+        const event = eventSnap?.data();
+        if (!event || !(profile.role === 'superAdmin' || (profile.role === 'admin'
+          && Boolean(profile.adminCity || profile.defaultCity) && (profile.adminCity || profile.defaultCity) === event.city))) {
+          throw new HttpsError('permission-denied', 'Not authorised to email this private stream link.');
+        }
+      }
+      return { sent: false, reason: 'registration-delivery-disabled' };
+    }
+
     let eventData = {};
     if (session.eventId) {
       const eventSnap = await db.collection('events').doc(session.eventId).get();
