@@ -5,6 +5,7 @@ import * as IntentLauncher from 'expo-intent-launcher';
 import Constants from 'expo-constants';
 import { getEventSuburb, getEventTitle } from './events';
 import { calculatePrayerTimes, prayerLabel, prayerDateAt, prayerTimeInstant } from './prayerTimes';
+import { registrationInstant, registrationSchedule } from '../registration/eventSchedule';
 
 const REMINDER_STORAGE_KEY = '@community-events/event-reminders';
 const REMINDER_CHANNEL_ID = 'event-reminders';
@@ -40,6 +41,12 @@ async function writeReminderMap(value) {
 }
 
 function eventStartDate(event = {}) {
+  if (event.registrationOnly) {
+    if (event.status !== 'approved') throw new Error('Reminders are unavailable for events that are not approved or have been deleted.');
+    const schedule = registrationSchedule({ ...event, date: event.eventDate || event.date });
+    if (!schedule.startAt) throw new Error('The organiser has not supplied a start time. Timed reminders are unavailable.');
+    return new Date(schedule.startAt);
+  }
   const date = String(event.eventDate || '').trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
   const time = String(event.startTime || '09:00').match(/^(\d{1,2}):(\d{2})/);
@@ -392,10 +399,18 @@ export async function setPrayerReminder(prayerKey, enabled, location) {
   return schedulePrayerReminderKeys(enabledKeys, location, current);
 }
 
-export async function getEventReminder(eventId) {
+export async function getEventReminder(eventId, event = null) {
   if (!eventId) return null;
   const reminders = await readReminderMap();
-  return reminders[eventId] || null;
+  const reminder = reminders[eventId] || null;
+  if (reminder && event?.registrationOnly) {
+    const schedule = registrationSchedule({ ...event, date: event.eventDate || event.date });
+    if (event.status !== 'approved' || !schedule.startAt || reminder.eventStartAt !== schedule.startAt) {
+      await cancelEventReminder(eventId);
+      return null;
+    }
+  }
+  return reminder;
 }
 
 export async function cancelEventReminder(eventId) {
@@ -435,7 +450,7 @@ export async function scheduleEventReminder(event, minutesBefore) {
       title: `Upcoming event: ${title}`,
       body: location ? `${location} • Starts ${start.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}` : `Starts ${start.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}`,
       sound: 'default',
-      data: { eventId: event.id, screen: 'home' },
+      data: { eventId: event.id, screen: 'home', ...(event.registrationOnly ? { eventKind: 'registration' } : {}) },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -460,13 +475,22 @@ export async function scheduleEventReminder(event, minutesBefore) {
 
 export async function scheduleFavouriteReminder(event) {
   if (!event?.id) return null;
+  if (event.registrationOnly) await getEventReminder(event.id, event);
+  if (event.registrationOnly && (event.status !== 'approved' || !event.startTime)) return null;
   const reminders = await readReminderMap();
   const existing = reminders[event.id];
   if (existing) return existing;
   const date = String(event.eventDate || '').trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  const triggerDate = new Date(`${date}T19:00:00`);
-  triggerDate.setDate(triggerDate.getDate() - 1);
+  let triggerDate;
+  if (event.registrationOnly) {
+    eventStartDate(event);
+    const day = new Date(`${date}T12:00:00Z`); day.setUTCDate(day.getUTCDate() - 1);
+    triggerDate = new Date(registrationInstant(day.toISOString().slice(0, 10), '19:00', event.timeZone));
+  } else {
+    triggerDate = new Date(`${date}T19:00:00`);
+    triggerDate.setDate(triggerDate.getDate() - 1);
+  }
   if (triggerDate.getTime() <= Date.now()) return null;
   if (!(await ensureNotificationPermission())) return null;
   const notificationId = await scheduleVerifiedNotification({
@@ -474,7 +498,7 @@ export async function scheduleFavouriteReminder(event) {
       title: `Tomorrow: ${getEventTitle(event)}`,
       body: `${getEventSuburb(event) || 'Community event'} \u2022 Tap to view details`,
       sound: 'default',
-      data: { eventId: event.id, screen: 'favourites' },
+      data: { eventId: event.id, screen: 'favourites', ...(event.registrationOnly ? { eventKind: 'registration' } : {}) },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -482,7 +506,8 @@ export async function scheduleFavouriteReminder(event) {
       ...(Platform.OS === 'android' ? { channelId: REMINDER_CHANNEL_ID } : {}),
     },
   });
-  const reminder = { notificationId, eventId: event.id, triggerAt: triggerDate.toISOString(), source: 'favourite-auto' };
+  const reminder = { notificationId, eventId: event.id, triggerAt: triggerDate.toISOString(), source: 'favourite-auto',
+    ...(event.registrationOnly ? { eventStartAt: eventStartDate(event).toISOString() } : {}) };
   reminders[event.id] = reminder;
   await writeReminderMap(reminders);
   return reminder;

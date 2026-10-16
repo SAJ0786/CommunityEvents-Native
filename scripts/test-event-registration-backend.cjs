@@ -62,6 +62,49 @@ test('poster quota is atomic, private uploads have recovery intents and stale ma
   assert.equal([...f.records.values()].find(value => value.windowStart)?.count, 1);
 });
 
+test('explicit event schedule is city-correct, optional, overnight-aware and preserved for older edits', async () => {
+  const f = fixture();
+  const dateOnly = await f.create();
+  const original = await f.handlers.getRegistrationEvent(f.request(null, { eventId: dateOnly.eventId })).catch(error => error);
+  assert.equal(original.code, 'not-found');
+  const timed = await f.handlers.saveRegistrationEvent(f.request('host', {
+    eventId: dateOnly.eventId, expectedRevision: 1, city: 'sydney', draft: { ...f.draft, startTime: '23:30', endTime: '01:00', startAt: 'FORGED' },
+  }));
+  const record = f.records.get(`registrationEvents/${dateOnly.eventId}`);
+  assert.equal(record.startAt, '2026-12-01T12:30:00.000Z');
+  assert.equal(record.endAt, '2026-12-01T14:00:00.000Z');
+  await f.approve(timed); await f.submit(dateOnly);
+  const edited = await f.handlers.saveRegistrationEvent(f.request('host', {
+    eventId: dateOnly.eventId, expectedRevision: timed.revision, city: 'sydney', draft: f.draft,
+  }));
+  const detail = await f.handlers.getRegistrationEvent(f.request('member', { eventId: dateOnly.eventId }));
+  assert.equal(detail.event.startTime, '23:30');
+  assert.equal(detail.event.endTime, '01:00');
+  assert.equal(detail.event.startAt, record.startAt);
+  assert.equal(detail.ownRegistration.places, 2);
+  const cleared = await f.handlers.saveRegistrationEvent(f.request('host', {
+    eventId: dateOnly.eventId, expectedRevision: edited.revision, city: 'sydney', draft: { ...f.draft, startTime: '', endTime: '' },
+  }));
+  const publicRows = await f.handlers.listRegistrationEvents(f.request(null, { scope: 'public', city: 'sydney' }));
+  assert.equal(publicRows.events[0].startAt, null);
+  assert.equal(publicRows.events[0].endAt, null);
+  assert.deepEqual(f.records.get(`registrationChanges/${dateOnly.eventId}-${cleared.revision}`).changes, ['date']);
+  assert.equal(f.records.get(`registrationEvents/${dateOnly.eventId}`).formVersion, 1);
+});
+
+test('event schedule rejects invalid clocks, impossible DST times and overlaps before writing', async () => {
+  const f = fixture();
+  for (const fields of [
+    { startTime: '24:00' }, { startTime: '20:60' }, { startTime: '12:00', endTime: '12:00' },
+    { endTime: '12:00' }, { date: '2027-10-03', startTime: '02:30' }, { date: '2027-04-04', startTime: '02:30' },
+  ]) {
+    await assert.rejects(f.handlers.saveRegistrationEvent(f.request('host', {
+      city: 'sydney', createKey: 'bad-schedule', draft: { ...f.draft, ...fields },
+    })), { code: 'invalid-argument' });
+  }
+  assert.equal([...f.records.keys()].some(key => key.startsWith('registrationEvents/')), false);
+});
+
 test('durable cleanup preserves referenced posters and retries failed deletes after replacement', async () => {
   const f = fixture(); const event = await f.create();
   const data = { eventId: event.eventId, mime: 'image/jpeg', base64: Buffer.from([255,216,255,0]).toString('base64') };

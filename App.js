@@ -70,7 +70,7 @@ import { auth, confirmPhoneVerification, ensureFirebaseSession, sendPhoneVerific
 import { compareEventsByDateTime, createEventSubmission, createRecurringEventSeries, getFutureSeriesEvents, prepareFutureSeriesEdit, deleteEventSeries, deleteEventSubmission, getPublicEvents, getUserEventSubmissions, listenActiveEvents, prepareHomeEvents, setEventVisibility, updateEventSeries, updateEventSubmission } from './src/services/events';
 import { uploadEventPoster } from './src/services/images';
 import { completeMemberProfile, deleteMyAccountAndEvents, ensureUserProfile, migratePhoneAccount, toggleSavedEvent, updateUserPreferences } from './src/services/users';
-import { cancelFavouriteReminder, initializeDefaultPrayerReminders, scheduleFavouriteReminder } from './src/services/reminders';
+import { cancelFavouriteReminder, getEventReminder, initializeDefaultPrayerReminders, scheduleFavouriteReminder } from './src/services/reminders';
 import { listenForDevicePushTokenChanges, registerDevicePushNotifications, unregisterDevicePushNotifications, listenForBusinessPushOpens } from './src/services/pushNotifications';
 import { getPrayerLocation } from './src/utils/prayerLocations';
 import { EVENT_TYPE_GROUPS } from './src/utils/eventOptions';
@@ -562,12 +562,22 @@ function MainApp() {
       registrationEventFeed(api, 'public', selectedCity),
       currentUser?.uid && !currentUser.isAnonymous ? registrationEventFeed(api, 'mine') : Promise.resolve([]),
       currentUser?.uid && !currentUser.isAnonymous ? registrationEventFeed(api, 'attending') : Promise.resolve([]),
-    ]).then(([publicRows, ownRows, attendingRows]) => {
+    ]).then(async ([publicRows, ownRows, attendingRows]) => {
+      for (const event of new Map([...publicRows, ...ownRows, ...attendingRows].map(event => [event.id, event])).values()) {
+        await getEventReminder(event.id, event);
+      }
       if (active) { setRegistrationEvents(publicRows); setHostRegistrationEvents(ownRows); setAttendingRegistrationEvents(attendingRows); setRegistrationError(''); }
     }).catch(err => { if (active) setRegistrationError(friendlyError(err, 'Could not load registration events.')); });
     const timer = setInterval(() => { if (active) setRegistrationRefresh(value => value + 1); }, AUTO_EVENT_REFRESH_MS);
     return () => { active = false; clearInterval(timer); };
   }, [currentUser?.uid, currentUser?.isAnonymous, profile?.role, selectedCity, registrationRefresh, cityCatalogueVersion]);
+
+  useEffect(() => {
+    setSelectedEvent(current => {
+      if (!current?.registrationOnly) return current;
+      return [...registrationEvents, ...hostRegistrationEvents, ...attendingRegistrationEvents].find(event => event.id === current.id) || null;
+    });
+  }, [registrationEvents, hostRegistrationEvents, attendingRegistrationEvents]);
 
   useEffect(() => {
     setRegistrationEvents([]); setHostRegistrationEvents([]); setAttendingRegistrationEvents([]);

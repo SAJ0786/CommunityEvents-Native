@@ -201,7 +201,7 @@ export default function EventDetailsModal({
       })
       .catch(() => {});
 
-    getEventReminder(event.id)
+    getEventReminder(event.id, event)
       .then(value => {
         if (alive) setReminder(value);
       })
@@ -447,8 +447,8 @@ export default function EventDetailsModal({
                       onPress={event.isLive && hasPlayableLiveUrl ? openLiveVideo : () => onManageStream(event)}
                     />
                   ) : null}
-                  <ActionButton icon={reminder ? 'bell-check-outline' : 'alarm'} label={reminder ? 'Reminder Set' : 'Reminder'} onPress={() => { setReminderError(''); setReminderOpen(true); }} disabled={isGuest} />
-                  <ActionButton icon="calendar-sync-outline" label="Sync Calendar" variant="primary" onPress={addToCalendar} disabled={isGuest} />
+                  <ActionButton icon={reminder ? 'bell-check-outline' : 'alarm'} label={reminder ? 'Reminder Set' : 'Reminder'} onPress={() => { setReminderError(''); setReminderOpen(true); }} disabled={isGuest || (event.registrationOnly && (!event.startTime || event.status !== 'approved'))} />
+                  <ActionButton icon="calendar-sync-outline" label="Sync Calendar" variant="primary" onPress={addToCalendar} disabled={isGuest || (event.registrationOnly && event.status !== 'approved')} />
                   {onNiazArrangement ? <ActionButton icon="bowl-mix-outline" label="Niaz Arrangement" variant="share" disabled={isGuest || !canArrangeNiaz} onPress={() => onNiazArrangement(event)} /> : null}
                   <ActionButton icon="pencil-outline" label="Edit" disabled={!onEdit} onPress={() => onEdit?.(event)} />
                   {isSeriesEvent ? <ActionButton icon="folder-edit-outline" label="Edit Series" disabled={!onEditSeries} onPress={() => onEditSeries?.(event)} /> : null}
@@ -458,6 +458,7 @@ export default function EventDetailsModal({
                 </View>
 
                 <Text style={styles.date}>{formatEventDate(event.eventDate)}</Text>
+                {event.registrationOnly && !event.startTime ? <Text style={styles.notes}>Start time not supplied. Calendar entry is date-only; timed reminders are unavailable.</Text> : null}
                 {registrationNotice ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{registrationNotice}</Text> : null}
                 {registrationDetail?.registrationNeedsReview ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>The registration form changed. Review your answers and agree to the current terms again.</Text> : null}
 

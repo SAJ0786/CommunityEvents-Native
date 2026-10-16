@@ -3,6 +3,7 @@ const { enqueuePosterCleanup } = require('./posterMaintenance');
 const model = import('./formModel.mjs');
 const catalogueModel = import('./cityCatalogue.mjs');
 const venueModel = import('./privateVenue.mjs');
+const scheduleModel = import('./eventSchedule.mjs');
 const RETENTION = Object.freeze({ policy: 'until-organiser-deletes-or-attendee-cancels', notice: 'Your registration answers are kept until the organiser deletes them or you cancel/delete your registration. Cancelling deletes your answers and releases your places. Organiser answer deletion alone does not cancel your booking. Deleting your account queues removal of your registration answers and cancels upcoming events you organise, notifying attendees. Contact support for other privacy requests.' });
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -61,6 +62,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const draft = {
       title: text(raw.title, 160), eventType: text(raw.eventType, 80), customEventType: text(raw.customEventType || '', 80, true),
       date: text(raw.date, 10), suburb: text(raw.suburb, 100), address: text(raw.address, 500), notes: text(raw.notes || '', 5000, true),
+      startTime: text(raw.startTime ?? '', 5, true), endTime: text(raw.endTime ?? '', 5, true),
       closes: text(raw.closes || '', 16, true), capacity: Number(raw.capacity), allowCancellation: raw.allowCancellation === true,
       purpose: text(raw.purpose, 1000),
       fields: raw.fields.map(field => {
@@ -98,6 +100,14 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (current?.status === 'cancelled' || current?.deletedAt) fail('failed-precondition', 'A cancelled or deleted event cannot be edited.');
       if (current && request.data.expectedRevision !== current.revision) fail('aborted', 'The event has changed. Reload before saving.');
       const timeZone = await zone(city, tx);
+      let schedule;
+      try {
+        schedule = (await scheduleModel).registrationSchedule({
+          date: draft.date, timeZone,
+          startTime: request.data.draft.startTime === undefined && request.data.draft.endTime === undefined ? current?.startTime || '' : draft.startTime,
+          endTime: request.data.draft.startTime === undefined && request.data.draft.endTime === undefined ? current?.endTime || '' : draft.endTime,
+        });
+      } catch (error) { fail('invalid-argument', error.message); }
       const previousForm = current ? (await tx.get(formRef(reference.id))).data() : null;
       const previousVenue = current ? (await tx.get(privateRef(reference.id))).data() : null;
       if (draft.capacity < (current?.reservedPlaces || 0)) fail('failed-precondition', 'Capacity cannot be lower than existing registrations.');
@@ -108,10 +118,10 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const status = current?.status || 'pending';
       const changes = current ? [
         ...(formChanged ? ['form'] : []),
-        ...(current.date !== draft.date ? ['date'] : []),
+        ...(current.date !== draft.date || (current.startTime || '') !== schedule.startTime || (current.endTime || '') !== schedule.endTime || current.timeZone !== timeZone ? ['date'] : []),
         ...(current.city !== city || previousVenue?.address !== draft.address || JSON.stringify(previousVenue?.venue || null) !== JSON.stringify(venue) ? ['venue'] : []),
       ] : [];
-      const publicData = { ...(await model).publicEvent(draft), city, timeZone, ownerUid: current?.ownerUid || caller.uid, revision,
+      const publicData = { ...(await model).publicEvent(draft), ...schedule, city, timeZone, ownerUid: current?.ownerUid || caller.uid, revision,
         formVersion, status, reservedPlaces: current?.reservedPlaces || 0, registrationCount: current?.registrationCount || 0,
         createdAt: current?.createdAt || now().toISOString(), updatedAt: now().toISOString(), allowCancellation: draft.allowCancellation, creationFingerprint: current?.creationFingerprint || fingerprint };
       if (current?.approvedAt) { publicData.approvedAt = current.approvedAt; publicData.approvedBy = current.approvedBy; }
@@ -238,7 +248,8 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (event.status !== 'approved' && !manager && !registered) fail('not-found', 'Event not available.');
       const form = await tx.get(formRef(event.id));
       const details = await tx.get(privateRef(event.id));
-      const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), id: event.id, ownerUid: event.ownerUid, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
+      const schedule = (await scheduleModel).registrationSchedule({ ...event, timeZone: event.timeZone });
+      const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), ...schedule, id: event.id, ownerUid: event.ownerUid, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
       result.canApprove = Boolean(caller && event.status === 'pending' && approves(caller, event));
       result.canRegister = event.status === 'approved' && localMinute(now(), event.timeZone) < (event.closes || `${event.date}T00:00`);
       result.canEditRegistration = Boolean(registered && event.status === 'approved' && localMinute(now(), event.timeZone).slice(0, 10) < event.date);

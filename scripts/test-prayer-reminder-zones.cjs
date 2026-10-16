@@ -9,6 +9,7 @@ const source = compiled('src/services/reminders.js');
 const now = Date.parse('2026-10-13T13:30:00Z');
 class Clock extends Date { constructor(...args) { super(...(args.length ? args : [now])); } static now() { return now; } }
 const prayer = {}; vm.runInNewContext(compiled('src/services/prayerTimes.js'), { exports: prayer, Intl, Date: Clock });
+const registration = {}; vm.runInNewContext(compiled('src/registration/eventSchedule.js'), { exports: registration, Intl, Date: Clock });
 async function check(platform) {
   const store = new Map(); const scheduled = new Map(); let sequence = 0;
   const location = { fullAddress: 'Sydney NSW', suburb: 'Sydney', state: 'NSW', timeZone: 'Australia/Sydney', latitude: -33.8688, longitude: 151.2093 };
@@ -21,7 +22,7 @@ async function check(platform) {
     getAllScheduledNotificationsAsync: async () => [...scheduled.keys()].map(identifier => ({ identifier })) };
   const mocks = { 'react-native': { Platform: { OS: platform }, Linking: {} },
     '@react-native-async-storage/async-storage': { getItem: async key => store.get(key), setItem: async (key, value) => store.set(key, value) },
-    'expo-notifications': notifications, 'expo-intent-launcher': {}, 'expo-constants': {}, './events': {}, './prayerTimes': prayer };
+    'expo-notifications': notifications, 'expo-intent-launcher': {}, 'expo-constants': {}, './events': {}, './prayerTimes': prayer, '../registration/eventSchedule': registration };
   function load() { const exports = {}; vm.runInNewContext(source, { exports, Date: Clock, require: name => { assert.ok(name in mocks, name); return mocks[name]; } }); return exports; }
   let api = load();
   await api.initializeDefaultPrayerReminders(location);

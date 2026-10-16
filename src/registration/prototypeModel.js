@@ -55,11 +55,11 @@ export function publicNotesError(draft) {
 }
 // Allowlisted public projection. Never include private venue, coordinates or poster.
 export function publicEvent(draft) {
-  return { title: draft.title, eventType: resolvedEventType(draft), date: draft.date, suburb: publicSuburbError(draft) ? '' : draft.suburb, notes: publicNotesError(draft) ? '' : draft.notes, capacity: Number(draft.capacity), closes: draft.closes };
+  return { title: draft.title, eventType: resolvedEventType(draft), date: draft.date, startTime: draft.startTime || '', endTime: draft.endTime || '', startAt: draft.startAt || null, endAt: draft.endAt || null, suburb: publicSuburbError(draft) ? '' : draft.suburb, notes: publicNotesError(draft) ? '' : draft.notes, capacity: Number(draft.capacity), closes: draft.closes };
 }
 export function createDraft() {
   return { title: 'Community family workshop', eventType: 'Custom', customEventType: 'Workshop', date: '', suburb: '', address: '', notes: '', poster: null,
-    capacity: 30, closes: '', allowCancellation: true,
+    startTime: '', endTime: '', capacity: 30, closes: '', allowCancellation: true,
     purpose: 'Your answers will be used by the organiser to arrange this event.',
     fields: STANDARD_FIELDS.filter(f => ['name', 'email', 'phone'].includes(f.id)).map(f => ({ ...f, description: '', options: [] })) };
 }
@@ -79,6 +79,8 @@ export function validateDraft(draft) {
   const errors = [];
   if (!draft.title.trim()) errors.push('Enter an event title.');
   if (!isCalendarDate(draft.date)) errors.push('Choose a valid event date.');
+  if ((draft.startTime && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(draft.startTime)) || (draft.endTime && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(draft.endTime)) || (draft.endTime && !draft.startTime)) errors.push('Enter a start time and optional end time as HH:mm.');
+  if (draft.startTime && draft.endTime === draft.startTime) errors.push('End time must differ from start time.');
   if (!draft.eventType?.trim() || (draft.eventType === 'Custom' && !draft.customEventType?.trim())) errors.push('Select an event type or enter a custom event type.');
   if (!draft.address?.trim() || draft.address.length > 500) errors.push('Enter the full event address (up to 500 characters).');
   if (publicSuburbError(draft)) errors.push(publicSuburbError(draft));

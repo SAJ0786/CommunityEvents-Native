@@ -2,6 +2,7 @@ import { Linking, Platform } from 'react-native';
 import * as Calendar from 'expo-calendar';
 import * as Clipboard from 'expo-clipboard';
 import { getEventTitle } from './events';
+import { registrationSchedule } from '../registration/eventSchedule';
 
 const APP_DOMAIN = 'https://communityevents.siza.info';
 
@@ -51,7 +52,25 @@ function eventDateTime(dateValue, timeValue, fallbackHour = 10) {
   return new Date(year, month - 1, day, Number.isFinite(hour) ? hour : fallbackHour, Number.isFinite(minute) ? minute : 0);
 }
 
-export async function openEventInDeviceCalendar(event = {}) {
+export function eventCalendarDetails(event = {}) {
+  if (event.registrationOnly) {
+    if (event.status !== 'approved') throw new Error('Only approved, available events can be added to your calendar.');
+    const date = event.eventDate || event.date;
+    const day = new Date(`${date}T00:00:00`);
+    const check = new Date(`${date}T12:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !Number.isFinite(check.getTime()) || check.toISOString().slice(0, 10) !== date) throw new Error('This event does not have a valid date.');
+    const schedule = registrationSchedule({ ...event, date });
+    const nextDay = new Date(day); nextDay.setDate(nextDay.getDate() + 1);
+    return {
+      title: getEventTitle(event),
+      startDate: schedule.startAt ? new Date(schedule.startAt) : day,
+      endDate: schedule.startAt ? new Date(schedule.endAt || schedule.startAt) : nextDay,
+      allDay: !schedule.startAt,
+      timeZone: schedule.startAt ? event.timeZone : undefined,
+      location: event.suburb || event.address?.suburb || '',
+      notes: [event.notes, !schedule.startAt ? 'Start time not specified by the organiser.' : '', 'Community Events Australia'].filter(Boolean).join('\n'),
+    };
+  }
   const startDate = eventDateTime(event.eventDate, event.startTime);
   if (!startDate) throw new Error('This event does not have a valid date.');
   const endDate = eventDateTime(event.eventDate, event.endTime) || new Date(startDate.getTime() + 60 * 60 * 1000);
@@ -69,12 +88,16 @@ export async function openEventInDeviceCalendar(event = {}) {
     event.notes,
     'Community Events Australia',
   ].filter(Boolean).join('\n');
-  return Calendar.createEventInCalendarAsync({
+  return {
     title: getEventTitle(event),
     startDate,
     endDate,
     location: address,
     notes,
     timeZone: event.prayerTimeZone || undefined,
-  });
+  };
+}
+
+export async function openEventInDeviceCalendar(event = {}) {
+  return Calendar.createEventInCalendarAsync(eventCalendarDetails(event));
 }

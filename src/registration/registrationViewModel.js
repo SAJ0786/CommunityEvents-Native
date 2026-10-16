@@ -6,6 +6,7 @@ export function eventDraftFromDetail(detail, eventTypes) {
   const knownType = eventTypes.includes(event.eventType);
   return { ...createDraft(), title: event.title, eventType: knownType ? event.eventType : 'Custom',
     customEventType: knownType ? '' : event.eventType, date: event.date, suburb: event.suburb,
+    startTime: event.startTime || '', endTime: event.endTime || '',
     address: detail.privateDetails.address, venue: detail.privateDetails.venue, notes: event.notes || '',
     capacity: event.capacity, closes: event.closes || '', allowCancellation: event.allowCancellation,
     purpose: detail.form.purpose, fields: JSON.parse(JSON.stringify(detail.form.fields)), poster: null };

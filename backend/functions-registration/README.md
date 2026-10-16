@@ -55,6 +55,38 @@ review or approve pending events through the approval scope.
 
 ### Release and acceptance
 
+#### Optional schedule and normal-event shortcuts
+
+Save drafts may additionally contain `startTime` and `endTime` (empty string or
+strict `HH:mm`). End requires start; equal clocks are invalid; an earlier end
+clock means the following local day. City catalogue `timeZone` is authoritative.
+DST gaps/overlaps are rejected rather than guessed. Public list/detail fields
+include the clocks and server-derived ISO UTC `startAt` / `endAt` (null when
+unspecified); supplied instants are ignored. Older saves omitting BOTH clock
+keys preserve the existing schedule. Editors send both keys, including empty
+strings for deliberate clearing. Schedule changes queue the existing date-change
+outbox without changing bookings or formVersion. Notices remain OFF.
+
+Native one-off calendars use exact city-derived instants. With no start time
+they create a date-only all-day entry and disable timed reminders with a visible
+reason. Missing end time does not invent a duration (zero-duration calendar
+entry). Calendar location is public suburb only, never the private venue.
+Favourite reminder time remains the previous day's 19:00, using the EVENT city
+for registration events. Custom reminders subtract the chosen lead time from
+the actual instant. Feed/detail refresh removes stale local reminders after
+schedule/status changes; a device that remains offline cannot learn server edits.
+Ordinary-event scheduling is unchanged.
+
+Contact Host uses the existing authorized thread path with the projected owner
+UID; registration IDs are not written to legacy event documents. Streaming parity
+is held pending the coordinated privacy decision and explicit collection-aware
+backend routing; registration cards do not call legacy-only streaming functions.
+The authoritative deployed `/cal` and streaming functions live in the Web repo's
+`functions/index.js`, not this repo's recovered email source. `/cal` registration
+support must ship there, limited to approved active public metadata/suburb and
+the same all-day/UTC schedule contract (no venue/poster/registration answers).
+No stream/notification/email behavior is enabled by this schedule slice.
+
 No mirror is created in the legacy public `events` collection. Old clients
 therefore cannot receive pending/private registration payloads. The new scope,
 flags and deletion callable reuse existing query shapes; **no new rules or
@@ -68,8 +100,8 @@ delivery is enabled here. Preserve existing maintenance/cleanup gates. Exact
 private map pins remain unavailable to public list/map feeds; authorised users
 get directions through refreshed event details.
 
-Local evidence: source check, 30 backend tests, 14 Native client/feed/view-model
-tests, private-venue tests and the Native regression suite pass. These checks do
+Local evidence: source check, backend and Native client/feed/view-model tests,
+schedule/DST/calendar/reminder tests, private-venue tests and the Native regression suite pass. These checks do
 not substitute for iOS/Android device, Storage/App Check or coordinated Web
 acceptance. No Expo build or production deployment was performed.
 
