@@ -1,4 +1,4 @@
-﻿export const DEFAULT_CITY = 'sydney';
+export const DEFAULT_CITY = 'sydney';
 
 export const CITY_OPTIONS = [
   { value: 'adelaide', label: 'Adelaide, Australia' },
@@ -7,8 +7,8 @@ export const CITY_OPTIONS = [
   { value: 'hobart', label: 'Hobart, Australia' },
   { value: 'melbourne', label: 'Melbourne, Australia' },
   { value: 'perth', label: 'Perth, Australia' },
-  { value: 'rest-of-australia', label: 'Rest of Australia' },
   { value: 'sydney', label: 'Sydney, Australia' },
+  { value: 'rest-of-australia', label: 'Rest of Australia' },
 ];
 
 export const CITY_CODES = {
@@ -42,7 +42,8 @@ let revision = 0;
 const subscribers = new Set();
 export const cityCatalogueRevision = () => revision;
 export const subscribeCityCatalogue = listener => { subscribers.add(listener); return () => subscribers.delete(listener); };
-export const getCityDefinitions = () => definitions.map(city => ({ ...city }));
+export const compareCityNames = (a, b) => (a.id === 'rest-of-australia') - (b.id === 'rest-of-australia') || a.label.localeCompare(b.label, 'en', { sensitivity: 'base' });
+export const getCityDefinitions = () => definitions.map(city => ({ ...city })).sort(compareCityNames);
 export const getCityDefinition = id => definitions.find(city => city.id === id) || null;
 export function validateCityCatalogue(data) {
   if (data?.schemaVersion !== 1 || !Array.isArray(data.cities) || !data.cities.length || data.cities.length > 100) return null;
@@ -87,7 +88,7 @@ export function installCityCatalogue(data) {
   if (definitions.some(city => !validated.cities.some(next => next.id === city.id))) return false;
   if (JSON.stringify(definitions) === JSON.stringify(validated.cities)) return true;
   definitions = validated.cities;
-  CITY_OPTIONS.splice(0, CITY_OPTIONS.length, ...definitions.filter(city => city.enabled).map(city => ({ value: city.id, label: city.label })));
+  CITY_OPTIONS.splice(0, CITY_OPTIONS.length, ...definitions.filter(city => city.enabled).sort(compareCityNames).map(city => ({ value: city.id, label: city.label })));
   definitions.forEach(city => { CITY_CODES[city.id] = city.code; });
   revision++; subscribers.forEach(listener => listener());
   return true;
