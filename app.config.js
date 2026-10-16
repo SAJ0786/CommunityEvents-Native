@@ -56,7 +56,7 @@ export default ({ config }) => ({
   extra: {
     ...(config.extra || {}),
     // Opt in only for a reviewed test/release environment with deployed prerequisites.
-    // No EAS profile enables this while registration security/device gates are open.
+    // Only dedicated registration tester profiles opt in before device acceptance.
     eventRegistrationEnabled: process.env.EVENT_REGISTRATION_CLIENT_ENABLED === 'true',
     cityManagementEnabled: process.env.CITY_MANAGEMENT_CLIENT_ENABLED === 'true',
     promotionAudienceEnabled: process.env.PROMOTION_AUDIENCE_CLIENT_ENABLED === 'true',

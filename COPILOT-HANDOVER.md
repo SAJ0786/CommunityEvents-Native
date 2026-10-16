@@ -1,5 +1,156 @@
 # Community Connect Australia — Copilot / next-agent handover
 
+## Current Codex handover - 17 October 2026, Australia/Sydney
+
+**This section supersedes the historical continuation below, especially its old
+checkout paths, undeployed-backend statements, App Check description and
+immediate-approved-edit policy. Do not enable delivery or publish public-store
+builds based on historical instructions.**
+
+### Checkout, ownership and authorization
+
+- Current Native checkout:
+  `C:\Users\sajja\.copilot\repos\CommunityEvents-Native`, repository
+  `SAJ0786/CommunityEvents-Native`, user-owned `main`. Fetch safely, preserve
+  unrelated edits, commit intended files only with the Copilot trailer, push
+  normally and verify origin equality. No new branches, PRs or force pushes.
+- Web owns `SAJ0786/CommunityConnect-WebApp`; coordinate rather than editing its
+  backend/Hosting from Native. Native owns the `registration` Firebase codebase
+  and `events-email:sendPrivateStreamLinkEmail`. Web owns its 12 canonical default
+  streaming/calendar functions; never migrate the email function's ownership.
+- User authorized this registration backend and Web release, then explicitly
+  selected **"Authorize 2.1.1 tester builds with registration enabled"**:
+  TestFlight first, Android test APK next, existing app identities, NO public-store
+  submission, no OTA architecture and no new registration email/push/reminder
+  delivery. Native build and distribution status is tracked separately below.
+
+### Production release - verified, not just source ready
+
+- Native/backend source `1848a204b318a2f5849540060c03a22382cbc470` was deployed
+  from clean main with:
+  `firebase deploy --only functions:registration --project community-event-8b639 --config backend\firebase.json --non-interactive`.
+  Exit 0, no force retry; all 19 functions ACTIVE, Node 22,
+  `australia-southeast1`, updated 16 October 2026 19:19:19-39 UTC.
+- Downloaded deployed source archive matches all 14 tracked JS/MJS/JSON source
+  and package files byte-for-byte. Representative revisions:
+  save `saveregistrationevent-00003-wuk`,
+  approve `approveregistrationevent-00003-cot`,
+  get `getregistrationevent-00003-fin`,
+  list `listregistrationevents-00003-ker`,
+  poster put/get/remove `00003-hil` / `00003-cuh` / `00003-kig`,
+  account cleanup `cleanupregistrationaccounts-00003-bot`.
+- All 19 preserve `EVENT_REGISTRATION_ENABLED=true`,
+  `EVENT_REGISTRATION_NOTICES_ENABLED=false`,
+  `EVENT_REGISTRATION_MAINTENANCE_ENABLED=true`. Secret references unchanged;
+  callable `enforceAppCheck:false` unchanged. No rules, indexes, migrations,
+  real participant writes, emails, pushes or streams were run for verification.
+  Runtime env comparison resolved two metadata-hash differences: save runtime env
+  unchanged; delete gained only platform-managed `FUNCTION_SIGNATURE_TYPE=http`.
+- Existing owned email guard remains live from `dfe9c57`,
+  `sendprivatestreamlinkemail-00014-zek`: authorized registration session calls
+  return `{sent:false,reason:'registration-delivery-disabled'}`; ordinary behavior
+  unchanged. This release did NOT redeploy events-email or other codebases.
+- Web partner confirms live runtime source `9729f2f36757d6995a69e854a6fb45eee3c59b79`,
+  Hosting version `aa458d7a89f29384`, released 16 October 2026 19:21:35 UTC,
+  https://communityconnect.siza.info. All 134 hosted file hashes match; `/`,
+  `/app`, `/businesses` return exact deployed artifact; signed-out 390/1440 layouts
+  pass without overflow/browser errors. Thirteen empty-payload rejection probes
+  pass (10 auth 401, 3 invalid-argument 400, NOT authenticated-flow acceptance).
+  Web handover/docs main `e24ae3f3d30e10fcb0d03e3dbae9c230d4d7fee7`.
+  Prior Hosting `97f9f2dedf9923d5` retained on
+  `registration-pre-staged-20261017`. No default function change in this follow-up.
+
+### Current registration contract
+
+- Normal Home cards/order, Quick Access registration-only/all toggle; no standalone
+  registration navigation. Initial pending event only host My Events/admin
+  management, prominent `UnApproved`; approval superAdmin only under User Management.
+- Approved edits now stage privately in `registrationPendingChanges/{eventId}`.
+  Published event/form/private venue/contacts/poster stay live for discovery,
+  attendee and host self-registration, calendars and streaming until approval.
+  Manager `getRegistrationEvent` adds `event.hasPendingChanges` and
+  `pendingChanges:{event,form,privateDetails,submittedAt,submittedBy}`; top-level
+  stays published for EVERY caller. Nonmanagers receive neither pending object
+  nor pending flag. Review scope includes initial pending and approved+staged.
+- `canApprove` is server-authorized superAdmin for initial pending OR staged
+  approved event. Approval requires expected control revision, rechecks current
+  capacity/city/timezone/event-day restrictions, atomically promotes editable
+  content without stale counters/stream state, and increments revision on staged
+  promotion. Changed form uses promotion revision; unchanged formVersion stays.
+  Clients reload authoritative state after mutation, never predict revisions.
+- Approved poster upload/removal stages; default poster is published;
+  `getRegistrationPoster({eventId,view:'pending'})` manager-only, no fallback.
+  Cleanup protects both referenced versions and retires superseded media through
+  existing grace/retry machinery. Delete/account cleanup discards drafts safely;
+  participant history retained. Direct pending collection access remains denied
+  by default; no rules/index/migration was needed.
+- Native uses actual normal `CreateEventForm` in registration mode. Public
+  descriptive metadata includes host/organiser/on-behalf, audience/speaker/reciters,
+  Hijri and exact `timeMode:'manual'|'prayer'` metadata. Private contacts are
+  `hostPhone` and `hostContactOptional`, not public projection. No public poster
+  URL; authorised callable-only private media. Full constraints:
+  `backend\functions-registration\README.md` current staged section.
+- Explicit city-zone start/end clocks derive UTC; date-only remains valid, no
+  fabricated time/duration. Reported legacy Badminton card lacked all four saved
+  clock/instant fields (Web public-only query); user must re-enter time.
+- Delivery holds remain: registration notices off, private-stream email guard,
+  no registration legacy live notification, Web reminder candidate unexported/
+  undeployed. Promotion may queue outbox; this does NOT authorize sending it.
+
+### Native tester delivery - do not confuse build with installation
+
+- No compatible OTA route: no `expo-updates` dependency, update URL, runtime or EAS
+  channel; checked-in Android manifest explicitly disables updates. New signed
+  binaries required. Backend/Hosting/source changes do not update installed apps.
+- Read-only EAS history: latest successful Android internal APK build
+  `b94dd666-2d68-4e56-b75a-189d565228cb`, version 2.0.0/build 96,
+  old source `ba9dc5f`; NOT this release. Recent iOS entries cancelled/errored;
+  no current iOS artifact is claimed. EAS authenticated; preview/production
+  environments list a Maps variable, no registration/city/promotion flags.
+- Public Apple lookup 17 October confirms existing bundle
+  `info.siza.communityevents` / App Store ID `6782770347` live version **2.1.0**.
+  Source/package/Android marketing version raised deliberately to **2.1.1**;
+  EAS remote auto-increment controls monotonic build numbers.
+- Dedicated `registration-testflight` extends production identity/Xcode image,
+  tester release mode, production App Check, registration enabled only;
+  `registration-apk` extends existing internal APK/debug-App-Check tester profile.
+  Both explicitly keep unrelated city/promotion flags false. Ordinary profiles
+  stay registration-disabled. No personal-test bundle/certificate substitution,
+  no new signing identity or upload key, no debug token committed.
+- Build/distribution: prepared; no new artifacts queued yet. Use existing EAS
+  credentials with `--freeze-credentials`; surface missing/expired credentials or
+  Apple agreements rather than creating replacement identities. iOS upload is
+  TestFlight only, never App Store review/public release. Record exact build IDs,
+  source SHA, actual version/build/signing and TestFlight processing separately.
+
+### Verification and outstanding Codex tasks
+
+- Revalidated deployed source: 79 targeted tests PASS (40 backend, 25 Native
+  integration, 6 schedule, 4 stream, 3 email guard, 1 venue), 129 JS source files
+  parse. Tester release revalidation also passes 35 client/schedule/stream tests,
+  all 14 regressions, source check and updated 2.1.1 release check. Resolved EAS
+  TestFlight config confirms version 2.1.1, production bundle/App Check,
+  registration true, unrelated gates false, tester mode and remote auto-increment.
+  Prior complete source checkpoint also passed prayer timezone fixtures.
+- Web reports 277 Node +18 React +95 responsive layouts and production build pass.
+- [ ] Complete 2.1.1 signed TestFlight build/upload and Android test APK; inspect
+  artifacts/version/gates/signing. Distinguish queued/build success/upload/
+  processing/tester availability from actual installed acceptance.
+- [ ] Physical iPhone/Android acceptance: host builder/save/reopen, staged approval
+  and private poster/venue isolation, attendee edit/cancel/form re-consent,
+  superAdmin approval shortcut, time/prayer/Hijri roundtrip, calendar/reminders,
+  normal event regression, safe areas/keyboard/large font and user-owned streaming.
+- [ ] Merged rules/Storage/App Check/old-client compatibility and provider acceptance
+  remain separate from mocked/local tests. Do not enforce App Check automatically.
+- [ ] Before any later delivery activation review queued historical outbox, opt-outs,
+  provider outcomes and notification consent; explicit authorization required.
+- [ ] Nationwide promotion/city-management work has disabled gates and its own
+  readiness documents; this registration release does not certify or enable it.
+- [ ] Public-store submission requires separate approval after tester acceptance.
+  Update store legal/data disclosures and verify current highest remote versions.
+
+## Historical continuation - superseded where the current section differs
+
 Last checkpoint: 16 October 2026, Australia/Sydney. Work is in progress.
 Latest item 1 checkpoint: native local/Australia-wide promotion request and explicit
 admin approval, server-only audience proof, preference-aware email/push, and national

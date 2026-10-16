@@ -59,6 +59,24 @@
         "IOS_GOOGLE_SERVICES_FILE": "./GoogleService-Info.personal-test.plist"
       }
     },
+    "registration-testflight": {
+      "extends": "production",
+      "env": {
+        "APP_RELEASE_MODE": "tester",
+        "APP_CHECK_PROVIDER": "production",
+        "EVENT_REGISTRATION_CLIENT_ENABLED": "true",
+        "CITY_MANAGEMENT_CLIENT_ENABLED": "false",
+        "PROMOTION_AUDIENCE_CLIENT_ENABLED": "false"
+      }
+    },
+    "registration-apk": {
+      "extends": "apk",
+      "env": {
+        "EVENT_REGISTRATION_CLIENT_ENABLED": "true",
+        "CITY_MANAGEMENT_CLIENT_ENABLED": "false",
+        "PROMOTION_AUDIENCE_CLIENT_ENABLED": "false"
+      }
+    },
     "production": {
       "environment": "production",
       "autoIncrement": true,

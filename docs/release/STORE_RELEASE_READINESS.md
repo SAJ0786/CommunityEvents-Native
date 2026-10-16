@@ -2,7 +2,13 @@
 
 Status date: 9 September 2026
 
-Candidate version: 2.0.0
+Candidate version: 2.1.1
+
+17 October authorization is limited to registration-enabled tester builds:
+`registration-testflight` then `registration-apk`, not public-store submission.
+The current `COPILOT-HANDOVER.md` records deployed backend/Web status, actual build
+delivery and remaining device acceptance. The store checklist below remains a
+future gate; historical device evidence does not certify the new registration flow.
 
 Android application ID: `info.siza.communityevents.app`
 

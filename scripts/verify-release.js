@@ -24,8 +24,8 @@ const androidStreamManager = read('android/app/src/main/java/info/siza/community
 const androidStreamView = read('android/app/src/main/java/info/siza/communityevents/app/AndroidRootEncoderLiveStreamView.java');
 
 if (app.name !== 'Community Connect Australia') throw new Error(`Unexpected store name: ${app.name}`);
-if (app.version !== '2.0.0' || packageJson.version !== app.version) {
-  throw new Error('App and package release versions must both be 2.0.0.');
+if (app.version !== '2.1.1' || packageJson.version !== app.version) {
+  throw new Error('App and package release versions must both be 2.1.1.');
 }
 if (app.android?.package !== 'info.siza.communityevents.app') throw new Error('Unexpected Android application ID.');
 if (app.ios?.bundleIdentifier !== 'info.siza.communityevents') throw new Error('Unexpected iOS bundle identifier.');
@@ -41,7 +41,7 @@ if (!(app.plugins || []).includes('./plugins/with-rnfirebase-cocoapods')) {
   throw new Error('The iOS Firebase CocoaPods resolver plugin is required.');
 }
 
-if (!/versionName\s+["']2\.0\.0["']/.test(androidGradle)) throw new Error('Checked-in Android versionName is not 2.0.0.');
+if (!/versionName\s+["']2\.1\.1["']/.test(androidGradle)) throw new Error('Checked-in Android versionName is not 2.1.1.');
 if (!new RegExp(`versionCode\\s+${Number(app.android.versionCode)}\\b`).test(androidGradle)) {
   throw new Error(`Checked-in Android versionCode does not match app.json (${app.android.versionCode}).`);
 }
@@ -74,6 +74,29 @@ if (!androidGradle.includes('com.github.pedroSG94.RootEncoder:library:2.5.9') ||
 const production = eas.build?.production;
 const apk = eas.build?.apk;
 const preview = eas.build?.preview;
+const registrationTestflight = eas.build?.['registration-testflight'];
+const registrationApk = eas.build?.['registration-apk'];
+if (registrationTestflight?.extends !== 'production' ||
+    registrationTestflight?.env?.APP_RELEASE_MODE !== 'tester' ||
+    registrationTestflight?.env?.APP_CHECK_PROVIDER !== 'production' ||
+    registrationApk?.extends !== 'apk') {
+  throw new Error('Registration tester builds must retain the existing TestFlight identity and internal APK safeguards.');
+}
+for (const profile of [registrationTestflight, registrationApk]) {
+  if (profile?.env?.EVENT_REGISTRATION_CLIENT_ENABLED !== 'true' ||
+      profile?.env?.CITY_MANAGEMENT_CLIENT_ENABLED !== 'false' ||
+      profile?.env?.PROMOTION_AUDIENCE_CLIENT_ENABLED !== 'false' ||
+      profile?.env?.IOS_BUNDLE_IDENTIFIER ||
+      profile?.env?.IOS_GOOGLE_SERVICES_FILE ||
+      profile?.env?.FIREBASE_APP_CHECK_DEBUG_TOKEN) {
+    throw new Error('Registration tester profiles must enable only registration, without identity or token overrides.');
+  }
+}
+if (production?.env?.EVENT_REGISTRATION_CLIENT_ENABLED === 'true' ||
+    apk?.env?.EVENT_REGISTRATION_CLIENT_ENABLED === 'true' ||
+    preview?.env?.EVENT_REGISTRATION_CLIENT_ENABLED === 'true') {
+  throw new Error('Registration must remain opt-in only in dedicated tester profiles.');
+}
 if (apk?.environment !== 'preview' ||
     apk?.distribution !== 'internal' ||
     apk?.android?.buildType !== 'apk' ||
@@ -188,4 +211,4 @@ const colorType = png[25];
 if (width !== 1024 || height !== 1024) throw new Error(`Store icon must be 1024x1024, found ${width}x${height}.`);
 if (colorType === 4 || colorType === 6) throw new Error('Store icon contains an alpha channel; iOS icons must be opaque.');
 
-console.log('Release configuration check passed: v2.0.0/build baseline 63, existing store identities, production Firebase/App Check settings, canonical SIZA.info legal links, API 36, device-tested maps dependency, stable Android RootEncoder streaming, native iOS sample-buffer PiP with user-owned RTMP lifecycle, static iOS frameworks with Firebase CocoaPods, api.video/HaishinKit Xcode 26 compatibility fixes, pinned Xcode 26.0/iOS 26 SDK image, and opaque 1024px icon verified.');
+console.log('Release configuration check passed: v2.1.1/build baseline 63, registration-only tester profiles, existing store identities, production Firebase/App Check settings, canonical SIZA.info legal links, API 36, device-tested maps dependency, stable Android RootEncoder streaming, native iOS sample-buffer PiP with user-owned RTMP lifecycle, static iOS frameworks with Firebase CocoaPods, api.video/HaishinKit Xcode 26 compatibility fixes, pinned Xcode 26.0/iOS 26 SDK image, and opaque 1024px icon verified.');

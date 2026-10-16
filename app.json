@@ -2,7 +2,7 @@
   "expo": {
     "name": "Community Connect Australia",
     "slug": "community-events-australia-native",
-    "version": "2.0.0",
+    "version": "2.1.1",
     "newArchEnabled": true,
     "orientation": "default",
     "icon": "./assets/icon-store-1024.png",
