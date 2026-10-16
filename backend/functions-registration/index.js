@@ -1,4 +1,4 @@
-// Separate codebase: not added to production firebase.json until emulator/security review.
+// Separate registration codebase; deploy only with explicitly authorized clients.
 const admin = require('firebase-admin');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
@@ -17,7 +17,7 @@ const handlers = createRegistrationHandlers({ db: admin.firestore(), bucket: adm
 for (const [name, handler] of Object.entries(handlers)) {
   exports[name] = onCall({ region: 'australia-southeast1', enforceAppCheck: false, maxInstances: 5 }, handler);
 }
-// Candidate only. Not in production Firebase config; explicit feature gate applies.
+// Maintenance remains feature-gated independently from notice delivery.
 const sweepPosters = createPosterMaintenance({ db: admin.firestore(), bucket: admin.storage().bucket(),
   enabled: () => process.env.EVENT_REGISTRATION_ENABLED === 'true' });
 exports.cleanupRegistrationPosters = onSchedule({ schedule: 'every 60 minutes', region: 'australia-southeast1', maxInstances: 1 }, async () => {

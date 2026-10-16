@@ -1,8 +1,90 @@
 # Event registration backend and Native integration
 
+## Independent recurring registrations - 17 October follow-up (NOT deployed)
+
+User chose separate registrations, capacity and closing for every occurrence.
+The additive `createRegistrationSeries` callable creates 2..100 independent pending
+events in ONE transaction (yearly at most 5; other frequencies within one year,
+yearly within four years). Bounded serialized event/form/private data must fit
+8 MiB; larger requests fail before any write rather than partially creating.
+No new deployment, migration, index, rules, delivery or gate activation is implied.
+Production still has the 19-function staged release described below until this
+new 20-function codebase is explicitly authorized and deployed.
+
+Request:
+
+```js
+{
+  city, createKey, draft, // existing flat event/form/private venue draft
+  recurrence: {
+    calendarType: 'gregorian', // or 'hijri'
+    frequency: 'week', // 'day', 'week', 'month', 'year'; fortnight = week / 2
+    repeatEvery: 1, // integer 1..100
+    endMode: 'count', // or 'date'
+    occurrenceCount: 4, // count mode: 2..100, yearly 2..5
+    // endDate: '2027-01-01', // Gregorian date end, inclusive
+    // startHijri: { day: 1, month: 7, year: 1448 }, // required Hijri cadence
+    // endHijri: { day: 1, month: 9, year: 1448 } // Hijri date end, inclusive
+  },
+  occurrences: [
+    { date: '2026-12-01', capacity: 30, closes: '2026-11-30T18:00',
+      startTime: '18:30', endTime: '20:00' }
+    // ... all exact rule-generated occurrences; do not submit a partial preview
+  ]
+}
+```
+
+First occurrence must match draft date/capacity/closes/clocks. Each row requires
+all five fields; empty closes/clock strings retain the existing date-only/default
+event-day closing semantics. Different capacities and earlier closing dates/times
+are permitted on each row. Every row is independently validated, including DST
+gaps/overlaps, private address rules, enabled city and already-closed bookings.
+Only the shared draft may contain venue/contacts/form metadata. No row can inject
+owner/status/approval/media paths. Clock instants always derive from the city;
+prayer clients must calculate each occurrence, not reuse the first seasonal time.
+
+Server regenerates dates using the rule; Hijri cadence uses authoritative
+`settings/hijriCalendar.overrides`, never client-provided overrides. Stale Hijri
+preview fails visibly; accepted retries resolve their receipt even if the calendar
+later changes. Gregorian/Hijri cadence matches normal Native recurrence, including
+month clamping and five-yearly-occurrence limit. Duplicate/non-increasing lunar
+dates are rejected rather than silently reserving multiple events for one date.
+Occurrence Hijri parts/display are canonicalized on creation; Gregorian recurrence
+does not falsely repeat the first occurrence's entered-Hijri metadata.
+
+Response: `{seriesId,events:[{eventId,revision:1,status:'pending'}]}`. Stable
+createKey + canonical payload is idempotent; changed payload under the same key
+fails `already-exists`. `registrationSeries/{seriesId}` is a callable-private
+receipt containing owner, fingerprint and creation result, no answers/contacts.
+All event, private and form documents commit atomically; no participant writes,
+notification outbox or delivery occur on creation.
+
+Detail/list event projections add immutable creation provenance:
+`seriesId`, zero-based `occurrenceIndex`, `occurrenceCount`, `recurrenceRule`.
+Existing `saveRegistrationEvent`, approve, booking, cancellation, delete, streaming,
+calendar and staged edits operate on ONE occurrence. Rule provenance never
+regenerates siblings when editing/moving one date; drafts cannot forge it.
+No series-wide edits/deletion/approval or shared booking/capacity is implemented
+or implied. Each private poster must upload through its own event/revision callable;
+report and retry individual failures without recreating the series or sharing paths.
+
+Client `createRegistrationClient.createSeries` is an explicit separate action;
+existing single-event `save` remains unchanged. New clients require this backend
+deployment; already-delivered Android build 97 does NOT contain this follow-up.
+Native supports preview/review of each occurrence's capacity, closing and clocks,
+with per-date prayer recalculation, immutable retry snapshots, quota-aware private
+poster uploads and My Events confirmation routing. Existing edits/copies never
+implicitly create a series. Native keeps its shared normal-form step followed by
+registration settings, rather than claiming Web's exact new single-page field order.
+
+Source acceptance: 99 targeted backend/Native/recurrence/schedule/stream/privacy
+tests, 130-file source check, release check, 14 regressions and prayer timezone
+fixtures pass. This remains local mocked/runtime validation, not production
+Firestore transaction/device/provider acceptance.
+
 ## Staged changes and normal-form parity — 17 October source update
 
-**Not deployed.** This section supersedes older statements that approved edits
+**Deployed from `1848a20` on 17 October, all 19 functions ACTIVE.** This section supersedes older statements that approved edits
 publish immediately. The user chose to keep the last approved version live
 while a separate submitted revision awaits superAdmin approval.
 
@@ -77,9 +159,11 @@ hostContactEmail. Omitted new fields preserve prior values for older clients;
 explicit empty strings/arrays clear them. Descriptive organisation selection
 does not grant ownership, admin permission or contact visibility.
 
-Release this source only with both pending-aware clients. Production remains
-at the previous deployed semantics until an explicitly authorized coordinated
-release. Native client flag, notice delivery and App Check settings are unchanged.
+Pending-aware Web is live (Hosting `aa458d7a89f29384`); Native tester build 97
+contains this staged contract, while iOS provisioning is pending local Apple
+authentication. Native production client profiles remain disabled; dedicated
+authorized tester profiles enable registration only. Notices remain OFF and
+App Check enforcement unchanged. See root `COPILOT-HANDOVER.md` for exact evidence.
 
 ## Unified event discovery — 16 October implementation
 

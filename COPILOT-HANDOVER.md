@@ -2,6 +2,68 @@
 
 ## Current Codex handover - 17 October 2026, Australia/Sydney
 
+### New recurring-registration follow-up - source work, NOT deployed
+
+- User added recurring registration events and explicitly chose **separate
+  registration, capacity and closing date for each occurrence**. This is new
+  work after the deployed staged release/Android build 97; no new deployment
+  or build authorization is inferred. iOS local Apple authentication remains
+  unconfirmed; leave the existing signing terminal for the user.
+- Additive callable `createRegistrationSeries({city,createKey,draft,recurrence,
+  occurrences})` creates independent pending event/form/private documents
+  atomically plus callable-private `registrationSeries/{seriesId}` retry receipt.
+  Returns `{seriesId,events:[{eventId,revision:1,status:'pending'}]}`.
+  Stable key retries do not duplicate or partially create events.
+- Rule: `calendarType:'gregorian'|'hijri'`, `frequency:'day'|'week'|'month'|'year'`,
+  integer `repeatEvery:1..100`, `endMode:'count'|'date'`, count or inclusive end.
+  Fortnightly is week/every 2. Hijri cadence uses `startHijri:{day,month,year}` and
+  date-end `endHijri`, with server-owned `settings/hijriCalendar.overrides`.
+  True lunar recurrence is required, not Gregorian monthly/yearly spacing
+  disguised by a Hijri first-date display.
+- Max 100 occurrences/atomic creation (yearly max 5), nonyear within one year,
+  yearly within four years; 8 MiB serialized series data bound. Every row requires
+  explicit `date,capacity,closes,startTime,endTime`; row zero matches draft.
+  Empty clocks/date-only and overnight semantics retained; each schedule resolves
+  using authoritative city timezone and DST validation. Each prayer clock must
+  be recalculated by the client; never copy the first seasonal prayer time.
+- Immutable read provenance: `seriesId`, zero-based `occurrenceIndex`,
+  `occurrenceCount`, `recurrenceRule`. Existing editor/save/approve/delete/book/
+  cancel/stream/calendar/staged publication acts on ONE occurrence. Editing a
+  member must never regenerate siblings/new series. No series-wide lifecycle
+  or shared bookings/capacity is authorized or implied.
+- Private posters remain separate per-event, per-revision uploads; no shared path
+  or public URL. Existing quota is 10 uploads/user/hour; report failures and
+  unattempted remaining posters explicitly without recreating events or bypassing
+  quota. Pending/private projection, approval and notification holds remain.
+- Production currently has the prior 19 functions. This source adds a twentieth
+  callable and the new private receipt collection (default-denied client access).
+  No rules/index/migration needed. Deliver both pending-aware clients plus new
+  callable in a later explicitly authorized coordinated release; older clients
+  continue single-event flow. Android build 97 DOES NOT contain recurrence.
+- Backend/helper validation so far: 64 targeted tests pass, including all 100
+  occurrences committed, oversized forms rejected with zero writes, retry races,
+  independent booking/cancellation/staged approval/privacy and true Hijri cadence.
+  Forward calendar conversion matches Native across 1,680 anchored test cases;
+  Gregorian/fortnightly/month clamp/leap rules match prior art across four zones.
+  Native recurrence UI is implemented: one-time/recurring, calendar cadence and
+  count/end controls, reviewed per-occurrence closing/capacity/clocks, seasonal
+  prayer recalculation, frozen ambiguous-retry request and quota-aware per-event
+  private poster failures. Edit/copy never regenerate series. Confirmation routes
+  to actual My Events, not public Home where initial pending events are hidden.
+- Native retains the actual shared normal event form followed by registration
+  settings; it does NOT duplicate Web's newly requested exact single-page field
+  order. Native existing order is title, organiser/host, date/time, private venue,
+  event type/subject/audience/speakers/notes, then registration closing/capacity/
+  frequency/preview/cancellation/private poster and questions. This layout
+  difference is explicit, not claimed as exact-order parity.
+- Final combined source verification: **99 targeted tests PASS**, including 45
+  backend, 35 mounted/Native integration, 5 recurrence parity/transport, 6 schedule,
+  4 stream, 3 email guard and 1 venue. Source check 130 JS files, release config
+  check, all 14 regressions, prayer/Azaan timezone fixtures and diff checks pass.
+  No real records, notifications, streams, deploys or new artifacts were produced
+  for recurrence. It still requires authorized backend/client coordinated release
+  and a later tester binary; installed Android97 remains the previous release.
+
 **This section supersedes the historical continuation below, especially its old
 checkout paths, undeployed-backend statements, App Check description and
 immediate-approved-edit policy. Do not enable delivery or publish public-store

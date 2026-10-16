@@ -1487,7 +1487,7 @@ function MainApp() {
           onInitialFilterConsumed={() => setDirectoryFilter(null)}
         />
       ) : REGISTRATION_ENABLED && activeTab === 'registration' ? (
-        <RegistrationScreen key={`${currentUser?.uid || 'guest'}-${selectedCity}-${registrationTarget?.nonce || ''}`} enabled initialEventId={registrationTarget?.eventId} initialAction={registrationTarget?.action || 'entry'} user={currentUser} profile={profile} city={selectedCity} onBack={() => { setRegistrationTarget(null); setRegistrationRefresh(value => value + 1); setActiveTab('home'); }} onRequireSignIn={requestSignIn} />
+        <RegistrationScreen key={`${currentUser?.uid || 'guest'}-${selectedCity}-${registrationTarget?.nonce || ''}`} enabled initialEventId={registrationTarget?.eventId} initialAction={registrationTarget?.action || 'entry'} user={currentUser} profile={profile} city={selectedCity} onMyEvents={() => { setRegistrationTarget(null); setRegistrationRefresh(value => value + 1); setActiveTab('my_events'); }} onBack={() => { setRegistrationTarget(null); setRegistrationRefresh(value => value + 1); setActiveTab('home'); }} onRequireSignIn={requestSignIn} />
       ) : activeTab === 'home' && homeViewMode === 'map' ? (
         <ScrollView contentContainerStyle={styles.mapScrollContent} nestedScrollEnabled>
           <View style={styles.mapHeader}>{renderHeader()}</View>
@@ -1597,7 +1597,7 @@ function MainApp() {
           onChoose={setCreateMode}
         />
       ) : REGISTRATION_ENABLED && activeTab === 'create' && createMode === 'registration' ? (
-        <RegistrationScreen key={`${currentUser?.uid || 'guest'}-${selectedCity}`} enabled initialCreate user={currentUser} profile={profile} city={selectedCity} onBack={() => { setCreateMode(''); setRegistrationRefresh(value => value + 1); }} onRequireSignIn={requestSignIn} />
+        <RegistrationScreen key={`${currentUser?.uid || 'guest'}-${selectedCity}`} enabled initialCreate user={currentUser} profile={profile} city={selectedCity} onMyEvents={() => { setCreateMode(''); setRegistrationRefresh(value => value + 1); setActiveTab('my_events'); }} onBack={() => { setCreateMode(''); setRegistrationRefresh(value => value + 1); }} onRequireSignIn={requestSignIn} />
       ) : __DEV__ && activeTab === 'create' && createMode === 'registration-preview' ? (
         <RegistrationPrototypeScreen onBack={() => setCreateMode('')} />
       ) : activeTab === 'create' && createMode === 'recurring' && (!editingEvent || editingEvent.__editSeries) ? (

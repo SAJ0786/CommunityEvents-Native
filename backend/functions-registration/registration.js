@@ -5,6 +5,7 @@ const model = import('./formModel.mjs');
 const catalogueModel = import('./cityCatalogue.mjs');
 const venueModel = import('./privateVenue.mjs');
 const scheduleModel = import('./eventSchedule.mjs');
+const recurrenceModel = import('./registrationRecurrence.mjs');
 const RETENTION = Object.freeze({ policy: 'until-organiser-deletes-or-attendee-cancels', notice: 'Your registration answers are kept until the organiser deletes them or you cancel/delete your registration. Cancelling deletes your answers and releases your places. Organiser answer deletion alone does not cancel your booking. Deleting your account queues removal of your registration answers and cancels upcoming events you organise, notifying attendees. Contact support for other privacy requests.' });
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -82,6 +83,105 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
   const checkOpen = event => {
     if (event.status !== 'approved' || localMinute(now(), event.timeZone) >= (event.closes || `${event.date}T00:00`)) fail('failed-precondition', 'Registration is closed or this event is not approved.');
   };
+  async function createRegistrationSeries(request) {
+    await actor(request);
+    const city = id(request.data?.city);
+    const createKey = id(request.data?.createKey);
+    const raw = request.data?.draft;
+    const base = await cleanDraft(raw);
+    const suppliedVenue = raw?.venue;
+    const venue = suppliedVenue == null ? null : (await venueModel).normalisePrivateVenue(suppliedVenue);
+    if (suppliedVenue != null && (!venue || venue.fullAddress !== base.address || venue.suburb !== base.suburb)) fail('invalid-argument', 'Select the full address again and confirm its public suburb.');
+    const rule = request.data?.recurrence;
+    if (!rule || typeof rule !== 'object' || Array.isArray(rule)) fail('invalid-argument', 'Choose recurrence settings.');
+    const allowedRule = ['calendarType', 'frequency', 'repeatEvery', 'endMode', 'occurrenceCount', 'endDate', 'startHijri', 'endHijri'];
+    if (Object.keys(rule).some(key => !allowedRule.includes(key))) fail('invalid-argument', 'Unsupported recurrence setting.');
+    const recurrence = {
+      calendarType: rule.calendarType, frequency: rule.frequency, repeatEvery: rule.repeatEvery, endMode: rule.endMode,
+      ...(rule.endMode === 'count' ? { occurrenceCount: rule.occurrenceCount }
+        : rule.calendarType === 'hijri' ? { endHijri: rule.endHijri } : { endDate: rule.endDate }),
+      ...(rule.calendarType === 'hijri' ? { startHijri: rule.startHijri } : {}),
+    };
+    for (const key of ['startHijri', 'endHijri']) {
+      if (recurrence[key] !== undefined) {
+        const value = recurrence[key];
+        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(field => !['day', 'month', 'year'].includes(field))) fail('invalid-argument', 'Invalid Hijri recurrence date.');
+      }
+    }
+    const occurrences = request.data?.occurrences;
+    if (!Array.isArray(occurrences) || occurrences.length < 2 || occurrences.length > 100) fail('invalid-argument', 'Create between 2 and 100 separate occurrences.');
+    const occurrenceKeys = ['date', 'closes', 'capacity', 'startTime', 'endTime', 'hijriDate', 'enteredAsHijri', 'hijriDay', 'hijriMonth', 'hijriYear'];
+    const drafts = [];
+    for (const occurrence of occurrences) {
+      if (!occurrence || typeof occurrence !== 'object' || Array.isArray(occurrence)
+          || Object.keys(occurrence).some(key => !occurrenceKeys.includes(key))
+          || occurrence.capacity === undefined
+          || ['date', 'closes', 'startTime', 'endTime'].some(key => typeof occurrence[key] !== 'string')) fail('invalid-argument', 'Each occurrence needs its own date, capacity, closing and clock settings.');
+      drafts.push(await cleanDraft({ ...raw, ...occurrence }));
+    }
+    if (['date', 'capacity', 'closes', 'startTime', 'endTime'].some(key => (base[key] ?? '') !== (drafts[0][key] ?? ''))) fail('invalid-argument', 'The first occurrence must match the event settings.');
+    const fingerprint = createHash('sha256').update(JSON.stringify({ city, base, venue, recurrence, drafts })).digest('hex');
+    const seriesId = createHash('sha256').update(`series:${request.auth?.uid}:${createKey}`).digest('hex');
+    const receiptRef = db.collection('registrationSeries').doc(seriesId);
+    const references = drafts.map((_, index) => eventRef(createHash('sha256').update(`${seriesId}:${index}`).digest('hex')));
+    return db.runTransaction(async tx => {
+      const caller = await actor(request, tx);
+      const receipt = await tx.get(receiptRef);
+      if (receipt.exists) {
+        if (receipt.data().ownerUid !== caller.uid || receipt.data().fingerprint !== fingerprint) fail('already-exists', 'This series creation reference was already used.');
+        return receipt.data().result;
+      }
+      const timeZone = await zone(city, tx);
+      const calendar = recurrence.calendarType === 'hijri' ? await tx.get(db.collection('settings').doc('hijriCalendar')) : null;
+      const overrides = calendar?.data()?.overrides ?? [];
+      if (!Array.isArray(overrides) || overrides.length > 1200 || overrides.some(item => {
+        if (!item || !Number.isInteger(Number(item.hYear)) || Number(item.hYear) < 1300 || Number(item.hYear) > 1700
+            || !Number.isInteger(Number(item.hMonth)) || Number(item.hMonth) < 1 || Number(item.hMonth) > 12
+            || typeof item.gDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(item.gDate)) return true;
+        const date = new Date(`${item.gDate}T12:00:00Z`);
+        return !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== item.gDate;
+      })) fail('failed-precondition', 'Hijri calendar settings need administrator review.');
+      let preview;
+      try { preview = (await recurrenceModel).registrationOccurrencePreview(base.date, recurrence, overrides); }
+      catch (error) { fail('invalid-argument', error.message); }
+      if (preview.length !== drafts.length || preview.some((row, index) => row.date !== drafts[index].date)) fail('invalid-argument', 'Occurrence dates do not match the current recurrence preview. Reload the calendar and try again.');
+      for (const reference of references) {
+        if ((await tx.get(reference)).exists) fail('already-exists', 'An occurrence already exists without its series receipt. Contact support.');
+      }
+      const timestamp = now().toISOString();
+      const rows = [];
+      let bytes = 0;
+      for (let index = 0; index < drafts.length; index++) {
+        const draft = { ...drafts[index], ...preview[index] };
+        const monthNames = ['Muharram', 'Safar', 'Rabi al-Awwal', 'Rabi al-Thani', 'Jumada al-Awwal', 'Jumada al-Thani', 'Rajab', "Sha'ban", 'Ramadan', 'Shawwal', "Dhu al-Qi'dah", 'Dhu al-Hijjah'];
+        draft.hijriDate = draft.enteredAsHijri ? `${draft.hijriDay} ${monthNames[draft.hijriMonth - 1]} ${draft.hijriYear} AH` : '';
+        let schedule;
+        try { schedule = (await scheduleModel).registrationSchedule({ date: draft.date, startTime: draft.startTime, endTime: draft.endTime, timeZone }); }
+        catch (error) { fail('invalid-argument', `Occurrence ${index + 1}: ${error.message}`); }
+        if (localMinute(now(), timeZone) >= (draft.closes || `${draft.date}T00:00`)) fail('failed-precondition', `Occurrence ${index + 1} has already closed.`);
+        if (draft.timeMode === 'prayer' && (!draft.prayerName || !schedule.startAt)) fail('invalid-argument', `Occurrence ${index + 1} needs its calculated prayer time.`);
+        const event = { ...(await model).publicEvent(draft), ...schedule, city, timeZone,
+          ...(draft.timeMode === 'prayer' ? { prayerTimeZone: timeZone } : {}),
+          ownerUid: caller.uid, revision: 1, formVersion: 1, status: 'pending', reservedPlaces: 0, registrationCount: 0,
+          createdAt: timestamp, updatedAt: timestamp, allowCancellation: draft.allowCancellation,
+          seriesId, occurrenceIndex: index, occurrenceCount: drafts.length, recurrenceRule: recurrence };
+        const privateDetails = { address: draft.address, venue, hostPhone: draft.hostPhone ?? '', hostContactOptional: draft.hostContactOptional ?? '' };
+        const form = { version: 1, fields: draft.fields, purpose: draft.purpose };
+        bytes += Buffer.byteLength(JSON.stringify({ event, privateDetails, form }));
+        rows.push({ event, privateDetails, form });
+      }
+      if (bytes > 8 * 1024 * 1024) fail('resource-exhausted', 'This series and form are too large. Use fewer occurrences.');
+      const result = { seriesId, events: references.map(reference => ({ eventId: reference.id, revision: 1, status: 'pending' })) };
+      for (let index = 0; index < rows.length; index++) {
+        const reference = references[index]; const row = rows[index];
+        tx.set(reference, row.event);
+        tx.set(privateRef(reference.id), row.privateDetails);
+        tx.set(formRef(reference.id), row.form);
+      }
+      tx.set(receiptRef, { ownerUid: caller.uid, fingerprint, result, createdAt: timestamp });
+      return result;
+    });
+  }
   async function saveRegistrationEvent(request) {
     gate(); const draft = await cleanDraft(request.data?.draft);
     // The legacy prototype has no coordinates. New production clients supply a
@@ -547,6 +647,6 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const snapshot = await query.get();
     return { templates: snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })), nextCursor: snapshot.docs.length === 50 ? snapshot.docs.at(-1).id : null };
   }
-  return { saveRegistrationEvent, approveRegistrationEvent, submitEventRegistration, cancelEventRegistration, cancelRegistrationEvent, deleteRegistrationEvent, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
+  return { createRegistrationSeries, saveRegistrationEvent, approveRegistrationEvent, submitEventRegistration, cancelEventRegistration, cancelRegistrationEvent, deleteRegistrationEvent, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
 }
 module.exports = { createRegistrationHandlers, localMinute, active, manages, approves };

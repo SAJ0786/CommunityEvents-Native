@@ -532,6 +532,7 @@ test('editor renders the actual shared form in registration mode and keeps dedic
     './prototypeModel': load(path.join(root, 'src/registration/prototypeModel.js')),
     './privateVenue': load(path.join(root, 'src/registration/privateVenue.js')),
     './registrationViewModel': view,
+    ...recurrenceEditorDependencies(),
   }, { initialDraft: view.eventDraftFromDetail(detail, ['Majlis']), eventId: 'event', city: 'sydney', savedTemplates: [], onCancel() {}, hasPoster: true });
   const form = flatten(fixture.render()).find(node => node.type === 'ActualCreateEventForm');
   assert.equal(form.props.registrationMode, true);
@@ -543,6 +544,253 @@ test('editor renders the actual shared form in registration mode and keeps dedic
   assert.match(JSON.stringify(settings), /Select private poster/);
   assert.match(JSON.stringify(settings), /Remove existing private poster/);
   assert.match(JSON.stringify(settings), /Capacity \(places\)/);
+});
+
+function recurrenceEditorDependencies() {
+  return {
+    './registrationRecurrence': load(path.join(root, 'src/registration/registrationRecurrence.js')),
+    '../services/hijri': load(path.join(root, 'src/services/hijri.js')),
+    '../services/settings': { getHijriSettings: async () => ({ overrides: [] }) },
+    '../services/prayerTimes': load(path.join(root, 'src/services/prayerTimes.js')),
+    '../utils/cities': { getCityDefinition: () => ({ timeZone: 'Australia/Sydney' }) },
+  };
+}
+function recurrenceEditorFixture(extra = {}, overrides = {}) {
+  const draft = { ...load(path.join(root, 'src/registration/prototypeModel.js')).createDraft(), title: 'Independent sessions', date: '2027-01-01',
+    venue: { fullAddress: '1 Private Lane', suburb: 'Parramatta', state: 'NSW', postcode: '2150', latitude: -33.8, longitude: 151 },
+    address: '1 Private Lane', suburb: 'Parramatta', closes: '2026-12-30T18:00', capacity: 10, ...extra };
+  const saves = [];
+  const fixture = componentFixture('src/registration/RegistrationEditor.js', {
+    'react-native': { Image: 'Image', Switch: 'Switch', Text: 'Text', View: 'View' },
+    'expo-image-picker': {},
+    '../components/CreateEventForm': { __esModule: true, default: 'ActualCreateEventForm' },
+    '../components/NativeDateTimeField': 'DateTimeField',
+    './RegistrationControls': { Action: 'Action', Input: 'Input', styles: {} },
+    './prototypeModel': load(path.join(root, 'src/registration/prototypeModel.js')),
+    './privateVenue': load(path.join(root, 'src/registration/privateVenue.js')),
+    './registrationViewModel': view, ...recurrenceEditorDependencies(), ...overrides,
+  }, { initialDraft: draft, city: 'sydney', savedTemplates: [], initialStep: 'settings', onSave: (...args) => saves.push(args) });
+  return { ...fixture, saves };
+}
+function press(fixture, label) {
+  const action = flatten(fixture.render()).find(node => node.type === 'Action' && node.props.children.flat(Infinity).join('') === label);
+  assert.ok(action, `Action ${label} exists`); action.props.onPress();
+}
+function input(fixture, label, value) {
+  const field = flatten(fixture.render()).find(node => node.type === 'Input' && node.props.label === label);
+  assert.ok(field, `Input ${label} exists`); field.props.onChangeText(value);
+}
+async function previewRecurrence(fixture, cadence = 'Fortnightly') {
+  fixture.render(); await new Promise(setImmediate);
+  press(fixture, 'Recurring'); press(fixture, cadence); press(fixture, 'Preview occurrences');
+}
+function confirmAndSaveRecurrence(fixture) {
+  flatten(fixture.render()).find(node => node.type === 'Switch' && node.props.accessibilityLabel === 'Confirm all independent occurrences').props.onValueChange(true);
+  press(fixture, 'Choose registration form'); press(fixture, 'Continue current form'); press(fixture, 'Save event and registration form');
+}
+test('mounted recurrence editor previews fortnightly independent closing/capacity and date-only clocks', async () => {
+  const fixture = recurrenceEditorFixture();
+  await previewRecurrence(fixture);
+  input(fixture, 'Occurrence 2 capacity', '17');
+  const closing = flatten(fixture.render()).find(node => node.props.accessibilityLabel === 'Occurrence 2 closing date');
+  closing.props.onChange('2027-01-10');
+  confirmAndSaveRecurrence(fixture);
+  assert.equal(fixture.saves.length, 1);
+  const [draft, series] = fixture.saves[0];
+  assert.equal(series.recurrence.frequency, 'week'); assert.equal(series.recurrence.repeatEvery, 2);
+  assert.deepEqual(Array.from(series.occurrences, row => row.date), ['2027-01-01', '2027-01-15', '2027-01-29', '2027-02-12']);
+  assert.equal(series.occurrences[1].capacity, 17); assert.equal(series.occurrences[1].closes, '2027-01-10T18:00');
+  assert.equal(series.occurrences[2].closes, '2027-01-27T18:00');
+  assert.equal(series.occurrences[2].startTime, ''); assert.equal(series.occurrences[2].endTime, '');
+  for (const key of ['date', 'capacity', 'closes', 'startTime', 'endTime']) assert.equal(draft[key], series.occurrences[0][key]);
+});
+test('mounted recurrence editor blocks same-day closing, missing review and stale previews', async () => {
+  const fixture = recurrenceEditorFixture();
+  await previewRecurrence(fixture);
+  flatten(fixture.render()).find(node => node.props.accessibilityLabel === 'Occurrence 2 closing date').props.onChange('2027-01-15');
+  confirmAndSaveRecurrence(fixture);
+  assert.equal(fixture.saves.length, 0); assert.match(JSON.stringify(fixture.render()), /before the event date, not the same day/);
+  press(fixture, 'Review registration settings and occurrences');
+  input(fixture, 'Capacity (places)', '20');
+  assert.doesNotMatch(JSON.stringify(fixture.render()), /Confirm all independent occurrences/);
+  press(fixture, 'Choose registration form'); press(fixture, 'Continue current form'); press(fixture, 'Save event and registration form');
+  assert.equal(fixture.saves.length, 0); assert.match(JSON.stringify(fixture.render()), /Preview and confirm/);
+});
+test('mounted recurrence editor calculates seasonal prayer starts and preserves explicit overnight ends', async () => {
+  const fixture = recurrenceEditorFixture({ timeMode: 'prayer', prayerName: 'maghreb', prayerOffsetMinutes: 10, prayerTimeZone: 'Australia/Sydney', startTime: '20:00', endTime: '01:00' });
+  await previewRecurrence(fixture, 'Monthly');
+  confirmAndSaveRecurrence(fixture);
+  assert.equal(fixture.saves.length, 1);
+  const rows = fixture.saves[0][1].occurrences;
+  const prayer = load(path.join(root, 'src/services/prayerTimes.js'));
+  for (const row of rows) {
+    assert.equal(row.startTime, prayer.applyPrayerOffset(prayer.calculatePrayerTimes(row.date, { fullAddress: '1 Private Lane', state: 'NSW', latitude: -33.8, longitude: 151 }).maghreb, 10));
+    assert.equal(row.endTime, '01:00');
+  }
+  assert.ok(new Set(rows.map(row => row.startTime)).size > 1, 'seasonal times are not copied');
+  const broken = recurrenceEditorFixture({ timeMode: 'prayer', prayerName: 'maghreb' }, { '../services/prayerTimes': { calculatePrayerTimes: () => null } });
+  await previewRecurrence(broken);
+  assert.match(JSON.stringify(broken.render()), /Cannot reliably resolve prayer time/);
+  assert.doesNotMatch(JSON.stringify(broken.render()), /Confirm all independent occurrences/);
+});
+function recurrenceScreenFixture(transport, extra = {}) {
+  return componentFixture('src/components/RegistrationScreen.js', {
+    'react-native': { ActivityIndicator: 'ActivityIndicator', Alert: { alert() {} }, AppState: { addEventListener: () => ({ remove() {} }) }, Share: {}, Text: 'Text', View: 'View' },
+    './KeyboardAwareScrollView': 'ScrollView', './MemberPageHeader': 'MemberPageHeader',
+    '../registration/RegistrationEditor': { __esModule: true, default: 'Editor' },
+    '../registration/RegistrationControls': { Action: 'Action', Answer: 'Answer', Input: 'Input', styles: {} },
+    '../registration/firebaseRegistration': {}, '../registration/registrationClient': contract,
+    '../registration/registrationViewModel': view, '../registration/prototypeModel': load(path.join(root, 'src/registration/prototypeModel.js')),
+    '../utils/eventOptions': { EVENT_TYPES: ['Majlis'] }, '../services/eventOptionsAdmin': { getDynamicEventOptions: async () => ({ eventTypes: [] }) },
+    '../utils/cities': { cityLabel: value => value }, '../theme': { colors: {} },
+  }, { enabled: true, user: { uid: 'host' }, city: 'sydney', initialCreate: true, transport, ...extra });
+}
+async function screenEditor(fixture) {
+  fixture.render(); await new Promise(setImmediate);
+  return flatten(fixture.render()).find(node => node.type === 'Editor');
+}
+const seriesRequest = () => ({
+  recurrence: { calendarType: 'gregorian', frequency: 'week', repeatEvery: 2, endMode: 'count', occurrenceCount: 2 },
+  occurrences: [
+    { date: '2027-01-01', closes: '2026-12-30T18:00', capacity: 10, startTime: '', endTime: '' },
+    { date: '2027-01-15', closes: '2027-01-10T18:00', capacity: 17, startTime: '23:00', endTime: '01:00' },
+  ],
+});
+test('mounted create screen uses atomic series transport and individual private poster revisions; reports partial failures', async () => {
+  const calls = [], poster = { uri: 'file://private', mime: 'image/jpeg', base64: 'PRIVATE_BYTES' };
+  const transport = {
+    templates: async () => ({ templates: [] }),
+    createSeries: async request => { calls.push(['series', request]); return { seriesId: 'series', events: [{ eventId: 'one', revision: 1 }, { eventId: 'two', revision: 7 }] }; },
+    save: async () => assert.fail('series must not use single save'),
+    uploadPoster: async (...args) => { calls.push(['poster', ...args]); if (args[0] === 'two') throw Error('Upload denied'); },
+    load: async id => { calls.push(['load', id]); return { ...stagedDetail(), event: { ...stagedDetail().event, id, status: 'pending' } }; },
+  };
+  let returned = false;
+  const fixture = recurrenceScreenFixture(transport, { onMyEvents: () => { returned = true; } });
+  const editor = await screenEditor(fixture);
+  await editor.props.onSave({ ...editor.props.initialDraft, ...seriesRequest().occurrences[0], poster }, seriesRequest());
+  assert.equal(calls.filter(call => call[0] === 'series').length, 1);
+  assert.equal(calls[0][1].draft.poster, undefined);
+  assert.deepEqual(calls.filter(call => call[0] === 'poster').map(call => call.slice(1)), [
+    ['one', 1, 'image/jpeg', 'PRIVATE_BYTES'], ['two', 7, 'image/jpeg', 'PRIVATE_BYTES'],
+  ]);
+  assert.equal(calls.at(-1)[1], 'one', 'authoritative first event is reloaded');
+  const output = JSON.stringify(fixture.render());
+  assert.ok(flatten(fixture.render()).some(node => node.type === 'Text' && node.props.children.flat(Infinity).join('').startsWith('2 independent occurrences')));
+  assert.match(output, /failed for 1 occurrence/);
+  assert.match(output, /Return to My Events/); assert.doesNotMatch(output, /PRIVATE_BYTES|file:\/\/private/);
+  press(fixture, 'Return to My Events'); assert.equal(returned, true);
+  const app = fs.readFileSync(path.join(root, 'App.js'), 'utf8');
+  assert.equal((app.match(/<RegistrationScreen[^\n]+onMyEvents=\{\(\) => \{[^\n]+setActiveTab\('my_events'\)/g) || []).length, 2);
+});
+test('mounted series retry retains exact create key, draft and occurrence snapshot despite local mutation', async () => {
+  const requests = [];
+  const transport = {
+    templates: async () => ({ templates: [] }),
+    createSeries: async request => {
+      requests.push(JSON.stringify(request));
+      if (requests.length === 1) throw Error('Connection lost after commit');
+      return { seriesId: 'series', events: [{ eventId: 'one', revision: 1 }, { eventId: 'two', revision: 1 }] };
+    },
+    load: async () => stagedDetail(),
+  };
+  const fixture = recurrenceScreenFixture(transport), editor = await screenEditor(fixture);
+  const series = seriesRequest(), draft = { ...editor.props.initialDraft, title: 'Original' };
+  await editor.props.onSave(draft, series);
+  assert.match(JSON.stringify(fixture.render()), /Connection lost after commit/);
+  draft.title = 'Changed'; series.occurrences[1].capacity = 999;
+  press(fixture, 'Retry original save request'); await new Promise(setImmediate);
+  assert.equal(requests.length, 2); assert.equal(requests[0], requests[1]);
+  assert.match(requests[1], /"title":"Original"/); assert.doesNotMatch(requests[1], /999/);
+});
+test('definitive series validation rejection unlocks correction rather than retaining an invalid retry snapshot', async () => {
+  const transport = {
+    templates: async () => ({ templates: [] }),
+    createSeries: async () => { throw Object.assign(Error('Review occurrence closing'), { code: 'functions/invalid-argument' }); },
+  };
+  const fixture = recurrenceScreenFixture(transport), editor = await screenEditor(fixture);
+  await editor.props.onSave(editor.props.initialDraft, seriesRequest());
+  const tree = fixture.render();
+  assert.match(JSON.stringify(tree), /Review occurrence closing/);
+  assert.doesNotMatch(JSON.stringify(tree), /Retry original save request/);
+  assert.equal(flatten(tree).find(node => node.type === 'Editor').props.busy, false);
+});
+test('reload failure after series creation and poster failure never recreates events or repeats successful uploads', async () => {
+  let creates = 0, uploads = 0, loads = 0;
+  const transport = {
+    templates: async () => ({ templates: [] }),
+    createSeries: async () => { creates++; return { seriesId: 'series', events: [{ eventId: 'one', revision: 1 }, { eventId: 'two', revision: 1 }] }; },
+    uploadPoster: async id => { uploads++; if (id === 'two') throw Error('Poster denied'); },
+    load: async () => { if (++loads === 1) throw Error('Reload failed'); return stagedDetail(); },
+  };
+  const fixture = recurrenceScreenFixture(transport), editor = await screenEditor(fixture);
+  await editor.props.onSave({ ...editor.props.initialDraft, poster: { mime: 'image/png', base64: 'PRIVATE' } }, seriesRequest());
+  press(fixture, 'Retry original save request'); await new Promise(setImmediate);
+  assert.equal(creates, 1); assert.equal(uploads, 2); assert.equal(loads, 2);
+  assert.match(JSON.stringify(fixture.render()), /failed for 1 occurrence/);
+});
+test('series poster quota stops uploads and identifies failed and unattempted occurrence dates for retry', async () => {
+  const uploads = [];
+  const transport = {
+    templates: async () => ({ templates: [] }),
+    createSeries: async () => ({ seriesId: 'series', events: ['one', 'two', 'three'].map(eventId => ({ eventId, revision: 1 })) }),
+    uploadPoster: async id => {
+      uploads.push(id);
+      if (id === 'two') throw Object.assign(Error('Quota'), { code: 'functions/resource-exhausted' });
+    },
+    load: async () => stagedDetail(),
+  };
+  const fixture = recurrenceScreenFixture(transport), editor = await screenEditor(fixture), series = seriesRequest();
+  series.occurrences.push({ ...series.occurrences[1], date: '2027-01-29' });
+  await editor.props.onSave({ ...editor.props.initialDraft, poster: { mime: 'image/png', base64: 'PRIVATE' } }, series);
+  assert.deepEqual(uploads, ['one', 'two']);
+  const output = JSON.stringify(fixture.render());
+  assert.match(output, /2027-01-15 \(two\): failed/);
+  assert.match(output, /2027-01-29 \(three\): pending, not attempted/);
+  assert.match(output, /after the upload quota resets/);
+  assert.doesNotMatch(output, /PRIVATE/);
+});
+test('mounted recurrence editor supports Hijri count and date endings using trusted calendar dates', async () => {
+  const fixture = recurrenceEditorFixture();
+  fixture.render(); await new Promise(setImmediate);
+  press(fixture, 'Recurring'); press(fixture, 'Hijri'); press(fixture, 'Monthly');
+  input(fixture, 'Occurrences (2–100)', '3');
+  press(fixture, 'Preview occurrences');
+  confirmAndSaveRecurrence(fixture);
+  assert.equal(fixture.saves.length, 1);
+  const series = fixture.saves[0][1];
+  assert.equal(series.recurrence.calendarType, 'hijri'); assert.ok(series.recurrence.startHijri);
+  assert.ok(series.occurrences.every(row => row.enteredAsHijri && row.hijriYear));
+  const dated = recurrenceEditorFixture();
+  await previewRecurrence(dated, 'Daily');
+  press(dated, 'End by date');
+  flatten(dated.render()).find(node => node.props.accessibilityLabel === 'Recurrence end date').props.onChange('2027-01-03');
+  press(dated, 'Preview occurrences'); confirmAndSaveRecurrence(dated);
+  assert.equal(dated.saves[0][1].occurrences.length, 3);
+  const yearly = recurrenceEditorFixture();
+  await previewRecurrence(yearly, 'Yearly');
+  input(yearly, 'Occurrences (2–5)', '6'); press(yearly, 'Preview occurrences');
+  assert.match(JSON.stringify(yearly.render()), /between 2 and 5/);
+});
+test('edit and copy never recreate a series from immutable provenance', async () => {
+  const detail = stagedDetail();
+  Object.assign(detail.event, { seriesId: 'old-series', occurrenceIndex: 2, occurrenceCount: 4, recurrenceRule: seriesRequest().recurrence });
+  const saved = [];
+  const transport = {
+    templates: async () => ({ templates: [] }), load: async () => detail,
+    createSeries: async () => assert.fail('edit/copy must not infer series creation'),
+    save: async request => { saved.push(request); return { eventId: 'one', revision: 20 }; },
+  };
+  const editFixture = recurrenceScreenFixture(transport, { initialCreate: false, initialEventId: 'one', initialAction: 'editor' });
+  const editor = await screenEditor(editFixture);
+  assert.equal(editor.props.initialDraft.recurrenceRule, undefined);
+  await editor.props.onSave(editor.props.initialDraft, seriesRequest());
+  assert.equal(saved[0].eventId, detail.event.id); assert.equal(saved[0].recurrence, undefined);
+  const copyFixture = recurrenceScreenFixture(transport, { initialCreate: false, initialEventId: 'one', initialAction: 'copy' });
+  const copyEditor = await screenEditor(copyFixture);
+  assert.equal(copyEditor.props.eventId, undefined); assert.equal(copyEditor.props.initialDraft.seriesId, undefined);
+  await copyEditor.props.onSave(copyEditor.props.initialDraft);
+  assert.equal(saved[1].eventId, undefined); assert.equal(saved[1].recurrence, undefined); assert.ok(saved[1].createKey);
 });
 test('host screen edits pending draft but self-registration stays on published form and revision', async () => {
   const detail = stagedDetail();

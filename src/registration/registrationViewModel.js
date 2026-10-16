@@ -1,4 +1,4 @@
-import { createDraft } from './prototypeModel';
+import { createDraft, validateDraft } from './prototypeModel';
 
 const EVENT_METADATA = ['hostName', 'organiserType', 'organiserId', 'organiserName', 'organisationType', 'isOnBehalfOf', 'eventSubject', 'audienceType', 'speakerName', 'reciters', 'timeMode', 'prayerName', 'prayerLabel', 'prayerOffsetMinutes', 'prayerTimeZone', 'hijriDate', 'enteredAsHijri', 'hijriDay', 'hijriMonth', 'hijriYear'];
 const eventMetadata = source => Object.fromEntries(EVENT_METADATA.filter(key => source[key] !== undefined).map(key => [key, source[key]]));
@@ -36,6 +36,34 @@ export function registrationDraftFromNormalEvent(draft, event) {
     hostPhone: event.hostPhone || '', hostContactOptional: event.hostContactOptional || '',
     venue: { ...event.address }, address: event.address.fullAddress, suburb: event.address.suburb,
     notes: event.notes || '' };
+}
+
+export function registrationPrayerStart(draft, date, prayer, cityDefinition) {
+  if (draft.timeMode !== 'prayer') return draft.startTime || '';
+  const venue = draft.venue;
+  if (!venue || !['NSW', 'ACT', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'NT'].includes(venue.state)
+      || !draft.prayerName || !Number.isFinite(Number(draft.prayerOffsetMinutes || 0))) throw Error(`Cannot resolve prayer time for ${date}. Select a complete venue and prayer.`);
+  const times = prayer.calculatePrayerTimes(date, venue);
+  if (!times?.timeZone || !times[draft.prayerName] || (cityDefinition?.timeZone && times.timeZone !== cityDefinition.timeZone)
+      || (!cityDefinition?.timeZone && !draft.prayerTimeZone) || (draft.prayerTimeZone && times.timeZone !== draft.prayerTimeZone)) throw Error(`Cannot reliably resolve prayer time in the event city for ${date}. Review the venue and timezone.`);
+  const start = prayer.applyPrayerOffset(times[draft.prayerName], draft.prayerOffsetMinutes || 0);
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(start)) throw Error(`Cannot resolve prayer time for ${date}.`);
+  return start;
+}
+
+export function registrationOccurrenceDefaults(draft, dates, prayer, cityDefinition) {
+  const lead = draft.closes ? (Date.parse(`${draft.date}T12:00:00Z`) - Date.parse(`${draft.closes.slice(0, 10)}T12:00:00Z`)) / 86400000 : null;
+  return dates.map(row => ({ ...row, capacity: Number(draft.capacity), startTime: registrationPrayerStart(draft, row.date, prayer, cityDefinition), endTime: draft.endTime || '',
+    closes: lead === null ? '' : `${new Date(Date.parse(`${row.date}T12:00:00Z`) - lead * 86400000).toISOString().slice(0, 10)}T${draft.closes.slice(11)}` }));
+}
+
+export function validateRegistrationOccurrences(draft, rows, prayer, cityDefinition) {
+  if (!Array.isArray(rows) || rows.length < 2) throw Error('Preview at least two occurrences before saving.');
+  rows.forEach((row, index) => {
+    const errors = validateDraft({ ...draft, ...row });
+    if (errors.length) throw Error(`Occurrence ${index + 1} (${row.date}): ${errors.join(' ')}`);
+    if (draft.timeMode === 'prayer' && row.startTime !== registrationPrayerStart(draft, row.date, prayer, cityDefinition)) throw Error(`Prayer time changed for ${row.date}. Regenerate the occurrence preview.`);
+  });
 }
 
 // Preserve compatible saved answers, never auto-agree to old or changed terms.

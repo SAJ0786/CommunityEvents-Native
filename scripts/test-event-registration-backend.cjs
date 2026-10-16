@@ -48,6 +48,129 @@ function fixture() {
   return { records, files, now: () => new Date(clock), onDownload: callback => { onDownload = callback; }, onDelete: callback => { onDelete = callback; }, onSave: callback => { onSave = callback; }, advance: ms => { clock += ms; }, sweep, handlers, request, draft, create, approve, submit, db };
 }
 
+function seriesRequest(f, changes = {}) {
+  return {
+    city: 'sydney', createKey: 'series-one',
+    draft: { ...f.draft, startTime: '10:00', endTime: '11:00' },
+    recurrence: { calendarType: 'gregorian', frequency: 'week', repeatEvery: 1, endMode: 'count', occurrenceCount: 2 },
+    occurrences: [
+      { date: '2026-12-01', closes: '2026-11-30T18:00', capacity: 3, startTime: '10:00', endTime: '11:00' },
+      { date: '2026-12-08', closes: '2026-12-06T12:00', capacity: 7, startTime: '11:00', endTime: '12:00' },
+    ], ...changes,
+  };
+}
+
+test('series creation is atomic, authenticated, retry-safe and separate from public discovery until individual approval', async () => {
+  const f = fixture(); const data = seriesRequest(f);
+  await assert.rejects(f.handlers.createRegistrationSeries(f.request(null, data)), { code: 'unauthenticated' });
+  const [created, duplicate] = await Promise.all([f.handlers.createRegistrationSeries(f.request('host', data)), f.handlers.createRegistrationSeries(f.request('host', data))]);
+  assert.deepEqual(created, duplicate);
+  assert.equal(created.events.length, 2);
+  assert.equal([...f.records.keys()].filter(key => /^registrationEvents\/[^/]+$/.test(key)).length, 2);
+  assert.equal((await f.handlers.listRegistrationEvents(f.request(null, { scope: 'public', city: 'sydney' }))).events.length, 0);
+  await assert.rejects(f.handlers.createRegistrationSeries(f.request('host', { ...data, occurrences: [data.occurrences[0], { ...data.occurrences[1], capacity: 8 }] })), { code: 'already-exists' });
+  const host = await f.handlers.getRegistrationEvent(f.request('host', { eventId: created.events[1].eventId }));
+  assert.equal(host.event.seriesId, created.seriesId); assert.equal(host.event.occurrenceIndex, 1);
+  assert.equal(host.event.capacity, 7); assert.equal(host.event.closes, '2026-12-06T12:00');
+  assert.equal(host.privateDetails.address, f.draft.address);
+  await assert.rejects(f.handlers.approveRegistrationEvent(f.request('admin', { eventId: created.events[0].eventId, expectedRevision: 1 })), { code: 'permission-denied' });
+  await f.approve(created.events[0]);
+  const page = await f.handlers.listRegistrationEvents(f.request(null, { scope: 'public', city: 'sydney' }));
+  assert.equal(page.events.length, 1); assert.equal(page.events[0].seriesId, created.seriesId);
+  assert.equal(JSON.stringify(page).includes(f.draft.address), false);
+  assert.equal(JSON.stringify(page).includes('privateDetails'), false);
+});
+
+test('series occurrences have independent bookings, staged approval, cancellation and immutable provenance', async () => {
+  const f = fixture(); const data = seriesRequest(f);
+  const result = await f.handlers.createRegistrationSeries(f.request('host', data));
+  const [first, second] = result.events;
+  await f.approve(first); await f.approve(second);
+  await f.submit(first); await f.submit(second);
+  assert.equal(f.records.get(`registrationEvents/${first.eventId}`).reservedPlaces, 2);
+  assert.equal(f.records.get(`registrationEvents/${second.eventId}`).reservedPlaces, 2);
+  await f.handlers.cancelEventRegistration(f.request('member', { eventId: first.eventId, expectedRevision: 1 }));
+  assert.equal(f.records.get(`registrationEvents/${first.eventId}`).reservedPlaces, 0);
+  assert.equal(f.records.get(`registrationEvents/${second.eventId}`).reservedPlaces, 2);
+  const saved = await f.handlers.saveRegistrationEvent(f.request('host', {
+    city: 'sydney', eventId: second.eventId, expectedRevision: 1,
+    draft: { ...data.draft, ...data.occurrences[1], title: 'Changed occurrence only', seriesId: 'FORGED', occurrenceIndex: 55 },
+  }));
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('member', { eventId: second.eventId }))).event.title, data.draft.title);
+  await f.approve(saved);
+  const detail = await f.handlers.getRegistrationEvent(f.request('member', { eventId: second.eventId }));
+  assert.equal(detail.event.title, 'Changed occurrence only'); assert.equal(detail.event.seriesId, result.seriesId);
+  assert.equal(detail.event.occurrenceIndex, 1); assert.equal(detail.event.recurrenceRule.frequency, 'week');
+  await f.handlers.deleteRegistrationEvent(f.request('host', { eventId: first.eventId, expectedRevision: 1, confirmation: 'DELETE EVENT' }));
+  assert.equal(f.records.get(`registrationEvents/${second.eventId}`).status, 'approved');
+});
+
+test('invalid later occurrences, DST schedules, closing dates and creation bounds cannot partially write a series', async () => {
+  const f = fixture(); const data = seriesRequest(f);
+  for (const changes of [
+    { occurrences: [data.occurrences[0], { ...data.occurrences[1], capacity: 0 }] },
+    { occurrences: [data.occurrences[0], { ...data.occurrences[1], date: '2026-12-09' }] },
+    { occurrences: [data.occurrences[0], { ...data.occurrences[1], closes: '2026-12-08T12:00' }] },
+    { occurrences: [data.occurrences[0], { ...data.occurrences[1], endTime: '11:00' }] },
+    { recurrence: { ...data.recurrence, occurrenceCount: 101 } },
+    { recurrence: { ...data.recurrence, overrides: [] } },
+  ]) {
+    await assert.rejects(f.handlers.createRegistrationSeries(f.request('host', { ...data, ...changes })), { code: 'invalid-argument' });
+    assert.equal([...f.records.keys()].filter(key => key.startsWith('registrationEvents/')).length, 0);
+  }
+  f.advance(305 * 86400000);
+  const gap = seriesRequest(f, {
+    draft: { ...data.draft, date: '2027-10-02', closes: '2027-10-01T18:00', startTime: '02:30', endTime: '' },
+    recurrence: { ...data.recurrence, frequency: 'day' },
+    occurrences: [
+      { date: '2027-10-02', closes: '2027-10-01T18:00', capacity: 3, startTime: '02:30', endTime: '' },
+      { date: '2027-10-03', closes: '2027-10-02T18:00', capacity: 3, startTime: '02:30', endTime: '' },
+    ],
+  });
+  await assert.rejects(f.handlers.createRegistrationSeries(f.request('host', gap)), { code: 'invalid-argument' });
+  assert.equal([...f.records.keys()].filter(key => key.startsWith('registrationEvents/')).length, 0);
+});
+
+test('series dates use true Hijri cadence and trusted calendar overrides; stale previews do not write', async () => {
+  const f = fixture();
+  const { registrationOccurrencePreview } = await import('../backend/functions-registration/registrationRecurrence.mjs');
+  const { hijriToGregorian } = await import('../backend/functions-registration/hijri.mjs');
+  const recurrence = { calendarType: 'hijri', frequency: 'month', repeatEvery: 1, endMode: 'count', occurrenceCount: 3, startHijri: { day: 1, month: 7, year: 1448 } };
+  const startDate = hijriToGregorian(1, 7, 1448);
+  const preview = registrationOccurrencePreview(startDate, recurrence);
+  assert.notEqual(preview[1].date.slice(8), preview[0].date.slice(8));
+  const occurrences = preview.map(row => ({ ...row, capacity: 3, closes: '', startTime: '10:00', endTime: '' }));
+  const data = seriesRequest(f, { draft: { ...f.draft, ...occurrences[0] }, recurrence, occurrences });
+  const stale = fixture();
+  stale.records.set('settings/hijriCalendar', { overrides: [{ hYear: 1448, hMonth: 7, gDate: new Date(Date.parse(startDate + 'T12:00:00Z') + 86400000).toISOString().slice(0, 10) }] });
+  await assert.rejects(stale.handlers.createRegistrationSeries(stale.request('host', data)), { code: 'invalid-argument' });
+  assert.equal([...stale.records.keys()].filter(key => key.startsWith('registrationEvents/')).length, 0);
+  const result = await f.handlers.createRegistrationSeries(f.request('host', data));
+  const detail = await f.handlers.getRegistrationEvent(f.request('host', { eventId: result.events[1].eventId }));
+  assert.equal(detail.event.hijriMonth, 8); assert.equal(detail.event.enteredAsHijri, true);
+  assert.equal(detail.event.recurrenceRule.calendarType, 'hijri');
+  // A valid retry is resolved by its receipt, even if the authoritative calendar later changes.
+  f.records.set('settings/hijriCalendar', { overrides: [{ hYear: 1448, hMonth: 7, gDate: '2026-12-20' }] });
+  assert.deepEqual(await f.handlers.createRegistrationSeries(f.request('host', data)), result);
+});
+
+test('the exact 100 occurrence bound commits all documents but oversized repeated forms fail before writes', async () => {
+  const { registrationOccurrenceDates } = await import('../backend/functions-registration/registrationRecurrence.mjs');
+  const f = fixture();
+  const recurrence = { calendarType: 'gregorian', frequency: 'day', repeatEvery: 1, endMode: 'count', occurrenceCount: 100 };
+  const occurrences = registrationOccurrenceDates('2026-12-01', recurrence).map(date => ({ date, capacity: 3, closes: '', startTime: '', endTime: '' }));
+  const data = seriesRequest(f, { draft: { ...f.draft, closes: '', startTime: '', endTime: '' }, recurrence, occurrences });
+  const result = await f.handlers.createRegistrationSeries(f.request('host', data));
+  assert.equal(result.events.length, 100);
+  assert.equal([...f.records.keys()].filter(key => key.startsWith('registrationEvents/')).length, 100);
+  assert.equal([...f.records.keys()].filter(key => key.startsWith('registrationForms/')).length, 100);
+  assert.equal([...f.records.keys()].filter(key => key.startsWith('registrationEventPrivate/')).length, 100);
+  const large = fixture();
+  const fields = Array.from({ length: 30 }, (_, index) => ({ id: `field-${index}`, type: 'text', label: 'Q'.repeat(200), description: 'D'.repeat(500), terms: 'T'.repeat(1000), required: false, options: Array.from({ length: 20 }, (_, option) => `${option}`.padEnd(100, 'X')) }));
+  await assert.rejects(large.handlers.createRegistrationSeries(large.request('host', { ...data, draft: { ...data.draft, fields, notes: 'N'.repeat(5000) } })), { code: 'resource-exhausted' });
+  assert.equal([...large.records.keys()].filter(key => key.startsWith('registrationEvents/') || key.startsWith('registrationSeries/')).length, 0);
+});
+
 test('poster quota is atomic, private uploads have recovery intents and stale managers cannot spend quota', async () => {
   const f = fixture(); const event = await f.create();
   const data = { eventId: event.eventId, mime: 'image/jpeg', base64: Buffer.from([255,216,255,0]).toString('base64') };

@@ -14,7 +14,7 @@ import { cityLabel } from '../utils/cities';
 import { colors } from '../theme';
 
 const newReference = () => `r-${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
-export default function RegistrationScreen({ enabled = false, user, profile, city, initialCreate = false, initialEventId = null, initialAction = 'entry', onBack, onRequireSignIn, transport }) {
+export default function RegistrationScreen({ enabled = false, user, profile, city, initialCreate = false, initialEventId = null, initialAction = 'entry', onBack, onMyEvents, onRequireSignIn, transport }) {
   const api = useMemo(() => transport || firebaseRegistration({ enabled }), [enabled, transport]);
   const [stage, setStage] = useState('loading');
   const [detail, setDetail] = useState(null); const [draft, setDraft] = useState(null);
@@ -25,6 +25,8 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
   const [notice, setNotice] = useState(''); const [busy, setBusy] = useState(false); const [obscured, setObscured] = useState(false);
   const busyRef = useRef(false); const epoch = useRef(0); const currentId = useRef(null);
   const createKey = useRef(newReference()); const submission = useRef(null);
+  const pendingSave = useRef(null);
+  const [seriesSummary, setSeriesSummary] = useState(null);
   const stageRef = useRef(stage); stageRef.current = stage;
   const member = Boolean(user?.uid && !user.isAnonymous);
 
@@ -92,18 +94,59 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     return () => listener.remove();
   }, [api, enabled, city]);
 
-  const save = nextDraft => run(async valid => {
-    const result = await api.save({ ...(detail ? { eventId: detail.event.id, expectedRevision: detail.event.revision } : { createKey: createKey.current }), city: detail?.event.city || city, draft: nextDraft });
-    if (!valid()) return;
-    currentId.current = result.eventId;
-    let posterError = '';
-    if (nextDraft.poster) {
-      try { await api.uploadPoster(result.eventId, result.revision, nextDraft.poster.mime, nextDraft.poster.base64); if (valid()) setPendingPoster(null); }
-      catch (error) { posterError = `Event saved, but poster upload failed: ${error.message}. Open the event card to retry.`; if (valid()) setPendingPoster(nextDraft.poster); }
+  const save = (nextDraft, series) => run(async valid => {
+    // Freeze the exact request across transport failures. A lost response must
+    // never turn a retry into a different series under the same create key.
+    if (!pendingSave.current) {
+      const { poster, ...eventDraft } = nextDraft;
+      pendingSave.current = { request: JSON.parse(JSON.stringify({
+        ...(detail ? { eventId: detail.event.id, expectedRevision: detail.event.revision } : { createKey: createKey.current }),
+        city: detail?.event.city || city, draft: eventDraft,
+        ...(!detail && series ? { recurrence: series.recurrence, occurrences: series.occurrences } : {}),
+      })), poster: poster ? { ...poster } : null, isSeries: !detail && Boolean(series), result: null, postersDone: false, posterError: '' };
     }
-    const fresh = await api.load(result.eventId);
+    const pending = pendingSave.current;
+    if (!pending.result) {
+      try { pending.result = pending.isSeries ? await api.createSeries(pending.request) : await api.save(pending.request); }
+      catch (error) {
+        if (['invalid-argument', 'permission-denied', 'unauthenticated', 'failed-precondition'].some(code => String(error?.code || '').endsWith(code))) {
+          // A definitive rejection made no write; allow correction with a new key.
+          pendingSave.current = null; createKey.current = newReference();
+        }
+        throw error;
+      }
+    }
+    const result = pending.result;
     if (!valid()) return;
-    setDetail(fresh); setStage('host-confirmation'); setDraft(null); setNotice(posterError || (fresh.event.hasPendingChanges ? 'Changes submitted for super administrator review. The published event and form remain live and unchanged.' : 'Saved for super administrator review. The event is not public until approved.'));
+    const events = pending.isSeries ? result.events : [result];
+    if (!events?.length || events.some(event => !event.eventId || !Number.isInteger(event.revision))) throw Error('The save response was incomplete. Retry the same saved request.');
+    currentId.current = events[0].eventId;
+    if (pending.poster && !pending.postersDone) {
+      const failures = [];
+      let quotaReached = false;
+      for (const [index, event] of events.entries()) {
+        const label = `${pending.request.occurrences?.[index]?.date || pending.request.draft.date} (${event.eventId})`;
+        if (quotaReached) { failures.push(`${label}: pending, not attempted (poster upload quota reached)`); continue; }
+        try { await api.uploadPoster(event.eventId, event.revision, pending.poster.mime, pending.poster.base64); }
+        catch (error) {
+          quotaReached = String(error?.code || '').includes('resource-exhausted');
+          failures.push(`${label}: failed${quotaReached ? ' (poster upload quota reached)' : ''}`);
+        }
+        if (!valid()) return;
+      }
+      pending.postersDone = true;
+      if (failures.length) {
+        pending.posterError = pending.isSeries
+          ? `${events.length} events were saved. Private poster upload failed for ${failures.length} occurrence(s), including any unattempted pending uploads: ${failures.join('; ')}. Open those individual events in My Events and select the poster again${quotaReached ? ' after the upload quota resets' : ''}. No events were recreated.`
+          : 'Event saved, but poster upload failed. Open the event card to retry.';
+        if (!pending.isSeries) setPendingPoster(pending.poster);
+      } else setPendingPoster(null);
+    }
+    const fresh = await api.load(events[0].eventId);
+    if (!valid()) return;
+    setSeriesSummary(pending.isSeries ? { count: events.length, seriesId: result.seriesId } : null);
+    setDetail(fresh); setStage('host-confirmation'); setDraft(null); setNotice(pending.posterError || (fresh.event.hasPendingChanges ? 'Changes submitted for super administrator review. The published event and form remain live and unchanged.' : 'Saved for super administrator review. The event is not public until approved.'));
+    pendingSave.current = null;
   });
   const startEntry = () => {
     if (!requireMember()) return;
@@ -149,9 +192,13 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     <View style={styles.row}><Action disabled={busy} onPress={onBack}>Back to events</Action></View>
     {busy && <ActivityIndicator color={colors.tealDark} />}
     {notice ? <Text accessibilityRole="alert" style={styles.error}>{notice}</Text> : null}
+    {stage === 'editor' && pendingSave.current && !busy && <View style={styles.panel}>
+      <Text style={styles.text}>The original save request is retained unchanged. Retry it before making further changes; leaving now may hide a successfully created event until My Events reloads.</Text>
+      <Action primary onPress={() => save()}>Retry original save request</Action>
+    </View>}
     <View pointerEvents={busy ? 'none' : 'auto'}>
     {stage === 'editor' && draft && <RegistrationEditor initialDraft={draft} eventId={detail?.event.id} city={detail?.event.city || city} defaultHostName={profile?.fullName || user?.displayName || ''} defaultHostPhone={profile?.phone || user?.phoneNumber || ''}
-      initialStep={initialAction === 'form' ? 'form' : 'event'} eventTypes={types} savedTemplates={templates} hasMoreTemplates={Boolean(templateCursor)} onMoreTemplates={() => run(valid => loadTemplates(valid, templateCursor))} busy={busy} onSave={save} onCancel={onBack} hasPoster={(detail?.pendingChanges || detail)?.privateDetails?.hasPoster} onRemovePoster={() => posterChange(true)} onSaveTemplate={template => run(async valid => {
+      initialStep={initialAction === 'form' ? 'form' : 'event'} eventTypes={types} savedTemplates={templates} hasMoreTemplates={Boolean(templateCursor)} onMoreTemplates={() => run(valid => loadTemplates(valid, templateCursor))} busy={busy || Boolean(pendingSave.current)} onSave={save} onCancel={onBack} hasPoster={(detail?.pendingChanges || detail)?.privateDetails?.hasPoster} onRemovePoster={() => posterChange(true)} onSaveTemplate={template => run(async valid => {
       await api.saveTemplate({ ...template, templateId: newReference() }); await loadTemplates(valid); if (valid()) setNotice('Template saved to your account.');
     })} />}
     {detail && stage === 'entry' && <View style={styles.panel}>
@@ -165,8 +212,10 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     {detail && ['confirmation', 'host-confirmation'].includes(stage) && <View style={styles.panel}>
       <Text style={styles.title}>{stage === 'confirmation' ? 'Registration confirmed' : 'Event and form saved'}</Text>
       <Text style={styles.text}>{detail.event.title}</Text>
+      {stage === 'host-confirmation' && (seriesSummary || detail.event.seriesId) && <Text style={styles.title}>{seriesSummary?.count || detail.event.occurrenceCount} independent occurrences — separate bookings, capacities, closing dates and approvals. Editing here changes only this occurrence.</Text>}
       <Text style={styles.muted}>{stage === 'confirmation' ? `${detail.ownRegistration?.places || 0} places reserved.` : detail.event.hasPendingChanges ? 'Changes await super administrator approval. The published event and form remain unchanged.' : detail.event.status === 'pending' ? 'Awaiting super administrator approval. Your event appears in My Events until approved.' : 'Changes saved.'}</Text>
       <Action primary onPress={onBack}>Back to events</Action><Action onPress={() => stage === 'confirmation' ? startEntry() : edit()}>{stage === 'confirmation' ? 'Edit registration' : 'Edit event or form'}</Action>
+      {stage === 'host-confirmation' && seriesSummary && <Action primary onPress={onMyEvents || onBack}>Return to My Events</Action>}
       {pendingPoster && <Action onPress={() => posterChange(false)}>Retry selected poster upload</Action>}
     </View>}
     {detail && stage === 'responses' && <View style={styles.group}>

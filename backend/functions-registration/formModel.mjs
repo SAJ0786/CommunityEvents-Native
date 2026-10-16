@@ -56,6 +56,9 @@ export function publicNotesError(draft) {
 // Allowlisted public projection. Never include private venue, coordinates or poster.
 export function publicEvent(draft) {
   const metadata = {};
+  for (const key of ['seriesId', 'occurrenceIndex', 'occurrenceCount', 'recurrenceRule']) {
+    if (draft[key] !== undefined) metadata[key] = draft[key];
+  }
   for (const key of ['hostName', 'organiserType', 'organiserId', 'organiserName', 'organisationType', 'isOnBehalfOf', 'eventSubject', 'audienceType', 'speakerName', 'reciters', 'timeMode', 'prayerName', 'prayerLabel', 'prayerOffsetMinutes', 'prayerTimeZone', 'hijriDate', 'enteredAsHijri', 'hijriDay', 'hijriMonth', 'hijriYear']) {
     if (draft[key] !== undefined) metadata[key] = draft[key];
   }
