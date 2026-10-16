@@ -155,6 +155,13 @@ export default function EventDetailsModal({
   onRemoveLiveStale,
   canManageStream = false,
   onManageStream,
+  registrationDetail,
+  registrationNotice,
+  onRegister,
+  onEditRegistrationForm,
+  onRegistrationResponses,
+  onApproveRegistration,
+  onCancelRegistration,
 }) {
   const { translateY, requestClose: animateClose, panHandlers } = useMenuDrawerMotion({ visible, onClose });
   const [posterUri, setPosterUri] = useState('');
@@ -186,9 +193,9 @@ export default function EventDetailsModal({
       return () => { alive = false; };
     }
 
-    setPosterUri(getImmediatePosterSource(event));
+    setPosterUri(event.registrationOnly ? event.imageUrl || '' : getImmediatePosterSource(event));
 
-    resolvePosterSource(event)
+    if (!event.registrationOnly) resolvePosterSource(event)
       .then(value => {
         if (alive && value) setPosterUri(value);
       })
@@ -227,8 +234,8 @@ export default function EventDetailsModal({
   const publicLocation = typeof address === 'string'
     ? getEventSuburb(event)
     : [address.suburb || getEventSuburb(event), address.state].filter(Boolean).join(', ');
-  const location = isGuest ? publicLocation : fullAddress || publicLocation;
-  const shareMessage = buildEventShareMessage(event, { isGuest, user, profile });
+  const location = isGuest || (event.registrationOnly && !event.registrationPrivate) ? publicLocation : fullAddress || publicLocation;
+  const shareMessage = buildEventShareMessage(event.registrationOnly ? { ...event, address: { suburb: event.suburb }, imageUrl: '' } : event, { isGuest, user, profile });
   const hasPoster = Boolean(posterUri);
   const hasUploadedPoster = Boolean(event.imageUrl || event.posterUrl || event.poster || event.image || event.flyerUrl || event.flyer || event.imagePath || event.posterPath);
   const canSharePoster = hasUploadedPoster && hasPoster;
@@ -419,11 +426,16 @@ export default function EventDetailsModal({
                 </View>
 
                 <View style={styles.actionGrid}>
+                  {registrationDetail && <ActionButton icon="clipboard-edit-outline" label={registrationDetail.ownRegistration?.status === 'registered' ? 'Edit registrations' : 'Register for event'} onPress={onRegister} disabled={!registrationDetail.canRegister && !registrationDetail.canEditRegistration} />}
+                  {onEditRegistrationForm && <ActionButton icon="form-select" label="Edit Registration form" onPress={onEditRegistrationForm} />}
+                  {onRegistrationResponses && <ActionButton icon="clipboard-list-outline" label="Registration responses" onPress={onRegistrationResponses} />}
+                  {onApproveRegistration && <ActionButton icon="check-decagram-outline" label="Approve Event" onPress={onApproveRegistration} />}
+                  {onCancelRegistration && <ActionButton icon="clipboard-remove-outline" label="Delete my registration" variant="danger" onPress={onCancelRegistration} />}
                   {onToggleVisibility ? <ActionButton icon={event.hidden ? 'eye-outline' : 'eye-off-outline'} label={event.hidden ? 'Make Visible' : 'Hide Event'} onPress={() => onToggleVisibility(event)} /> : null}
                   {onTransfer ? <ActionButton icon="account-switch-outline" label="Transfer" variant="primary" onPress={() => onTransfer(event)} /> : null}
                   {onRemoveLiveStale ? <ActionButton icon="broadcast-off" label="Remove Live Stale" variant="danger" onPress={() => onRemoveLiveStale(event)} /> : null}
                   <ActionButton icon="share-variant-outline" label="Share" variant="share" onPress={() => setShareOpen(true)} />
-                  <ActionButton icon="map-marker-path" label="Directions" variant="primary" onPress={openDirections} disabled={isGuest || !fullAddress} />
+                  <ActionButton icon="map-marker-path" label="Directions" variant="primary" onPress={openDirections} disabled={isGuest || !fullAddress || (event.registrationOnly && !event.registrationPrivate)} />
                   <ActionButton icon="email-outline" label="Contact Host" disabled={!canConnectHost} onPress={() => { setHostMessageStatus(''); setHostMessageOpen(true); }} />
                   {!isGuest && event.isLive && hasPlayableLiveUrl && event.liveAppVisibility !== 'private' && !(canManageStream && onManageStream) ? <ActionButton iconNode={<FontAwesome name="youtube-play" size={22} color="#dc2626" />} label="Watch on YouTube" variant="danger" onPress={openLiveVideo} /> : null}
                   {canManageStream && onManageStream ? (
@@ -446,6 +458,8 @@ export default function EventDetailsModal({
                 </View>
 
                 <Text style={styles.date}>{formatEventDate(event.eventDate)}</Text>
+                {registrationNotice ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{registrationNotice}</Text> : null}
+                {registrationDetail?.registrationNeedsReview ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>The registration form changed. Review your answers and agree to the current terms again.</Text> : null}
 
                 {canSharePoster ? (
                   <Pressable onPress={() => setPosterOpen(true)} style={styles.posterFrame}>

@@ -148,6 +148,7 @@ export function prepareHomeEvents(events, city) {
 }
 
 export function getEventTitle(event = {}) {
+  if (event.registrationOnly && event.title) return event.title;
   const type = event.eventTypeDisplay || event.customEventType || event.eventType || event.type || 'Event';
   const host = event.hostName || event.organiserName || event.organizationName || '';
   const subject = event.eventSubject || event.subject || event.eventName || '';

@@ -19,7 +19,7 @@ function manages(actor, event) {
     || (actor.profile.role === 'admin' && Boolean(actor.profile.adminCity || actor.profile.defaultCity) && (actor.profile.adminCity || actor.profile.defaultCity) === event.city);
 }
 function approves(actor, event) {
-  return actor.profile.role === 'superAdmin' || (actor.profile.role === 'admin' && Boolean(actor.profile.adminCity || actor.profile.defaultCity) && (actor.profile.adminCity || actor.profile.defaultCity) === event.city);
+  return actor.profile.role === 'superAdmin';
 }
 function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Date(), enabled = () => false }) {
   const fail = (code, message) => { throw new HttpsError(code, message); };
@@ -95,6 +95,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         return { eventId: reference.id, revision: current.revision, status: current.status };
       }
       if (current && (!manages(caller, current) || !manages(caller, { ...current, city }))) fail('permission-denied', 'You cannot edit this event.');
+      if (current?.status === 'cancelled' || current?.deletedAt) fail('failed-precondition', 'A cancelled or deleted event cannot be edited.');
       if (current && request.data.expectedRevision !== current.revision) fail('aborted', 'The event has changed. Reload before saving.');
       const timeZone = await zone(city, tx);
       const previousForm = current ? (await tx.get(formRef(reference.id))).data() : null;
@@ -129,8 +130,8 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
   async function approveRegistrationEvent(request) {
     return db.runTransaction(async tx => {
       const caller = await actor(request, tx); const event = await readEvent(request.data?.eventId, tx);
-      if (!approves(caller, event)) fail('permission-denied', 'An authorised city admin or super admin must approve this event.');
-      if (event.status === 'cancelled') fail('failed-precondition', 'A cancelled event cannot be reopened. Create a new event instead.');
+      if (!approves(caller, event)) fail('permission-denied', 'Only a super admin can approve an event.');
+      if (event.status !== 'pending') fail('failed-precondition', 'Only a pending event can be approved.');
       if (request.data.expectedRevision !== event.revision) fail('aborted', 'Review the latest event before approval.');
       if (localMinute(now(), event.timeZone) >= (event.closes || `${event.date}T00:00`)) fail('failed-precondition', 'The registration closing time has passed.');
       tx.update(eventRef(event.id), { status: 'approved', approvedBy: caller.uid, approvedAt: now().toISOString() });
@@ -210,6 +211,21 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       return { eventId: event.id, revision, status: 'cancelled' };
     });
   }
+  async function deleteRegistrationEvent(request) {
+    if (request.data?.confirmation !== 'DELETE EVENT') fail('invalid-argument', 'Confirm that you want to delete this event.');
+    return db.runTransaction(async tx => {
+      const caller = await actor(request, tx); const event = await readEvent(request.data?.eventId, tx);
+      if (!manages(caller, event)) fail('permission-denied', 'You cannot delete this event.');
+      if (event.deletedAt) return { eventId: event.id, revision: event.revision, status: 'cancelled', deleted: true };
+      if (request.data.expectedRevision !== event.revision) fail('aborted', 'Reload the event before deleting it.');
+      const revision = event.revision + 1; const timestamp = now().toISOString();
+      tx.update(eventRef(event.id), { status: 'cancelled', deletedAt: timestamp, deletedBy: caller.uid, revision, reservedPlaces: 0 });
+      if (event.registrationCount > 0) tx.set(db.collection('registrationChanges').doc(`${event.id}-${revision}`), {
+        eventId: event.id, revision, formVersion: event.formVersion, changes: ['cancelled'], createdAt: timestamp, state: 'pending', cursor: null,
+      });
+      return { eventId: event.id, revision, status: 'cancelled', deleted: true };
+    });
+  }
   async function getRegistrationEvent(request) {
     gate();
     return db.runTransaction(async tx => {
@@ -222,8 +238,8 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (event.status !== 'approved' && !manager && !registered) fail('not-found', 'Event not available.');
       const form = await tx.get(formRef(event.id));
       const details = await tx.get(privateRef(event.id));
-      const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), id: event.id, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
-      result.canApprove = Boolean(caller && approves(caller, event));
+      const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), id: event.id, ownerUid: event.ownerUid, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
+      result.canApprove = Boolean(caller && event.status === 'pending' && approves(caller, event));
       result.canRegister = event.status === 'approved' && localMinute(now(), event.timeZone) < (event.closes || `${event.date}T00:00`);
       result.canEditRegistration = Boolean(registered && event.status === 'approved' && localMinute(now(), event.timeZone).slice(0, 10) < event.date);
       result.registrationNeedsReview = Boolean(registered && own.formVersion !== event.formVersion);
@@ -237,8 +253,23 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
   async function listRegistrationEvents(request) {
     gate();
     const scope = request.data?.scope || 'public';
-    if (!['public', 'mine', 'review', 'attending'].includes(scope)) fail('invalid-argument', 'Choose a valid event list.');
-    const caller = scope === 'public' ? null : await actor(request);
+    if (!['public', 'mine', 'review', 'attending', 'management'].includes(scope)) fail('invalid-argument', 'Choose a valid event list.');
+    const hasSignedInCaller = Boolean(request.auth && request.auth.token?.firebase?.sign_in_provider !== 'anonymous');
+    const caller = scope === 'public' && !hasSignedInCaller ? null : await actor(request);
+    const listRow = detail => {
+      const { registrationCount, ...event } = detail.event;
+      const row = {
+        ...event,
+        registrationOnly: true,
+        canManage: detail.canManage,
+        canApprove: detail.canApprove,
+        isRegistered: detail.ownRegistration?.status === 'registered',
+        canRegister: detail.canRegister,
+        canEditRegistration: detail.canEditRegistration,
+      };
+      if (detail.privateDetails) row.hasPoster = detail.privateDetails.hasPoster;
+      return row;
+    };
     if (scope === 'attending') {
       let query = db.collection('registrationMemberEvents').doc(caller.uid).collection('events').orderBy('__name__').limit(25);
       if (request.data?.cursor) query = query.startAfter(id(request.data.cursor));
@@ -247,31 +278,37 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         try {
           const detail = await getRegistrationEvent({ ...request, data: { eventId: entry.id } });
           if (detail.ownRegistration?.status !== 'registered') continue;
-          const { registrationCount, ...publicData } = detail.event;
-          events.push(publicData);
+          events.push(listRow(detail));
         } catch (error) { if (error.code !== 'not-found') throw error; }
       }
       return { events, nextCursor: page.docs.length === 25 ? page.docs.at(-1).id : null };
     }
-    const city = scope === 'mine' ? null : id(request.data?.city);
-    if (scope === 'review' && !approves(caller, { city })) fail('permission-denied', 'You cannot review this city.');
+    const city = scope === 'mine' ? null : (scope === 'review' && request.data?.city == null ? null : id(request.data?.city));
+    if (scope === 'review' && !approves(caller, { city })) fail('permission-denied', 'You cannot review events.');
+    if (scope === 'management' && caller.profile.role !== 'superAdmin'
+      && !(caller.profile.role === 'admin' && (caller.profile.adminCity || caller.profile.defaultCity) === city)) {
+      fail('permission-denied', 'You cannot manage events in this city.');
+    }
     // One equality + document ID order uses a bounded page; filtering MUST NOT
     // move the cursor to the last visible row or pending rows could cause loops.
-    let query = db.collection('registrationEvents').where(scope === 'mine' ? 'ownerUid' : 'city', '==', scope === 'mine' ? caller.uid : city).orderBy('__name__').limit(25);
+    let query = db.collection('registrationEvents');
+    if (scope === 'mine') query = query.where('ownerUid', '==', caller.uid);
+    else if (scope !== 'review' || city) query = query.where('city', '==', city);
+    query = query.orderBy('__name__').limit(25);
     if (request.data?.cursor) query = query.startAfter(id(request.data.cursor));
     const page = await query.get(); const events = [];
     for (const doc of page.docs) {
       const event = doc.data();
+      if (event.deletedAt) continue;
       if (scope === 'public' && (event.status !== 'approved' || event.date < localMinute(now(), event.timeZone).slice(0, 10))) continue;
       if (scope === 'review' && event.status !== 'pending') continue;
       // Re-read through the transactional detail policy to handle approval/access
       // changes during pagination. Only the public allowlist leaves this endpoint.
       try {
         const result = await getRegistrationEvent({ ...request, data: { eventId: doc.id } });
-        if (scope === 'public' && result.event.status !== 'approved') continue;
+        if (scope === 'public' && (result.event.status !== 'approved' || result.event.date < localMinute(now(), result.event.timeZone).slice(0, 10))) continue;
         if (scope === 'review' && (!result.canApprove || result.event.status !== 'pending')) continue;
-        const { registrationCount, ...publicCard } = result.event;
-        events.push(publicCard);
+        events.push(listRow(result));
       } catch (error) { if (error.code !== 'not-found') throw error; }
     }
     return { events, nextCursor: page.docs.length === 25 ? page.docs.at(-1).id : null };
@@ -402,6 +439,6 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const snapshot = await query.get();
     return { templates: snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })), nextCursor: snapshot.docs.length === 50 ? snapshot.docs.at(-1).id : null };
   }
-  return { saveRegistrationEvent, approveRegistrationEvent, submitEventRegistration, cancelEventRegistration, cancelRegistrationEvent, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
+  return { saveRegistrationEvent, approveRegistrationEvent, submitEventRegistration, cancelEventRegistration, cancelRegistrationEvent, deleteRegistrationEvent, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
 }
 module.exports = { createRegistrationHandlers, localMinute, active, manages, approves };

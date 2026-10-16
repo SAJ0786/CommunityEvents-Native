@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, AppState, Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, radius, shadow, spacing } from '../theme';
 import { formatEventTime } from '../utils/formatters';
 import { getEventPoster, getEventSuburb } from '../services/events';
 import { getImmediatePosterSource, resolvePosterSource } from '../services/images';
+import { firebaseRegistration, REGISTRATION_ENABLED } from '../registration/firebaseRegistration';
 
 const fallbackLogo = require('../../assets/logo.png');
 
@@ -39,17 +40,37 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
   const compact = width / Math.max(fontScale, 1) < 390;
   const [poster, setPoster] = useState(getEventPoster(event) || getImmediatePosterSource(event));
   const [posterOpen, setPosterOpen] = useState(false);
+  const [posterError, setPosterError] = useState('');
+  const [posterRefresh, setPosterRefresh] = useState(0);
+  const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const chip = dateChip(event.eventDate);
   const displayType = event.eventTypeDisplay || event.customEventType || event.eventType || 'Event';
   const host = event.hostName || event.organiserName || event.organizationName || '';
-  const title = [displayType, host].filter(Boolean).join(' - ');
+  const title = event.registrationOnly ? event.title : [displayType, host].filter(Boolean).join(' - ');
   const suburb = getEventSuburb(event);
   const organiser = organiserBadge(event);
   const displayTime = `${event.prayerLabel ? `${event.prayerLabel} ` : ''}${formatEventTime(event.startTime, event.endTime)}`.trim();
-  const hasUploadedPoster = Boolean(event.imageUrl || event.posterUrl || event.poster || event.image || event.flyerUrl || event.flyer || event.imagePath || event.posterPath);
+  const hasUploadedPoster = event.registrationOnly ? event.hasPoster : Boolean(event.imageUrl || event.posterUrl || event.poster || event.image || event.flyerUrl || event.flyer || event.imagePath || event.posterPath);
+
+  useEffect(() => {
+    if (!event.registrationOnly) return undefined;
+    const listener = AppState.addEventListener('change', state => {
+      setPoster(''); setPosterOpen(false); setForeground(state === 'active');
+      if (state === 'active') setPosterRefresh(value => value + 1);
+    });
+    return () => listener.remove();
+  }, [event.registrationOnly]);
 
   useEffect(() => {
     let alive = true;
+    setPosterError('');
+    if (event.registrationOnly) {
+      setPoster('');
+      if (event.hasPoster && foreground) firebaseRegistration({ enabled: REGISTRATION_ENABLED }).poster(event.id)
+        .then(result => { if (alive) setPoster(`data:${result.mime};base64,${result.base64}`); })
+        .catch(() => { if (alive) setPosterError('Poster unavailable. Open event to retry.'); });
+      return () => { alive = false; };
+    }
     const immediate = getEventPoster(event) || getImmediatePosterSource(event);
     setPoster(immediate || '');
     resolvePosterSource(event)
@@ -60,7 +81,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
     return () => {
       alive = false;
     };
-  }, [event]);
+  }, [event, foreground, posterRefresh]);
 
   return (
     <>
@@ -97,6 +118,9 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
       </Pressable>
 
       <View style={styles.content}>
+        {event.registrationOnly && event.status === 'pending' && event.canManage ? <Text accessibilityRole="alert" style={{ color: colors.danger, fontSize: 20, fontWeight: '800' }}>UnApproved</Text> : null}
+        {event.registrationOnly && event.status === 'cancelled' ? <Text style={styles.metaText}>Event no longer available</Text> : null}
+        {posterError ? <Text accessibilityRole="alert" style={styles.metaText}>{posterError}</Text> : null}
         <View style={styles.titlePanel}>
           <Text maxFontSizeMultiplier={1.06} style={[styles.title, compact && styles.titleCompact]} numberOfLines={2}>{title}</Text>
         </View>

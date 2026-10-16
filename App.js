@@ -44,7 +44,9 @@ import BulkShareScreen from './src/components/BulkShareScreen';
 import AddEventChoice from './src/components/AddEventChoice';
 import RegistrationPrototypeScreen from './src/components/RegistrationPrototypeScreen';
 import RegistrationScreen from './src/components/RegistrationScreen';
-import { REGISTRATION_ENABLED } from './src/registration/firebaseRegistration';
+import { REGISTRATION_ENABLED, firebaseRegistration } from './src/registration/firebaseRegistration';
+import { registrationEventFeed } from './src/registration/eventFeed';
+import RegistrationEventDetails from './src/components/RegistrationEventDetails';
 import CalendarScreen from './src/components/CalendarScreen';
 import CreateEventForm from './src/components/CreateEventForm';
 import CitySelector from './src/components/CitySelector';
@@ -258,6 +260,12 @@ function MainApp() {
   const [streamEvent, setStreamEvent] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
   const [registrationTarget, setRegistrationTarget] = useState(null);
+  const [registrationOnly, setRegistrationOnly] = useState(false);
+  const [registrationEvents, setRegistrationEvents] = useState([]);
+  const [hostRegistrationEvents, setHostRegistrationEvents] = useState([]);
+  const [attendingRegistrationEvents, setAttendingRegistrationEvents] = useState([]);
+  const [registrationRefresh, setRegistrationRefresh] = useState(0);
+  const [registrationError, setRegistrationError] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [authResolved, setAuthResolved] = useState(false);
   const [guestAccessGranted, setGuestAccessGranted] = useState(false);
@@ -546,14 +554,36 @@ function MainApp() {
     };
   }, [currentUser?.isAnonymous, currentUser?.uid, createSuccess]);
 
+  useEffect(() => {
+    let active = true;
+    if (!REGISTRATION_ENABLED) return undefined;
+    const api = firebaseRegistration({ enabled: true });
+    Promise.all([
+      registrationEventFeed(api, 'public', selectedCity),
+      currentUser?.uid && !currentUser.isAnonymous ? registrationEventFeed(api, 'mine') : Promise.resolve([]),
+      currentUser?.uid && !currentUser.isAnonymous ? registrationEventFeed(api, 'attending') : Promise.resolve([]),
+    ]).then(([publicRows, ownRows, attendingRows]) => {
+      if (active) { setRegistrationEvents(publicRows); setHostRegistrationEvents(ownRows); setAttendingRegistrationEvents(attendingRows); setRegistrationError(''); }
+    }).catch(err => { if (active) setRegistrationError(friendlyError(err, 'Could not load registration events.')); });
+    const timer = setInterval(() => { if (active) setRegistrationRefresh(value => value + 1); }, AUTO_EVENT_REFRESH_MS);
+    return () => { active = false; clearInterval(timer); };
+  }, [currentUser?.uid, currentUser?.isAnonymous, profile?.role, selectedCity, registrationRefresh, cityCatalogueVersion]);
+
+  useEffect(() => {
+    setRegistrationEvents([]); setHostRegistrationEvents([]); setAttendingRegistrationEvents([]);
+    setRegistrationError('');
+    setSelectedEvent(current => current?.registrationOnly ? null : current);
+    setRegistrationTarget(null);
+  }, [currentUser?.uid, currentUser?.isAnonymous, profile?.role, selectedCity]);
+
   const visibleEvents = useMemo(
-    () => prepareHomeEvents(events, selectedCity).filter(event => event.isLive || event.eventDate >= localDateString()),
-    [events, selectedCity, cityCatalogueVersion]
+    () => prepareHomeEvents([...events, ...registrationEvents], selectedCity).filter(event => event.isLive || event.eventDate >= localDateString()),
+    [events, registrationEvents, selectedCity, cityCatalogueVersion]
   );
 
   const liveEventCount = useMemo(() => events.filter(isPublicPlayableLiveEvent).length, [events]);
   const displayedEvents = useMemo(() => {
-    const filtered = filterHomeEvents(visibleEvents, homeQuery, homeFilters);
+    const filtered = filterHomeEvents(registrationOnly ? visibleEvents.filter(event => event.registrationOnly) : visibleEvents, homeQuery, homeFilters);
     const liveFiltered = liveOnly ? filtered.filter(event => event.isLive) : filtered;
     if (!nearbyEventsOnly || !eventUserLocation) return liveFiltered;
     return liveFiltered.slice().sort((left, right) => {
@@ -564,7 +594,7 @@ function MainApp() {
       if (rightDistance == null) return -1;
       return leftDistance - rightDistance;
     });
-  }, [eventUserLocation, homeFilters, homeQuery, liveOnly, nearbyEventsOnly, visibleEvents]);
+  }, [eventUserLocation, homeFilters, homeQuery, liveOnly, nearbyEventsOnly, visibleEvents, registrationOnly]);
 
   const enableNearbyEvents = async () => {
     if (nearbyEventsOnly) {
@@ -605,8 +635,8 @@ function MainApp() {
   );
 
   const savedEvents = useMemo(
-    () => events.filter(event => savedEventIds.includes(event.id)).sort(compareEventsByDateTime),
-    [events, savedEventIds]
+    () => [...events, ...registrationEvents].filter(event => savedEventIds.includes(event.id)).sort(compareEventsByDateTime),
+    [events, registrationEvents, savedEventIds]
   );
 
   const selectedEventOwned = useMemo(() => (
@@ -920,7 +950,7 @@ function MainApp() {
     if (!event?.id) return;
     Alert.alert(
       'Delete event',
-      'This will permanently remove the submission from your My Events list. Continue?',
+      event.registrationOnly ? 'This hides the event and closes registration. Participant history is retained. Continue?' : 'This will permanently remove the submission from your My Events list. Continue?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -930,11 +960,15 @@ function MainApp() {
             setDeleteBusyId(event.id);
             setMyEventsError('');
             try {
-              await deleteEventSubmission(event.id);
+              if (event.registrationOnly) {
+                await firebaseRegistration({ enabled: REGISTRATION_ENABLED }).deleteEvent(event.id, event.revision);
+                setRegistrationRefresh(value => value + 1);
+              } else await deleteEventSubmission(event.id);
               setMyEvents(prev => prev.filter(item => item.id !== event.id));
               setEvents(prev => prev.filter(item => item.id !== event.id));
             } catch (err) {
               setMyEventsError(friendlyError(err, 'Could not delete event.'));
+              if (event.registrationOnly) Alert.alert('Could not delete event', friendlyError(err, 'Reload the event and try again.'));
             } finally {
               setDeleteBusyId('');
             }
@@ -945,6 +979,12 @@ function MainApp() {
   }, []);
 
   const handleEditMyEvent = useCallback(event => {
+    if (event.registrationOnly) {
+      setSelectedEvent(null);
+      setRegistrationTarget({ eventId: event.id, action: 'editor', nonce: Date.now() });
+      setActiveTab('registration');
+      return;
+    }
     setEditingEvent(event);
     setCreateMode('single');
     setCreateError('');
@@ -968,6 +1008,11 @@ function MainApp() {
 
 
   const handleCopyMyEvent = useCallback(event => {
+    if (event.registrationOnly) {
+      setRegistrationTarget({ eventId: event.id, action: 'copy', nonce: Date.now() });
+      setActiveTab('registration');
+      return;
+    }
     const draft = {
       hostName: event.hostName || '',
       hostPhone: event.hostPhone || '',
@@ -1257,7 +1302,6 @@ function MainApp() {
 
   const renderHeader = () => (
     <View style={[styles.contentHeader, compactEventsLayout && styles.contentHeaderCompact]}>
-      {REGISTRATION_ENABLED && <Pressable accessibilityRole="button" onPress={() => setActiveTab('registration')} style={{ padding: spacing.md, backgroundColor: colors.tealSoft, borderRadius: radius.md }}><Text style={{ color: colors.tealDark, fontWeight: '700' }}>Browse registration only events</Text></Pressable>}
       <View style={[styles.titleRow, compactEventsLayout && styles.titleRowCompact]}>
         <View style={styles.titleCopy}>
           <Text maxFontSizeMultiplier={1.08} style={styles.sectionEyebrow}>DISCOVER WHAT'S ON</Text>
@@ -1287,12 +1331,13 @@ function MainApp() {
       <View style={styles.sectionHeadingRow}><Text style={styles.homeSectionTitle}>Quick access</Text></View>
       <View style={styles.quickGrid}>
         {[
+          ...(REGISTRATION_ENABLED ? [['clipboard-text-outline', registrationOnly ? 'All events' : 'Registration only', colors.tealSoft, colors.tealDark, () => setRegistrationOnly(value => !value)]] : []),
           [homeViewMode === 'map' ? 'format-list-bulleted' : 'map-outline', homeViewMode === 'map' ? 'List' : 'Map', colors.blueSoft, colors.blue, () => setHomeViewMode(current => current === 'map' ? 'list' : 'map')],
           ['broadcast', 'Live', colors.roseSoft, colors.rose, () => requestTabChange('streams')],
           ['moon-waning-crescent', 'Hijri', colors.purpleSoft, colors.purple, () => requestTabChange('hijri-calendar')],
           ['calendar-month-outline', 'Calendar', colors.tealSoft, colors.tealDark, () => requestTabChange('calendar')],
         ].map(([icon, label, backgroundColor, color, onPress]) => (
-          <Pressable key={label} onPress={onPress} style={({ pressed }) => [styles.quickAction, pressed && styles.eventShortcutPressed]}>
+          <Pressable key={label} accessibilityRole="button" accessibilityState={{ selected: icon === 'clipboard-text-outline' && registrationOnly }} onPress={onPress} style={({ pressed }) => [styles.quickAction, pressed && styles.eventShortcutPressed]}>
             <View style={[styles.quickOrb, { backgroundColor }]}><MaterialCommunityIcons color={color} name={icon} size={22} /></View>
             <Text style={styles.quickLabel}>{label}</Text>
           </Pressable>
@@ -1318,6 +1363,7 @@ function MainApp() {
         </View>
       ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      {registrationError ? <Text accessibilityRole="alert" style={styles.error}>{registrationError}</Text> : null}
     </View>
   );
 
@@ -1431,7 +1477,7 @@ function MainApp() {
           onInitialFilterConsumed={() => setDirectoryFilter(null)}
         />
       ) : REGISTRATION_ENABLED && activeTab === 'registration' ? (
-        <RegistrationScreen key={`${currentUser?.uid || 'guest'}-${selectedCity}-${registrationTarget?.nonce || ''}`} enabled initialEventId={registrationTarget?.uid === currentUser?.uid ? registrationTarget.eventId : null} user={currentUser} profile={profile} city={selectedCity} onBack={() => { setRegistrationTarget(null); setActiveTab('home'); }} onRequireSignIn={requestSignIn} />
+        <RegistrationScreen key={`${currentUser?.uid || 'guest'}-${selectedCity}-${registrationTarget?.nonce || ''}`} enabled initialEventId={registrationTarget?.eventId} initialAction={registrationTarget?.action || 'entry'} user={currentUser} profile={profile} city={selectedCity} onBack={() => { setRegistrationTarget(null); setRegistrationRefresh(value => value + 1); setActiveTab('home'); }} onRequireSignIn={requestSignIn} />
       ) : activeTab === 'home' && homeViewMode === 'map' ? (
         <ScrollView contentContainerStyle={styles.mapScrollContent} nestedScrollEnabled>
           <View style={styles.mapHeader}>{renderHeader()}</View>
@@ -1459,9 +1505,9 @@ function MainApp() {
         />
       ) : activeTab === 'my_events' ? (
         <MyEventsScreen
-          events={myEvents}
+          events={[...new Map([...myEvents, ...hostRegistrationEvents, ...attendingRegistrationEvents].map(event => [event.id, event])).values()].sort(compareEventsByDateTime)}
           loading={myEventsLoading}
-          error={myEventsError}
+          error={myEventsError || registrationError}
           onPressEvent={setSelectedEvent}
           deletingId={deleteBusyId}
           onDelete={handleDeleteMyEvent}
@@ -1475,6 +1521,7 @@ function MainApp() {
           visibilityBusyId={visibilityBusyId}
           seriesCounts={myEventSeriesCounts}
           onEditSeries={handleEditSeries}
+          onOpenRegistration={(event, action) => { setRegistrationTarget({ eventId: event.id, action, nonce: Date.now() }); setActiveTab('registration'); }}
           onDeleteSeries={profile?.role === 'admin' || profile?.role === 'superAdmin' ? handleDeleteSeries : undefined}
           deletingSeriesId={deleteSeriesBusyId}
         />
@@ -1504,6 +1551,7 @@ function MainApp() {
           onEditEvent={handleEditMyEvent}
           onCopyEvent={handleCopyMyEvent}
           onEditSeries={handleEditSeries}
+          onOpenRegistration={(event, action) => { setRegistrationTarget({ eventId: event.id, action, nonce: Date.now() }); setActiveTab('registration'); }}
         />
       ) : activeTab === 'streams' ? (
         <StreamedVideosScreen
@@ -1539,7 +1587,7 @@ function MainApp() {
           onChoose={setCreateMode}
         />
       ) : REGISTRATION_ENABLED && activeTab === 'create' && createMode === 'registration' ? (
-        <RegistrationScreen key={`${currentUser?.uid || 'guest'}-${selectedCity}`} enabled initialCreate user={currentUser} profile={profile} city={selectedCity} onBack={() => setCreateMode('')} onRequireSignIn={requestSignIn} />
+        <RegistrationScreen key={`${currentUser?.uid || 'guest'}-${selectedCity}`} enabled initialCreate user={currentUser} profile={profile} city={selectedCity} onBack={() => { setCreateMode(''); setRegistrationRefresh(value => value + 1); }} onRequireSignIn={requestSignIn} />
       ) : __DEV__ && activeTab === 'create' && createMode === 'registration-preview' ? (
         <RegistrationPrototypeScreen onBack={() => setCreateMode('')} />
       ) : activeTab === 'create' && createMode === 'recurring' && (!editingEvent || editingEvent.__editSeries) ? (
@@ -1615,9 +1663,21 @@ function MainApp() {
           onPreferredModuleChange={handlePreferredModuleChange}
         />
       )}
+      <RegistrationEventDetails
+        key={`${currentUser?.uid || 'guest'}-${selectedEvent?.id || ''}`}
+        event={appModule === 'events' && selectedEvent?.registrationOnly ? selectedEvent : null}
+        user={currentUser}
+        profile={profile}
+        isGuest={isGuest}
+        onClose={() => { setSelectedEvent(null); setRegistrationRefresh(value => value + 1); }}
+        onRequireSignIn={requestSignIn}
+        onEdit={handleEditMyEvent}
+        onDelete={event => { setSelectedEvent(null); handleDeleteMyEvent(event); }}
+        onOperation={(event, action) => { setSelectedEvent(null); setRegistrationTarget({ eventId: event.id, action, nonce: Date.now() }); setActiveTab('registration'); }}
+      />
       <EventDetailsModal
         event={selectedEvent}
-        visible={appModule === 'events' && Boolean(selectedEvent)}
+        visible={appModule === 'events' && Boolean(selectedEvent) && !selectedEvent.registrationOnly}
         onClose={() => setSelectedEvent(null)}
         isGuest={isGuest}
         user={currentUser}

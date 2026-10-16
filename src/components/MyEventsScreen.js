@@ -29,6 +29,7 @@ export default function MyEventsScreen({
   onEditSeries,
   onDeleteSeries,
   deletingSeriesId = '',
+  onOpenRegistration,
 }) {
   const renderEvent = ({ item: event }) => (
     <View style={styles.itemWrap}>
@@ -40,7 +41,7 @@ export default function MyEventsScreen({
           </Text>
         </View>
       ) : null}
-      <View style={styles.visibilityRow}>
+      {!event.registrationOnly && <View style={styles.visibilityRow}>
         <Text style={[styles.visibilityText, event.hidden ? styles.hiddenText : styles.visibleText]}>
           {event.hidden ? 'Hidden from home screen' : 'Visible on home screen'}
         </Text>
@@ -60,13 +61,14 @@ export default function MyEventsScreen({
             <Text style={styles.visibilityButtonText}>{event.hidden ? 'Make Visible' : 'Hide Event'}</Text>
           )}
         </Pressable>
-      </View>
+      </View>}
       <View style={event.hidden ? styles.hiddenCard : undefined}>
         <EventCard event={event} onPress={() => onPressEvent?.(event)} />
       </View>
-      <View style={styles.metaRow}>
+      {event.registrationOnly && event.isRegistered ? <Pressable onPress={() => onPressEvent?.(event)} style={styles.editButton}><Text style={styles.editText}>{event.status === 'cancelled' ? 'View registration history' : 'View or edit my registration'}</Text></Pressable> : null}
+      {(!event.registrationOnly || event.canManage) && <View style={styles.metaRow}>
         <View style={styles.actionRow}>
-          <Pressable onPress={() => onEdit?.(event)} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}>
+          <Pressable disabled={event.registrationOnly && event.status === 'cancelled'} onPress={() => onEdit?.(event)} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}>
             <Text style={styles.editText}>Edit</Text>
           </Pressable>
           {event.seriesId || event.recurringSeriesId ? (
@@ -74,6 +76,7 @@ export default function MyEventsScreen({
               <Text style={styles.seriesText}>Edit Entire Series</Text>
             </Pressable>
           ) : null}
+          {event.registrationOnly && <>{event.status !== 'cancelled' && <Pressable onPress={() => onOpenRegistration?.(event, 'form')} style={styles.editButton}><Text style={styles.editText}>Edit Registration form</Text></Pressable>}<Pressable onPress={() => onOpenRegistration?.(event, 'responses')} style={styles.editButton}><Text style={styles.editText}>Registration responses</Text></Pressable></>}
           <Pressable disabled={!onCopy} onPress={() => onCopy?.(event)} style={({ pressed }) => [styles.copyButton, !onCopy && styles.disabled, pressed && onCopy && styles.pressed]}>
             <Text style={styles.copyText}>Copy</Text>
           </Pressable>
@@ -102,7 +105,7 @@ export default function MyEventsScreen({
             )}
           </Pressable>
         </View>
-      </View>
+      </View>}
     </View>
   );
 
@@ -115,7 +118,7 @@ export default function MyEventsScreen({
       ItemSeparatorComponent={() => <View style={styles.separator} />}
       ListHeaderComponent={(
         <View style={styles.headerContent}>
-          <MemberPageHeader title="My Events" subtitle="Events you created. Toggle visibility to show or hide from the home screen." icon="calendar-check-outline" tone="teal" />
+          <MemberPageHeader title="My Events" subtitle="Events you created and your registrations. Manage your events or open a booking to review it." icon="calendar-check-outline" tone="teal" />
           {loading ? (
             <View style={styles.loadingCard}>
               <ActivityIndicator color={colors.teal} size="large" />

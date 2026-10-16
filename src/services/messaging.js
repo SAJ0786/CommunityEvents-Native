@@ -54,7 +54,7 @@ export async function sendHostMessage({ event, user, profile, text }) {
   const threadId = `${event.id}_${senderUid}_${hostUid}`;
   const threadRef = doc(db, 'hostMessageThreads', threadId);
   const senderName = getSenderName(user, profile);
-  const eventTitle = `${event.eventTypeDisplay || event.eventType || 'Event'} - ${event.hostName || 'Host'}`;
+  const eventTitle = event.registrationOnly ? event.title : `${event.eventTypeDisplay || event.eventType || 'Event'} - ${event.hostName || 'Host'}`;
   const city = normalizeCity(event.metroArea || DEFAULT_CITY);
 
   const messageRef = doc(collection(threadRef, 'messages'));

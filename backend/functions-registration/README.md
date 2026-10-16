@@ -1,8 +1,81 @@
-# Event registration backend candidate — NOT DEPLOYED
+# Event registration backend and Native integration
 
-## Current status — 16 October (supersedes historical notes below)
+## Unified event discovery — 16 October implementation
 
-- Initial events require scoped admin approval. Approved organiser edits and poster
+This section supersedes the older rollout notes below. The registration codebase
+is configured in `backend/firebase.json`; the new changes in this checkout have
+not been deployed. Production notices remain OFF and callable App Check enforcement
+is unchanged (false). Do not enable notifications or modify production records as
+part of this implementation.
+
+Native registration events now use the normal EventCard, EventDetailsModal,
+Home ordering/search/filters, calendar and Favourites. Quick Access toggles
+registration-only/all events; there is no registration menu item or browser page.
+Only form entry, event/form editor, and response operations use RegistrationScreen.
+Existing attendee booking/history cards live in My Events alongside hosted events;
+attendee cards do not receive host management controls.
+The host's My Events and Admin Event Management display pending cards with a large
+`UnApproved` note. User Management contains a superAdmin-only approval panel,
+initially spanning all cities, including disabled/former cities. Approval removes the note without
+replacing it with an Approved badge. City admins retain city management but cannot
+review or approve pending events through the approval scope.
+
+### Shared callable contract (australia-southeast1)
+
+- `listRegistrationEvents({scope, city, cursor})` returns `{events,nextCursor}`.
+  Scopes: `public` (approved upcoming only), `mine` (current owner), `management`
+  (city-scoped admin/superAdmin), `review` (superAdmin pending), `attending`
+  (current account's registration history). City is required for public and
+  management, optional for review, and omitted for mine/attending. Omitting city
+  in review pages all cities. Consume every page, including empty filtered pages,
+  until nextCursor is null. Native uses global review by default.
+- Each row retains public event fields (id, title, eventType, date, suburb, notes,
+  capacity, closes, city, timeZone, revision, status, formVersion,
+  allowCancellation) and adds `ownerUid`, `registrationOnly`, `canManage`,
+  `canApprove`, `isRegistered`, `canRegister`, `canEditRegistration`, `hasPoster`.
+  Poster presence is only true for authorised managers/registrants. No private
+  address, coordinates, form answers, poster URL or bytes occur on lists.
+- `getRegistrationEvent({eventId})` retains its existing form, ownRegistration,
+  retention and action flags. Its public event includes ownerUid for Contact Host.
+  `privateDetails` remains exclusive to managers and confirmed registrants
+  (cancelled events revoke attendee access). Poster bytes are fetched exclusively
+  through `getRegistrationPoster({eventId}) -> {mime,base64}` and are not persisted
+  in Native event feeds or a shared poster cache.
+- `approveRegistrationEvent({eventId,expectedRevision})` is superAdmin-only.
+- `deleteRegistrationEvent({eventId,expectedRevision,confirmation:'DELETE EVENT'})`
+  returns `{eventId,revision,status:'cancelled',deleted:true}`. It atomically marks deletedAt/
+  deletedBy, closes capacity, and queues the existing cancelled outbox while
+  retaining participant history. Deleted rows are absent from discovery and
+  manager lists; authorised detail/attending history remain available. Neither
+  saving nor approving can resurrect cancelled/deleted events. Legacy
+  cancelRegistrationEvent remains supported, but no Cancel Whole button is shown.
+- Save, submission, templates, response deletion and poster upload/removal retain
+  their prior arguments. Approved edits stay approved; changed questions/terms/
+  purpose increment formVersion and require fresh attendee review/consent.
+
+### Release and acceptance
+
+No mirror is created in the legacy public `events` collection. Old clients
+therefore cannot receive pending/private registration payloads. The new scope,
+flags and deletion callable reuse existing query shapes; **no new rules or
+indexes** are required by this slice. Deploy the registration functions before
+enabling a client that uses deleteRegistrationEvent or management.
+
+The Native build flag `EVENT_REGISTRATION_CLIENT_ENABLED` remains opt-in/off by
+default. Enable deliberately only after coordinated backend/Web release and
+device acceptance. Leave EVENT_REGISTRATION_NOTICES_ENABLED OFF; no email/push
+delivery is enabled here. Preserve existing maintenance/cleanup gates. Exact
+private map pins remain unavailable to public list/map feeds; authorised users
+get directions through refreshed event details.
+
+Local evidence: source check, 30 backend tests, 14 Native client/feed/view-model
+tests, private-venue tests and the Native regression suite pass. These checks do
+not substitute for iOS/Android device, Storage/App Check or coordinated Web
+acceptance. No Expo build or production deployment was performed.
+
+## Earlier 16 October snapshot (superseded by the unified contract above)
+
+- Initial events require superAdmin approval. Approved organiser edits and poster
   changes remain approved. Stable forms preserve formVersion; changed questions,
   terms or purpose require review of the new version.
 - Existing attendees may edit answers/reduce places after closing until event day.
@@ -58,12 +131,14 @@ Separate, feature-disabled codebase. Do not add to production firebase.json or d
 
 ## Implemented
 
-- Pending event creation/edit with explicit admin city-scope approval. Existing open events are untouched.
+- Pending event creation/edit with super-admin-only approval. City admins may manage events in their assigned city but cannot approve them.
 - Strict earlier-day registration closing checks in the server-selected Australian timezone.
-- Public event projection, separately stored full address and private poster path; no private fields in public response.
+- Callable-only public event projection, separately stored full address and private poster path; no public events mirror or private fields on list responses. List cards include server-derived registration/management flags; poster presence is disclosed only to an authorised manager or registrant.
+- Paginated `public`, `mine`, `review`, `attending`, and `management` lists. Public results are approved upcoming events only; review is super-admin-only and pending-only, and may omit city to page pending events across all cities (including disabled/former cities); management and public lists require a city.
 - Only the organiser, authorised city admin/super admin, or currently registered attendee may retrieve private details. Other members cannot.
 - Transactional seat reservation, edit deltas, optimistic registration/event revisions, stable create/submission retry identifiers, original question/terms snapshots, cancellation and access revocation.
 - Owner/admin-only paginated response access and account-owned paginated templates.
+- Revision-checked `deleteRegistrationEvent` soft-deletes with `DELETE EVENT`, marks the event cancelled/deleted, releases reserved places and queues the existing cancellation notice while retaining booking history. The existing `cancelRegistrationEvent` contract remains available.
 - Raster-only bounded poster upload through a callable, server-only Storage path, no bearer download URLs, authenticated poster retrieval. Uploading changes approval state to pending.
 - Shared model validation and native/PWA transport adapters, disabled by default. CSV export neutralises spreadsheet formulas.
 
@@ -99,18 +174,18 @@ Collections: `registrationEvents`, `registrationEventPrivate`, `registrationForm
 
 ## Evidence
 
-`node --test scripts/test-event-registration-backend.cjs`: eight factory tests.
+`node --test scripts/test-event-registration-backend.cjs`: 29 backend tests.
 `scripts/test-event-registration-emulator.cjs`: real isolated Firestore emulator checks event-creation retry, account-only templates, two concurrent requests for the final seat, retry deduplication, private view access, cancellation revocation, and direct unauthenticated read denial. The tested emulator rule file is an isolated deny-all rule; this is NOT a complete merged-production rule acceptance result.
 
 Only project `demo-registration-20261012` and emulator `127.0.0.1:8398` are accepted by the emulator test. No real users, email or production data.
 
 ## Still required before rollout
 
-15 October: native RegistrationScreen/Editor now connect the adapter behind the
+16 October: native RegistrationScreen/Editor now connect the adapter behind the
 disabled EVENT_REGISTRATION_CLIENT_ENABLED build flag. listRegistrationEvents is
-a bounded city/owner/scoped-review endpoint; public list cards omit private fields.
+a bounded city/owner/scoped-review/management endpoint; public list cards omit private fields.
 New detail action flags are server-derived. Five native contract/view-model tests,
-16 backend tests and the isolated Firestore emulator script pass. Native UI/device,
+29 backend tests and the isolated Firestore emulator script pass. Native UI/device,
 Storage/App Check and merged-rules acceptance remain pending. See COPILOT-HANDOVER.md
 for current commands and the Firebase CLI post-test update-check warning.
 

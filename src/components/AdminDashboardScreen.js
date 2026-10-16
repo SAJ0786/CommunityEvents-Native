@@ -88,6 +88,7 @@ import { addDynamicEventOption, deleteDynamicEventType, getDynamicEventOptions }
 import { EVENT_TYPES, EVENT_TYPE_GROUPS } from '../utils/eventOptions';
 import AdminPageHeader from './AdminPageHeader';
 import DiagnosticRegisterPanel from './DiagnosticRegisterPanel';
+import RegistrationManagementPanel from './RegistrationManagementPanel';
 
 const HIJRI_OBSERVANCE_CATEGORIES = ['Wiladat', 'Shahadat', 'Wafat', 'Eid', 'Ayyam-e-Aza', 'Amaal', 'Season', 'Event'];
 const BULK_IMPORT_TEMPLATE_URL = 'https://communityevents.siza.info/Community_Events_Import_Template.xlsx';
@@ -455,6 +456,7 @@ export default function AdminDashboardScreen({
   onEditEvent,
   onCopyEvent,
   onEditSeries,
+  onOpenRegistration,
 }) {
   const adminScrollRef = useRef(null);
   const [panel, setPanel] = useState('overview');
@@ -2029,6 +2031,7 @@ export default function AdminDashboardScreen({
           <AdminPageHeader title={"Users"} subtitle={"User management and contact updates"} icon="account-group-outline" onBack={() => setPanel('overview')}>
             <Pressable accessibilityRole="button" accessibilityLabel="Export users as CSV" onPress={exportUsersCsv} style={styles.compactUserAction}><MaterialCommunityIcons name="download-outline" size={21} color={colors.tealDark} /></Pressable>
           </AdminPageHeader>
+          <RegistrationManagementPanel user={user} profile={profile} review onOperation={onOpenRegistration} />
 
           <View style={styles.statisticsCard}>
             <View style={styles.statisticsHead}>
@@ -2412,6 +2415,7 @@ export default function AdminDashboardScreen({
       ) : panel === 'events' ? (
         <View style={styles.section}>
           <AdminPageHeader title={"Events"} subtitle={"Admin event management"} icon="calendar-outline" onBack={() => setPanel('overview')} />
+          <RegistrationManagementPanel user={user} profile={profile} onOperation={onOpenRegistration} />
 
           <View style={styles.statisticsCard}>
             <View style={styles.statisticsHead}>

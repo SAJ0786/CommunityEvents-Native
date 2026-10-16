@@ -43,7 +43,7 @@ function fixture() {
   const request = (uid, data) => ({ auth: uid ? { uid, token: { firebase: { sign_in_provider: 'phone' } } } : null, data });
   const draft = { title: 'Synthetic event', eventType: 'Custom', customEventType: 'Workshop', city: 'sydney', date: '2026-12-01', suburb: 'Parramatta', address: '1 Synthetic Lane', notes: 'Public notes', capacity: 3, closes: '2026-11-30T18:00', allowCancellation: true, purpose: 'Arrange attendance', fields: [{ id: 'name', type: 'text', label: 'Name', required: true, options: [], description: '' }, { id: 'consent', type: 'consent', label: 'I agree', terms: 'Arrive on time', required: true, options: [], description: '' }] };
   const create = () => handlers.saveRegistrationEvent(request('host', { city: 'sydney', createKey: 'create-one', draft }));
-  const approve = event => handlers.approveRegistrationEvent(request('admin', { eventId: event.eventId, expectedRevision: event.revision }));
+  const approve = event => handlers.approveRegistrationEvent(request('super', { eventId: event.eventId, expectedRevision: event.revision }));
   const submit = (event, uid = 'member', overrides = {}) => handlers.submitEventRegistration(request(uid, { eventId: event.eventId, formVersion: 1, expectedRevision: 0, requestId: 'request-1', places: 2, answers: { name: 'Synthetic', consent: true }, ...overrides }));
   return { records, files, now: () => new Date(clock), onDownload: callback => { onDownload = callback; }, onDelete: callback => { onDelete = callback; }, onSave: callback => { onSave = callback; }, advance: ms => { clock += ms; }, sweep, handlers, request, draft, create, approve, submit, db };
 }
@@ -95,25 +95,99 @@ test('discovery is city scoped, private-data free, paginated across filtered row
   const f = fixture(); const event = await f.create();
   const list = (uid, scope, city = 'sydney', cursor = null) => f.handlers.listRegistrationEvents(f.request(uid, { scope, city, cursor }));
   assert.equal((await list(null, 'public')).events.length, 0);
+  assert.equal((await list('host', 'public')).events.length, 0);
+  assert.equal((await list('admin', 'public')).events.length, 0);
   assert.equal((await list('host', 'mine')).events.length, 1);
   assert.equal((await list('other', 'mine')).events.length, 0);
-  assert.equal((await list('admin', 'review')).events.length, 1);
+  await assert.rejects(list('admin', 'review'), { code: 'permission-denied' });
+  assert.equal((await list('super', 'review')).events.length, 1);
+  f.records.set('registrationEvents/former-city-pending', {
+    ...f.records.get(`registrationEvents/${event.eventId}`), city: 'former-disabled-city', ownerUid: 'other',
+  });
+  const globalReview = await f.handlers.listRegistrationEvents(f.request('super', { scope: 'review' }));
+  assert.equal(globalReview.events.length, 2);
+  assert.ok(globalReview.events.some(row => row.city === 'former-disabled-city'));
+  await assert.rejects(f.handlers.listRegistrationEvents(f.request('admin', { scope: 'review' })), { code: 'permission-denied' });
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('super', { eventId: event.eventId }))).canApprove, true);
+  assert.equal((await list('admin', 'management')).events.length, 1);
+  assert.equal((await list('super', 'management')).events.length, 1);
   await assert.rejects(list('wrongadmin', 'review'), { code: 'permission-denied' });
+  await assert.rejects(list('wrongadmin', 'management'), { code: 'permission-denied' });
   await assert.rejects(list(null, 'mine'), { code: 'unauthenticated' });
+  await assert.rejects(f.handlers.approveRegistrationEvent(f.request('admin', { eventId: event.eventId, expectedRevision: event.revision })), { code: 'permission-denied' });
+  await assert.rejects(f.handlers.approveRegistrationEvent(f.request('host', { eventId: event.eventId, expectedRevision: event.revision })), { code: 'permission-denied' });
   await f.approve(event);
   const publicPage = await list(null, 'public'); assert.equal(publicPage.events.length, 1);
   assert.equal((await list(null, 'public', 'perth')).events.length, 0);
   assert.equal(JSON.stringify(publicPage).includes('Synthetic Lane'), false);
-  assert.equal(publicPage.events[0].ownerUid, undefined);
+  assert.equal(publicPage.events[0].ownerUid, 'host');
   assert.equal(publicPage.events[0].registrationCount, undefined);
-  assert.equal((await f.handlers.getRegistrationEvent(f.request('admin', { eventId: event.eventId }))).canApprove, true);
+  assert.equal(publicPage.events[0].registrationOnly, true);
+  assert.equal(publicPage.events[0].canManage, false);
+  assert.equal(publicPage.events[0].canApprove, false);
+  assert.equal(publicPage.events[0].isRegistered, false);
+  assert.equal(publicPage.events[0].canRegister, true);
+  assert.equal(publicPage.events[0].canEditRegistration, false);
+  assert.equal(publicPage.events[0].hasPoster, undefined);
+  const ownerPage = await list('host', 'public');
+  assert.equal(ownerPage.events[0].canManage, true);
+  assert.equal(ownerPage.events[0].hasPoster, false);
+  assert.equal((await list('admin', 'public')).events[0].canManage, true);
+  assert.equal((await list('admin', 'public')).events[0].canApprove, false);
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('admin', { eventId: event.eventId }))).canApprove, false);
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('super', { eventId: event.eventId }))).canApprove, false);
   assert.equal((await f.handlers.getRegistrationEvent(f.request('host', { eventId: event.eventId }))).canApprove, false);
+  assert.equal((await f.handlers.getRegistrationEvent(f.request(null, { eventId: event.eventId }))).event.ownerUid, 'host');
+  await f.handlers.putRegistrationPoster(f.request('host', { eventId: event.eventId, expectedRevision: 1, mime: 'image/jpeg', base64: Buffer.from([255,216,255,0]).toString('base64') }));
+  assert.equal((await list(null, 'public')).events[0].hasPoster, undefined);
+  assert.equal((await list('other', 'public')).events[0].hasPoster, undefined);
+  const ownerWithPoster = await list('host', 'public');
+  assert.equal(ownerWithPoster.events[0].hasPoster, true);
+  assert.equal(JSON.stringify(ownerWithPoster).includes('base64'), false);
   await f.submit(event);
+  const registeredPage = await list('member', 'public');
+  assert.equal(registeredPage.events[0].isRegistered, true);
+  assert.equal(registeredPage.events[0].canEditRegistration, true);
+  assert.equal(registeredPage.events[0].hasPoster, true);
   assert.equal((await f.handlers.getRegistrationEvent(f.request('member', { eventId: event.eventId }))).canCancel, true);
   const row = f.records.get(`registrationEvents/${event.eventId}`);
   for (let i = 0; i < 26; i++) f.records.set(`registrationEvents/000-${String(i).padStart(2, '0')}`, { ...row, status: 'pending' });
   const first = await list(null, 'public'); assert.equal(first.events.length, 0); assert.equal(first.nextCursor, '000-24');
   const second = await list(null, 'public', 'sydney', first.nextCursor); assert.equal(second.events.length, 1); assert.equal(second.nextCursor, null);
+});
+
+test('cancelled events remain in manager lists, but never appear in public lists', async () => {
+  const f = fixture(); const event = await f.create(); await f.approve(event);
+  await f.handlers.cancelRegistrationEvent(f.request('host', { eventId: event.eventId, expectedRevision: event.revision, confirmation: 'CANCEL EVENT' }));
+  for (const scope of ['mine', 'management']) {
+    const result = await f.handlers.listRegistrationEvents(f.request(scope === 'mine' ? 'host' : 'admin', { scope, city: 'sydney' }));
+    assert.equal(result.events.length, 1);
+    assert.equal(result.events[0].status, 'cancelled');
+  }
+  assert.equal((await f.handlers.listRegistrationEvents(f.request(null, { scope: 'public', city: 'sydney' }))).events.length, 0);
+});
+
+test('event deletion is manager-only, soft, revisioned and cannot be reversed by saving or approving', async () => {
+  const f = fixture(); const event = await f.create(); await f.approve(event); await f.submit(event);
+  const beforeBooking = structuredClone(f.records.get(`registrationEvents/${event.eventId}/registrations/member`));
+  await assert.rejects(f.handlers.deleteRegistrationEvent(f.request('other', { eventId: event.eventId, expectedRevision: 1, confirmation: 'DELETE EVENT' })), { code: 'permission-denied' });
+  await assert.rejects(f.handlers.deleteRegistrationEvent(f.request('host', { eventId: event.eventId, expectedRevision: 1, confirmation: 'CANCEL EVENT' })), { code: 'invalid-argument' });
+  const deleted = await f.handlers.deleteRegistrationEvent(f.request('host', { eventId: event.eventId, expectedRevision: 1, confirmation: 'DELETE EVENT' }));
+  assert.deepEqual(deleted, { eventId: event.eventId, revision: 2, status: 'cancelled', deleted: true });
+  const stored = f.records.get(`registrationEvents/${event.eventId}`);
+  assert.equal(stored.status, 'cancelled'); assert.equal(stored.deletedBy, 'host'); assert.ok(stored.deletedAt);
+  assert.equal(stored.reservedPlaces, 0); assert.equal(stored.registrationCount, 1);
+  assert.deepEqual(f.records.get(`registrationEvents/${event.eventId}/registrations/member`), beforeBooking);
+  assert.deepEqual(f.records.get(`registrationChanges/${event.eventId}-2`).changes, ['cancelled']);
+  await assert.rejects(f.handlers.saveRegistrationEvent(f.request('host', { eventId: event.eventId, expectedRevision: 2, city: 'sydney', draft: f.draft })), { code: 'failed-precondition' });
+  await assert.rejects(f.handlers.approveRegistrationEvent(f.request('super', { eventId: event.eventId, expectedRevision: 2 })), { code: 'failed-precondition' });
+  for (const scope of ['mine', 'management', 'public', 'review']) {
+    assert.equal((await f.handlers.listRegistrationEvents(f.request(scope === 'public' ? null : 'super', { scope, city: 'sydney' }))).events.length, 0);
+  }
+  const attending = await f.handlers.listRegistrationEvents(f.request('member', { scope: 'attending' }));
+  assert.equal(attending.events.length, 1);
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('member', { eventId: event.eventId }))).event.status, 'cancelled');
+  assert.deepEqual(await f.handlers.deleteRegistrationEvent(f.request('host', { eventId: event.eventId, expectedRevision: 1, confirmation: 'DELETE EVENT' })), deleted);
 });
 
 test('venue coordinates are private, validated, cleared on text-only edit and included in retry identity', async () => {
@@ -159,7 +233,6 @@ test('poster replacement cleans old object, failed concurrent upload cannot dele
 test('poster download rechecks cancellation before returning bytes', async () => {
   const f = fixture(); const event = await f.create(); await f.approve(event); await f.submit(event);
   await f.handlers.putRegistrationPoster(f.request('host', { eventId: event.eventId, expectedRevision: 1, mime: 'image/jpeg', base64: Buffer.from([255,216,255,0]).toString('base64') }));
-  await f.approve({ ...event, revision: 2 });
   const request = f.request('member', { eventId: event.eventId });
   assert.ok((await f.handlers.getRegistrationPoster(request)).base64);
   f.onDownload(() => f.handlers.cancelEventRegistration(f.request('member', { eventId: event.eventId, expectedRevision: 1 })));
@@ -276,7 +349,7 @@ test('approved edits preserve approval, stable forms keep versions and material 
   const save = (revision, draft) => f.handlers.saveRegistrationEvent(f.request('host', { eventId: event.eventId, expectedRevision: revision, city: 'sydney', draft }));
   await save(1, { ...f.draft, title: 'New title' });
   const stored = f.records.get(`registrationEvents/${event.eventId}`);
-  assert.equal(stored.status, 'approved'); assert.equal(stored.approvedBy, 'admin'); assert.equal(stored.formVersion, 1);
+  assert.equal(stored.status, 'approved'); assert.equal(stored.approvedBy, 'super'); assert.equal(stored.formVersion, 1);
   assert.equal([...f.records.keys()].filter(key => key.startsWith('registrationChanges/')).length, 0);
   await save(2, { ...f.draft, purpose: 'Updated purpose' });
   const change = f.records.get(`registrationChanges/${event.eventId}-3`);
@@ -367,7 +440,7 @@ test('organiser cancellation is authorised and idempotent, sends notices, revoke
   assert.equal(detail.event.status, 'cancelled'); assert.equal(detail.privateDetails, undefined); assert.equal(detail.canCancel, true);
   assert.equal(f.records.get(`registrationEvents/${f.event.eventId}`).reservedPlaces, 0);
   assert.equal(f.records.get(`registrationEvents/${f.event.eventId}/registrations/member`).answers.name, 'Synthetic');
-  await assert.rejects(f.handlers.approveRegistrationEvent(f.request('admin', { eventId: f.event.eventId, expectedRevision: 3 })), { code: 'failed-precondition' });
+  await assert.rejects(f.handlers.approveRegistrationEvent(f.request('super', { eventId: f.event.eventId, expectedRevision: 3 })), { code: 'failed-precondition' });
   await f.worker.tick(); assert.equal(f.sent.length, 2); assert.ok(f.sent.every(row => row.notice.title.includes('cancelled')));
   const list = await f.handlers.listRegistrationEvents(f.request('member', { scope: 'attending' }));
   assert.equal(list.events.length, 1); assert.equal(JSON.stringify(list).includes('Synthetic Lane'), false);

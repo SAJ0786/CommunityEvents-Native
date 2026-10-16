@@ -8,9 +8,10 @@ import { FIELD_TYPES, FORM_TEMPLATES, NOTES_LIMIT, TERMS_LIMIT, closingDateError
 import { normalisePrivateVenue } from './privateVenue';
 
 // No local persistence: private venue and answers must not enter an unencrypted draft cache.
-export default function RegistrationEditor({ initialDraft, eventTypes, savedTemplates, hasMoreTemplates, onMoreTemplates, busy, onSave, onSaveTemplate, onCancel }) {
+export default function RegistrationEditor({
+ initialDraft, eventTypes, savedTemplates, hasMoreTemplates, onMoreTemplates, busy, onSave, onSaveTemplate, onCancel, hasPoster = false, onRemovePoster, initialStep = 'event' }) {
   const [draft, setDraft] = useState(initialDraft);
-  const [step, setStep] = useState('event');
+  const [step, setStep] = useState(initialStep);
   const [error, setError] = useState('');
   const [templateName, setTemplateName] = useState('');
   const serial = useRef(0);
@@ -34,7 +35,7 @@ export default function RegistrationEditor({ initialDraft, eventTypes, savedTemp
     } catch (failure) { setError(failure.message || 'Could not select poster.'); }
   };
   return <View style={styles.group} pointerEvents={busy ? 'none' : 'auto'}>
-    <View style={styles.row}><Action onPress={onCancel}>Back to event list/card</Action>{step !== 'event' && <Action onPress={() => setStep('event')}>Edit event details</Action>}</View>
+    <View style={styles.row}><Action onPress={onCancel}>Back to events</Action>{step !== 'event' && <Action onPress={() => setStep('event')}>Edit event details</Action>}</View>
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
     {step === 'event' && <View style={styles.panel}>
       <Text style={styles.title}>Event details</Text>
@@ -55,8 +56,9 @@ export default function RegistrationEditor({ initialDraft, eventTypes, savedTemp
       <Input label="Capacity (places)" value={String(draft.capacity)} keyboardType="number-pad" onChangeText={value => update('capacity', value)} />
       <View style={styles.row}><Text style={styles.flex}>Allow attendee cancellation before event day</Text><Switch value={draft.allowCancellation} onValueChange={value => update('allowCancellation', value)} /></View>
       <Action onPress={selectPoster}>Select private poster</Action>
+      {hasPoster && <Action onPress={onRemovePoster}>Remove existing private poster</Action>}
       {draft.poster && <><Image source={{ uri: draft.poster.uri }} style={styles.poster} resizeMode="contain" /><Action onPress={() => update('poster', null)}>Discard selected poster</Action></>}
-      <Text style={styles.muted}>Existing uploaded posters are managed on the event card. A newly selected poster uploads after event details save.</Text>
+      <Text style={styles.muted}>A newly selected poster uploads after event details save. Only registrants, the host and authorised admins can see it.</Text>
       <Action primary onPress={() => setStep('templates')}>Choose registration form</Action>
     </View>}
     {step === 'templates' && <View style={styles.panel}>
@@ -82,7 +84,7 @@ export default function RegistrationEditor({ initialDraft, eventTypes, savedTemp
         if (type === 'consent') setError(`Write your own terms and conditions (up to ${TERMS_LIMIT} characters). The agreement remains at the end.`);
       }}>{label}</Action>)}</View></View>
       <View style={styles.panel}><Input label="Save reusable template as" value={templateName} maxLength={80} onChangeText={setTemplateName} /><Action disabled={!templateName.trim()} onPress={() => onSaveTemplate({ name: templateName, fields: draft.fields, purpose: draft.purpose })}>Save template (no venue or answers)</Action></View>
-      <Text style={styles.muted}>New events require administrator approval. Edits to approved events do not need another approval. Changes to questions, date or venue notify existing attendees; changed questions ask them to review their registration.</Text>
+      <Text style={styles.muted}>New events require super administrator approval. Edits to approved events do not need another approval. Changes to questions, date or venue queue attendee updates; changed questions ask them to review their registration.</Text>
       <Action primary onPress={save}>Save event and registration form</Action>
     </>}
   </View>;

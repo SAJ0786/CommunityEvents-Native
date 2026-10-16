@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Image, Linking, Platform, Share, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Share, Text, View } from 'react-native';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 import MemberPageHeader from './MemberPageHeader';
 import RegistrationEditor from '../registration/RegistrationEditor';
@@ -8,28 +8,25 @@ import { firebaseRegistration } from '../registration/firebaseRegistration';
 import { createSubmission, registrationsCsv } from '../registration/registrationClient';
 import { answersForReview, eventDraftFromDetail, mergeRegistrationPage } from '../registration/registrationViewModel';
 import { createDraft, validateAnswers } from '../registration/prototypeModel';
-import { privateVenueLinks } from '../registration/privateVenue';
 import { EVENT_TYPES } from '../utils/eventOptions';
 import { getDynamicEventOptions } from '../services/eventOptionsAdmin';
 import { cityLabel } from '../utils/cities';
 import { colors } from '../theme';
 
 const newReference = () => `r-${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
-export default function RegistrationScreen({ enabled = false, user, profile, city, initialCreate = false, initialEventId = null, onBack, onRequireSignIn, transport }) {
+export default function RegistrationScreen({ enabled = false, user, profile, city, initialCreate = false, initialEventId = null, initialAction = 'entry', onBack, onRequireSignIn, transport }) {
   const api = useMemo(() => transport || firebaseRegistration({ enabled }), [enabled, transport]);
-  const [stage, setStage] = useState('list'); const [scope, setScope] = useState('public');
-  const [items, setItems] = useState([]); const [cursor, setCursor] = useState(null);
+  const [stage, setStage] = useState('loading');
   const [detail, setDetail] = useState(null); const [draft, setDraft] = useState(null);
   const [types, setTypes] = useState(EVENT_TYPES); const [templates, setTemplates] = useState([]); const [templateCursor, setTemplateCursor] = useState(null);
   const [responses, setResponses] = useState([]); const [responseCursor, setResponseCursor] = useState(null);
   const [answers, setAnswers] = useState({}); const [places, setPlaces] = useState('1');
-  const [poster, setPoster] = useState(null); const [pendingPoster, setPendingPoster] = useState(null);
+  const [pendingPoster, setPendingPoster] = useState(null);
   const [notice, setNotice] = useState(''); const [busy, setBusy] = useState(false); const [obscured, setObscured] = useState(false);
   const busyRef = useRef(false); const epoch = useRef(0); const currentId = useRef(null);
   const createKey = useRef(newReference()); const submission = useRef(null);
   const stageRef = useRef(stage); stageRef.current = stage;
   const member = Boolean(user?.uid && !user.isAnonymous);
-  const admin = ['admin', 'superAdmin'].includes(profile?.role);
 
   async function run(work) {
     if (!enabled || busyRef.current) return;
@@ -39,17 +36,25 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     finally { if (token === epoch.current) { busyRef.current = false; setBusy(false); } }
   }
   const requireMember = () => { if (member) return true; onRequireSignIn?.('Sign in to register for or organise an event.'); return false; };
-  const list = (nextScope = scope, nextCursor = null) => run(async valid => {
-    const result = await api.list({ scope: nextScope, city, cursor: nextCursor });
-    if (!valid()) return;
-    currentId.current = null; setDetail(null); setPoster(null); setResponses([]); setAnswers({});
-    setItems(current => mergeRegistrationPage(nextCursor ? current : [], result.events)); setCursor(result.nextCursor); setScope(nextScope); setStage('list');
-  });
-  const open = eventId => run(async valid => {
-    setPoster(null); setDetail(null); setAnswers({}); setResponses([]);
+  const open = (eventId, action = 'entry') => run(async valid => {
+    setDetail(null); setAnswers({}); setResponses([]);
     const result = await api.load(eventId);
     if (!valid()) return;
-    currentId.current = eventId; setDetail(result); setStage('card');
+    currentId.current = eventId; setDetail(result);
+    if (action === 'entry') {
+      if (!requireMember()) return;
+      setAnswers(answersForReview(result)); setPlaces(String(result.ownRegistration?.status === 'registered' ? result.ownRegistration.places : 1)); setStage('entry');
+    } else if (action === 'editor' || action === 'form' || action === 'copy') {
+      const options = await getDynamicEventOptions();
+      if (!valid()) return;
+      const eventTypes = [...new Set([...EVENT_TYPES, ...(options.eventTypes || [])])];
+      setTypes(eventTypes); setDraft(eventDraftFromDetail(result, eventTypes)); setStage('editor');
+      if (action === 'copy') { createKey.current = newReference(); currentId.current = null; setDetail(null); }
+      await loadTemplates(valid);
+    } else if (action === 'responses') {
+      const page = await api.responses(eventId);
+      if (valid()) { setResponses(page.registrations); setResponseCursor(page.nextCursor); setStage('responses'); }
+    } else if (['confirmation', 'host-confirmation'].includes(action)) setStage(action);
   });
   async function loadTemplates(valid, next = null) {
     const result = await api.templates(next);
@@ -71,17 +76,17 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
   };
   useEffect(() => {
     if (!enabled) return undefined;
-    if (initialEventId && member) open(initialEventId); else if (initialCreate && member) edit(true); else list('public');
+    if (initialEventId) open(initialEventId, initialAction); else if (initialCreate && member) edit(true);
     return () => { epoch.current++; busyRef.current = false; };
   }, [enabled]); // Parent keys this screen by account and selected city.
   useEffect(() => {
     const listener = AppState.addEventListener('change', state => {
       if (state === 'background' && stageRef.current !== 'editor') {
         // Do not leave private posters/responses visible in a backgrounded screen.
-        epoch.current++; busyRef.current = false; setBusy(false); setObscured(true); setPoster(null); setResponses([]); setAnswers({});
+        epoch.current++; busyRef.current = false; setBusy(false); setObscured(true); setResponses([]); setAnswers({});
       } else if (state === 'active' && stageRef.current !== 'editor') {
         setObscured(false);
-        if (currentId.current) open(currentId.current); else list('public');
+        if (currentId.current) open(currentId.current, ['confirmation', 'host-confirmation'].includes(stageRef.current) ? stageRef.current : initialAction);
       }
     });
     return () => listener.remove();
@@ -98,7 +103,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     }
     const fresh = await api.load(result.eventId);
     if (!valid()) return;
-    setDetail(fresh); setStage('host-confirmation'); setDraft(null); setNotice(posterError || (fresh.event.status === 'approved' ? 'Changes saved. Your event remains approved. Attendee notices are queued when registration questions, date or venue change.' : 'Saved for administrator review. The event is not public until approved.'));
+    setDetail(fresh); setStage('host-confirmation'); setDraft(null); setNotice(posterError || (fresh.event.status === 'approved' ? 'Changes saved. Your event remains approved. Attendee changes are queued for delivery when notifications are enabled.' : 'Saved for super administrator review. The event is not public until approved.'));
   });
   const startEntry = () => {
     if (!requireMember()) return;
@@ -119,15 +124,6 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       setDetail(fresh); submission.current = null; setAnswers({}); setStage('confirmation');
     });
   };
-  const cancel = () => Alert.alert('Delete your registration?', 'Your answers will be deleted, your places released, and access to the private venue and poster removed.', [
-    { text: 'Keep registration', style: 'cancel' }, { text: 'Delete registration', style: 'destructive', onPress: () => run(async valid => {
-      await api.cancel(detail.event.id, detail.ownRegistration.revision);
-      if (!valid()) return;
-      setPoster(null); setDetail(null); setAnswers({});
-      const fresh = await api.load(currentId.current);
-      if (valid()) { setDetail(fresh); setStage('card'); setNotice('Registration and submitted answers deleted.'); }
-    }) },
-  ]);
   const responsePage = (next = null) => run(async valid => {
     const result = await api.responses(detail.event.id, next);
     if (valid()) { setResponses(current => mergeRegistrationPage(next ? current : [], result.registrations)); setResponseCursor(result.nextCursor); setStage('responses'); }
@@ -138,72 +134,45 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       if (valid()) { setResponses(current => current.filter(item => item.registrationId !== row.registrationId)); setNotice('Answers deleted. Booking status and places are unchanged. Reload responses to see current metadata.'); }
     }) },
   ]);
-  const posterChange = remove => Alert.alert(remove ? 'Remove private poster?' : 'Retry poster upload?', 'This sends the event back for administrator approval.', [
+  const posterChange = remove => Alert.alert(remove ? 'Remove private poster?' : 'Retry poster upload?', 'This changes the private event poster.', [
     { text: 'Cancel', style: 'cancel' }, { text: 'Continue', onPress: () => run(async valid => {
       if (remove) await api.removePoster(detail.event.id, detail.event.revision);
       else await api.uploadPoster(detail.event.id, detail.event.revision, pendingPoster.mime, pendingPoster.base64);
       const fresh = await api.load(detail.event.id);
-      if (valid()) { setPoster(null); setPendingPoster(null); setDetail(fresh); }
+      if (valid()) { setPendingPoster(null); setDetail(fresh); }
     }) },
   ]);
-  const links = detail?.privateDetails ? privateVenueLinks(detail.privateDetails, Platform.OS) : null;
   if (!enabled) return <View style={styles.panel}><Text style={styles.text}>Registration is not enabled for this release.</Text><Action onPress={onBack}>Back</Action></View>;
   if (obscured) return <View style={styles.panel}><Text style={styles.muted}>Private event details hidden while the app is inactive.</Text></View>;
   return <KeyboardAwareScrollView contentContainerStyle={styles.content}>
-    <MemberPageHeader title="Registration only events" subtitle={cityLabel(city)} icon="clipboard-text-outline" tone="teal" />
-    <View style={styles.row}><Action disabled={busy} onPress={onBack}>Back to Home</Action>{stage !== 'list' && <Action disabled={busy} onPress={() => list(scope)}>Event list</Action>}</View>
+    <MemberPageHeader title={stage === 'responses' ? 'Registration responses' : stage === 'editor' ? 'Edit event and registration form' : 'Event registration'} subtitle={cityLabel(city)} icon="clipboard-text-outline" tone="teal" />
+    <View style={styles.row}><Action disabled={busy} onPress={onBack}>Back to events</Action></View>
     {busy && <ActivityIndicator color={colors.tealDark} />}
     {notice ? <Text accessibilityRole="alert" style={styles.error}>{notice}</Text> : null}
     <View pointerEvents={busy ? 'none' : 'auto'}>
-    {stage === 'list' && <View style={styles.group}>
-      <View style={styles.row}><Action primary={scope === 'public'} onPress={() => list('public')}>Browse events</Action>{member && <><Action primary={scope === 'attending'} onPress={() => list('attending')}>My registrations</Action><Action primary={scope === 'mine'} onPress={() => list('mine')}>My hosted events</Action></>}{admin && <Action primary={scope === 'review'} onPress={() => list('review')}>Review city events</Action>}<Action onPress={() => edit(true)}>Create registration event</Action></View>
-      {!items.length && <Text style={styles.muted}>No events on this page.{cursor ? ' Load the next page to continue.' : ''}</Text>}
-      {items.map(event => <View key={event.id} style={styles.panel}><Text style={styles.title}>{event.title}</Text><Text style={styles.text}>{event.eventType} · {event.date} · {event.suburb}</Text><Text style={styles.muted}>{event.status} · Registration required</Text><Action onPress={() => open(event.id)}>View event</Action></View>)}
-      {cursor && <Action onPress={() => list(scope, cursor)}>Load more events</Action>}
-    </View>}
-    {stage === 'editor' && draft && <RegistrationEditor initialDraft={draft} eventTypes={types} savedTemplates={templates} hasMoreTemplates={Boolean(templateCursor)} onMoreTemplates={() => run(valid => loadTemplates(valid, templateCursor))} busy={busy} onSave={save} onCancel={() => detail ? setStage('card') : list(scope)} onSaveTemplate={template => run(async valid => {
+    {stage === 'editor' && draft && <RegistrationEditor initialDraft={draft} initialStep={initialAction === 'form' ? 'form' : 'event'} eventTypes={types} savedTemplates={templates} hasMoreTemplates={Boolean(templateCursor)} onMoreTemplates={() => run(valid => loadTemplates(valid, templateCursor))} busy={busy} onSave={save} onCancel={onBack} hasPoster={detail?.privateDetails?.hasPoster} onRemovePoster={() => posterChange(true)} onSaveTemplate={template => run(async valid => {
       await api.saveTemplate({ ...template, templateId: newReference() }); await loadTemplates(valid); if (valid()) setNotice('Template saved to your account.');
     })} />}
-    {detail && stage === 'card' && <View style={styles.panel}>
-      <Text style={styles.title}>{detail.event.title}</Text><Text style={styles.text}>{detail.event.eventType} · {detail.event.date} · {detail.event.suburb}</Text>
-      <Text style={styles.muted}>{detail.event.status === 'cancelled' ? 'Event cancelled — no places reserved' : detail.ownRegistration?.status === 'registered' ? 'Registered' : 'Registration required'} · {detail.event.status}</Text><Text style={styles.text}>{detail.event.notes}</Text>
-      {detail.privateDetails && <><Text style={styles.label}>Private venue</Text><Text style={styles.text}>{detail.privateDetails.address}</Text>{links && <View style={styles.row}><Action onPress={() => run(() => Linking.openURL(links.map))}>View map</Action><Action onPress={() => run(() => Linking.openURL(links.directions))}>Directions</Action></View>}
-        {detail.privateDetails.hasPoster && <Action onPress={() => run(async valid => { const result = await api.poster(detail.event.id); if (valid()) setPoster(`data:${result.mime};base64,${result.base64}`); })}>View private poster</Action>}
-        {poster && <Image source={{ uri: poster }} style={styles.poster} resizeMode="contain" />}
-      </>}
-      {!detail.privateDetails && <Text style={styles.muted}>{detail.event.status === 'cancelled' ? 'The private venue and poster are no longer available for this cancelled event.' : 'The full address and poster are available after confirmed registration.'}</Text>}
-      {detail.canManage && detail.event.status !== 'cancelled' && <Action onPress={() => Alert.alert('Cancel this event?', 'All attendees will be notified. Reserved places will be released. Answers remain until you or the attendee deletes them. This cannot be undone.', [
-        { text: 'Keep event', style: 'cancel' }, { text: 'Cancel event', style: 'destructive', onPress: () => run(async valid => {
-          await api.cancelEvent(detail.event.id, detail.event.revision, 'CANCEL EVENT'); const fresh = await api.load(detail.event.id);
-          if (valid()) { setDetail(fresh); setPoster(null); setNotice('Event cancelled. Attendee notifications are queued.'); }
-        }) },
-      ])}>Cancel whole event</Action>}
-      {detail.canManage && <><Action onPress={() => edit()}>Edit event or registration form</Action><Action onPress={() => responsePage()}>Registrations ({detail.event.registrationCount || 0})</Action>{detail.privateDetails?.hasPoster && <Action onPress={() => posterChange(true)}>Remove private poster</Action>}{pendingPoster && <Action onPress={() => posterChange(false)}>Retry selected poster upload</Action>}</>}
-      {detail.canApprove && detail.event.status === 'pending' && <Action primary onPress={() => run(async valid => { await api.approve(detail.event.id, detail.event.revision); const fresh = await api.load(detail.event.id); if (valid()) { setDetail(fresh); setNotice('Approved.'); } })}>Approve event after reviewing details</Action>}
-      {detail.registrationNeedsReview && <Text style={styles.muted}>The registration form has changed. Please review your answers and agree to the current terms.</Text>}
-      {(detail.canRegister || detail.canEditRegistration) && <Action primary onPress={startEntry}>{detail.ownRegistration?.status === 'registered' ? 'Edit registration' : 'Register for event'}</Action>}
-      {!detail.canRegister && <Text style={styles.muted}>{detail.canEditRegistration ? 'New registrations are closed. You can still update answers or reduce your places until event day.' : 'Registration is closed or awaiting approval.'}</Text>}
-      {detail.canCancel && <Action onPress={cancel}>Delete my registration and answers</Action>}
-    </View>}
     {detail && stage === 'entry' && <View style={styles.panel}>
       <Text style={styles.title}>{detail.ownRegistration?.status === 'registered' ? 'Edit registration' : 'Register'} · {detail.event.title}</Text>
       {detail.ownRegistration && detail.ownRegistration.formVersion !== detail.form.version && <Text style={styles.error}>The organiser changed the form. Review every question and agree to the current terms again.</Text>}
       <Text style={styles.text}>{detail.form.purpose}</Text><Text style={styles.muted}>{detail.retention?.notice}</Text>
       <Input label="Number of places" value={places} keyboardType="number-pad" onChangeText={value => { submission.current = null; setPlaces(value); }} />
       {detail.form.fields.map(field => <View key={field.id}><Answer field={field} value={answers[field.id]} onChange={value => { submission.current = null; setAnswers(current => ({ ...current, [field.id]: value })); }} />{field.description ? <Text style={styles.muted}>{field.description}</Text> : null}</View>)}
-      <Action primary onPress={submit}>Submit registration</Action><Action onPress={() => { setAnswers({}); setStage('card'); }}>Back to event</Action>
+      <Action primary onPress={submit}>Submit registration</Action><Action onPress={onBack}>Back to events</Action>
     </View>}
     {detail && ['confirmation', 'host-confirmation'].includes(stage) && <View style={styles.panel}>
       <Text style={styles.title}>{stage === 'confirmation' ? 'Registration confirmed' : 'Event and form saved'}</Text>
       <Text style={styles.text}>{detail.event.title}</Text>
-      <Text style={styles.muted}>{stage === 'confirmation' ? `${detail.ownRegistration?.places || 0} places reserved.` : 'Awaiting administrator approval. Review your event before it is published.'}</Text>
-      <Action primary onPress={() => setStage('card')}>View event details</Action><Action onPress={() => stage === 'confirmation' ? startEntry() : edit()}>{stage === 'confirmation' ? 'Edit registration' : 'Edit event or form'}</Action>
+      <Text style={styles.muted}>{stage === 'confirmation' ? `${detail.ownRegistration?.places || 0} places reserved.` : detail.event.status === 'pending' ? 'Awaiting super administrator approval. Your event appears in My Events until approved.' : 'Changes saved.'}</Text>
+      <Action primary onPress={onBack}>Back to events</Action><Action onPress={() => stage === 'confirmation' ? startEntry() : edit()}>{stage === 'confirmation' ? 'Edit registration' : 'Edit event or form'}</Action>
+      {pendingPoster && <Action onPress={() => posterChange(false)}>Retry selected poster upload</Action>}
     </View>}
     {detail && stage === 'responses' && <View style={styles.group}>
       <Text style={styles.muted}>Only authorised organiser/admin responses are shown. Export includes the loaded pages only; handle personal information securely.</Text>
       <Action onPress={() => run(() => Share.share({ title: 'Registration responses (loaded pages)', message: registrationsCsv(responses) }))}>Share loaded responses as CSV text</Action>
       {responses.map(row => <View key={row.registrationId} style={styles.panel}><Text style={styles.label}>{row.registrationId} · {row.status} · {row.places} places</Text>{(row.fields || []).map(field => <View key={field.id}><Text style={styles.label}>{field.label}</Text><Text style={styles.text}>{Array.isArray(row.answers[field.id]) ? row.answers[field.id].join(', ') : row.answers[field.id] === true ? 'Agreed' : String(row.answers[field.id] ?? '')}</Text></View>)}{row.answersDeletedAt ? <Text style={styles.muted}>Answers deleted.</Text> : <Action onPress={() => deleteAnswers(row)}>Permanently delete answers only</Action>}</View>)}
-      {responseCursor && <Action onPress={() => responsePage(responseCursor)}>Load more responses</Action>}<Action onPress={() => open(detail.event.id)}>Back to event</Action>
+      {responseCursor && <Action onPress={() => responsePage(responseCursor)}>Load more responses</Action>}<Action onPress={onBack}>Back to events</Action>
     </View>}
     </View>
   </KeyboardAwareScrollView>;
