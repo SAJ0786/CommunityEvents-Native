@@ -2,8 +2,13 @@ import { httpsCallable } from '@react-native-firebase/functions';
 import { functions } from '../firebase/firebase';
 import { getEventTitle } from './events';
 
-export async function startNativeEventStream(event, privacyStatus = 'public') {
+function requireSupportedStreamEvent(event) {
   if (!event?.id) throw new Error('Event not found.');
+  if (event.registrationOnly) throw new Error('Streaming is not available for registration events until viewing privacy and backend support are configured.');
+}
+
+export async function startNativeEventStream(event, privacyStatus = 'public') {
+  requireSupportedStreamEvent(event);
   const fnName = event.isLive && event.liveUrl ? 'nativeStreamResume' : 'nativeStreamStart';
   const payload = fnName === 'nativeStreamResume'
     ? { eventId: event.id, sessionId: event.liveUrl, directNative: true }
@@ -25,7 +30,7 @@ export async function startNativeEventStream(event, privacyStatus = 'public') {
 }
 
 export async function startExternalEventStream(event, youtubeUrl, privacyStatus = 'public') {
-  if (!event?.id) throw new Error('Event not found.');
+  requireSupportedStreamEvent(event);
   const result = await httpsCallable(functions, 'startExternalYouTubeStream')({
     eventId: event.id,
     youtubeUrl: String(youtubeUrl || '').trim(),
@@ -35,7 +40,7 @@ export async function startExternalEventStream(event, youtubeUrl, privacyStatus 
 }
 
 export async function endEventStream(event, sessionId = '') {
-  if (!event?.id) throw new Error('Event not found.');
+  requireSupportedStreamEvent(event);
   const functionName = event.liveSource === 'external-youtube'
     ? 'endExternalYouTubeStream'
     : 'nativeStreamEndEvent';
@@ -47,6 +52,7 @@ export async function endEventStream(event, sessionId = '') {
 }
 
 export function notifyEventLive(event) {
+  requireSupportedStreamEvent(event);
   return httpsCallable(functions, 'notifyEventLive')({
     eventId: event.id,
     eventTitle: event.eventTypeDisplay || event.eventType || 'Event',
