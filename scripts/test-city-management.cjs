@@ -84,3 +84,20 @@ test('invalid existing catalogue is not overwritten and duplicate city under ano
   await assert.rejects(api.add(req({ ...preview, code: 'DAR' })), { code: 'already-exists' });
   assert.equal(state.writes, 1);
 });
+
+test('super admin can edit a city code or hide an added city, but never a built-in one or a duplicate code', async () => {
+  const { api, state, req } = fixture();
+  const preview = await api.preview(req({ placeId: 'darwin-place' }));
+  await api.add(req({ ...preview, code: 'DRW' }));
+  const edited = await api.update(req({ cityId: 'darwin-nt', code: 'dar' }));
+  assert.equal(edited.catalogue.cities.find(city => city.id === 'darwin-nt').code, 'DAR');
+  await assert.rejects(api.update(req({ cityId: 'darwin-nt', code: 'SYD' })), { code: 'already-exists' });
+  await assert.rejects(api.update(req({ cityId: 'darwin-nt', code: 'X' })), { code: 'invalid-argument' });
+  await assert.rejects(api.update(req({ cityId: 'sydney', enabled: false })), { code: 'failed-precondition' });
+  await assert.rejects(api.update(req({ cityId: 'nowhere', code: 'ZZZ' })), { code: 'not-found' });
+  const hidden = await api.update(req({ cityId: 'darwin-nt', enabled: false }));
+  assert.equal(hidden.catalogue.cities.find(city => city.id === 'darwin-nt').enabled, false);
+  assert.equal(hidden.catalogue.cities.length, 9);
+  state.user.role = 'admin';
+  await assert.rejects(api.update(req({ cityId: 'darwin-nt', code: 'DWN' })), { code: 'permission-denied' });
+});

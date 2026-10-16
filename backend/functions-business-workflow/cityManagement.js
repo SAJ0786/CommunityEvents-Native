@@ -58,7 +58,35 @@ function createCityManagement({ db, HttpsError, provider, enabled = () => proces
       const city = await resolve(placeId);
       return { city, placeId, fingerprint: fingerprint(city) };
     },
-    async add(request) {
+    async update(request) {
+      const userRef = await authorize(request);
+      const id = text(request.data?.cityId);
+      const changesCode = request.data?.code !== undefined, changesEnabled = request.data?.enabled !== undefined;
+      if (!id || (!changesCode && !changesEnabled)) fail('invalid-argument', 'Choose a city and a change to apply.');
+      const code = changesCode ? text(request.data.code).toUpperCase() : '';
+      if (changesCode && !/^[A-Z0-9]{2,6}$/.test(code)) fail('invalid-argument', 'Use a city code of 2-6 letters or digits.');
+      if (changesEnabled && typeof request.data.enabled !== 'boolean') fail('invalid-argument', 'Enabled must be true or false.');
+      const { BUNDLED_CITY_CATALOGUE, validateCityCatalogue } = await model;
+      const ref = db.collection('settings').doc('cityCatalogue');
+      return db.runTransaction(async tx => {
+        const [user, snapshot] = await Promise.all([tx.get(userRef), tx.get(ref)]);
+        requireAdmin(user);
+        const existing = validateCityCatalogue(snapshot.exists ? snapshot.data() : BUNDLED_CITY_CATALOGUE);
+        if (!existing) fail('failed-precondition', 'Existing city catalogue needs repair before editing cities.');
+        const target = existing.cities.find(row => row.id === id);
+        if (!target) fail('not-found', 'City not found.');
+        if (changesCode && existing.cities.some(row => row.id !== id && row.code === code)) fail('already-exists', 'This city code is already used.');
+        // Cities are never deleted so members' saved cities keep resolving; extra cities may be hidden instead.
+        if (changesEnabled && target.enabled !== request.data.enabled && BUNDLED_CITY_CATALOGUE.cities.some(row => row.id === id)) {
+          fail('failed-precondition', 'Built-in cities cannot be hidden.');
+        }
+        const next = validateCityCatalogue({ schemaVersion: 1, cities: existing.cities.map(row => row.id !== id ? row
+          : { ...row, ...(changesCode ? { code } : {}), ...(changesEnabled ? { enabled: request.data.enabled } : {}) }) });
+        if (!next) fail('failed-precondition', 'That change conflicts with the catalogue.');
+        tx.set(ref, next);
+        return { catalogue: next, cityId: id };
+      });
+    },    async add(request) {
       const userRef = await authorize(request);
       const city = await resolve(text(request.data?.placeId));
       if (request.data?.fingerprint !== fingerprint(city)) fail('failed-precondition', 'Location changed. Search and review the coordinates again.');
@@ -117,11 +145,12 @@ function register({ db, onCall, HttpsError, REGION, apiKey }) {
     },
   };
   const handlers = createCityManagement({ db, HttpsError, provider });
-  const options = { region: REGION, enforceAppCheck: true, secrets: [apiKey], maxInstances: 2 };
+  const options = { region: REGION, enforceAppCheck: false, secrets: [apiKey], maxInstances: 2 };
   return {
     searchCatalogueCities: onCall(options, handlers.search),
     previewCatalogueCity: onCall(options, handlers.preview),
     addCatalogueCity: onCall(options, handlers.add),
+    updateCatalogueCity: onCall(options, handlers.update),
   };
 }
 module.exports = { createCityManagement, register };
