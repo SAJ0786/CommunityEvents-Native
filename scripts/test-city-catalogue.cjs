@@ -30,7 +30,7 @@ test('new city, codes, area matching, disabled selection and retained historical
   assert.equal(updates, 1); assert.equal(model.CITY_OPTIONS, options);
   assert.ok(options.some(city => city.value === 'darwin'));
   assert.equal(model.cityCode('darwin'), 'DRW');
-  assert.equal(model.cityLabel('darwin'), 'Darwin, Australia');
+  assert.equal(model.cityLabel('darwin'), 'Darwin, NT, Australia');
   assert.equal(model.classifyMetroArea({ fullAddress: 'Synthetic Street NT 0830' }), 'darwin');
   assert.equal(model.classifyMetroArea({ suburb: 'Palmerston' }), 'darwin');
   assert.equal(model.getEventMetroArea({ metroArea: 'future-city' }), 'future-city');
@@ -104,7 +104,7 @@ test('server resolver preserves unknown IDs, uses new coordinates/aliases and re
   assert.equal(resolver.getUserCity({ defaultCity: 'darwin' }), 'darwin');
   assert.equal(resolver.getUserCity({ defaultCity: 'future-city' }), 'future-city');
   assert.equal(resolver.getEventMetroArea({ address: { suburb: 'Palmerston' } }), 'darwin');
-  assert.equal(resolver.cityLabel('darwin'), 'Darwin, Australia');
+  assert.equal(resolver.cityLabel('darwin'), 'Darwin, NT, Australia');
   for (const latitude of [null, undefined, NaN, '', 0, -91]) {
     const invalid = clone(data); invalid.cities.at(-1).latitude = latitude;
     assert.throws(() => model.createCityResolver(invalid), /Invalid city catalogue/);
@@ -121,7 +121,7 @@ test('concurrent Events workers keep independent catalogue snapshots and fail cl
   const first = context.run(async () => { started(); await pause; return context.cityLabel('darwin'); });
   await entered; data.cities.at(-1).label = 'Updated Darwin';
   const second = await context.run(async () => context.cityLabel('darwin'));
-  release(); assert.equal(await first, 'Darwin, Australia'); assert.equal(second, 'Updated Darwin');
+  release(); assert.equal(await first, 'Darwin, NT, Australia'); assert.equal(second, 'Updated Darwin');
   data = { invalid: true }; let called = false;
   await assert.rejects(context.run(() => { called = true; }), /Invalid city catalogue/);
   assert.equal(called, false);

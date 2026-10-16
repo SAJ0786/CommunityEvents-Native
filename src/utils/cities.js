@@ -1,13 +1,13 @@
 export const DEFAULT_CITY = 'sydney';
 
 export const CITY_OPTIONS = [
-  { value: 'adelaide', label: 'Adelaide, Australia' },
-  { value: 'brisbane', label: 'Brisbane, Australia' },
-  { value: 'canberra', label: 'Canberra, Australia' },
-  { value: 'hobart', label: 'Hobart, Australia' },
-  { value: 'melbourne', label: 'Melbourne, Australia' },
-  { value: 'perth', label: 'Perth, Australia' },
-  { value: 'sydney', label: 'Sydney, Australia' },
+  { value: 'adelaide', label: 'Adelaide, SA, Australia' },
+  { value: 'brisbane', label: 'Brisbane, QLD, Australia' },
+  { value: 'canberra', label: 'Canberra, ACT, Australia' },
+  { value: 'hobart', label: 'Hobart, TAS, Australia' },
+  { value: 'melbourne', label: 'Melbourne, VIC, Australia' },
+  { value: 'perth', label: 'Perth, WA, Australia' },
+  { value: 'sydney', label: 'Sydney, NSW, Australia' },
   { value: 'rest-of-australia', label: 'Rest of Australia' },
 ];
 
@@ -45,6 +45,7 @@ export const subscribeCityCatalogue = listener => { subscribers.add(listener); r
 export const compareCityNames = (a, b) => (a.id === 'rest-of-australia') - (b.id === 'rest-of-australia') || a.label.localeCompare(b.label, 'en', { sensitivity: 'base' });
 export const getCityDefinitions = () => definitions.map(city => ({ ...city })).sort(compareCityNames);
 export const getCityDefinition = id => definitions.find(city => city.id === id) || null;
+const withState = (label, state) => state && /, Australia$/.test(label) && !label.includes(', ' + state + ',') ? label.replace(/, Australia$/, ', ' + state + ', Australia') : label;
 export function validateCityCatalogue(data) {
   if (data?.schemaVersion !== 1 || !Array.isArray(data.cities) || !data.cities.length || data.cities.length > 100) return null;
   const ids = new Set(); const result = [];
@@ -62,7 +63,7 @@ export function validateCityCatalogue(data) {
     if (!Array.isArray(row.aliases) || row.aliases.length > 200 || row.aliases.some(alias => typeof alias !== 'string' || !/[\p{L}\p{N}]/u.test(alias) || alias.length > 100)) return null;
     if (!Array.isArray(row.postcodeRanges) || row.postcodeRanges.length > 100 || row.postcodeRanges.some(range => !Array.isArray(range) || range.length !== 2 || range.some(number => !Number.isSafeInteger(number) || number < 800 || number > 9999) || range[0] > range[1])) return null;
     ids.add(row.id);
-    result.push({ id: row.id, label: row.label.trim(), code: row.code, enabled: row.enabled, order: row.order,
+    result.push({ id: row.id, label: withState(row.label.trim(), row.state), code: row.code, enabled: row.enabled, order: row.order,
       state: row.state || '', timeZone: row.timeZone || '', latitude: row.latitude ?? null, longitude: row.longitude ?? null,
       aliases: row.aliases.map(alias => alias.trim().toLowerCase()), postcodeRanges: row.postcodeRanges.map(range => [...range]) });
   }
