@@ -1,15 +1,19 @@
 # Event registration backend and Native integration
 
-## Independent recurring registrations - 17 October follow-up (NOT deployed)
+## Independent recurring registrations - 17 October follow-up (deployed)
 
 User chose separate registrations, capacity and closing for every occurrence.
 The additive `createRegistrationSeries` callable creates 2..100 independent pending
 events in ONE transaction (yearly at most 5; other frequencies within one year,
 yearly within four years). Bounded serialized event/form/private data must fit
 8 MiB; larger requests fail before any write rather than partially creating.
-No new deployment, migration, index, rules, delivery or gate activation is implied.
-Production still has the 19-function staged release described below until this
-new 20-function codebase is explicitly authorized and deployed.
+Following separate authorization for the Web release prerequisite, the 20-function
+registration codebase is deployed from clean `acae2b7` (source identical to
+implementation `1efe733`). All 20 ACTIVE, including
+`createregistrationseries-00001-xuh`; deployed source archive matches all 16
+tracked JS/MJS/JSON package/source files. Runtime gates remain true/false/true
+(enabled/notices/maintenance), existing secrets and App Check behavior preserved.
+No migration, index, rules, delivery activation or real participant writes.
 
 Request:
 
@@ -69,8 +73,9 @@ or implied. Each private poster must upload through its own event/revision calla
 report and retry individual failures without recreating the series or sharing paths.
 
 Client `createRegistrationClient.createSeries` is an explicit separate action;
-existing single-event `save` remains unchanged. New clients require this backend
-deployment; already-delivered Android build 97 does NOT contain this follow-up.
+existing single-event `save` remains unchanged. The backend prerequisite is live;
+already-delivered Android build 97 does NOT contain this follow-up. User owns
+building both final Native platforms; no additional agent build/submission.
 Native supports preview/review of each occurrence's capacity, closing and clocks,
 with per-date prayer recalculation, immutable retry snapshots, quota-aware private
 poster uploads and My Events confirmation routing. Existing edits/copies never

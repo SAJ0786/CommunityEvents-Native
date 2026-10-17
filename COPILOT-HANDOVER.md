@@ -18,14 +18,23 @@
   enable registration only. Default production profile still disables registration;
   do not accidentally build it expecting registration to appear. No public-store
   release authorization, new OTA architecture or notification activation implied.
-- **Recurrence backend prerequisite remains undeployed.** Before exercising or
-  distributing recurrence clients, explicitly authorize/deploy the new
-  20-function registration codebase from `1efe733` or a source-identical successor,
-  then release matching Web. Existing production has the earlier 19-function
-  staged contract, not `createRegistrationSeries`. A successful build alone cannot
-  make that new callable available. No migration/rules/index change required.
+- **Recurrence backend prerequisite is now LIVE**, following user's additional
+  request to deploy Web and the coordinated prerequisite authorization.
+  Only `functions:registration` deployed from clean
+  `acae2b7974891347904156194aac2c6a6b3bbfcf` (documentation-only successor of
+  implementation `1efe733`); command exit 0, no force. All 20 functions ACTIVE,
+  Node 22, `australia-southeast1`; includes
+  `createregistrationseries-00001-xuh`. Deployed archive matches all 16 tracked
+  JS/MJS/JSON source/package files byte-for-byte. All existing secret references
+  preserved; gates remain ENABLED=true / NOTICES=false / MAINTENANCE=true.
+  Full env hashes match 18 of 19 old functions; save's only actual difference is
+  platform-managed `FUNCTION_SIGNATURE_TYPE=http` added where previously absent.
+  New save/approve/get/list revisions: `00004-zuc` / `00004-xed` /
+  `00004-nok` / `00004-dug`. No real records/messages, rules/index/migration or
+  other-codebase changes. Matching Web release is coordinated by its owner.
 - Matching Web follow-up final source:
-  `5619d40ffe4aca55efc5f9f1b60c63b5d59b9e07`, clean/pushed, NOT deployed.
+  `5619d40ffe4aca55efc5f9f1b60c63b5d59b9e07`, clean/pushed; Hosting deployment
+  authorized and prerequisite confirmed, final Hosting evidence pending.
   Partner reports 283 root +21 React tests, 95 responsive layouts, phone/desktop
   field-order/headings/admin-tab checks and production build pass. Earlier live
   Web/runtime/backend release evidence below remains valid, not this new source.
@@ -39,13 +48,13 @@
   check, 14 regression runners and prayer timezone fixtures). Physical-device,
   store/provider acceptance and all user-owned binary delivery remain outstanding.
 
-### New recurring-registration follow-up - source work, NOT deployed
+### New recurring-registration follow-up - source complete, backend deployed
 
 - User added recurring registration events and explicitly chose **separate
   registration, capacity and closing date for each occurrence**. This is new
-  work after the deployed staged release/Android build 97; no new deployment
-  or build authorization is inferred. iOS local Apple authentication remains
-  unconfirmed; leave the existing signing terminal for the user.
+  work after the staged release/Android build 97. Backend deployment was separately
+  authorized and completed as recorded above; no new Native build is inferred.
+  User owns further signing/builds, not the agent.
 - Additive callable `createRegistrationSeries({city,createKey,draft,recurrence,
   occurrences})` creates independent pending event/form/private documents
   atomically plus callable-private `registrationSeries/{seriesId}` retry receipt.
@@ -72,11 +81,11 @@
   or public URL. Existing quota is 10 uploads/user/hour; report failures and
   unattempted remaining posters explicitly without recreating events or bypassing
   quota. Pending/private projection, approval and notification holds remain.
-- Production currently has the prior 19 functions. This source adds a twentieth
+- Production now has all 20 functions. This source added a twentieth
   callable and the new private receipt collection (default-denied client access).
-  No rules/index/migration needed. Deliver both pending-aware clients plus new
-  callable in a later explicitly authorized coordinated release; older clients
-  continue single-event flow. Android build 97 DOES NOT contain recurrence.
+  No rules/index/migration needed. Web owns authorized matching Hosting release;
+  user owns tester binaries; older clients continue single-event flow.
+  Android build 97 DOES NOT contain recurrence.
 - Backend/helper validation so far: 64 targeted tests pass, including all 100
   occurrences committed, oversized forms rejected with zero writes, retry races,
   independent booking/cancellation/staged approval/privacy and true Hijri cadence.
@@ -97,9 +106,9 @@
   backend, 35 mounted/Native integration, 5 recurrence parity/transport, 6 schedule,
   4 stream, 3 email guard and 1 venue. Source check 130 JS files, release config
   check, all 14 regressions, prayer/Azaan timezone fixtures and diff checks pass.
-  No real records, notifications, streams, deploys or new artifacts were produced
-  for recurrence. It still requires authorized backend/client coordinated release
-  and a later tester binary; installed Android97 remains the previous release.
+  No real records, notifications or streams were produced for recurrence.
+  Backend deployment completed after separate authorization; user-owned later
+  tester binaries are still needed. Android97 remains the previous release.
 
 **This section supersedes the historical continuation below, especially its old
 checkout paths, undeployed-backend statements, App Check description and
