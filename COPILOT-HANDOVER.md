@@ -2,6 +2,43 @@
 
 ## Current Codex handover - 17 October 2026, Australia/Sydney
 
+### Final source handoff - user owns BOTH platform builds
+
+- Latest user direction: **"You just confirm that Native App code in Git is final.
+  then I will build myself for both"**. This supersedes agent-owned binary delivery
+  tasks below. Stop waiting for Apple input; do not start further signing, builds
+  or submissions. User owns iOS AND Android builds/distribution from this source.
+  No completed TestFlight delivery or installed-device parity is claimed.
+- Final implementation source on Native `main`:
+  `1efe7330a316c98f204ddcd4e7cd851d653a0b8a`; checked clean and equal to
+  `origin/main` before this documentation-only handoff. Subsequent handoff commit
+  changes documentation only and is the final checkout for the user's builds.
+- Native source is ready for the user's tester builds within the documented
+  scope: 2.1.1, dedicated `registration-testflight` / `registration-apk` profiles
+  enable registration only. Default production profile still disables registration;
+  do not accidentally build it expecting registration to appear. No public-store
+  release authorization, new OTA architecture or notification activation implied.
+- **Recurrence backend prerequisite remains undeployed.** Before exercising or
+  distributing recurrence clients, explicitly authorize/deploy the new
+  20-function registration codebase from `1efe733` or a source-identical successor,
+  then release matching Web. Existing production has the earlier 19-function
+  staged contract, not `createRegistrationSeries`. A successful build alone cannot
+  make that new callable available. No migration/rules/index change required.
+- Matching Web follow-up final source:
+  `5619d40ffe4aca55efc5f9f1b60c63b5d59b9e07`, clean/pushed, NOT deployed.
+  Partner reports 283 root +21 React tests, 95 responsive layouts, phone/desktop
+  field-order/headings/admin-tab checks and production build pass. Earlier live
+  Web/runtime/backend release evidence below remains valid, not this new source.
+- Known Native layout difference: shared normal-form step followed by registration
+  settings, not Web's exact new single-page order/headings/admin-tab layout.
+  Recurrence behavior is implemented/tested; exact Web presentation is not claimed.
+- Android build 97 remains available only as a PRE-recurrence artifact; it is not
+  the final source handed over now. iOS provisioning was not completed/verified.
+  Preserve existing app/signing identities; user handles Apple setup locally.
+- Source validation is complete (99 targeted tests, 130-file source check, release
+  check, 14 regression runners and prayer timezone fixtures). Physical-device,
+  store/provider acceptance and all user-owned binary delivery remain outstanding.
+
 ### New recurring-registration follow-up - source work, NOT deployed
 
 - User added recurring registration events and explicitly chose **separate
@@ -242,9 +279,11 @@ builds based on historical instructions.**
   gates, protected-callable rejection and live Hosting artifacts.
 - [x] Build and distribute Android 2.1.1 test APK build 97; inspect actual package,
   version, gates and signing. Available artifact is not physical-device acceptance.
-- [ ] Complete signed iOS 2.1.1 TestFlight build/upload after local Apple
+- [ ] USER-OWNED: complete signed iOS 2.1.1 TestFlight build/upload after local Apple
   authentication/provisioning above. Inspect artifact/version/gates/signing;
   distinguish build success/upload/processing/tester availability from installation.
+- [ ] USER-OWNED: build final recurring-registration Android test APK; build 97 is
+  the earlier source and does not contain recurrence.
 - [ ] Physical iPhone/Android acceptance: host builder/save/reopen, staged approval
   and private poster/venue isolation, attendee edit/cancel/form re-consent,
   superAdmin approval shortcut, time/prayer/Hijri roundtrip, calendar/reminders,
