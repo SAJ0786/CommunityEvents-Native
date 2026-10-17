@@ -76,6 +76,8 @@ Client `createRegistrationClient.createSeries` is an explicit separate action;
 existing single-event `save` remains unchanged. The backend prerequisite is live;
 already-delivered Android build 97 does NOT contain this follow-up. User owns
 building both final Native platforms; no additional agent build/submission.
+Matching Web source `5619d40` is live on Hosting `83844b8344aed84d`; its owner
+verified all 133 deployed file hashes and safe unauthenticated rejection probes.
 Native supports preview/review of each occurrence's capacity, closing and clocks,
 with per-date prayer recalculation, immutable retry snapshots, quota-aware private
 poster uploads and My Events confirmation routing. Existing edits/copies never

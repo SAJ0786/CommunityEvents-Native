@@ -33,8 +33,14 @@
   `00004-nok` / `00004-dug`. No real records/messages, rules/index/migration or
   other-codebase changes. Matching Web release is coordinated by its owner.
 - Matching Web follow-up final source:
-  `5619d40ffe4aca55efc5f9f1b60c63b5d59b9e07`, clean/pushed; Hosting deployment
-  authorized and prerequisite confirmed, final Hosting evidence pending.
+  `5619d40ffe4aca55efc5f9f1b60c63b5d59b9e07`, deployed and verified by Web owner:
+  Hosting `83844b8344aed84d`, released 17 October 2026 00:09:21 UTC,
+  https://communityconnect.siza.info. All 133 live SHA-256 file hashes match the
+  build; `/`, `/app`, `/businesses` return exact 200 entries. Signed-out 390/1440
+  layouts have no overflow/page errors; 13 existing protected rejection probes
+  plus new-series unauthenticated 401 pass. Existing five production flags and
+  delivery holds preserved; prior `aa458d7a89f29384` retained on rollback channel
+  `registration-pre-recurrence-20261017`. No real bookings/messages were exercised.
   Partner reports 283 root +21 React tests, 95 responsive layouts, phone/desktop
   field-order/headings/admin-tab checks and production build pass. Earlier live
   Web/runtime/backend release evidence below remains valid, not this new source.
