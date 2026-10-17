@@ -199,8 +199,8 @@ async function main() {
   assert.match(read('backend/firestore.rules'), /getAfter\(\/databases\/\$\(database\)\/documents\/hostMessageThreads/);
   assert.match(read('src/components/EventDetailsModal.js'), /<DrawerDragZone panHandlers=\{panHandlers\} style=\{styles\.sheetHeader\}>/,
     'Event details drawer header must keep using the shared drag-zone wiring, not a bespoke panHandlers spread');
-  assert.doesNotMatch(read('src/components/EventDetailsModal.js'), /<Modal|import\s+\{[^}]*Modal/,
-    'Event details drawer must use the shared in-tree overlay architecture');
+  assert.match(read('src/components/EventDetailsModal.js'), /<Modal transparent visible=\{visible\}/,
+    'Event details must escape list clipping through a native modal; child overlays remain in that surface');
   assert.match(read('src/components/KeyboardAwareScrollView.js'), /input !== focused.current/);
   assert.match(read('src/components/NotificationsDrawer.js'), /BusinessNotificationsScreen.*user=\{user\}/);
   const hostInbox = read('src/components/InboxScreen.js');

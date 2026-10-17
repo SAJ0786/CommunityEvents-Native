@@ -285,6 +285,8 @@ export default function CreateEventForm({
   canSubmit = true,
   allowUnchangedSubmit = false,
   registrationMode = false,
+  registrationTitle,
+  onRegistrationTitleChange,
 }) {
   const cityCatalogueVersion = useCityCatalogueVersion();
   const defaults = useMemo(() => ({
@@ -809,12 +811,14 @@ export default function CreateEventForm({
     if (kind === 'end') update('endTime', localTime(value));
   };
 
+  const FormContainer = registrationMode ? View : ScrollView;
   return (
-    <ScrollView
+    <FormContainer
       keyboardShouldPersistTaps="handled"
-      contentContainerStyle={styles.content}
+      {...(registrationMode ? { style: styles.content } : { contentContainerStyle: styles.content })}
     >
-      <MemberPageHeader title={title} subtitle={subtitle} icon="calendar-edit" tone="teal" />
+      {!registrationMode && <MemberPageHeader title={title} subtitle={subtitle} icon="calendar-edit" tone="teal" />}
+      {registrationMode && <Field label="Event title"><TextInput accessibilityLabel="Event title" value={registrationTitle || ''} maxLength={160} onChangeText={onRegistrationTitleChange} style={styles.input} /></Field>}
 
       {!canSubmit ? (
         <View style={styles.accountNotice}>
@@ -987,10 +991,10 @@ export default function CreateEventForm({
 
         {registrationMode && form.timeMode === 'manual' ? <View>
           <Field label="Start Time" optional error={attempted ? validation.startTime : ''}>
-            <TextInput accessibilityLabel="Event start time" value={form.startTime} placeholder="HH:mm" onChangeText={value => update('startTime', value)} style={styles.input} />
+            <Pressable accessibilityRole="button" accessibilityLabel="Choose event start time" onPress={() => setNativePicker('start')} style={styles.pickerButton}><Text style={styles.pickerValue}>{form.startTime || 'Choose start time'}</Text></Pressable>
           </Field>
           <Field label="End Time" optional error={attempted ? validation.endTime : ''}>
-            <TextInput accessibilityLabel="Event end time" value={form.endTime} placeholder="HH:mm" onChangeText={value => update('endTime', value)} style={styles.input} />
+            <Pressable accessibilityRole="button" accessibilityLabel="Choose event end time" onPress={() => setNativePicker('end')} style={styles.pickerButton}><Text style={styles.pickerValue}>{form.endTime || 'Choose end time'}</Text></Pressable>
           </Field>
           <Pressable onPress={() => setForm(current => ({ ...current, startTime: '', endTime: '' }))}><Text style={styles.addButtonText}>Clear event times</Text></Pressable>
           <Text style={styles.helper}>Use HH:mm in the selected event city's timezone. No time means a date-only calendar entry, not a scheduled start. An earlier end time means the following day. Daylight-saving gaps or ambiguous times must be corrected.</Text>
@@ -1265,7 +1269,7 @@ export default function CreateEventForm({
           </Pressable>
         ) : null}
       </View>
-    </ScrollView>
+    </FormContainer>
   );
 }
 

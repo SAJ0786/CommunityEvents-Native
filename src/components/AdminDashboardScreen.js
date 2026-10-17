@@ -492,6 +492,7 @@ export default function AdminDashboardScreen({
   const [adminEvents, setAdminEvents] = useState([]);
   const [archivedAdminEvents, setArchivedAdminEvents] = useState([]);
   const [adminEventView, setAdminEventView] = useState('active');
+  const [eventCollection, setEventCollection] = useState('events');
   const [adminEventQuery, setAdminEventQuery] = useState('');
   const [adminEventType, setAdminEventType] = useState('all');
   const [adminSeriesFilter, setAdminSeriesFilter] = useState('all');
@@ -907,6 +908,8 @@ export default function AdminDashboardScreen({
       return;
     }
     if (key === 'users') {
+      setUserSummaryFilter('all'); setUserRoleFilter('all'); setUserCityFilter('all');
+      setUserCalendarSyncedOnly(false); setUserQuery('');
       setPanel('users');
       setStatus({ message: '', error: false });
       return;
@@ -958,16 +961,16 @@ export default function AdminDashboardScreen({
     try {
       const nextUsers = await listUsers({ includeHidden: true });
       setUsersList(nextUsers);
+      setUsersLoaded(true);
     } catch (error) {
       setUsersError(error.message || 'Could not load users.');
     } finally {
-      setUsersLoaded(true);
       setUsersLoading(false);
     }
   };
 
   useEffect(() => {
-    if (panel === 'overview' || panel === 'users') {
+    if ((panel === 'overview' || panel === 'users') && !usersLoaded) {
       loadUsers();
     }
   }, [panel]);
@@ -2031,7 +2034,7 @@ export default function AdminDashboardScreen({
           <AdminPageHeader title={"Users"} subtitle={"User management and contact updates"} icon="account-group-outline" onBack={() => setPanel('overview')}>
             <Pressable accessibilityRole="button" accessibilityLabel="Export users as CSV" onPress={exportUsersCsv} style={styles.compactUserAction}><MaterialCommunityIcons name="download-outline" size={21} color={colors.tealDark} /></Pressable>
           </AdminPageHeader>
-          <RegistrationManagementPanel user={user} profile={profile} review onOperation={onOpenRegistration} />
+
 
           <View style={styles.statisticsCard}>
             <View style={styles.statisticsHead}>
@@ -2121,7 +2124,7 @@ export default function AdminDashboardScreen({
             </View>
           ) : null}
 
-          {usersLoading ? (
+          {usersLoading && !usersLoaded ? (
             <View style={styles.loadingCard}>
               <ActivityIndicator color={colors.tealDark} />
               <Text style={styles.cardDescription}>Loading users…</Text>
@@ -2415,7 +2418,13 @@ export default function AdminDashboardScreen({
       ) : panel === 'events' ? (
         <View style={styles.section}>
           <AdminPageHeader title={"Events"} subtitle={"Admin event management"} icon="calendar-outline" onBack={() => setPanel('overview')} />
-          <RegistrationManagementPanel user={user} profile={profile} onOperation={onOpenRegistration} />
+          <View style={styles.chipRow}>
+            {[['events', 'Events'], ['registration', 'Registration only Events']].map(([value, label]) => <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected: eventCollection === value }} onPress={() => setEventCollection(value)} style={[styles.chip, eventCollection === value && styles.chipActive]}><Text style={[styles.chipText, eventCollection === value && styles.chipTextActive]}>{label}</Text></Pressable>)}
+          </View>
+          {eventCollection === 'registration' ? <>
+            <RegistrationManagementPanel user={user} profile={profile} review onOperation={onOpenRegistration} />
+            <RegistrationManagementPanel user={user} profile={profile} onOperation={onOpenRegistration} />
+          </> : <>
 
           <View style={styles.statisticsCard}>
             <View style={styles.statisticsHead}>
@@ -2767,6 +2776,7 @@ export default function AdminDashboardScreen({
               </Text>
             </View>
           )}
+          </>}
         </View>
       ) : panel === 'repair' ? (
         <View style={styles.section}>

@@ -3,7 +3,7 @@ import { Image, Switch, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import CreateEventForm from '../components/CreateEventForm';
 import NativeDateTimeField from '../components/NativeDateTimeField';
-import { Action, Input, styles } from './RegistrationControls';
+import { Action, IconAction, Input, styles } from './RegistrationControls';
 import { FIELD_TYPES, FORM_TEMPLATES, TERMS_LIMIT, closingDateError, consentLast, makeField, moveField, publicNotesError, publicSuburbError, templateFields, validateDraft } from './prototypeModel';
 import { normalisePrivateVenue } from './privateVenue';
 import { normalEventFromRegistrationDraft, registrationDraftFromNormalEvent, registrationOccurrenceDefaults, validateRegistrationOccurrences } from './registrationViewModel';
@@ -88,11 +88,10 @@ export default function RegistrationEditor({
     } catch (failure) { setError(failure.message || 'Could not select poster.'); }
   };
   return <View style={styles.group} pointerEvents={busy ? 'none' : 'auto'}>
-    <View style={styles.row}><Action onPress={onCancel}>Back to events</Action>{step !== 'event' && <Action onPress={() => setStep('event')}>Edit event details</Action>}</View>
+    {step !== 'event' && <Action onPress={() => setStep('event')}>Edit event details</Action>}
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
     {step === 'event' && <View>
-      <Input label="Event title" value={draft.title} maxLength={160} onChangeText={value => update('title', value)} />
-      <CreateEventForm registrationMode defaultCity={city} defaultHostName={defaultHostName} defaultHostPhone={defaultHostPhone}
+      <CreateEventForm registrationMode registrationTitle={draft.title} onRegistrationTitleChange={value => update('title', value)} defaultCity={city} defaultHostName={defaultHostName} defaultHostPhone={defaultHostPhone}
         initialEvent={normalEventFromRegistrationDraft(draft, eventId)} allowUnchangedSubmit submitting={busy}
         title="Event details" subtitle="Registration event — private venue and poster" submitLabel="Continue to registration settings"
         onSubmit={acceptEvent} onCancel={onCancel} />
@@ -160,7 +159,7 @@ export default function RegistrationEditor({
         {['select', 'radio', 'checkboxes'].includes(field.type) && <Input label="Options (one per line)" value={field.options.join('\n')} multiline onChangeText={value => change(field.id, { options: value.split('\n') })} />}
         {field.type === 'consent' && <><Input label="Your terms and conditions" value={field.terms || ''} multiline maxLength={TERMS_LIMIT} onChangeText={value => change(field.id, { terms: value })} /><Text style={styles.muted}>{(field.terms || '').length}/{TERMS_LIMIT}. Describe exactly what attendees agree to. Agreement stays last.</Text></>}
         <View style={styles.row}><Text style={styles.flex}>Required</Text><Switch disabled={field.type === 'consent'} value={field.required} onValueChange={value => change(field.id, { required: value })} /></View>
-        <View style={styles.row}><Action onPress={() => update('fields', moveField(draft.fields, index, -1))}>Move up</Action><Action onPress={() => update('fields', moveField(draft.fields, index, 1))}>Move down</Action><Action onPress={() => update('fields', draft.fields.filter(item => item.id !== field.id))}>Remove</Action></View>
+        <View style={styles.row}><IconAction icon="arrow-up" label="Move question up" disabled={index === 0 || field.type === 'consent'} onPress={() => update('fields', moveField(draft.fields, index, -1))} /><IconAction icon="arrow-down" label="Move question down" disabled={index === draft.fields.length - 1 || field.type === 'consent'} onPress={() => update('fields', moveField(draft.fields, index, 1))} /><IconAction icon="delete-outline" label="Delete question" onPress={() => update('fields', draft.fields.filter(item => item.id !== field.id))} /></View>
       </View>)}
       <View style={styles.panel}><Text style={styles.title}>Add a question</Text><View style={styles.row}>{FIELD_TYPES.map(([type, label]) => <Action key={type} disabled={draft.fields.length >= 30} onPress={() => {
         update('fields', consentLast([...draft.fields, makeField(type, `q-${Date.now()}-${++serial.current}`)]));

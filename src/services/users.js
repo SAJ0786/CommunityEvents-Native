@@ -1,4 +1,4 @@
-import { arrayRemove, arrayUnion, collection, deleteField, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from '@react-native-firebase/firestore';
+import { arrayRemove, arrayUnion, collection, deleteField, doc, getDoc, getDocFromCache, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from '@react-native-firebase/firestore';
 import { httpsCallable } from '@react-native-firebase/functions';
 import { signOut } from '@react-native-firebase/auth';
 import { auth, db, functions } from '../firebase/firebase';
@@ -9,9 +9,9 @@ const ROLES = {
   SUPER_ADMIN: 'superAdmin',
 };
 
-export async function getUserProfile(uid) {
+export async function getUserProfile(uid, { cacheOnly = false } = {}) {
   if (!uid) return null;
-  const snapshot = await getDoc(doc(db, 'users', uid));
+  const snapshot = await (cacheOnly ? getDocFromCache : getDoc)(doc(db, 'users', uid));
   if (!snapshot.exists()) return null;
   const data = snapshot.data();
   return {
@@ -58,8 +58,9 @@ export async function ensureUserProfile(uid, defaults = {}) {
       ...createDefaults,
     }, { merge: true });
   }
-  const current = await getUserProfile(uid);
-  if (!current) return null;
+  const data = snapshot.exists() ? snapshot.data() : await getUserProfile(uid);
+  if (!data) return null;
+  const current = { id: uid, ...data, savedEvents: data.savedEvents || data.savedEventIds || [], savedBusinesses: data.savedBusinesses || data.savedBusinessIds || [] };
   const updates = {};
   if (!current.phone && defaults.phone) updates.phone = defaults.phone;
   if (!current.phoneVerified && defaults.phoneVerified) updates.phoneVerified = true;

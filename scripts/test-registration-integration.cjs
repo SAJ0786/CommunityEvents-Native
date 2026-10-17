@@ -110,7 +110,7 @@ test('unified native discovery and operations replace the separate registration 
   const dashboard = source('src/components/AdminDashboardScreen.js');
   assert.match(app, /prepareHomeEvents\(\[\.\.\.events, \.\.\.registrationEvents\]/);
   assert.match(app, /registrationOnly \? visibleEvents.filter\(event => event.registrationOnly\) : visibleEvents/);
-  assert.match(app, /registrationOnly \? 'All events' : 'Registration only'/);
+  assert.match(app, /registrationOnly \? 'All events' : 'Registration\\nonly'/);
   assert.doesNotMatch(app, /Browse registration only events/);
   assert.doesNotMatch(screen, /Browse events|My hosted events|stage === 'list'|stage === 'card'|Cancel whole event/);
   assert.match(modal, /'Edit registrations' : 'Register for event'/);
@@ -155,6 +155,8 @@ function detailsFixture(detail, isGuest = false) {
       AppState: { currentState: 'active', addEventListener: (_, callback) => { listeners.push(callback); return { remove() {} }; } },
       Alert: { alert: (...args) => alerts.push(args) } },
     './EventDetailsModal': { __esModule: true, default: 'NormalDetails' },
+    './ModalSafeArea': { __esModule: true, default: 'SafeAreaView' },
+    '../registration/RegistrationControls': { Action: 'Action', Input: 'Input', styles: {} },
     './KeyboardAwareScrollView': { __esModule: true, default: 'ScrollView' },
     './MemberPageHeader': { __esModule: true, default: 'MemberPageHeader' },
     '../registration/firebaseRegistration': { firebaseRegistration: () => api, REGISTRATION_ENABLED: true },
@@ -215,7 +217,7 @@ test('host normal modal fetches private poster, routes form/responses/edit and c
   fixture.render(); await new Promise(setImmediate);
   const review = fixture.render();
   assert.match(JSON.stringify(review), /Attendance/);
-  flatten(review).find(node => node.type === 'Pressable' && JSON.stringify(node.props.children).includes('Approve reviewed event and form')).props.onPress();
+  flatten(review).find(node => node.type === 'Action' && JSON.stringify(node.props.children).includes('Approve event and form')).props.onPress();
   await fixture.alerts.at(-1)[2][1].onPress();
   assert.equal(fixture.calls.some(call => call[0] === 'approve' && call[1] === 'event' && call[2] === 7), true);
   fixture.listeners[0]('background');
@@ -365,7 +367,7 @@ test('approved staged review displays submitted event, private venue, poster and
   const review = fixture.render();
   for (const value of ['Staged title', '2 Staged Lane', 'private-phone', 'private@example.test', 'Staged purpose', 'Staged question', 'New help', 'One', 'Two', 'Staged terms', 'STAGED_BYTES', 'New host', 'Poetry: Reciter']) assert.ok(JSON.stringify(review).includes(value), value);
   assert.equal(fixture.calls.some(call => call[0] === 'poster' && call[2] === 'pending'), true);
-  const approval = flatten(review).find(node => node.type === 'Pressable' && JSON.stringify(node.props.children).includes('Approve reviewed event and form'));
+  const approval = flatten(review).find(node => node.type === 'Action' && JSON.stringify(node.props.children).includes('Approve event and form'));
   assert.equal(approval.props.disabled, false);
   fixture.api.approve = async (...args) => {
     fixture.calls.push(['approve', ...args]);
@@ -390,7 +392,7 @@ test('unreadable staged poster blocks approval and background clears the review'
   fixture.api.poster = async () => { throw new Error('Cannot read submitted poster'); };
   fixture.render(); await new Promise(setImmediate);
   const review = fixture.render();
-  const approval = flatten(review).find(node => node.type === 'Pressable' && JSON.stringify(node.props.children).includes('Approve reviewed event and form'));
+  const approval = flatten(review).find(node => node.type === 'Action' && JSON.stringify(node.props.children).includes('Approve event and form'));
   assert.equal(approval.props.disabled, true);
   fixture.listeners[0]('background');
   assert.equal(JSON.stringify(fixture.render()).includes('Staged title'), false);
@@ -407,7 +409,7 @@ test('staged poster removal never falls back to the still-published private post
   assert.match(JSON.stringify(review), /No poster in this submitted version/);
   assert.doesNotMatch(JSON.stringify(review), /PRIVATE_BYTES|STAGED_BYTES/);
   assert.equal(fixture.calls.filter(call => call[0] === 'poster').length, previousPosters);
-  const approval = flatten(review).find(node => node.type === 'Pressable' && JSON.stringify(node.props.children).includes('Approve reviewed event and form'));
+  const approval = flatten(review).find(node => node.type === 'Action' && JSON.stringify(node.props.children).includes('Approve event and form'));
   assert.equal(approval.props.disabled, false);
 });
 test('denied pending poster rechecks authorization and drops stale manager venue and staged content', async () => {
@@ -635,11 +637,13 @@ test('mounted recurrence editor calculates seasonal prayer starts and preserves 
 });
 function recurrenceScreenFixture(transport, extra = {}) {
   return componentFixture('src/components/RegistrationScreen.js', {
-    'react-native': { ActivityIndicator: 'ActivityIndicator', Alert: { alert() {} }, AppState: { addEventListener: () => ({ remove() {} }) }, Share: {}, Text: 'Text', View: 'View' },
+    'react-native': { ActivityIndicator: 'ActivityIndicator', Alert: { alert() {} }, AppState: { addEventListener: () => ({ remove() {} }) }, Pressable: 'Pressable', Share: {}, Text: 'Text', View: 'View' },
     './KeyboardAwareScrollView': 'ScrollView', './MemberPageHeader': 'MemberPageHeader',
     '../registration/RegistrationEditor': { __esModule: true, default: 'Editor' },
     '../registration/RegistrationControls': { Action: 'Action', Answer: 'Answer', Input: 'Input', styles: {} },
     '../registration/firebaseRegistration': {}, '../registration/registrationClient': contract,
+    '../registration/responsePresentation': load(path.join(root, 'src/registration/responsePresentation.js')),
+    '../services/registrationExport': { exportRegistrationWorkbook: async () => {} },
     '../registration/registrationViewModel': view, '../registration/prototypeModel': load(path.join(root, 'src/registration/prototypeModel.js')),
     '../utils/eventOptions': { EVENT_TYPES: ['Majlis'] }, '../services/eventOptionsAdmin': { getDynamicEventOptions: async () => ({ eventTypes: [] }) },
     '../utils/cities': { cityLabel: value => value }, '../theme': { colors: {} },
@@ -802,11 +806,13 @@ test('host screen edits pending draft but self-registration stays on published f
     submit: async value => { submitted.push(value); },
   };
   const mocks = {
-    'react-native': { ActivityIndicator: 'ActivityIndicator', Alert: { alert() {} }, AppState: { addEventListener: () => ({ remove() {} }) }, Share: {}, Text: 'Text', View: 'View' },
+    'react-native': { ActivityIndicator: 'ActivityIndicator', Alert: { alert() {} }, AppState: { addEventListener: () => ({ remove() {} }) }, Pressable: 'Pressable', Share: {}, Text: 'Text', View: 'View' },
     './KeyboardAwareScrollView': 'ScrollView', './MemberPageHeader': 'MemberPageHeader',
     '../registration/RegistrationEditor': { __esModule: true, default: 'Editor' },
     '../registration/RegistrationControls': { Action: 'Action', Answer: 'Answer', Input: 'Input', styles: {} },
     '../registration/firebaseRegistration': {}, '../registration/registrationClient': contract,
+    '../registration/responsePresentation': load(path.join(root, 'src/registration/responsePresentation.js')),
+    '../services/registrationExport': { exportRegistrationWorkbook: async () => {} },
     '../registration/registrationViewModel': view, '../registration/prototypeModel': load(path.join(root, 'src/registration/prototypeModel.js')),
     '../utils/eventOptions': { EVENT_TYPES: ['Majlis'] }, '../services/eventOptionsAdmin': { getDynamicEventOptions: async () => ({ eventTypes: [] }) },
     '../utils/cities': { cityLabel: value => value }, '../theme': { colors: {} },
@@ -832,4 +838,29 @@ test('host screen edits pending draft but self-registration stays on published f
   assert.ok(submit, 'published entry provides confirmation action');
   submit.props.onPress(); await new Promise(setImmediate);
   assert.equal(submitted[0].formVersion, 2);
+});
+
+test('event details render before a slow private poster and retain authorization gates', async () => {
+  const fixture = detailsFixture({ event: { id: 'event', status: 'pending', title: 'Available immediately', revision: 2 }, canManage: true, privateDetails: { address: '1 Private Lane', hasPoster: true }, form: { fields: [] } });
+  let release;
+  fixture.api.poster = () => new Promise(resolve => { release = resolve; });
+  fixture.render(); await new Promise(setImmediate);
+  const tree = fixture.render();
+  assert.equal(tree.type, 'NormalDetails'); assert.equal(tree.props.event.title, 'Available immediately');
+  assert.equal(tree.props.event.imageUrl, '');
+  release({ mime: 'image/png', base64: 'POSTER' }); await new Promise(setImmediate);
+  assert.equal(fixture.render().props.event.imageUrl, 'data:image/png;base64,POSTER');
+});
+
+test('response list initially shows names and reveals answers only when expanded', async () => {
+  const row = { registrationId: 'internal-reference', status: 'registered', places: 1, fields: [{ id: 'name', label: 'Name of Participant', type: 'text' }, { id: 'age', label: 'Age', type: 'number' }], answers: { name: 'Test Participant', age: '9' } };
+  const fixture = recurrenceScreenFixture({ load: async () => ({ event: { id: 'event', title: 'Test' } }), responses: async () => ({ registrations: [row], nextCursor: null }) }, { initialCreate: false, initialEventId: 'event', initialAction: 'responses' });
+  fixture.render(); await new Promise(setImmediate);
+  const tree = fixture.render();
+  const names = flatten(tree).find(node => node.type === 'Pressable' && JSON.stringify(node.props.children).includes('Test Participant'));
+  assert.ok(names); assert.equal(names.props.accessibilityState.expanded, false);
+  assert.doesNotMatch(JSON.stringify(tree), /internal-reference ·|Share loaded responses as CSV|Only authorised organiser/);
+  assert.equal(flatten(tree).some(node => node.type === 'Text' && node.props.children.includes('Age')), false);
+  names.props.onPress();
+  assert.equal(flatten(fixture.render()).some(node => node.type === 'Text' && node.props.children.includes('Age')), true);
 });

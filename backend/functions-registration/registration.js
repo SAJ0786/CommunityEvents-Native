@@ -238,7 +238,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (status === 'approved') {
         tx.set(pendingRef(reference.id), { event: publicData, form: formData, privateDetails: privateData,
           submittedAt: now().toISOString(), submittedBy: caller.uid });
-        tx.update(reference, { revision, hasPendingChanges: true });
+        tx.update(reference, { revision, hasPendingChanges: true, reviewDecision: '', reviewFeedback: '' });
         return { eventId: reference.id, revision, status, hasPendingChanges: true };
       }
       tx.set(reference, publicData);
@@ -251,7 +251,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     return db.runTransaction(async tx => {
       const caller = await actor(request, tx); const event = await readEvent(request.data?.eventId, tx);
       if (!approves(caller, event)) fail('permission-denied', 'Only a super admin can approve an event.');
-      if (event.deletedAt || (event.status !== 'pending' && !(event.status === 'approved' && event.hasPendingChanges))) fail('failed-precondition', 'Only a pending event or submitted changes can be approved.');
+      if (event.deletedAt || event.reviewDecision || (event.status !== 'pending' && !(event.status === 'approved' && event.hasPendingChanges))) fail('failed-precondition', 'Only a pending event or submitted changes can be approved.');
       if (request.data.expectedRevision !== event.revision) fail('aborted', 'Review the latest event before approval.');
       const pending = (await tx.get(pendingRef(event.id))).data();
       const currentForm = (await tx.get(formRef(event.id))).data();
@@ -287,6 +287,20 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (localMinute(now(), event.timeZone) >= (event.closes || `${event.date}T00:00`)) fail('failed-precondition', 'The registration closing time has passed.');
       tx.update(eventRef(event.id), { status: 'approved', approvedBy: caller.uid, approvedAt: now().toISOString() });
       return { eventId: event.id, status: 'approved' };
+    });
+  }
+  async function reviewRegistrationEvent(request) {
+    const decision = request.data?.decision;
+    const feedback = String(request.data?.feedback || '').trim();
+    if (!['rejected', 'changes-requested'].includes(decision) || !feedback || feedback.length > 2000) fail('invalid-argument', 'Choose a decision and enter feedback (up to 2000 characters).');
+    return db.runTransaction(async tx => {
+      const caller = await actor(request, tx); const event = await readEvent(request.data?.eventId, tx);
+      if (!approves(caller, event)) fail('permission-denied', 'Only a super admin can review an event.');
+      if (event.deletedAt || event.reviewDecision || (event.status !== 'pending' && !(event.status === 'approved' && event.hasPendingChanges))) fail('failed-precondition', 'Reload an event awaiting review.');
+      if (request.data.expectedRevision !== event.revision) fail('aborted', 'Review the latest event before deciding.');
+      const revision = event.revision + 1;
+      tx.update(eventRef(event.id), { revision, reviewDecision: decision, reviewFeedback: feedback, reviewedBy: caller.uid, reviewedAt: now().toISOString() });
+      return { eventId: event.id, revision, decision };
     });
   }
   async function submitEventRegistration(request) {
@@ -408,12 +422,13 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         liveVideoRecordId: /^[A-Za-z0-9_-]{1,200}$/.test(event.liveVideoRecordId || '') ? event.liveVideoRecordId : null,
       } : { isLive: false };
       const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), ...schedule, ...live, id: event.id, ownerUid: event.ownerUid, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
-      result.canApprove = Boolean(caller && !event.deletedAt && (event.status === 'pending' || pending) && approves(caller, event));
+      result.canApprove = Boolean(caller && !event.deletedAt && !event.reviewDecision && (event.status === 'pending' || pending) && approves(caller, event));
       result.canRegister = event.status === 'approved' && localMinute(now(), event.timeZone) < (event.closes || `${event.date}T00:00`);
       result.canEditRegistration = Boolean(registered && event.status === 'approved' && localMinute(now(), event.timeZone).slice(0, 10) < event.date);
       result.registrationNeedsReview = Boolean(registered && own.formVersion !== event.formVersion);
       result.canCancel = Boolean(registered && (event.status === 'cancelled' || (event.allowCancellation && localMinute(now(), event.timeZone).slice(0, 10) < event.date)));
       result.retention = RETENTION;
+      if (manager && event.reviewDecision) result.reviewFeedback = { decision: event.reviewDecision, message: event.reviewFeedback };
       const { normalisePrivateVenue } = await venueModel;
       const privateProjection = data => ({ address: data?.address || '', venue: normalisePrivateVenue(data?.venue), hasPoster: Boolean(data?.posterPath),
         hostPhone: data?.hostPhone || '', hostContactOptional: data?.hostContactOptional || '' });
@@ -477,19 +492,22 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     query = query.orderBy('__name__').limit(25);
     if (request.data?.cursor) query = query.startAfter(id(request.data.cursor));
     const page = await query.get(); const events = [];
-    for (const doc of page.docs) {
+    for (let offset = 0; offset < page.docs.length; offset += 5) {
+      const rows = await Promise.all(page.docs.slice(offset, offset + 5).map(async doc => {
       const event = doc.data();
-      if (event.deletedAt) continue;
-      if (scope === 'public' && (event.status !== 'approved' || event.date < localMinute(now(), event.timeZone).slice(0, 10))) continue;
-      if (scope === 'review' && event.status !== 'pending' && !(event.status === 'approved' && event.hasPendingChanges)) continue;
+      if (event.deletedAt) return null;
+      if (scope === 'public' && (event.status !== 'approved' || event.date < localMinute(now(), event.timeZone).slice(0, 10))) return null;
+      if (scope === 'review' && (event.reviewDecision || (event.status !== 'pending' && !(event.status === 'approved' && event.hasPendingChanges)))) return null;
       // Re-read through the transactional detail policy to handle approval/access
       // changes during pagination. Only the public allowlist leaves this endpoint.
       try {
         const result = await getRegistrationEvent({ ...request, data: { eventId: doc.id } });
-        if (scope === 'public' && (result.event.status !== 'approved' || result.event.date < localMinute(now(), result.event.timeZone).slice(0, 10))) continue;
-        if (scope === 'review' && !result.canApprove) continue;
-        events.push(listRow(result));
-      } catch (error) { if (error.code !== 'not-found') throw error; }
+        if (scope === 'public' && (result.event.status !== 'approved' || result.event.date < localMinute(now(), result.event.timeZone).slice(0, 10))) return null;
+        if (scope === 'review' && !result.canApprove) return null;
+        return listRow(result);
+      } catch (error) { if (error.code !== 'not-found') throw error; return null; }
+      }));
+      events.push(...rows.filter(Boolean));
     }
     return { events, nextCursor: page.docs.length === 25 ? page.docs.at(-1).id : null };
   }
@@ -647,6 +665,6 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const snapshot = await query.get();
     return { templates: snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })), nextCursor: snapshot.docs.length === 50 ? snapshot.docs.at(-1).id : null };
   }
-  return { createRegistrationSeries, saveRegistrationEvent, approveRegistrationEvent, submitEventRegistration, cancelEventRegistration, cancelRegistrationEvent, deleteRegistrationEvent, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
+  return { createRegistrationSeries, saveRegistrationEvent, approveRegistrationEvent, reviewRegistrationEvent, submitEventRegistration, cancelEventRegistration, cancelRegistrationEvent, deleteRegistrationEvent, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
 }
 module.exports = { createRegistrationHandlers, localMinute, active, manages, approves };

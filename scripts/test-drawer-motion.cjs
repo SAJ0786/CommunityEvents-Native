@@ -137,7 +137,8 @@ assert.doesNotMatch(read('src/components/NotificationsDrawer.js'), /animationTyp
 // former Modal-backed drawers explicitly restore Android back dismissal.
 for (const name of ['AccountMenuSheet', 'EventDetailsModal', 'NotificationsDrawer']) {
   const source = read(`src/components/${name}.js`);
-  assert.doesNotMatch(source, /<Modal|import\s+\{[^}]*Modal/, `${name} must not use React Native Modal for the drawer surface`);
+  if (name === 'EventDetailsModal') assert.match(source, /<Modal transparent visible=\{visible\}/, 'event details must escape parent list clipping');
+  else assert.doesNotMatch(source, /<Modal|import\s+\{[^}]*Modal/, `${name} keeps its root overlay`);
   assert.match(source, /StyleSheet\.absoluteFillObject/, `${name} must cover the full screen`);
   assert.match(source, /zIndex:\s*(80|1000)/, `${name} must render above app content`);
 }

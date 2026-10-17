@@ -69,7 +69,7 @@ import { listenUserNotifications } from './src/services/businessNotifications';
 import { auth, confirmPhoneVerification, ensureFirebaseSession, sendPhoneVerification, setNativeDisplayName } from './src/firebase/firebase';
 import { compareEventsByDateTime, createEventSubmission, createRecurringEventSeries, getFutureSeriesEvents, prepareFutureSeriesEdit, deleteEventSeries, deleteEventSubmission, getPublicEvents, getUserEventSubmissions, listenActiveEvents, prepareHomeEvents, setEventVisibility, updateEventSeries, updateEventSubmission } from './src/services/events';
 import { uploadEventPoster } from './src/services/images';
-import { completeMemberProfile, deleteMyAccountAndEvents, ensureUserProfile, migratePhoneAccount, toggleSavedEvent, updateUserPreferences } from './src/services/users';
+import { completeMemberProfile, deleteMyAccountAndEvents, ensureUserProfile, getUserProfile, migratePhoneAccount, toggleSavedEvent, updateUserPreferences } from './src/services/users';
 import { cancelFavouriteReminder, getEventReminder, initializeDefaultPrayerReminders, scheduleFavouriteReminder } from './src/services/reminders';
 import { listenForDevicePushTokenChanges, registerDevicePushNotifications, unregisterDevicePushNotifications, listenForBusinessPushOpens } from './src/services/pushNotifications';
 import { getPrayerLocation } from './src/utils/prayerLocations';
@@ -273,6 +273,7 @@ function MainApp() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileRetry, setProfileRetry] = useState(0);
   const profileRequestRef = useRef(0);
+  const loginConsentRef = useRef(null);
   const [profileError, setProfileError] = useState('');
   const [savingEventId, setSavingEventId] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
@@ -328,7 +329,10 @@ function MainApp() {
   }, [currentUser?.isAnonymous, currentUser?.uid]);
 
   useEffect(() => {
+    let loadedUid = null;
     const unsubscribe = onIdTokenChanged(auth, user => {
+      if (user?.uid && user.uid === loadedUid) return;
+      loadedUid = user?.uid || null;
       const activeRequest = ++profileRequestRef.current;
       setCurrentUser(user);
       setAuthResolved(true);
@@ -341,21 +345,26 @@ function MainApp() {
       }
 
       setProfileLoading(true);
+      const loginConsent = loginConsentRef.current || {};
+      loginConsentRef.current = null;
       const profilePromise = withTimeout((async () => {
-        let migratedProfile = null;
-        if (user.phoneNumber) {
-          try {
-            migratedProfile = await migratePhoneAccount();
-          } catch {
-            migratedProfile = null;
+        // Firestore's device cache lets completed members enter immediately.
+        // Still refresh authoritative roles/account state in the background.
+        try {
+          const cached = await getUserProfile(user.uid, { cacheOnly: true });
+          if (activeRequest === profileRequestRef.current && memberEntryState(user, cached, false) === 'ready') {
+            setProfile(cached); setProfileLoading(false);
           }
-        }
-        return ensureUserProfile(user.uid, {
-          ...(migratedProfile || {}),
-          email: migratedProfile?.email || user.email || '',
-          phone: user.phoneNumber || migratedProfile?.phone || '',
-          phoneVerified: Boolean(user.phoneNumber),
+        } catch { /* A first login has no cached profile. */ }
+        const current = await ensureUserProfile(user.uid, {
+          email: user.email || '', phone: user.phoneNumber || '', phoneVerified: Boolean(user.phoneNumber), ...loginConsent,
         });
+        if (memberEntryState(user, current, false) === 'complete-profile' && user.phoneNumber) {
+          if (activeRequest === profileRequestRef.current) { setProfile(current); setProfileLoading(false); }
+          try { await migratePhoneAccount(); return await getUserProfile(user.uid); }
+          catch { return current; }
+        }
+        return current;
       })(), PROFILE_LOAD_TIMEOUT_MS);
 
       profilePromise
@@ -735,25 +744,18 @@ function MainApp() {
     setProfileError('');
     setProfileMessage('');
     try {
+      loginConsentRef.current = {
+        privacyAccepted: true, privacyPolicyVersion: LEGAL_DOCUMENT_VERSION,
+        termsAccepted: true, termsVersion: LEGAL_DOCUMENT_VERSION,
+        legalAcceptedAtClient: new Date().toISOString(),
+      };
       const user = await confirmPhoneVerification(confirmation, code);
-      try {
-        await ensureUserProfile(user.uid, {
-          phone: user.phoneNumber || '',
-          phoneVerified: Boolean(user.phoneNumber),
-          privacyAccepted: true,
-          privacyPolicyVersion: LEGAL_DOCUMENT_VERSION,
-          termsAccepted: true,
-          termsVersion: LEGAL_DOCUMENT_VERSION,
-          legalAcceptedAtClient: new Date().toISOString(),
-        });
-      } catch (consentError) {
-        recordNonFatalError(consentError, { action: 'persist_legal_consent' });
-      }
       setGuestAccessGranted(false);
       setAppModule(preferredModule);
       setProfileMessage('Mobile number verified.');
       return user;
     } catch (err) {
+      loginConsentRef.current = null;
       recordAuthenticationFailure(err, 'verify_phone_code');
       setProfileError(friendlyError(err, 'Could not verify the code.'));
       return null;
@@ -1341,7 +1343,7 @@ function MainApp() {
       <View style={styles.sectionHeadingRow}><Text style={styles.homeSectionTitle}>Quick access</Text></View>
       <View style={styles.quickGrid}>
         {[
-          ...(REGISTRATION_ENABLED ? [['clipboard-text-outline', registrationOnly ? 'All events' : 'Registration only', colors.tealSoft, colors.tealDark, () => setRegistrationOnly(value => !value)]] : []),
+          ...(REGISTRATION_ENABLED ? [['clipboard-text-outline', registrationOnly ? 'All events' : 'Registration\nonly', colors.tealSoft, colors.tealDark, () => setRegistrationOnly(value => !value)]] : []),
           [homeViewMode === 'map' ? 'format-list-bulleted' : 'map-outline', homeViewMode === 'map' ? 'List' : 'Map', colors.blueSoft, colors.blue, () => setHomeViewMode(current => current === 'map' ? 'list' : 'map')],
           ['broadcast', 'Live', colors.roseSoft, colors.rose, () => requestTabChange('streams')],
           ['moon-waning-crescent', 'Hijri', colors.purpleSoft, colors.purple, () => requestTabChange('hijri-calendar')],
@@ -1349,7 +1351,7 @@ function MainApp() {
         ].map(([icon, label, backgroundColor, color, onPress]) => (
           <Pressable key={label} accessibilityRole="button" accessibilityState={{ selected: icon === 'clipboard-text-outline' && registrationOnly }} onPress={onPress} style={({ pressed }) => [styles.quickAction, pressed && styles.eventShortcutPressed]}>
             <View style={[styles.quickOrb, { backgroundColor }]}><MaterialCommunityIcons color={color} name={icon} size={22} /></View>
-            <Text style={styles.quickLabel}>{label}</Text>
+            <Text numberOfLines={2} maxFontSizeMultiplier={1.15} style={styles.quickLabel}>{label}</Text>
           </Pressable>
         ))}
       </View>
@@ -1889,7 +1891,7 @@ const styles = StyleSheet.create({
   quickGrid: { flexDirection: 'row', gap: 7 },
   quickAction: { flex: 1, minWidth: 0, minHeight: 70, alignItems: 'center', justifyContent: 'center', gap: 5, padding: 5, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.72)' },
   quickOrb: { width: 39, height: 39, alignItems: 'center', justifyContent: 'center', borderRadius: 15, transform: [{ rotate: '-2deg' }] },
-  quickLabel: { color: colors.text, fontSize: 10, fontWeight: '600', textAlign: 'center' },
+  quickLabel: { color: colors.text, fontSize: 10, lineHeight: 13, minHeight: 26, fontWeight: '600', textAlign: 'center' },
   browseChips: { gap: 7, paddingRight: spacing.lg },
   browseChip: { minHeight: 34, justifyContent: 'center', paddingHorizontal: 13, borderWidth: 1, borderColor: colors.border, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.7)' },
   browseChipActive: { borderColor: colors.blue, backgroundColor: colors.blue },

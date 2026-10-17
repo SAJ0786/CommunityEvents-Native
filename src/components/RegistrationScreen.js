@@ -1,17 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Share, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Pressable, Text, View } from 'react-native';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 import MemberPageHeader from './MemberPageHeader';
 import RegistrationEditor from '../registration/RegistrationEditor';
 import { Action, Answer, Input, styles } from '../registration/RegistrationControls';
 import { firebaseRegistration } from '../registration/firebaseRegistration';
-import { createSubmission, registrationsCsv } from '../registration/registrationClient';
+import { createSubmission } from '../registration/registrationClient';
 import { answersForReview, eventDraftFromDetail, mergeRegistrationPage } from '../registration/registrationViewModel';
 import { createDraft, validateAnswers } from '../registration/prototypeModel';
 import { EVENT_TYPES } from '../utils/eventOptions';
 import { getDynamicEventOptions } from '../services/eventOptionsAdmin';
 import { cityLabel } from '../utils/cities';
 import { colors } from '../theme';
+import { responseName, responseAnswer } from '../registration/responsePresentation';
+import { exportRegistrationWorkbook } from '../services/registrationExport';
 
 const newReference = () => `r-${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 export default function RegistrationScreen({ enabled = false, user, profile, city, initialCreate = false, initialEventId = null, initialAction = 'entry', onBack, onMyEvents, onRequireSignIn, transport }) {
@@ -19,6 +21,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
   const [stage, setStage] = useState('loading');
   const [detail, setDetail] = useState(null); const [draft, setDraft] = useState(null);
   const [types, setTypes] = useState(EVENT_TYPES); const [templates, setTemplates] = useState([]); const [templateCursor, setTemplateCursor] = useState(null);
+  const [expandedResponse, setExpandedResponse] = useState(null);
   const [responses, setResponses] = useState([]); const [responseCursor, setResponseCursor] = useState(null);
   const [answers, setAnswers] = useState({}); const [places, setPlaces] = useState('1');
   const [pendingPoster, setPendingPoster] = useState(null);
@@ -40,7 +43,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
   const requireMember = () => { if (member) return true; onRequireSignIn?.('Sign in to register for or organise an event.'); return false; };
   const open = (eventId, action = 'entry') => run(async valid => {
     setDetail(null); setAnswers({}); setResponses([]);
-    const result = await api.load(eventId);
+    const [result, responseResult] = await Promise.all([api.load(eventId), action === 'responses' ? api.responses(eventId) : Promise.resolve(null)]);
     if (!valid()) return;
     currentId.current = eventId; setDetail(result);
     if (action === 'entry') {
@@ -54,7 +57,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       if (action === 'copy') { createKey.current = newReference(); currentId.current = null; setDetail(null); }
       await loadTemplates(valid);
     } else if (action === 'responses') {
-      const page = await api.responses(eventId);
+      const page = responseResult;
       if (valid()) { setResponses(page.registrations); setResponseCursor(page.nextCursor); setStage('responses'); }
     } else if (['confirmation', 'host-confirmation'].includes(action)) setStage(action);
   });
@@ -191,6 +194,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     <MemberPageHeader title={stage === 'responses' ? 'Registration responses' : stage === 'editor' ? 'Edit event and registration form' : 'Event registration'} subtitle={cityLabel(city)} icon="clipboard-text-outline" tone="teal" />
     <View style={styles.row}><Action disabled={busy} onPress={onBack}>Back to events</Action></View>
     {busy && <ActivityIndicator color={colors.tealDark} />}
+    {detail?.reviewFeedback && <Text style={styles.error}>{detail.reviewFeedback.message} Edit and save to resubmit for approval.</Text>}
     {notice ? <Text accessibilityRole="alert" style={styles.error}>{notice}</Text> : null}
     {stage === 'editor' && pendingSave.current && !busy && <View style={styles.panel}>
       <Text style={styles.text}>The original save request is retained unchanged. Retry it before making further changes; leaving now may hide a successfully created event until My Events reloads.</Text>
@@ -219,9 +223,26 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       {pendingPoster && <Action onPress={() => posterChange(false)}>Retry selected poster upload</Action>}
     </View>}
     {detail && stage === 'responses' && <View style={styles.group}>
-      <Text style={styles.muted}>Only authorised organiser/admin responses are shown. Export includes the loaded pages only; handle personal information securely.</Text>
-      <Action onPress={() => run(() => Share.share({ title: 'Registration responses (loaded pages)', message: registrationsCsv(responses) }))}>Share loaded responses as CSV text</Action>
-      {responses.map(row => <View key={row.registrationId} style={styles.panel}><Text style={styles.label}>{row.registrationId} · {row.status} · {row.places} places</Text>{(row.fields || []).map(field => <View key={field.id}><Text style={styles.label}>{field.label}</Text><Text style={styles.text}>{Array.isArray(row.answers[field.id]) ? row.answers[field.id].join(', ') : row.answers[field.id] === true ? 'Agreed' : String(row.answers[field.id] ?? '')}</Text></View>)}{row.answersDeletedAt ? <Text style={styles.muted}>Answers deleted.</Text> : <Action onPress={() => deleteAnswers(row)}>Permanently delete answers only</Action>}</View>)}
+      <Action disabled={busy} onPress={() => run(async valid => {
+        const rows = [...responses]; const seen = new Set(); let cursor = responseCursor;
+        while (cursor) {
+          if (seen.has(cursor)) throw Error('Response pagination did not advance. Please reload.');
+          seen.add(cursor);
+          const page = await api.responses(detail.event.id, cursor);
+          if (!valid()) return;
+          rows.push(...page.registrations); cursor = page.nextCursor;
+        }
+        if (valid()) await exportRegistrationWorkbook(detail.event.title, mergeRegistrationPage([], rows), valid);
+      })}>Export responses to Excel (.xlsx)</Action>
+      {!responses.length && <Text style={styles.muted}>No registration responses yet.</Text>}
+      {responses.map(row => <View key={row.registrationId} style={styles.panel}>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: expandedResponse === row.registrationId }} onPress={() => setExpandedResponse(current => current === row.registrationId ? null : row.registrationId)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={styles.label}>{responseName(row)}</Text></Pressable>
+        {expandedResponse === row.registrationId && <View style={styles.group}>
+          <Text style={styles.muted}>{row.status} · {row.places} {row.places === 1 ? 'place' : 'places'}</Text>
+          {(row.fields || []).map(field => <View key={field.id}><Text style={styles.label}>{field.label}</Text><Text style={styles.text}>{responseAnswer(row.answers?.[field.id])}</Text></View>)}
+          {row.answersDeletedAt ? <Text style={styles.muted}>Answers deleted.</Text> : <Action onPress={() => deleteAnswers(row)}>Permanently delete answers only</Action>}
+        </View>}
+      </View>)}
       {responseCursor && <Action onPress={() => responsePage(responseCursor)}>Load more responses</Action>}<Action onPress={onBack}>Back to events</Action>
     </View>}
     </View>

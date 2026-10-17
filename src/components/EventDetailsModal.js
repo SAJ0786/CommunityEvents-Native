@@ -6,6 +6,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
   Pressable,
   Share,
@@ -14,7 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import SafeAreaView from './ModalSafeArea';
 import useMenuDrawerMotion from './useMenuDrawerMotion';
 import DrawerDragZone from './DrawerDragZone';
 import ScrollView from './KeyboardAwareScrollView';
@@ -396,7 +397,7 @@ export default function EventDetailsModal({
   };
 
   return (
-    <>
+    <Modal transparent visible={visible} animationType="none" onRequestClose={animateClose} statusBarTranslucent>
         <SafeAreaView accessibilityViewIsModal={true} style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={animateClose} />
           <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
@@ -604,7 +605,7 @@ export default function EventDetailsModal({
             </View>
           </View> : null}
         </SafeAreaView>
-    </>
+    </Modal>
   );
 }
 
@@ -626,7 +627,8 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   sheet: {
-    maxHeight: '78%',
+    height: '78%',
+    maxHeight: '90%',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     backgroundColor: colors.background,

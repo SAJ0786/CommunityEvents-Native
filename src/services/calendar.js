@@ -68,7 +68,7 @@ export function eventCalendarDetails(event = {}) {
       allDay: !schedule.startAt,
       timeZone: schedule.startAt ? event.timeZone : undefined,
       location: event.suburb || event.address?.suburb || '',
-      notes: [event.notes, !schedule.startAt ? 'Start time not specified by the organiser.' : '', 'Community Events Australia'].filter(Boolean).join('\n'),
+      notes: [event.notes, !schedule.startAt ? 'Start time not specified by the organiser.' : '', 'Community Connect - Events'].filter(Boolean).join('\n'),
     };
   }
   const startDate = eventDateTime(event.eventDate, event.startTime);
@@ -86,7 +86,7 @@ export function eventCalendarDetails(event = {}) {
     event.audienceType,
     event.speakerName ? `Speaker: ${event.speakerName}` : '',
     event.notes,
-    'Community Events Australia',
+    'Community Connect - Events',
   ].filter(Boolean).join('\n');
   return {
     title: getEventTitle(event),

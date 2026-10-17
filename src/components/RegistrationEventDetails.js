@@ -4,6 +4,8 @@ import EventDetailsModal from './EventDetailsModal';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 import MemberPageHeader from './MemberPageHeader';
 import { firebaseRegistration, REGISTRATION_ENABLED } from '../registration/firebaseRegistration';
+import { Action, Input, styles } from '../registration/RegistrationControls';
+import SafeAreaView from './ModalSafeArea';
 import { registrationEventCard } from '../registration/eventFeed';
 
 export default function RegistrationEventDetails({ event, user, profile, isGuest, onClose, onOperation, onRequireSignIn, onEdit, onDelete, onManageStream, initialReview = false }) {
@@ -11,9 +13,11 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
   const [error, setError] = useState('');
   const [posterError, setPosterError] = useState('');
   const [refresh, setRefresh] = useState(0);
-  const [foreground, setForeground] = useState(AppState.currentState === 'active');
+  const [foreground, setForeground] = useState(AppState.currentState !== 'background' && AppState.currentState !== 'inactive');
   const [reviewing, setReviewing] = useState(initialReview);
   const [approving, setApproving] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  useEffect(() => setFeedback(''), [event?.id]);
   useEffect(() => { setReviewing(initialReview); }, [event?.id, initialReview]);
   useEffect(() => {
     const listener = AppState.addEventListener('change', state => {
@@ -29,6 +33,12 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
     const api = firebaseRegistration({ enabled: REGISTRATION_ENABLED });
     (async () => {
       let result = await api.load(event.id);
+      // Draw text/actions as soon as authorised details arrive, before image transfer.
+      if (active) setDetail({ ...result, reviewLoaded: false, card: {
+        ...registrationEventCard(result.event),
+        address: result.privateDetails ? { ...result.privateDetails.venue, fullAddress: result.privateDetails.address, suburb: result.event.suburb } : { suburb: result.event.suburb },
+        registrationPrivate: Boolean(result.privateDetails), imageUrl: '',
+      } });
       let poster = '';
       let reviewPoster = '';
       let reviewPosterFailed = false;
@@ -63,7 +73,7 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
       } });
     })().catch(err => { if (active) setError(err.message || 'Could not load this event.'); });
     return () => { active = false; };
-  }, [event, user?.uid, foreground, refresh, reviewing]);
+  }, [event?.id, event?.revision, user?.uid, foreground, refresh, reviewing]);
   if (!event) return null;
   if (!detail) return <Modal transparent onRequestClose={onClose}><View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#ffffff' }}>
     {error ? <Text accessibilityRole="alert">{error}</Text> : <ActivityIndicator />}
@@ -85,6 +95,16 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
       finally { setApproving(false); }
     } },
   ]);
+  const decide = async decision => {
+    if (approving) return;
+    if (!feedback.trim()) { Alert.alert('Feedback required', 'Enter the reason or suggested changes for the organiser.'); return; }
+    setApproving(true);
+    try {
+      await firebaseRegistration({ enabled: REGISTRATION_ENABLED }).review(detail.event.id, detail.event.revision, decision, feedback.trim());
+      onClose();
+    } catch (err) { Alert.alert('Review failed', err.message); }
+    finally { setApproving(false); }
+  };
   if (reviewing && detail.canManage) {
     const submitted = detail.pendingChanges || detail;
     const submittedEvent = submitted.event;
@@ -95,37 +115,40 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
       ['City', detail.event.city], ['Public suburb', submittedEvent.suburb], ['Public notes', submittedEvent.notes],
       ['Capacity', submittedEvent.capacity], ['Registration closes', submittedEvent.closes || 'Start of event day'],
       ['Allow cancellation', submittedEvent.allowCancellation ? 'Yes' : 'No'],
-      ...['hostName', 'organiserType', 'organiserId', 'organiserName', 'organisationType', 'isOnBehalfOf', 'eventSubject', 'audienceType', 'speakerName', 'timeMode', 'prayerName', 'prayerLabel', 'prayerOffsetMinutes', 'prayerTimeZone', 'hijriDate', 'enteredAsHijri', 'hijriDay', 'hijriMonth', 'hijriYear'].map(key => [key, submittedEvent[key]]),
+      ...[['Host', 'hostName'], ['Organiser', 'organiserName'], ['Organiser type', 'organiserType'], ['Subject', 'eventSubject'], ['Audience', 'audienceType'], ['Speaker', 'speakerName'], ['Time selection', 'timeMode'], ['Prayer', 'prayerLabel'], ['Hijri date', 'hijriDate']].map(([label, key]) => [label, submittedEvent[key]]),
       ['Reciters', (submittedEvent.reciters || []).map(item => `${item.type === 'Custom' ? item.customType : item.type}: ${item.name}`).join('\n')],
       ['Full address — private', submitted.privateDetails?.address],
-      ['Venue coordinates', submitted.privateDetails?.venue ? `${submitted.privateDetails.venue.latitude}, ${submitted.privateDetails.venue.longitude}` : ''],
       ['Host phone — private', submitted.privateDetails?.hostPhone], ['Host contact — private', submitted.privateDetails?.hostContactOptional],
     ];
-    return <Modal onRequestClose={() => setReviewing(false)}>
-      <KeyboardAwareScrollView contentContainerStyle={{ padding: 24, gap: 12 }}>
+    return <Modal onRequestClose={onClose}>
+      <SafeAreaView style={{ flex: 1 }}><KeyboardAwareScrollView contentContainerStyle={styles.content}>
         <MemberPageHeader title="Review submitted changes" subtitle={detail.pendingChanges ? 'Published event remains live until approval' : 'Unpublished event and registration form'} icon="clipboard-check-outline" tone="teal" />
-        <Pressable disabled={approving} onPress={() => setReviewing(false)}><Text>Back to published event</Text></Pressable>
+        <Action disabled={approving} onPress={onClose}>Back to events</Action>
         {detail.pendingChanges && <Text>Submitted {detail.pendingChanges.submittedAt || ''} by {detail.pendingChanges.submittedBy || 'organiser'}</Text>}
-        {values.filter(([, value]) => value !== undefined && value !== '').map(([label, value]) => <View key={label}><Text style={{ fontWeight: '700' }}>{label}</Text><Text selectable>{String(value)}</Text></View>)}
+        {values.filter(([, value]) => value !== undefined && value !== '').map(([label, value]) => <View key={label} style={styles.panel}><Text style={styles.label}>{label}</Text><Text selectable style={styles.text}>{String(value)}</Text></View>)}
         <Text style={{ fontWeight: '700' }}>Private poster</Text>
         {detail.reviewPoster ? <Image accessibilityLabel="Submitted private poster" source={{ uri: detail.reviewPoster }} style={{ width: '100%', height: 360 }} resizeMode="contain" /> : <Text>{detail.reviewPosterFailed ? 'Could not load submitted poster. Approval is blocked until it can be reviewed.' : 'No poster in this submitted version.'}</Text>}
         {posterError ? <Text accessibilityRole="alert">{posterError}</Text> : null}
         <Text style={{ fontWeight: '700' }}>Registration purpose</Text><Text>{submitted.form?.purpose}</Text>
-        {(submitted.form?.fields || []).map((field, index) => <View key={field.id}>
+        {(submitted.form?.fields || []).map((field, index) => <View key={field.id} style={styles.panel}>
           <Text style={{ fontWeight: '700' }}>{index + 1}. {field.label} ({field.type}, {field.required ? 'required' : 'optional'})</Text>
           {field.description ? <Text>{field.description}</Text> : null}
           {(field.options || []).map((option, optionIndex) => <Text key={optionIndex}>{option}</Text>)}
           {field.terms ? <Text selectable>Terms: {field.terms}</Text> : null}
         </View>)}
         {!complete ? <Text accessibilityRole="alert">Reload complete private details, form and poster before approving.</Text> : null}
-        <Pressable disabled={approving} onPress={() => setRefresh(value => value + 1)}><Text>Reload submitted changes</Text></Pressable>
-        {detail.canApprove && <Pressable accessibilityRole="button" disabled={!complete || approving} onPress={approve}><Text>{approving ? 'Approving…' : 'Approve reviewed event and form'}</Text></Pressable>}
-      </KeyboardAwareScrollView>
+        <Action disabled={approving} onPress={() => setRefresh(value => value + 1)}>Reload submitted changes</Action>
+        {detail.canApprove && <View style={styles.group}>
+          <Action primary disabled={!complete || approving} onPress={approve}>{approving ? 'Please wait…' : 'Approve event and form'}</Action>
+          <Input label="Feedback for organiser" value={feedback} onChangeText={setFeedback} multiline maxLength={2000} />
+          <View style={styles.row}><Action disabled={approving} onPress={() => decide('changes-requested')}>Suggest changes</Action><Action disabled={approving} onPress={() => decide('rejected')}>Reject</Action></View>
+        </View>}
+      </KeyboardAwareScrollView></SafeAreaView>
     </Modal>;
   }
   return <EventDetailsModal event={detail.card} visible onClose={onClose} user={user} profile={profile} isGuest={isGuest}
     registrationDetail={detail}
-    registrationNotice={detail.canManage && detail.event.hasPendingChanges ? <Text>Submitted changes await approval. The published event and form remain live and unchanged. <Text accessibilityRole="button" onPress={() => setReviewing(true)}>Review submitted changes</Text>{posterError ? `\n${posterError}` : ''}</Text> : posterError}
+    registrationNotice={detail.reviewFeedback ? `Review: ${detail.reviewFeedback.decision === 'rejected' ? 'Rejected' : 'Changes requested'} — ${detail.reviewFeedback.message}. Edit and save to resubmit.` : detail.canManage && detail.event.hasPendingChanges ? <Text>Submitted changes await approval. The published event and form remain live and unchanged. <Text accessibilityRole="button" onPress={() => setReviewing(true)}>Review submitted changes</Text>{posterError ? `\n${posterError}` : ''}</Text> : posterError}
     canManageStream={!isGuest && detail.canManage && detail.event.status === 'approved' && Boolean(onManageStream)}
     onManageStream={detail.canManage && detail.event.status === 'approved' ? onManageStream : undefined}
     onRegister={() => operation('entry')}

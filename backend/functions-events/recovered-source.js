@@ -1096,7 +1096,7 @@ exports.calendarFeed = onRequest(
     const lines = [
       "BEGIN:VCALENDAR", "VERSION:2.0",
       "PRODID:-//Community Events//EN", "CALSCALE:GREGORIAN",
-      "METHOD:PUBLISH", "X-WR-CALNAME:Community Events",
+      "METHOD:PUBLISH", "X-WR-CALNAME:Community Connect Australia",
       "X-WR-TIMEZONE:Australia/Sydney",
       "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H",
       // VTIMEZONE block for Australia/Sydney (AEDT/AEST)

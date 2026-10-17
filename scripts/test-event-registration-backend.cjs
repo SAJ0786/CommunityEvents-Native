@@ -908,3 +908,29 @@ test('organiser deletes answers explicitly without cancelling seats, with revisi
   await f.submit(event); // Retry an old accepted operation must never restore deleted answers.
   assert.deepEqual(f.records.get(`registrationEvents/${event.eventId}/registrations/member`).answers, {});
 });
+
+test('review decisions are superadmin-only, revision checked, private, and reset only on resubmission', async () => {
+  for (const decision of ['rejected', 'changes-requested']) {
+    const f = fixture(); const event = await f.create();
+    const data = { eventId: event.eventId, expectedRevision: event.revision, decision, feedback: 'Please correct the date.' };
+    await assert.rejects(f.handlers.reviewRegistrationEvent(f.request('host', data)), { code: 'permission-denied' });
+    await assert.rejects(f.handlers.reviewRegistrationEvent(f.request('admin', data)), { code: 'permission-denied' });
+    await assert.rejects(f.handlers.reviewRegistrationEvent(f.request('super', { ...data, expectedRevision: 99 })), { code: 'aborted' });
+    await assert.rejects(f.handlers.reviewRegistrationEvent(f.request('super', { ...data, feedback: '' })), { code: 'invalid-argument' });
+    const result = await f.handlers.reviewRegistrationEvent(f.request('super', data));
+    const owner = await f.handlers.getRegistrationEvent(f.request('host', { eventId: event.eventId }));
+    assert.equal(owner.reviewFeedback.message, data.feedback); assert.equal(owner.canApprove, false);
+    assert.equal((await f.handlers.listRegistrationEvents(f.request('super', { scope: 'review' }))).events.length, 0);
+    await assert.rejects(f.approve({ ...event, revision: result.revision }), { code: 'failed-precondition' });
+    const saved = await f.handlers.saveRegistrationEvent(f.request('host', { city: 'sydney', eventId: event.eventId, expectedRevision: result.revision, draft: f.draft }));
+    assert.equal((await f.handlers.listRegistrationEvents(f.request('super', { scope: 'review' }))).events.length, 1);
+    await f.approve(saved);
+    const staged = await f.handlers.saveRegistrationEvent(f.request('host', { city: 'sydney', eventId: event.eventId, expectedRevision: saved.revision, draft: { ...f.draft, title: 'Changed title' } }));
+    await f.handlers.reviewRegistrationEvent(f.request('super', { ...data, expectedRevision: staged.revision }));
+    const publicView = await f.handlers.getRegistrationEvent(f.request('other', { eventId: event.eventId }));
+    assert.equal(publicView.event.title, f.draft.title); assert.equal(publicView.reviewFeedback, undefined);
+    assert.equal(publicView.pendingChanges, undefined); assert.equal(publicView.privateDetails, undefined);
+    const hostView = await f.handlers.getRegistrationEvent(f.request('host', { eventId: event.eventId }));
+    assert.equal(hostView.pendingChanges.event.title, 'Changed title');
+  }
+});

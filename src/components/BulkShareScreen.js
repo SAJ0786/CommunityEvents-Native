@@ -1,14 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
-import { Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import ScrollView from './KeyboardAwareScrollView';
 import HomeFilters from './HomeFilters';
 import { colors, radius, shadow, spacing } from '../theme';
 import { DEFAULT_CITY, cityLabel, getEventMetroArea, normalizeCity } from '../utils/cities';
 import { compareEventsByDateTime } from '../services/events';
 import { formatEventDate } from '../utils/formatters';
-import { STORE_SHARE_LINES } from '../utils/storeLinks';
+import { APP_OPEN_LINK } from '../utils/storeLinks';
 import MemberPageHeader from './MemberPageHeader';
+import CitySelector from './CitySelector';
+import { Asset } from 'expo-asset';
+import NativeShare from 'react-native-share';
 
 const EMPTY_FILTERS = {
   organiser: '',
@@ -44,7 +47,7 @@ function getAdminCity(profile) {
 
 function getSharePrivacy(profile, event, uid) {
   const role = profile?.role;
-  const isAdmin = role === 'admin' || role === 'superAdmin';
+  const isAdmin = role === 'superAdmin' || (role === 'admin' && getEventMetroArea(event) === getAdminCity(profile));
   const isGuest = !uid;
   const isPrivate = event?.organiserType === 'private';
   const isOwner = uid && event?.createdByUserId === uid;
@@ -176,8 +179,7 @@ function buildMessage(selectedEvents, profile, uid, messageTitle, messageMode = 
     privateEvents.forEach(appendEvent);
   }
 
-  lines.push(...STORE_SHARE_LINES);
-  lines.push('_Shared via Community Events_');
+  lines.push('For more details please download Community Connect Australia App', APP_OPEN_LINK);
   return lines.join('\n');
 }
 
@@ -187,18 +189,20 @@ export default function BulkShareScreen({ events = [], profile, user }) {
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState(new Set());
   const [copied, setCopied] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState('');
   const [messageTitle, setMessageTitle] = useState('');
   const [messageMode, setMessageMode] = useState('detail');
 
   const today = localDateString();
-  const bulkShareCity = getAdminCity(profile);
+  const [bulkShareCity, setBulkShareCity] = useState(normalizeCity(profile?.defaultCity || getAdminCity(profile) || DEFAULT_CITY));
   const isNationalBulkShare = isSuperAdminRole(profile?.role);
 
   const upcoming = useMemo(() => events.filter(event => (
     event?.status !== 'inactive'
     && !event?.hidden
     && event.eventDate >= today
-    && (isNationalBulkShare || getEventMetroArea(event) === bulkShareCity)
+    && getEventMetroArea(event) === bulkShareCity
   )).sort(compareEventsByDateTime), [bulkShareCity, events, isNationalBulkShare, today]);
 
   const displayed = useMemo(() => filterEvents(upcoming, query, filters), [filters, query, upcoming]);
@@ -228,10 +232,14 @@ export default function BulkShareScreen({ events = [], profile, user }) {
   };
 
   const shareMessage = async () => {
-    if (!message) return;
+    if (!message || sharing) return;
+    setSharing(true); setShareError('');
     try {
-      await Share.share({ title: 'Community Events Programs Update', message });
-    } catch {}
+      const poster = Asset.fromModule(require('../../assets/community-connect-share.png'));
+      await poster.downloadAsync();
+      await NativeShare.open({ title: 'Community Connect Australia', message, url: poster.localUri || poster.uri, type: 'image/png', failOnCancel: false });
+    } catch (error) { setShareError(error?.message || 'Could not share the poster. You can copy the message and try again.'); }
+    finally { setSharing(false); }
   };
 
   if (!user?.uid || !['admin', 'superAdmin'].includes(profile?.role) || profile?.isActive === false) {
@@ -243,11 +251,12 @@ export default function BulkShareScreen({ events = [], profile, user }) {
       <View style={styles.card}>
         <MemberPageHeader
           title="Bulk Share Events"
-          subtitle={`Filter events, select the ones you want, then share or copy.${!isNationalBulkShare ? ` Your bulk share list is limited to ${cityLabel(bulkShareCity)}.` : ''}`}
+          subtitle={`Choose a city, select events, then share or copy. Showing ${cityLabel(bulkShareCity)}.`}
           icon="share-variant-outline"
           tone="teal"
         />
 
+        <CitySelector selectedCity={bulkShareCity} onChange={city => { setBulkShareCity(city); setSelected(new Set()); }} />
         <Text style={styles.label}>Message title</Text>
         <TextInput
           maxLength={120}
@@ -284,9 +293,10 @@ export default function BulkShareScreen({ events = [], profile, user }) {
           <ScrollView nestedScrollEnabled style={styles.previewBox}>
             <Text style={styles.previewText}>{message}</Text>
           </ScrollView>
+          {shareError ? <Text accessibilityRole="alert" style={styles.subtitle}>{shareError}</Text> : null}
           <View style={styles.actionRow}>
-            <Pressable onPress={shareMessage} style={({ pressed }) => [styles.primaryButton, styles.actionPrimary, pressed && styles.pressed]}>
-              <Text style={styles.primaryButtonText}>Share via WhatsApp / SMS</Text>
+            <Pressable disabled={sharing} onPress={shareMessage} style={({ pressed }) => [styles.primaryButton, styles.actionPrimary, pressed && styles.pressed]}>
+              <Text style={styles.primaryButtonText}>{sharing ? 'Preparing share…' : 'Share via WhatsApp / SMS'}</Text>
             </Pressable>
             <Pressable onPress={copyMessage} style={({ pressed }) => [styles.secondaryButton, styles.actionSecondary, pressed && styles.pressed]}>
               <Text style={styles.secondaryButtonText}>{copied ? 'Copied!' : 'Copy'}</Text>

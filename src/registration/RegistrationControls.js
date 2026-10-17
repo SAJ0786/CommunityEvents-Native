@@ -1,9 +1,13 @@
 import React from 'react';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing } from '../theme';
 
 export function Action({ children, onPress, primary, disabled }) {
   return <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled) }} disabled={disabled} onPress={onPress} style={[styles.button, primary && styles.primary, disabled && styles.disabled]}><Text style={[styles.buttonText, primary && styles.primaryText]}>{children}</Text></Pressable>;
+}
+export function IconAction({ icon, label, onPress, disabled }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} style={[styles.button, disabled && styles.disabled]}><MaterialCommunityIcons name={icon} size={24} color={colors.tealDark} /></Pressable>;
 }
 export function Input({ label, error, ...props }) {
   return <View style={styles.group}><Text style={styles.label}>{label}</Text><TextInput accessibilityLabel={label} placeholderTextColor={colors.muted} maxLength={2000} {...props} style={[styles.input, props.multiline && styles.multiline]} />{error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}</View>;
