@@ -1,3 +1,32 @@
+# EAS replaces the root .gitignore; keep its exclusions here as well.
+﻿node_modules/
+.expo/
+.expo-export-check-*/
+.tmp-*
+.idea/
+.jdk17-build/
+.local-jdk17/
+.tools/
+android/.gradle-codex/
+dist/
+build/
+coverage/
+*.log
+*.apk
+*.aab
+*.ipa
+*.xcarchive
+*.mobileprovision
+*.p12
+*.jks
+*.keystore
+release-artifacts/
+.DS_Store
+.env
+.env.local
+firebase-test-lab/robo/*.generated.json
+
+# Additional cloud-build exclusions.
 node_modules/
 .expo/
 .expo-export-check-*/
@@ -26,3 +55,12 @@ backend/
 
 # Local conversation handover is unrelated to the shipped application.
 codex-context.md
+
+# Machine-specific Android configuration and IDE outputs.
+local.properties
+*.iml
+*.hprof
+android/.gradle/
+android/.kotlin/
+android/.cxx/
+android/app/.cxx/
