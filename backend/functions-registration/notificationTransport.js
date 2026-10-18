@@ -5,7 +5,7 @@ function createNotificationTransport({ mailer, messaging, from }) {
   return {
     sendEmail: (email, notice) => mailer.sendMail({
       from, to: email, subject: notice.title,
-      text: `${notice.body}\n\nIn Community Connect Australia, choose Events, then Browse registration only events, then My registrations and open your event.\n\nThis is a service message about an event you registered for, not a promotional email.`,
+      text: `${notice.body}\n\nIn Community Connect Australia, choose Events, then Open My Events and select your registration event and open your event.\n\nThis is a service message about an event you registered for, not a promotional email.`,
       messageId: `<registration-${notice.noticeId}@siza.info>`,
     }),
     sendPush: async (tokens, notice) => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, PanResponder, Platform, Pressable, StyleSheet, StatusBar, Text, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 
 const HEADER_TOP_PADDING = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 4 : spacing.sm;
 
@@ -67,6 +67,6 @@ const styles = StyleSheet.create({
   button: { flex: 1, minWidth: 0, minHeight: 37, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 4, overflow: 'hidden' },
   iconFrame: { width: 22, height: 22, flexShrink: 0, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   icon: { width: 22, height: 22, color: colors.navy, fontSize: 15, lineHeight: 20, textAlign: 'center', includeFontPadding: false },
-  label: { minWidth: 0, flexShrink: 1, color: '#7b848c', fontSize: 11.5, fontWeight: '600' },
+  label: { minWidth: 0, flexShrink: 1, color: '#7b848c', fontSize: typography.subtitle.fontSize, fontWeight: '600' },
   labelActive: { color: colors.blue, fontWeight: '700' },
 });

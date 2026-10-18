@@ -97,7 +97,7 @@ function harness(exportName, initialProps) {
     createElement: (type, properties, ...children) => ({ type, props: properties || {}, children: children.flat() }), Fragment: 'Fragment' };
   const mod = load('src/business/BusinessHoursEditor.js', { react,
     'react-native': { Alert: { alert: (...args) => alerts.push(args) }, Pressable: 'Pressable', Text: 'Text', View: 'View', StyleSheet: { create: value => value } },
-    '../components/NativeDateTimeField': 'TimeField', '../theme': { colors: {}, radius: {}, spacing: {} }, '../utils/businessHours': hours });
+    '../components/NativeDateTimeField': 'TimeField', '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {}, radius: {}, spacing: {} }, '../utils/businessHours': hours });
   return { alerts, render(nextProps) { if (nextProps) props = nextProps; index = 0; return mod[exportName](props); } };
 }
 function testEditor() {

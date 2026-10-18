@@ -2,7 +2,10 @@
 
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
-const { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const triggers = require('firebase-functions/v2/firestore');
+const deliveryContext = new (require('node:async_hooks').AsyncLocalStorage)();
+const bindEvent = factory => (options, handler) => factory(options, event => deliveryContext.run(event.id, () => handler(event)));
+const onDocumentCreated = bindEvent(triggers.onDocumentCreated), onDocumentDeleted = bindEvent(triggers.onDocumentDeleted), onDocumentUpdated = bindEvent(triggers.onDocumentUpdated);
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
@@ -25,7 +28,7 @@ const BUSINESS_FROM_NAME = emailBrand('directory');
 const PROFILE_FIELDS = [
   'fullName', 'email', 'phone', 'defaultCity', 'defaultModule',
   'pushNotificationsEnabled', 'smsNotificationsEnabled', 'emailNotificationsEnabled',
-  'eventNotificationsEnabled', 'businessNotificationsEnabled', 'prayerRemindersEnabled',
+  'eventNotificationsEnabled', 'businessNotificationsEnabled', 'prayerRemindersEnabled', 'reminderEmailEnabled', 'adminAlertEmailEnabled',
 ];
 const BUSINESS_ANALYTICS_ACTIONS = new Set([
   'page_view', 'contact', 'message_enquiry', 'call', 'whatsapp', 'directions',
@@ -127,56 +130,16 @@ function uniqueRecipients(recipients) {
 async function deliver(recipients, notification) {
   const unique = uniqueRecipients(recipients).filter(user => allowsNotification(user, notification.type));
   if (!unique.length) return;
-  const batch = db.batch();
-  unique.forEach(recipient => {
-    batch.set(db.collection('userNotifications').doc(), {
-      recipientUid: recipient.uid,
-      module: 'directory',
-      type: notification.type,
-      icon: notification.icon || 'bell-outline',
-      title: notification.title,
-      body: notification.body,
-      city: notification.city || '',
-      entityId: notification.entityId || '',
-      entityType: notification.entityType || '',
-      read: false,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  for (const recipient of unique) {
+    const key = require('node:crypto').createHash('sha256').update(`${deliveryContext.getStore()}:${recipient.uid}:${notification.type}`).digest('hex');
+    const bell = db.collection('userNotifications').doc(key), email = db.collection('eventEmailOutbox').doc(key);
+    await db.runTransaction(async tx => {
+      const previous = await tx.get(bell); if (previous.exists) return;
+      tx.create(bell, { recipientUid: recipient.uid, module: 'directory', type: notification.type, icon: notification.icon || 'bell-outline', title: notification.title, body: notification.body,
+        city: notification.city || '', entityId: notification.entityId || '', entityType: notification.entityType || '', read: false, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+      if (allowsNotification(recipient, notification.type, 'email') && clean(recipient.email)) tx.create(email, { uid: recipient.uid, required: notification.type !== 'profile.updated', category: 'admin', module: 'directory', state: 'pending', queuedAt: Date.now(), message: { to: clean(recipient.email), subject: notification.title, text: notification.body } });
     });
-  });
-  await batch.commit();
-
-  // Push is sent by deliverBusinessPush from the notification document, for
-  // both workflow alerts and private messages. Do not send a second push here.
-  const transporter = buildTransporter();
-  if (!transporter) {
-    logger.warn('Business workflow email skipped because SMTP is not configured.');
-    return;
   }
-  const from = sender();
-  const emailRecipients = unique.filter(recipient => allowsNotification(recipient, notification.type, 'email') && clean(recipient.email));
-  const results = await Promise.allSettled(emailRecipients.map(recipient => transporter.sendMail({
-    from,
-    replyTo: SUPPORT_EMAIL,
-    headers: {
-      'Auto-Submitted': 'auto-generated',
-      'X-Auto-Response-Suppress': 'All',
-    },
-    to: clean(recipient.email),
-    subject: notification.title,
-    ...buildWorkflowEmail(notification),
-  })));
-  results.forEach((result, index) => {
-    if (result.status === 'rejected') {
-      logger.error('Business workflow email failed', { uid: emailRecipients[index]?.uid, error: result.reason?.message });
-      return;
-    }
-    logger.info('Business workflow email accepted by SMTP provider', {
-      uid: emailRecipients[index]?.uid,
-      messageId: clean(result.value?.messageId),
-      acceptedCount: Array.isArray(result.value?.accepted) ? result.value.accepted.length : 0,
-      rejectedCount: Array.isArray(result.value?.rejected) ? result.value.rejected.length : 0,
-    });
-  });
 }
 
 function businessCity(business) {

@@ -1,3 +1,4 @@
+import { clearAccountDeviceAlerts } from './src/services/reminders';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -332,6 +333,7 @@ function MainApp() {
     let loadedUid = null;
     const unsubscribe = onIdTokenChanged(auth, user => {
       if (user?.uid && user.uid === loadedUid) return;
+      if (loadedUid && loadedUid !== user?.uid) clearAccountDeviceAlerts().catch(error => recordNonFatalError(error, { feature: 'reminders', operation: 'clear_previous_account' }));
       loadedUid = user?.uid || null;
       const activeRequest = ++profileRequestRef.current;
       setCurrentUser(user);
@@ -769,6 +771,7 @@ function MainApp() {
     setProfileError('');
     try {
       await unregisterDevicePushNotifications(auth.currentUser?.uid);
+      await clearAccountDeviceAlerts();
       await signOut(auth);
       setGuestAccessGranted(false);
     } catch (err) {
@@ -844,6 +847,7 @@ function MainApp() {
     setProfileError('');
     setProfileMessage('');
     try {
+      await clearAccountDeviceAlerts();
       await deleteMyAccountAndEvents(currentUser, archiveEventsNow);
       setActiveTab('home');
       return true;
@@ -1290,6 +1294,12 @@ function MainApp() {
     }, { registrationEnabled: REGISTRATION_ENABLED });
   }, [currentUser?.uid, currentUser?.isAnonymous]);
 
+  const openBellNotification = row => {
+    if (row.recipientUid !== currentUser?.uid) return;
+    if (row.module === 'registration' && REGISTRATION_ENABLED) { setRegistrationTarget({ eventId: row.eventId, uid: currentUser.uid, nonce: Date.now() }); setAppModule('events'); setActiveTab('registration'); }
+    else handleHeaderNavigate(row.module === 'events' ? row.threadId ? 'host-inbox' : row.type === 'event.favourite_reminder' ? 'favourites' : 'home' : row.threadId ? 'business-inbox' : 'business-notifications');
+  };
+
   const openEventsProfile = useCallback(() => {
     setAppModule('events');
     setSelectedBusinessId('');
@@ -1578,7 +1588,7 @@ function MainApp() {
           onBack={() => setActiveTab('home')}
         />
       ) : activeTab === 'notifications' ? (
-        <BusinessNotificationsScreen
+        <BusinessNotificationsScreen onOpenNotification={openBellNotification}
           user={currentUser}
           profile={profile}
           onBack={() => { setActiveTab('home'); setAccountMenuOpen(true); }}
@@ -1756,7 +1766,7 @@ function MainApp() {
           onNavigate={handleHeaderNavigate}
           onSignOut={handleSignOut}
         />
-        <NotificationsDrawer visible={!isGuest && notificationsDrawerOpen} onClose={() => setNotificationsDrawerOpen(false)} user={currentUser} profile={profile} />
+        <NotificationsDrawer onOpenNotification={openBellNotification} visible={!isGuest && notificationsDrawerOpen} onClose={() => setNotificationsDrawerOpen(false)} user={currentUser} profile={profile} />
         {appModule === 'events' ? (
           <BottomNavigation
             onNavigationLayout={menuLayout.onNavigationLayout}

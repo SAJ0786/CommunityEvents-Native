@@ -5,7 +5,7 @@ import ScrollView from '../components/KeyboardAwareScrollView';
 import CompactSelect from '../components/CompactSelect';
 import { BUSINESS_ACTION_LABELS, listenBusinessStatistics } from '../services/businessAnalytics';
 import { CITY_OPTIONS, cityLabel, normalizeCity } from '../utils/cities';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import AdminPageHeader from '../components/AdminPageHeader';
 
 const EMPTY_STATISTICS = { pageViews: 0, enquiries: 0, actions: {} };
@@ -139,24 +139,24 @@ const styles = StyleSheet.create({
   header: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: '#e6f5f2', ...shadow },
   back: { alignSelf: 'flex-start', minHeight: 34, justifyContent: 'center' },
   backText: { color: colors.tealDark, fontSize: 12, fontWeight: '700' },
-  eyebrow: { color: colors.tealDark, fontSize: 9, fontWeight: '700', letterSpacing: 1 },
+  eyebrow: { color: colors.tealDark, fontSize: typography.eyebrow.fontSize, fontWeight: '700', letterSpacing: 1 },
   title: { marginTop: 4, color: colors.navy, fontSize: 24, fontWeight: '700' },
-  subtitle: { marginTop: 5, color: colors.muted, fontSize: 11, lineHeight: 17, fontWeight: '700' },
+  subtitle: { marginTop: 5, color: colors.muted, fontSize: typography.label.fontSize, lineHeight: 17, fontWeight: '700' },
   filters: { gap: spacing.sm, marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface },
-  filterLabel: { marginTop: 2, color: colors.tealDark, fontSize: 9, fontWeight: '700', letterSpacing: 0.8 },
+  filterLabel: { marginTop: 2, color: colors.tealDark, fontSize: typography.eyebrow.fontSize, fontWeight: '700', letterSpacing: 0.8 },
   searchBox: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md },
   searchIcon: { color: colors.muted, fontSize: 21, fontWeight: '700' },
-  searchInput: { flex: 1, minWidth: 0, color: colors.text, fontSize: 13, fontWeight: '700' },
+  searchInput: { flex: 1, minWidth: 0, color: colors.text, fontSize: typography.body.fontSize, fontWeight: '700' },
   categoryRail: { gap: spacing.sm, paddingRight: spacing.md },
   category: { width: 84, minHeight: 72, alignItems: 'center', justifyContent: 'center', gap: 4, padding: 7, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   categoryActive: { borderColor: colors.teal, backgroundColor: colors.teal },
   categoryIcon: { fontSize: 19 },
-  categoryText: { color: colors.text, fontSize: 9, lineHeight: 12, fontWeight: '600', textAlign: 'center' },
+  categoryText: { color: colors.text, fontSize: typography.eyebrow.fontSize, lineHeight: 12, fontWeight: '600', textAlign: 'center' },
   categoryTextActive: { color: colors.surface },
   error: { marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: '#fff0f0' },
   errorText: { color: colors.danger, fontSize: 12, fontWeight: '600' },
   scopeTitle: { marginTop: spacing.lg, color: colors.navy, fontSize: 15, fontWeight: '700' },
-  scopeText: { marginTop: 3, color: colors.muted, fontSize: 11, fontWeight: '700' },
+  scopeText: { marginTop: 3, color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '700' },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   metric: { minWidth: 98, flex: 1, padding: spacing.md, borderWidth: 1, borderRadius: radius.md, backgroundColor: colors.surface },
   metricBlue: { borderColor: '#c8ddf5', backgroundColor: '#f3f8fe' },
@@ -167,16 +167,16 @@ const styles = StyleSheet.create({
   sectionTitle: { marginTop: spacing.lg, marginBottom: spacing.sm, color: colors.navy, fontSize: 15, fontWeight: '700' },
   breakdown: { overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   breakdownRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  breakdownLabel: { flex: 1, color: colors.text, fontSize: 11, fontWeight: '700' },
-  breakdownValue: { color: colors.tealDark, fontSize: 14, fontWeight: '700' },
+  breakdownLabel: { flex: 1, color: colors.text, fontSize: typography.label.fontSize, fontWeight: '700' },
+  breakdownValue: { color: colors.tealDark, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
   ranking: { overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   rankRow: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   rankNumber: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, backgroundColor: colors.tealSoft },
-  rankNumberText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
+  rankNumberText: { color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '700' },
   rankCopy: { flex: 1, minWidth: 0 },
   rankName: { color: colors.navy, fontSize: 12, fontWeight: '700' },
   rankMeta: { marginTop: 2, color: colors.muted, fontSize: 9.5, fontWeight: '700' },
-  rankArrow: { color: colors.tealDark, fontSize: 22, fontWeight: '700' },
-  emptyText: { padding: spacing.md, color: colors.muted, fontSize: 11, textAlign: 'center' },
+  rankArrow: { color: colors.tealDark, fontSize: typography.pageTitle.fontSize, fontWeight: '700' },
+  emptyText: { padding: spacing.md, color: colors.muted, fontSize: typography.label.fontSize, textAlign: 'center' },
   privacy: { marginTop: spacing.lg, color: colors.muted, fontSize: 10, lineHeight: 15, fontStyle: 'italic', textAlign: 'center' },
 });

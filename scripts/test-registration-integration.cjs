@@ -268,7 +268,7 @@ test('My Events preserves attendee history without exposing host edit/delete con
     'react-native': { ActivityIndicator: 'ActivityIndicator', FlatList: 'FlatList', Pressable: 'Pressable', Text: 'Text', View: 'View', StyleSheet: { create: value => value } },
     './EventCard': { __esModule: true, default: 'EventCard' },
     './MemberPageHeader': { __esModule: true, default: 'MemberPageHeader' },
-    '../theme': { colors: {}, radius: {}, shadow: {}, spacing: {} },
+    '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {}, radius: {}, shadow: {}, spacing: {} },
   };
   const exports = {};
   const code = babel.transformSync(fs.readFileSync(path.join(root, 'src/components/MyEventsScreen.js'), 'utf8'), {
@@ -479,7 +479,7 @@ function normalFormFixture(initialEvent, registrationMode) {
     './MemberPageHeader': 'MemberPageHeader',
     './AddressAutocomplete': 'AddressAutocomplete',
     './CompactSelect': 'CompactSelect',
-    '../theme': { colors: {}, radius: {}, shadow: {}, spacing: {} },
+    '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {}, radius: {}, shadow: {}, spacing: {} },
     '../services/cityCatalogue': { useCityCatalogueVersion: () => 0 },
     '../services/hijri': { getHijriDisplay: () => '', getHijriParts: () => ({ day: 1, month: 1, year: 1448 }), HIJRI_MONTHS: [] },
     '../services/prayerTimes': { calculatePrayerTimes: () => null },
@@ -646,7 +646,7 @@ function recurrenceScreenFixture(transport, extra = {}) {
     '../services/registrationExport': { exportRegistrationWorkbook: async () => {} },
     '../registration/registrationViewModel': view, '../registration/prototypeModel': load(path.join(root, 'src/registration/prototypeModel.js')),
     '../utils/eventOptions': { EVENT_TYPES: ['Majlis'] }, '../services/eventOptionsAdmin': { getDynamicEventOptions: async () => ({ eventTypes: [] }) },
-    '../utils/cities': { cityLabel: value => value }, '../theme': { colors: {} },
+    '../utils/cities': { cityLabel: value => value }, '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {} },
   }, { enabled: true, user: { uid: 'host' }, city: 'sydney', initialCreate: true, transport, ...extra });
 }
 async function screenEditor(fixture) {
@@ -815,7 +815,7 @@ test('host screen edits pending draft but self-registration stays on published f
     '../services/registrationExport': { exportRegistrationWorkbook: async () => {} },
     '../registration/registrationViewModel': view, '../registration/prototypeModel': load(path.join(root, 'src/registration/prototypeModel.js')),
     '../utils/eventOptions': { EVENT_TYPES: ['Majlis'] }, '../services/eventOptionsAdmin': { getDynamicEventOptions: async () => ({ eventTypes: [] }) },
-    '../utils/cities': { cityLabel: value => value }, '../theme': { colors: {} },
+    '../utils/cities': { cityLabel: value => value }, '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {} },
   };
   const props = { enabled: true, user: { uid: 'host' }, city: 'perth', initialEventId: 'event', transport };
   const editorFixture = componentFixture('src/components/RegistrationScreen.js', mocks, { ...props, initialAction: 'editor' });

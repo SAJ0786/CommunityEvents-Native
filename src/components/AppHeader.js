@@ -15,7 +15,7 @@ import {
   View,
 } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 
 const EVENT_AUTH_ITEMS = [
   { key: 'home', label: 'Home', icon: '\u{1F3E0}' },
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
   brandTextWrap: { minWidth: 0 },
   brand: {
     color: colors.navy,
-    fontSize: 22,
+    fontSize: typography.pageTitle.fontSize,
     fontWeight: '700',
     lineHeight: 24,
   },
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
   },
   youtubeMenuIcon: { backgroundColor: '#ff0000', borderColor: '#ff0000' },
   hijriMenuIcon: { backgroundColor: '#5b3fb5', borderColor: '#5b3fb5' },
-  specialMenuIcon: { color: '#ffffff' },
+  specialMenuIcon: { color: colors.onPrimary },
   hijriMenuIconText: { color: '#ffd66b' },
   moduleSwitcherWrap: {
     paddingHorizontal: spacing.lg,
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
   },
   menuUserTitle: {
     color: colors.tealDark,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '700',
   },
   menuUserSubtle: {
@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
   },
   rolePillText: {
     color: colors.tealDark,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '700',
   },
   menuList: {
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
   },
   groupLabel: {
     color: colors.muted,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '700',
     textTransform: 'uppercase',
     paddingHorizontal: spacing.lg,
@@ -529,7 +529,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#cdeee7',
   },
   menuIcon: {
-    fontSize: 16,
+    fontSize: typography.sectionTitle.fontSize,
   },
   menuItemActive: {
     backgroundColor: colors.tealSoft,
@@ -539,7 +539,7 @@ const styles = StyleSheet.create({
   },
   menuItemText: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '700',
   },
   menuItemTextActive: {
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
   },
   loginButtonText: {
     color: colors.tealDark,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '700',
   },
   logoutButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: '#fff1f0' },

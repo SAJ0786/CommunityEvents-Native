@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import ScrollView from './KeyboardAwareScrollView';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import { LEGAL_DOCUMENT_VERSION, LEGAL_URLS, SIZA_WEBSITE_URL, SUPPORT_EMAIL } from '../config/legal';
 import { cityLabel, DEFAULT_CITY, normalizeCity } from '../utils/cities';
 import CitySelector from './CitySelector';
@@ -85,8 +85,9 @@ export default function ProfileScreen({
   const [deleteStep, setDeleteStep] = useState(null);
   const [archiveEventsNow, setArchiveEventsNow] = useState(null);
   const [pushEnabled, setPushEnabled] = useState(profile?.pushNotificationsEnabled !== false);
+  const [adminEmail, setAdminEmail] = useState(profile?.adminAlertEmailEnabled !== false);
   const [smsEnabled, setSmsEnabled] = useState(profile?.smsNotificationsEnabled === true);
-  const [emailEnabled, setEmailEnabled] = useState(profile?.emailNotificationsEnabled !== false);
+  const [emailEnabled, setEmailEnabled] = useState((profile?.emailNotificationsEnabled ?? profile?.reminderEmailEnabled) !== false);
   const [eventNotifications, setEventNotifications] = useState(profile?.eventNotificationsEnabled !== false);
   const [businessNotifications, setBusinessNotifications] = useState(profile?.businessNotificationsEnabled !== false);
   const [prayerReminders, setPrayerReminders] = useState(profile?.prayerRemindersEnabled !== false);
@@ -111,13 +112,14 @@ export default function ProfileScreen({
   }, [profile?.defaultCity, profile?.email, profile?.fullName]);
 
   useEffect(() => {
+    setAdminEmail(profile?.adminAlertEmailEnabled !== false);
     setPushEnabled(profile?.pushNotificationsEnabled !== false);
     setSmsEnabled(profile?.smsNotificationsEnabled === true);
-    setEmailEnabled(profile?.emailNotificationsEnabled !== false);
+    setEmailEnabled((profile?.emailNotificationsEnabled ?? profile?.reminderEmailEnabled) !== false);
     setEventNotifications(profile?.eventNotificationsEnabled !== false);
     setBusinessNotifications(profile?.businessNotificationsEnabled !== false);
     setPrayerReminders(profile?.prayerRemindersEnabled !== false);
-  }, [profile?.businessNotificationsEnabled, profile?.emailNotificationsEnabled, profile?.eventNotificationsEnabled, profile?.prayerRemindersEnabled, profile?.pushNotificationsEnabled, profile?.smsNotificationsEnabled]);
+  }, [profile?.adminAlertEmailEnabled, profile?.reminderEmailEnabled, profile?.businessNotificationsEnabled, profile?.emailNotificationsEnabled, profile?.eventNotificationsEnabled, profile?.prayerRemindersEnabled, profile?.pushNotificationsEnabled, profile?.smsNotificationsEnabled]);
 
   useEffect(() => {
     let alive = true;
@@ -209,22 +211,21 @@ export default function ProfileScreen({
   const saveNotifications = async () => {
     setProfileValidation('');
     try {
-      if (pushEnabled || prayerReminders) {
-        const allowed = await ensureDeviceNotificationsEnabled();
-        setDeviceNotificationsAllowed(allowed);
-        if (!allowed) {
-          throw new Error('Phone notifications are blocked in device settings. Enable them before saving push notifications or reminders.');
-        }
-      }
-      await setPrayerRemindersEnabled(prayerReminders, getPrayerLocation(defaultCity));
-      await onSaveProfile?.({
+      const saved = await onSaveProfile?.({
         pushNotificationsEnabled: pushEnabled,
         smsNotificationsEnabled: smsEnabled,
         emailNotificationsEnabled: emailEnabled,
+        reminderEmailEnabled: emailEnabled,
+        adminAlertEmailEnabled: adminEmail,
         eventNotificationsEnabled: eventNotifications,
         businessNotificationsEnabled: businessNotifications,
         prayerRemindersEnabled: prayerReminders,
       });
+      if (saved === false) return;
+      const allowed = (pushEnabled || prayerReminders) ? await ensureDeviceNotificationsEnabled() : false;
+      setDeviceNotificationsAllowed(allowed);
+      if (allowed || !prayerReminders) await setPrayerRemindersEnabled(prayerReminders, getPrayerLocation(defaultCity));
+      if (!allowed && (pushEnabled || prayerReminders)) setProfileValidation('Settings saved. Phone alerts need permission in device settings.');
     } catch (nextError) {
       setProfileValidation(nextError?.message || 'Could not save notification settings.');
     }
@@ -515,10 +516,10 @@ export default function ProfileScreen({
 
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Notifications</Text>
-            <Text style={styles.sectionHint}>Updates default to on. You can turn optional updates off below. Business enquiries, replies and administrative decisions (including approvals, requested changes and listing closures) remain enabled as service notifications. Phone notification permission is still required for push alerts.</Text>
+            <Text style={styles.sectionHint}>Updates default to on. You can turn optional updates off below. Business enquiries, replies and administrative decisions remain enabled as service notifications. Community announcements and approved national offers also remain enabled under the notification policy. Phone notification permission is still required for push alerts.</Text>
             {[
               ['Push notifications', pushEnabled, setPushEnabled],
-              ['SMS notifications', smsEnabled, setSmsEnabled],
+              ...(['admin', 'superAdmin'].includes(profile?.role) ? [['Administrator alert emails', adminEmail, setAdminEmail]] : []),
               ['Email notifications', emailEnabled, setEmailEnabled],
               ['Community Events updates', eventNotifications, setEventNotifications],
               ['Prayer-time reminders', prayerReminders, setPrayerReminders],
@@ -608,7 +609,7 @@ export default function ProfileScreen({
 const styles = StyleSheet.create({
   content: { flexGrow: 1, padding: spacing.lg, paddingBottom: 48, gap: spacing.md },
   title: { color: colors.navy, fontSize: 28, fontWeight: '700' },
-  subtitle: { color: colors.muted, fontSize: 14, fontWeight: '700', marginTop: -spacing.sm, marginBottom: spacing.xs },
+  subtitle: { color: colors.muted, fontSize: typography.cardTitle.fontSize, fontWeight: '700', marginTop: -spacing.sm, marginBottom: spacing.xs },
   card: {
     width: '100%',
     maxWidth: 620,
@@ -621,7 +622,7 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   statusPill: { alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.tealSoft },
-  statusText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
+  statusText: { color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '700' },
   cardTitle: { color: colors.navy, fontSize: 17, fontWeight: '700', marginTop: spacing.md },
   sectionHeader: {
     flexDirection: 'row',
@@ -631,20 +632,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   sectionHeaderCopy: { flex: 1 },
-  sectionTitle: { color: colors.navy, fontSize: 16, fontWeight: '700' },
-  sectionHint: { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 4 },
+  sectionTitle: { color: colors.navy, fontSize: typography.sectionTitle.fontSize, fontWeight: '700' },
+  sectionHint: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 18, marginTop: 4 },
   body: { color: colors.text, fontSize: 15, lineHeight: 22, marginTop: spacing.sm },
-  bodySmall: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: spacing.xs, marginBottom: spacing.md },
-  loadingText: { color: colors.muted, fontSize: 14, fontWeight: '700', marginTop: spacing.md, textAlign: 'center' },
+  bodySmall: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 19, marginTop: spacing.xs, marginBottom: spacing.md },
+  loadingText: { color: colors.muted, fontSize: typography.cardTitle.fontSize, fontWeight: '700', marginTop: spacing.md, textAlign: 'center' },
   inputGroup: { marginTop: spacing.md },
   inputLabel: { color: colors.navy, fontSize: 12, fontWeight: '700', marginBottom: 6, textTransform: 'uppercase' },
   moduleChoice: { flexDirection: 'row', padding: 3, marginBottom: spacing.md, borderRadius: radius.md, backgroundColor: '#edf2f1' },
   moduleChoiceButton: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 7, borderRadius: 11 },
   moduleChoiceButtonActive: { backgroundColor: colors.surface, ...shadow },
-  moduleChoiceText: { color: colors.muted, fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  moduleChoiceText: { color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '600', textAlign: 'center' },
   moduleChoiceTextActive: { color: colors.tealDark, fontWeight: '700' },
   preferenceRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
-  preferenceLabel: { flex: 1, color: colors.text, fontSize: 13, fontWeight: '600' },
+  preferenceLabel: { flex: 1, color: colors.text, fontSize: typography.body.fontSize, fontWeight: '600' },
   notificationWarning: {
     marginTop: spacing.md,
     padding: spacing.md,
@@ -662,7 +663,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: colors.danger,
   },
-  notificationSettingsButtonText: { color: colors.surface, fontSize: 13, fontWeight: '700' },
+  notificationSettingsButtonText: { color: colors.surface, fontSize: typography.body.fontSize, fontWeight: '700' },
   input: {
     minHeight: 48,
     borderWidth: 1,
@@ -677,7 +678,7 @@ const styles = StyleSheet.create({
   otpInput: { fontSize: 19, fontWeight: '700', letterSpacing: 8, textAlign: 'center' },
   consentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   consentCopy: { flex: 1 },
-  consentText: { color: colors.text, fontSize: 13, lineHeight: 19, fontWeight: '700' },
+  consentText: { color: colors.text, fontSize: typography.body.fontSize, lineHeight: 19, fontWeight: '700' },
   legalLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.xs },
   legalLink: { color: colors.tealDark, fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
   buttonRow: { gap: spacing.sm, marginTop: spacing.lg },
@@ -710,7 +711,7 @@ const styles = StyleSheet.create({
   },
   dangerButtonText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
   linkButton: { minHeight: 40, alignItems: 'center', justifyContent: 'center' },
-  linkText: { color: colors.tealDark, fontSize: 13, fontWeight: '600' },
+  linkText: { color: colors.tealDark, fontSize: typography.body.fontSize, fontWeight: '600' },
   inlineAction: {
     minHeight: 42,
     minWidth: 72,
@@ -723,24 +724,24 @@ const styles = StyleSheet.create({
   inlineActionPrimary: {
     backgroundColor: colors.teal,
   },
-  inlineActionText: { color: colors.tealDark, fontSize: 14, fontWeight: '700' },
+  inlineActionText: { color: colors.tealDark, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
   inlineActionTextPrimary: { color: colors.surface },
   editActions: { marginTop: spacing.md },
   buttonPressed: { opacity: 0.8 },
   buttonDisabled: { opacity: 0.5 },
   row: { paddingVertical: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
   rowLabel: { color: colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
-  rowValue: { color: colors.text, fontSize: 16, fontWeight: '700', marginTop: spacing.xs },
+  rowValue: { color: colors.text, fontSize: typography.sectionTitle.fontSize, fontWeight: '700', marginTop: spacing.xs },
   rowValueSubtle: { color: colors.muted },
   policyLink: { minHeight: 44, justifyContent: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
-  policyText: { color: colors.tealDark, fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
+  policyText: { color: colors.tealDark, fontSize: typography.cardTitle.fontSize, fontWeight: '600', textDecorationLine: 'underline' },
   diagnosticCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md, marginBottom: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   diagnosticCopy: { flex: 1 },
-  diagnosticLabel: { color: colors.muted, fontSize: 9, fontWeight: '700' },
+  diagnosticLabel: { color: colors.muted, fontSize: typography.eyebrow.fontSize, fontWeight: '700' },
   diagnosticValue: { marginTop: 3, color: colors.tealDark, fontSize: 12, fontWeight: '700' },
   diagnosticSessionLabel: { marginTop: spacing.sm },
   copyButton: { minHeight: 38, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: 10, backgroundColor: colors.surface },
-  copyButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
+  copyButtonText: { color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '700' },
   deleteWrap: {
     marginTop: spacing.lg,
     paddingTop: spacing.lg,
@@ -757,14 +758,14 @@ const styles = StyleSheet.create({
     borderColor: '#fecaca',
   },
   deleteTitle: { color: colors.navy, fontSize: 15, fontWeight: '700' },
-  deleteBody: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: spacing.xs },
-  aboutBrand: { color: colors.tealDark, fontSize: 13, fontWeight: '700', marginTop: spacing.sm },
+  deleteBody: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 19, marginTop: spacing.xs },
+  aboutBrand: { color: colors.tealDark, fontSize: typography.body.fontSize, fontWeight: '700', marginTop: spacing.sm },
   sizaLogo: { width: '100%', height: 110, marginTop: spacing.md, borderRadius: radius.md },
   aboutTagline: { color: colors.muted, fontSize: 12, fontWeight: '700', marginTop: 4 },
   aboutTitle: { color: colors.navy, fontSize: 18, fontWeight: '700', marginTop: spacing.md },
-  aboutBody: { color: colors.text, fontSize: 14, lineHeight: 21, marginTop: spacing.sm },
+  aboutBody: { color: colors.text, fontSize: typography.cardTitle.fontSize, lineHeight: 21, marginTop: spacing.sm },
   buildText: { color: colors.muted, fontSize: 12, fontWeight: '600', marginTop: spacing.md },
-  inlineError: { color: colors.danger, fontSize: 13, fontWeight: '600', marginTop: spacing.md },
-  error: { width: '100%', maxWidth: 620, alignSelf: 'center', color: colors.danger, fontSize: 13, fontWeight: '600' },
-  success: { width: '100%', maxWidth: 620, alignSelf: 'center', color: colors.tealDark, fontSize: 13, fontWeight: '600' },
+  inlineError: { color: colors.danger, fontSize: typography.body.fontSize, fontWeight: '600', marginTop: spacing.md },
+  error: { width: '100%', maxWidth: 620, alignSelf: 'center', color: colors.danger, fontSize: typography.body.fontSize, fontWeight: '600' },
+  success: { width: '100%', maxWidth: 620, alignSelf: 'center', color: colors.tealDark, fontSize: typography.body.fontSize, fontWeight: '600' },
 });

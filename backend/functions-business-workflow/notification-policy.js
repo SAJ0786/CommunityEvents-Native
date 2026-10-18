@@ -13,6 +13,7 @@ const isRequired = type => REQUIRED_TYPES.has(type);
 function allowsNotification(user, type, channel = 'inApp') {
   if (!isActiveRecipient(user)) return false;
   if (isRequired(type)) return true;
+  if (type === 'profile.updated') return channel === 'email' ? user.adminAlertEmailEnabled !== false : channel === 'push' ? user.pushNotificationsEnabled !== false : true;
   if (user.businessNotificationsEnabled === false) return false;
   return channel === 'push' ? user.pushNotificationsEnabled !== false
     : channel === 'email' ? user.emailNotificationsEnabled !== false : true;

@@ -90,6 +90,11 @@ function register({ admin, db, onCall, onDocumentCreated, HttpsError, REGION, EM
       }));
       tx.set(limit, { lastAt: Date.now() });
     });
+    if (kind === 'app-feedback') {
+      const acknowledgement = db.collection('eventEmailOutbox').doc(`support-ack-${reference}`);
+      try { await acknowledgement.create({ uid: '', required: true, category: 'service', state: 'pending', queuedAt: Date.now(), message: { to: senderEmail, subject: 'Your support request was received', text: `Thank you for contacting Community Connect Australia. Your reference is ${reference.slice(0, 12)}. Our support team will review your request. Contact support@siza.info for follow-up.` } }); }
+      catch (error) { if (error.code !== 6 && error.code !== 'already-exists') throw error; }
+    }
     return { reference, status: 'queued' };
   });
 
@@ -109,6 +114,7 @@ function register({ admin, db, onCall, onDocumentCreated, HttpsError, REGION, EM
     const sender = (await db.collection('users').doc(message.senderUid).get()).data() || {};
     const eligible = ownerMatches && isActiveRecipient(recipient);
     const address = clean(fromCustomer ? business.contact?.email : recipient.email);
+    const addresses = [...new Set((fromCustomer ? [address, clean(recipient.email)] : [address]).filter(validEmail).map(value => value.toLowerCase()))];
     const kind = fromCustomer ? 'business-enquiry' : 'business-reply';
     // Keep the existing stable key so redeployment cannot duplicate old enquiries.
     const reference = digest(`enquiry:${event.params.threadId}:${event.params.messageId}`);
@@ -135,8 +141,8 @@ function register({ admin, db, onCall, onDocumentCreated, HttpsError, REGION, EM
         // Do not disclose the owner's private account email to a customer.
         senderEmail: clean(fromCustomer ? sender.email : business.contact?.email),
         message: clean(message.text), submittedAt: event.data.createTime.toDate().toISOString(),
-        recipients: eligible && validEmail(address) ? [address] : [],
-        status: eligible && validEmail(address) ? 'queued' : 'skipped',
+        recipients: eligible ? addresses : [],
+        status: eligible && addresses.length ? 'queued' : 'skipped',
         skipReason: !ownerMatches ? 'ownership-changed' : !eligible ? 'inactive-recipient'
           : validEmail(address) ? '' : fromCustomer ? 'no-recorded-business-email' : 'no-customer-email',
         attempts: 0, createdAt: timestamp(),
@@ -149,7 +155,7 @@ function register({ admin, db, onCall, onDocumentCreated, HttpsError, REGION, EM
     if (!ref) return;
     const job = await db.runTransaction(async tx => {
       const snapshot = await tx.get(ref), value = snapshot.data();
-      if (!value || ['sent', 'skipped', 'failed'].includes(value.status)) return null;
+      if (!value || ['sent', 'skipped', 'failed', 'review-required'].includes(value.status)) return null;
       if (value.leaseUntil > Date.now()) throw new Error('Email delivery already leased; retry later.');
       if (Number(value.attempts || 0) >= 5) {
         tx.update(ref, { status: 'failed', leaseUntil: 0, updatedAt: timestamp() });
@@ -167,7 +173,7 @@ function register({ admin, db, onCall, onDocumentCreated, HttpsError, REGION, EM
         const recipient = (await db.collection('users').doc(job.recipientUid).get()).data() || {};
         const address = clean(job.kind === 'business-enquiry' ? business.contact?.email : recipient.email);
         if (clean(route.active === true ? route.ownerUid : business.ownerId) !== job.ownerUid
-          || !isActiveRecipient(recipient) || !job.recipients.includes(address)) {
+          || !isActiveRecipient(recipient) || !job.recipients.some(value => [address, ...(job.kind === 'business-enquiry' ? [clean(recipient.email)] : [])].map(x => x.toLowerCase()).includes(value.toLowerCase()))) {
           await ref.update({ status: 'skipped', skipReason: 'recipient-or-ownership-changed', leaseUntil: 0 });
           return;
         }
@@ -175,19 +181,36 @@ function register({ admin, db, onCall, onDocumentCreated, HttpsError, REGION, EM
       const transporter = buildTransporter();
       if (!transporter) throw new Error('SMTP unavailable');
       const email = buildEmail(job, event.params.reference);
+      let needsReview = false;
       for (const address of job.recipients || []) {
         const key = digest(address.toLowerCase()), receipt = ref.collection('deliveries').doc(key);
-        if ((await receipt.get()).data()?.status === 'sent') continue;
-        const result = await transporter.sendMail({ ...email, to: address, messageId: `<${event.params.reference}.${key.slice(0, 16)}@siza.info>` });
-        if (!result.accepted?.length || result.rejected?.length) throw new Error('SMTP did not accept recipient');
-        await receipt.set({ status: 'sent', messageId: clean(result.messageId), sentAt: timestamp() });
+        const previous = (await receipt.get()).data();
+        if (previous?.status === 'sent') continue;
+        if (previous?.status === 'sending' || previous?.status === 'review-required') { await ref.update({ status: 'review-required', leaseUntil: 0 }); return; }
+        if (job.recipientUid) {
+          const current = (await db.collection('users').doc(job.recipientUid).get()).data();
+          const business = (await db.collection('businesses').doc(job.businessId).get()).data() || {};
+          const permitted = (job.kind === 'business-enquiry' ? [business.contact?.email, current?.email] : [current?.email]).map(value => clean(value).toLowerCase());
+          if (!permitted.includes(address.toLowerCase())) continue;
+        }
+        await receipt.set({ status: 'sending', startedAt: timestamp() });
+        try {
+          const result = await transporter.sendMail({ ...email, to: address, messageId: `<${event.params.reference}.${key.slice(0, 16)}@siza.info>` });
+          if (!result.accepted?.length || result.rejected?.length) throw new Error('SMTP did not accept recipient');
+          await receipt.set({ status: 'sent', messageId: clean(result.messageId), sentAt: timestamp() });
+        } catch {
+          needsReview = true;
+          await receipt.set({ status: 'review-required', reason: 'provider-outcome-uncertain', updatedAt: timestamp() });
+        }
       }
+      if (needsReview) { await ref.update({ status: 'review-required', leaseUntil: 0 }); return; }
       await ref.update({ status: 'sent', leaseUntil: 0, sentAt: timestamp() });
       if (job.submissionId) await db.collection('supportSubmissions').doc(job.submissionId).update({ status: 'email-sent', updatedAt: timestamp() });
     } catch (error) {
-      await ref.update({ status: 'retrying', leaseUntil: 0, updatedAt: timestamp() });
+      await ref.update({ status: 'review-required', leaseUntil: 0, updatedAt: timestamp() });
       logger.error('Support email retry required', { reference: event.params.reference, code: clean(error.code) || 'delivery-error' });
-      throw new Error('Support email delivery failed; retry required.');
+      // SMTP may have accepted before a timeout/writeback failure. Reconcile instead of blind replay.
+      return;
     }
   });
   return { submitSupportRequest, queueBusinessEnquiryEmail, deliverSupportEmail };

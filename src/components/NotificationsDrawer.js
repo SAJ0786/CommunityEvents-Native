@@ -6,7 +6,7 @@ import useMenuDrawerMotion from './useMenuDrawerMotion';
 import DrawerDragZone from './DrawerDragZone';
 import { colors } from '../theme';
 
-export default function NotificationsDrawer({ visible, onClose, user, profile }) {
+export default function NotificationsDrawer({ visible, onClose, user, profile, onOpenNotification }) {
   const { translateY, requestClose, panHandlers } = useMenuDrawerMotion({ visible, onClose });
   useEffect(() => {
     if (!visible) return undefined;
@@ -23,7 +23,7 @@ export default function NotificationsDrawer({ visible, onClose, user, profile })
       <SafeAreaView accessibilityViewIsModal={true} pointerEvents="box-none" style={styles.layer}>
         <Pressable accessibilityLabel="Close notifications" style={StyleSheet.absoluteFillObject} onPress={requestClose} />
         <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
-          <BusinessNotificationsScreen key={user?.uid || 'guest'} user={user} profile={profile} onBack={requestClose}
+          <BusinessNotificationsScreen key={user?.uid || 'guest'} user={user} profile={profile} onBack={requestClose} onOpenNotification={row => { requestClose(); onOpenNotification?.(row); }}
             renderHeader={header => (
               <DrawerDragZone panHandlers={panHandlers} style={styles.dragZone}>
                 <View style={styles.handle} />

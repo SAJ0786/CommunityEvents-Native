@@ -138,7 +138,7 @@ async function main() {
     '../components/KeyboardAwareScrollView': 'ScrollView', '../components/NativeBackButton': 'Back',
     '../components/MemberPageHeader': 'MemberPageHeader',
     '../services/messaging': messaging, '../services/businessSafety': {},
-    '../theme': { colors: {}, radius: {}, shadow: {}, spacing: {} },
+    '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {}, radius: {}, shadow: {}, spacing: {} },
   };
   vm.runInNewContext(inboxCode, { exports: inboxExports, require: key => { assert.ok(key in inboxMocks, key); return inboxMocks[key]; } });
   const flatten = node => node && typeof node === 'object' ? [node, ...(node.children || []).flatMap(flatten)] : [];

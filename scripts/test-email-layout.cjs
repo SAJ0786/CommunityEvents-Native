@@ -39,30 +39,11 @@ async function main() {
   assert.match(hostile.html, /&lt;img/);
   assert.match(hostile.html, /&lt;reference&gt;/);
   const workflow = fs.readFileSync(path.join(root, 'backend/functions-business-workflow/index.js'), 'utf8');
-  assert.match(workflow, /\.\.\.buildWorkflowEmail\(notification\)/);
-  assert.doesNotMatch(workflow, /html: `|font-size:25px/);
-  // Exercise the real delivery body as well as its template. This catches
-  // undefined envelope variables that a standalone rendering test cannot see.
-  const statements = require('@babel/parser').parse(workflow, { sourceType: 'script' }).program.body;
-  const deliveryCode = statements.filter(node =>
-    (node.type === 'FunctionDeclaration' && ['clean', 'uniqueRecipients', 'deliver'].includes(node.id.name)) ||
-    (node.type === 'VariableDeclaration' && node.declarations.some(item => item.id.name === 'SUPPORT_EMAIL'))
-  ).map(node => workflow.slice(node.start, node.end)).join('\n');
-  const sent = [];
-  const context = {
-    ...require('../backend/functions-business-workflow/notification-policy'),
-    buildWorkflowEmail, sender: () => 'support@siza.info',
-    buildTransporter: () => ({ sendMail: async email => { sent.push(email); return { messageId: 'synthetic' }; } }),
-    db: { batch: () => ({ set() {}, commit: async () => {} }), collection: () => ({ doc: () => ({}) }) },
-    admin: { firestore: { FieldValue: { serverTimestamp: () => 0 } } },
-    logger: { info() {}, warn() {}, error(message) { throw new Error(message); } },
-  };
-  require('node:vm').runInNewContext(deliveryCode, context);
-  await context.deliver([{ uid: 'synthetic-user', email: 'recipient@example.test', pushNotificationsEnabled: false }],
-    { type: 'test', title: 'Business changes submitted', body: 'Synthetic delivery test' });
-  assert.equal(sent.length, 1);
-  assert.equal(sent[0].replyTo, 'support@siza.info');
-  assert.equal(sent[0].to, 'recipient@example.test');
+  assert.match(workflow, /eventEmailOutbox/);
+  assert.match(workflow, /module: 'directory'/);
+  const worker = fs.readFileSync(path.join(root, 'backend/functions-events/queued-email.js'), 'utf8');
+  assert.match(worker, /buildWorkflowEmail/);
+  // Actual queue/SMTP claims are executed by test-notification-matrix.cjs and test-business-push.cjs.
 
   if (process.argv.includes('--render')) {
     const { chromium } = require('playwright');

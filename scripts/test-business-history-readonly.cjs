@@ -46,7 +46,7 @@ const mocks = {
   react,
   'react-native': { ...native, Alert: { alert() {} }, Linking: {}, StyleSheet: { create: value => value }, useWindowDimensions: () => ({ width: 400, fontScale: 1 }) },
   '../services/businesses': services,
-  '../theme': { colors: {}, radius: {}, shadow: {}, spacing: {} },
+  '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {}, radius: {}, shadow: {}, spacing: {} },
   '../utils/errors': { friendlyError: error => error.message },
   '../components/MemberPageHeader': 'MemberPageHeader',
   '../components/AdminPageHeader': 'AdminPageHeader',

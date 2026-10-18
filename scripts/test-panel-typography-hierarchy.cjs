@@ -13,7 +13,10 @@ const HEADER_TITLE_SIZE = 22;
 function assertFontSizeBelow(file, styleKey, maxSize, label) {
   const source = read(file);
   const pattern = new RegExp(`${styleKey}:\\s*\\{[^}]*fontSize:\\s*([0-9.]+)`);
-  const match = source.match(pattern);
+  const literal = source.match(pattern);
+  const token = source.match(new RegExp(`${styleKey}:\\s*\\{[^}]*fontSize:\\s*typography\\.(\\w+)\\.fontSize`));
+  const sizes = { eyebrow:9,label:11,subtitle:11.5,body:13,cardTitle:14,sectionTitle:16,pageTitle:22 };
+  const match = literal || (token && [token[0], sizes[token[1]]]);
   assert.ok(match, `${file} should define styles.${styleKey}`);
   const size = Number(match[1]);
   assert.ok(size < maxSize, `${file} styles.${styleKey} (${label}) is ${size}px, expected below ${maxSize}px`);

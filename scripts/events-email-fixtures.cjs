@@ -16,6 +16,7 @@ async function eventEmailFixtures() {
   const snapshot = data => ({ exists: !!data, id: 'fixture', data: () => data });
   const db = { collection(name) { return {
     get: async () => ({ docs: name === 'users' ? [snapshot(profile)] : [] }),
+    where: () => ({ get: async () => ({ docs: name === 'users' ? [snapshot(profile)] : [] }) }),
     doc: () => ({ get: async () => snapshot(name === 'events' ? record : name === 'users' ? profile : null), set: async () => {} }),
   }; } };
   const register = (...args) => args.at(-1);
@@ -33,6 +34,7 @@ async function eventEmailFixtures() {
       if (['crypto', 'path', 'url'].includes(name)) return require(name);
       if (name === 'fs') return {};
       if (name === './email-layout' || name === './email-template') return require(path.join(folder, name));
+      if (name === './queued-email') return { queueEmail: async (_db, _key, _uid, message) => require(path.join(folder, 'email-layout')).sendEventEmail({ sendMail: async value => { messages.push(value); return { accepted: [value.to] }; } }, message) };
       if (name === './cityContext') return require(path.join(folder, name));
       throw new Error('Unmocked dependency: ' + name);
     },

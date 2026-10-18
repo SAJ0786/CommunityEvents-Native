@@ -4,7 +4,7 @@ import SafeAreaView from './ModalSafeArea';
 import ScrollView from './KeyboardAwareScrollView';
 import NativeBackButton from './NativeBackButton';
 import { APP_SUPPORT_CATEGORIES, BUSINESS_REPORT_CATEGORIES, newSupportReference, submitSupportRequest } from '../services/support';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, spacing, typography } from '../theme';
 import MemberPageHeader from './MemberPageHeader';
 
 export default function SupportForm({ user, profile, business, onBack }) {
@@ -65,7 +65,7 @@ export function SupportModal({ visible, onClose, ...props }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background }, content: { padding: spacing.lg, paddingBottom: 48 },
-  title: { color: colors.navy, fontSize: 25, fontWeight: '700', marginTop: 16 }, help: { color: colors.muted, fontSize: 13, lineHeight: 20, marginVertical: 12 },
+  title: { color: colors.navy, fontSize: 25, fontWeight: '700', marginTop: 16 }, help: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 20, marginVertical: 12 },
   label: { color: colors.navy, fontWeight: '600', marginTop: 12, marginBottom: 7 }, input: { color: colors.text, padding: 12, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, minHeight: 46 }, message: { minHeight: 140, textAlignVertical: 'top' },
   categories: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, chip: { padding: 10, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border }, selected: { backgroundColor: colors.teal }, text: { color: colors.text }, selectedText: { color: '#fff', fontWeight: '600' }, button: { minHeight: 48, borderRadius: radius.md, backgroundColor: colors.teal, justifyContent: 'center', alignItems: 'center', marginTop: 16 }, status: { color: colors.danger, marginVertical: 10 }, success: { color: colors.tealDark },
 });

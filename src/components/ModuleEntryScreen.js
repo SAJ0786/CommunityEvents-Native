@@ -2,7 +2,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getModuleExperience, MODULE_EXPERIENCE_LIST } from '../config/moduleExperience';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import AuthLandingScreen from './AuthLandingScreen';
 
 const cappedText = { maxFontSizeMultiplier: 1.12 };
@@ -168,12 +168,12 @@ const styles = StyleSheet.create({
   },
   logo: { width: 43, height: 43 },
   brandCopy: { flexShrink: 1 },
-  brandMain: { color: colors.navy, fontSize: 16, lineHeight: 20, fontWeight: '700' },
+  brandMain: { color: colors.navy, fontSize: typography.sectionTitle.fontSize, lineHeight: 20, fontWeight: '700' },
   brandSub: { marginTop: 2, color: colors.blueDark, fontSize: 8.5, lineHeight: 12, letterSpacing: 1.2, fontWeight: '700' },
   intro: { alignItems: 'center', marginBottom: spacing.xl },
   eyebrow: { color: colors.blueDark, fontSize: 10, lineHeight: 15, letterSpacing: 1.5, fontWeight: '700', textAlign: 'center' },
   title: { marginTop: 7, color: colors.navy, fontSize: 26, lineHeight: 31, letterSpacing: -0.55, fontWeight: '700', textAlign: 'center' },
-  subtitle: { maxWidth: 340, marginTop: 8, color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  subtitle: { maxWidth: 340, marginTop: 8, color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 19, textAlign: 'center' },
   options: { gap: spacing.md },
   option: {
     minHeight: 108,
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
   check: { width: 25, height: 25, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 13, backgroundColor: colors.background },
   checkSelected: { borderColor: colors.blue, backgroundColor: colors.blue },
   primary: { minHeight: 54, alignItems: 'center', justifyContent: 'center', marginTop: spacing.xl, paddingHorizontal: spacing.md, borderRadius: radius.lg, backgroundColor: colors.blue, ...shadow },
-  primaryText: { color: '#ffffff', fontSize: 14, lineHeight: 19, fontWeight: '700', textAlign: 'center' },
+  primaryText: { color: colors.surface, fontSize: typography.cardTitle.fontSize, lineHeight: 19, fontWeight: '700', textAlign: 'center' },
   guest: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
   guestText: { color: colors.blueDark, fontSize: 12, lineHeight: 17, fontWeight: '700', textAlign: 'center' },
   pressed: { opacity: 0.76 },

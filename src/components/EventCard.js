@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, AppState, Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import { formatEventTime } from '../utils/formatters';
 import { getEventPoster, getEventSuburb } from '../services/events';
 import { getImmediatePosterSource, resolvePosterSource } from '../services/images';
@@ -181,13 +181,13 @@ const styles = StyleSheet.create({
   poster: { width: '100%', height: '100%' },
   dateChip: { position: 'absolute', top: 4, left: 4, minWidth: 31, alignItems: 'center', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 7, backgroundColor: colors.surface, ...shadow },
   dateMonth: { color: colors.tealDark, fontSize: 7, fontWeight: '700', letterSpacing: 0.3 },
-  dateDay: { color: colors.text, fontSize: 14, lineHeight: 14, fontWeight: '700' },
+  dateDay: { color: colors.text, fontSize: typography.cardTitle.fontSize, lineHeight: 14, fontWeight: '700' },
   dateWeekday: { color: colors.muted, fontSize: 7, fontWeight: '600' },
-  liveBadge: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingVertical: 2, color: colors.surface, backgroundColor: colors.teal, fontSize: 9, fontWeight: '700', textAlign: 'center' },
+  liveBadge: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingVertical: 2, color: colors.surface, backgroundColor: colors.teal, fontSize: typography.eyebrow.fontSize, fontWeight: '700', textAlign: 'center' },
   posterCalendarIcon: { position: 'absolute', right: 5, bottom: 5, width: 25, height: 25, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: 'rgba(37,99,235,0.88)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.76)' },
   content: { flex: 1, minWidth: 0, position: 'relative', justifyContent: 'center' },
   titlePanel: { alignSelf: 'stretch', minHeight: 30, justifyContent: 'center', paddingRight: 46, marginBottom: 3 },
-  title: { color: colors.navy, fontSize: 13, lineHeight: 17, fontWeight: '700', letterSpacing: -0.15 },
+  title: { color: colors.navy, fontSize: typography.body.fontSize, lineHeight: 17, fontWeight: '700', letterSpacing: -0.15 },
   titleCompact: { fontSize: 12, lineHeight: 16 },
   metaRow: { minWidth: 0, flexDirection: 'row', alignItems: 'center', paddingRight: 25, gap: 3, overflow: 'hidden' },
   metaText: { flexShrink: 0, color: colors.muted, fontSize: 9.5, lineHeight: 13, fontWeight: '600' },
@@ -204,5 +204,5 @@ const styles = StyleSheet.create({
   saveTextActive: { color: '#d43867' },
   posterModal: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(0,0,0,0.94)' },
   posterFullscreen: { width: '100%', height: '88%' },
-  posterCloseHint: { position: 'absolute', bottom: 34, color: colors.surface, fontSize: 13, fontWeight: '600' },
+  posterCloseHint: { position: 'absolute', bottom: 34, color: colors.surface, fontSize: typography.body.fontSize, fontWeight: '600' },
 });

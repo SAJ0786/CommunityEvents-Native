@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, spacing, typography } from '../theme';
 
 function isIsoDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
@@ -129,11 +129,11 @@ const styles = StyleSheet.create({
   button: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   buttonCompact: { minHeight: 44, paddingHorizontal: spacing.sm },
   icon: { fontSize: 17 },
-  value: { flex: 1, minWidth: 0, color: colors.text, fontSize: 14, fontWeight: '600' },
+  value: { flex: 1, minWidth: 0, color: colors.text, fontSize: typography.cardTitle.fontSize, fontWeight: '600' },
   placeholder: { color: colors.muted },
-  chevron: { color: colors.tealDark, fontSize: 22, fontWeight: '700' },
+  chevron: { color: colors.tealDark, fontSize: typography.pageTitle.fontSize, fontWeight: '700' },
   pressed: { opacity: 0.74 },
   iosPicker: { marginTop: spacing.sm, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   done: { alignSelf: 'flex-end', minHeight: 38, justifyContent: 'center', paddingHorizontal: spacing.md },
-  doneText: { color: colors.tealDark, fontSize: 13, fontWeight: '700' },
+  doneText: { color: colors.tealDark, fontSize: typography.body.fontSize, fontWeight: '700' },
 });

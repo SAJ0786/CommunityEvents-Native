@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import ScrollView from './KeyboardAwareScrollView';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, spacing, typography } from '../theme';
 import { LEGAL_URLS, LEGAL_DOCUMENT_VERSION } from '../config/legal';
 import { openExternalUrl } from '../utils/openExternalUrl';
 import { cleanMemberName, cleanMemberEmail, validMemberName, validMemberEmail } from '../utils/memberProfile';
@@ -44,12 +44,12 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: colors.background },
   card: { padding: spacing.lg, borderRadius: radius.xl, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   title: { fontSize: 23, fontWeight: '700', color: colors.navy, marginBottom: spacing.md },
-  copy: { fontSize: 14, lineHeight: 21, color: colors.muted, marginBottom: spacing.md },
-  label: { fontSize: 13, fontWeight: '700', color: colors.navy, marginBottom: spacing.sm },
-  input: { minHeight: 50, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, color: colors.text, backgroundColor: colors.background, marginBottom: spacing.md, fontSize: 16 },
+  copy: { fontSize: typography.cardTitle.fontSize, lineHeight: 21, color: colors.muted, marginBottom: spacing.md },
+  label: { fontSize: typography.body.fontSize, fontWeight: '700', color: colors.navy, marginBottom: spacing.sm },
+  input: { minHeight: 50, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, color: colors.text, backgroundColor: colors.background, marginBottom: spacing.md, fontSize: typography.sectionTitle.fontSize },
   consent: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, links: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, marginBottom: spacing.md },
-  link: { color: colors.blueDark, fontSize: 14, fontWeight: '600' },
+  link: { color: colors.blueDark, fontSize: typography.cardTitle.fontSize, fontWeight: '600' },
   primary: { minHeight: 50, justifyContent: 'center', alignItems: 'center', padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.blue },
   primaryText: { color: colors.onPrimary, fontSize: 15, fontWeight: '700' }, secondary: { minHeight: 48, justifyContent: 'center', alignItems: 'center', marginTop: spacing.sm },
-  error: { color: colors.danger, fontSize: 14, marginBottom: spacing.md }, disabled: { opacity: 0.6 },
+  error: { color: colors.danger, fontSize: typography.cardTitle.fontSize, marginBottom: spacing.md }, disabled: { opacity: 0.6 },
 });

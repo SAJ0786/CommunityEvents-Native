@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as Notifications from 'expo-notifications';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 
 const azaanRecording = require('../../assets/sounds/azan_mashad.mp3');
 
@@ -114,8 +114,8 @@ const styles = StyleSheet.create({
   icon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: '#5b3fb5' },
   iconText: { color: '#ffd66b', fontSize: 23, fontWeight: '700' },
   copy: { flex: 1, minWidth: 0 },
-  title: { color: colors.navy, fontSize: 14, fontWeight: '700' },
-  time: { color: colors.muted, fontSize: 11, fontWeight: '700', marginTop: 2 },
+  title: { color: colors.navy, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
+  time: { color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '700', marginTop: 2 },
   stop: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: spacing.md, borderRadius: 20, backgroundColor: '#dc2626' },
   stopIcon: { width: 11, height: 11, borderRadius: 2, backgroundColor: colors.surface },
   stopText: { color: colors.surface, fontSize: 12, fontWeight: '700' },

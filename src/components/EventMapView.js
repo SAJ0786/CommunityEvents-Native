@@ -3,7 +3,7 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from '
 import * as Location from 'expo-location';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { getEventTitle } from '../services/events';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import { formatEventTime } from '../utils/formatters';
 
 const AUDIENCE_COLORS = {
@@ -330,12 +330,12 @@ export default function EventMapView({ events = [], onSelectEvent }) {
 
 const styles = StyleSheet.create({
   container: { paddingHorizontal: spacing.lg, paddingBottom: 120 },
-  introTitle: { color: colors.navy, fontSize: 22, fontWeight: '700' },
-  introText: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 4, marginBottom: spacing.md },
+  introTitle: { color: colors.navy, fontSize: typography.pageTitle.fontSize, fontWeight: '700' },
+  introText: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 19, marginTop: 4, marginBottom: spacing.md },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: spacing.md },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 9, height: 9, borderRadius: 5 },
-  legendText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  legendText: { color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '700' },
   summaryCard: {
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
   },
   locationButtonText: {
     color: colors.surface,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontWeight: '700',
   },
   secondaryButton: {
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: colors.tealDark,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontWeight: '700',
   },
   locationError: {
@@ -396,12 +396,12 @@ const styles = StyleSheet.create({
   },
   map: { flex: 1 },
   mapLoading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.tealSoft },
-  mapLoadingText: { color: colors.tealDark, fontSize: 13, fontWeight: '700' },
+  mapLoadingText: { color: colors.tealDark, fontSize: typography.body.fontSize, fontWeight: '700' },
   mapProblem: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, backgroundColor: 'rgba(239,247,246,0.96)' },
   mapProblemTitle: { color: colors.navy, fontSize: 18, fontWeight: '700', textAlign: 'center' },
-  mapProblemText: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: spacing.sm },
+  mapProblemText: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 19, textAlign: 'center', marginTop: spacing.sm },
   retryButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.teal, marginTop: spacing.md },
-  retryButtonText: { color: colors.surface, fontSize: 13, fontWeight: '700' },
+  retryButtonText: { color: colors.surface, fontSize: typography.body.fontSize, fontWeight: '700' },
   mapPreview: {
     position: 'absolute',
     left: spacing.md,
@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
   mapPreviewFooter: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.sm },
   mapPreviewBadges: { flex: 1, gap: 2 },
   mapPreviewAudience: { fontSize: 12, fontWeight: '700' },
-  mapPreviewDistance: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  mapPreviewDistance: { color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '600' },
   mapPreviewButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.teal },
   mapPreviewButtonText: { color: colors.surface, fontSize: 12, fontWeight: '700' },
   mapPreviewButtonArrow: { color: colors.surface, fontSize: 21, lineHeight: 21, fontWeight: '700' },
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   emptyTitle: { color: colors.navy, fontSize: 18, fontWeight: '700', marginTop: 5 },
-  emptyText: { color: colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 19, marginTop: 4 },
+  emptyText: { color: colors.muted, fontSize: typography.body.fontSize, textAlign: 'center', lineHeight: 19, marginTop: 4 },
   pressed: { opacity: 0.82 },
   disabled: { opacity: 0.55 },
 });

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import EventCard from './EventCard';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import MemberPageHeader from './MemberPageHeader';
 
 export default function FavouritesScreen({
@@ -71,13 +71,13 @@ export default function FavouritesScreen({
 const styles = StyleSheet.create({
   content: { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xl },
   header: { marginBottom: spacing.lg },
-  count: { color: colors.tealDark, fontSize: 14, fontWeight: '700' },
+  count: { color: colors.tealDark, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
   stateCard: { alignItems: 'center', justifyContent: 'center', padding: spacing.xl, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, ...shadow },
   emptyStar: { color: colors.teal, fontSize: 44, lineHeight: 52, marginBottom: spacing.sm },
   emptyTitle: { color: colors.navy, fontSize: 17, fontWeight: '700' },
   stateText: { color: colors.muted, fontSize: 15, lineHeight: 21, fontWeight: '700', marginTop: spacing.sm, textAlign: 'center' },
   browseButton: { minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md, paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.teal },
-  browseText: { color: colors.surface, fontSize: 14, fontWeight: '700' },
+  browseText: { color: colors.surface, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
   removeButton: { alignSelf: 'flex-start', marginBottom: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: radius.sm, backgroundColor: '#fef3c7' },
   removeText: { color: '#92400e', fontSize: 12, fontWeight: '700' },
   pressed: { opacity: 0.78 },

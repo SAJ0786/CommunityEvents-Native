@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { doc, runTransaction, serverTimestamp } from '@react-native-firebase/firestore';
-import { getMessaging, getToken, getAPNSToken, registerDeviceForRemoteMessages, isDeviceRegisteredForRemoteMessages, onTokenRefresh, deleteToken, getInitialNotification, onNotificationOpenedApp } from '@react-native-firebase/messaging';
+import { getMessaging, getToken, getAPNSToken, registerDeviceForRemoteMessages, isDeviceRegisteredForRemoteMessages, onTokenRefresh, deleteToken, getInitialNotification, onNotificationOpenedApp, onMessage } from '@react-native-firebase/messaging';
 import { auth, db } from '../firebase/firebase';
 
 export const BUSINESS_ALERT_CHANNEL_ID = 'business-alerts';
@@ -106,19 +106,23 @@ export function listenForBusinessPushOpens(uid, onOpen, onError = () => {}, { re
   let active = true;
   const seen = new Set();
   const open = data => {
-    const registration = registrationEnabled && data?.module === 'registration' && data.type === 'registration.changed'
+    const registration = registrationEnabled && data?.module === 'registration' && ['registration.changed', 'registration.reminder', 'registration.reviewed', 'registration.booking', 'registration.submitted', 'registration.approved'].includes(data.type)
       && typeof data.eventId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(data.eventId) && data.recipientUid === uid;
-    if (!active || auth.currentUser?.uid !== uid || (data?.module !== 'directory' && !registration)
+    if (!active || auth.currentUser?.uid !== uid || (!['directory', 'events'].includes(data?.module) && !registration)
       || (data.recipientUid && data.recipientUid !== uid)) return;
     const key = data.notificationId;
     if (key && seen.has(key)) return;
     if (key) seen.add(key);
-    onOpen(registration ? 'registration' : data.threadId ? 'business-inbox' : 'business-notifications', registration ? data.eventId : null);
+    onOpen(registration ? 'registration' : data.module === 'events' ? data.threadId ? 'host-inbox' : 'notifications' : data.threadId ? 'business-inbox' : 'business-notifications', registration ? data.eventId : null);
   };
   const messaging = getMessaging();
+  const foreground = onMessage(messaging, async message => {
+    if (!active || auth.currentUser?.uid !== uid || message.data?.recipientUid && message.data.recipientUid !== uid || Platform.OS !== 'android') return;
+    if (message.notification) await Notifications.scheduleNotificationAsync({ content: { title: message.notification.title, body: message.notification.body, data: message.data, sound: 'default' }, trigger: null }).catch(onError);
+  });
   const unsubscribe = onNotificationOpenedApp(messaging, message => open(message.data));
   getInitialNotification(messaging).then(message => { if (message) open(message.data); }).catch(onError);
   // Expo still handles local notifications and may own the tap callback on iOS.
   const expo = Notifications.addNotificationResponseReceivedListener(response => open(response.notification.request.content.data));
-  return () => { active = false; unsubscribe(); expo.remove(); };
+  return () => { active = false; foreground(); unsubscribe(); expo.remove(); };
 }

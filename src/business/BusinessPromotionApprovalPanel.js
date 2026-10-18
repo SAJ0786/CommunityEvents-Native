@@ -7,7 +7,7 @@ import {
   rejectBusinessPromotion,
 } from '../services/businesses';
 import { friendlyError } from '../utils/errors';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import Constants from 'expo-constants';
 import CompactSelect from '../components/CompactSelect';
 
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   metric: { flex: 1, alignItems: 'center', paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, ...shadow },
   metricValue: { color: colors.navy, fontSize: 23, fontWeight: '700' },
   metricLabel: { marginTop: 3, color: colors.muted, fontSize: 8.5, fontWeight: '700' },
-  search: { minHeight: 50, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, color: colors.text, fontSize: 14, fontWeight: '700' },
+  search: { minHeight: 50, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, color: colors.text, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   filter: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 99, backgroundColor: colors.surface },
   filterActive: { borderColor: colors.teal, backgroundColor: colors.teal },
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   statusRejected: { backgroundColor: '#ffeded', color: colors.danger },
   expand: { width: 30, color: colors.tealDark, fontSize: 24, fontWeight: '700', textAlign: 'center' },
   body: { padding: spacing.md, paddingTop: 0, borderTopWidth: 1, borderTopColor: colors.border },
-  offer: { marginTop: spacing.md, color: '#aa6507', fontSize: 14, fontWeight: '700' },
+  offer: { marginTop: spacing.md, color: '#aa6507', fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
   details: { marginTop: spacing.sm, color: colors.text, fontSize: 12, lineHeight: 19, fontWeight: '600' },
   metaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   meta: { flex: 1, minWidth: 90, padding: spacing.sm, borderRadius: 10, backgroundColor: '#f4f7f6' },
@@ -220,12 +220,12 @@ const styles = StyleSheet.create({
   reject: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e2b5b5', borderRadius: radius.md, backgroundColor: '#fff5f5' },
   rejectText: { color: colors.danger, fontSize: 10, fontWeight: '700' },
   error: { padding: spacing.md, borderRadius: radius.md, backgroundColor: '#fff0f0' },
-  errorText: { color: colors.danger, fontSize: 11, lineHeight: 17, fontWeight: '600' },
+  errorText: { color: colors.danger, fontSize: typography.label.fontSize, lineHeight: 17, fontWeight: '600' },
   loading: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl },
-  loadingText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  loadingText: { color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '700' },
   empty: { alignItems: 'center', padding: spacing.xl, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface },
   emptyIcon: { color: '#2f7740', fontSize: 35, fontWeight: '700' },
   emptyTitle: { marginTop: spacing.sm, color: colors.navy, fontSize: 17, fontWeight: '700' },
-  emptyText: { marginTop: 4, color: colors.muted, fontSize: 11, fontWeight: '700' },
+  emptyText: { marginTop: 4, color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '700' },
   disabled: { opacity: 0.5 },
 });

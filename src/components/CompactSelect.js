@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import SafeAreaView from './ModalSafeArea';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 
 function normaliseOption(option) {
   if (typeof option === 'string') return { value: option, label: option, group: '' };
@@ -77,7 +77,7 @@ export default function CompactSelect({ options = [], value, onChange, placehold
 
 const styles = StyleSheet.create({
   compactTrigger: { minHeight: 44, paddingHorizontal: 8, gap: 4, backgroundColor: colors.tealSoft },
-  compactText: { fontSize: 11, fontWeight: '600' },
+  compactText: { fontSize: typography.label.fontSize, fontWeight: '600' },
   disabled: { opacity: 0.55 },
   trigger: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   triggerText: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '700' },
@@ -89,9 +89,9 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, marginBottom: spacing.md },
   title: { flex: 1, color: colors.navy, fontSize: 20, fontWeight: '700' },
   close: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  closeText: { color: colors.tealDark, fontSize: 13, fontWeight: '700' },
+  closeText: { color: colors.tealDark, fontSize: typography.body.fontSize, fontWeight: '700' },
   list: { gap: spacing.sm, paddingBottom: spacing.lg },
-  groupTitle: { color: colors.tealDark, fontSize: 11, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: spacing.sm, paddingHorizontal: 2 },
+  groupTitle: { color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: spacing.sm, paddingHorizontal: 2 },
   option: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   optionActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
   optionText: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '700' },

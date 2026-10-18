@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import ScrollView from './KeyboardAwareScrollView';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import NativeBackButton from './NativeBackButton';
 import MemberPageHeader from './MemberPageHeader';
 import {
@@ -241,33 +241,33 @@ const styles = StyleSheet.create({
   conversationHeader: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
   headerCopy: { flex: 1 },
   title: { color: colors.navy, fontSize: 17, fontWeight: '700' },
-  subtitle: { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: spacing.xs },
-  sectionTitle: { color: colors.navy, fontSize: 16, fontWeight: '700', marginBottom: spacing.sm },
-  emptyText: { color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  subtitle: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 18, marginTop: spacing.xs },
+  sectionTitle: { color: colors.navy, fontSize: typography.sectionTitle.fontSize, fontWeight: '700', marginBottom: spacing.sm },
+  emptyText: { color: colors.muted, fontSize: typography.cardTitle.fontSize, lineHeight: 20, textAlign: 'center' },
   lightButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  lightButtonText: { color: colors.tealDark, fontSize: 13, fontWeight: '700' },
+  lightButtonText: { color: colors.tealDark, fontSize: typography.body.fontSize, fontWeight: '700' },
   threadCard: { padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, marginTop: spacing.sm },
   threadCardActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
   threadHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm, alignItems: 'center' },
   threadTitle: { color: colors.text, fontSize: 15, fontWeight: '700', flex: 1 },
   unreadBadge: { backgroundColor: colors.danger, borderRadius: 99, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
-  unreadBadgeText: { color: colors.surface, fontSize: 11, fontWeight: '700' },
-  threadPreview: { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 6 },
-  selectedMeta: { color: colors.muted, fontSize: 13, lineHeight: 18, marginBottom: spacing.md },
+  unreadBadgeText: { color: colors.surface, fontSize: typography.label.fontSize, fontWeight: '700' },
+  threadPreview: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 18, marginTop: 6 },
+  selectedMeta: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 18, marginBottom: spacing.md },
   messageList: { gap: spacing.sm, marginBottom: spacing.md },
   messageBubble: { maxWidth: '86%', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 14 },
   messageBubbleMine: { alignSelf: 'flex-end', backgroundColor: colors.teal },
-  messageBubbleOther: { alignSelf: 'flex-start', backgroundColor: '#f3f7f6' },
+  messageBubbleOther: { alignSelf: 'flex-start', backgroundColor: colors.background },
   messageSender: { color: colors.text, fontSize: 12, fontWeight: '700', marginBottom: 4 },
   messageSenderMine: { color: colors.surface },
-  messageText: { color: colors.text, fontSize: 14, lineHeight: 20 },
+  messageText: { color: colors.text, fontSize: typography.cardTitle.fontSize, lineHeight: 20 },
   messageTextMine: { color: colors.surface },
-  messageTime: { color: colors.muted, fontSize: 11, marginTop: 6 },
+  messageTime: { color: colors.muted, fontSize: typography.label.fontSize, marginTop: 6 },
   messageTimeMine: { color: 'rgba(255,255,255,0.72)' },
   textarea: { minHeight: 110, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, color: colors.text, backgroundColor: colors.surface, fontSize: 15 },
   primaryButton: { minHeight: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.teal, paddingHorizontal: spacing.lg, marginTop: spacing.md },
   primaryButtonText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
-  statusText: { color: colors.tealDark, fontSize: 13, fontWeight: '600', marginTop: spacing.md },
+  statusText: { color: colors.tealDark, fontSize: typography.body.fontSize, fontWeight: '600', marginTop: spacing.md },
   disabled: { opacity: 0.5 },
   pressed: { opacity: 0.78 },
 });

@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@react-native-firebase/firestore';
+import { addDoc, collection, doc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, startAfter, updateDoc, where, writeBatch } from '@react-native-firebase/firestore';
 import { httpsCallable } from '@react-native-firebase/functions';
 import { auth, db, ensureFirebaseSession, functions } from '../firebase/firebase';
 import { isFutureSeriesEvent } from '../utils/seriesScope';
@@ -43,14 +43,16 @@ export async function getPublicEvents() {
   ].join('-');
 
   const eventCollection = collection(db, 'events');
+  const allUpcoming = async () => {
+    const docs = []; let cursor;
+    do {
+      const page = await getDocs(query(eventCollection, where('status', '==', 'active'), where('eventDate', '>=', yesterday), orderBy('eventDate', 'asc'), ...(cursor ? [startAfter(cursor)] : []), limit(250)));
+      docs.push(...page.docs); cursor = page.docs.length === 250 ? page.docs.at(-1) : null;
+    } while (cursor);
+    return { docs };
+  };
   const [upcomingSnapshot, liveSnapshot] = await Promise.all([
-    getDocs(query(
-      eventCollection,
-      where('status', '==', 'active'),
-      where('eventDate', '>=', yesterday),
-      orderBy('eventDate', 'asc'),
-      limit(750)
-    )),
+    allUpcoming(),
     getDocs(query(eventCollection, where('isLive', '==', true))),
   ]);
 
@@ -82,8 +84,7 @@ export function listenActiveEvents(onEvents, onError) {
     eventCollection,
     where('status', '==', 'active'),
     where('eventDate', '>=', yesterday),
-    orderBy('eventDate', 'asc'),
-    limit(750)
+    orderBy('eventDate', 'asc')
   );
   const liveQuery = query(eventCollection, where('isLive', '==', true));
   let upcomingEvents = [];

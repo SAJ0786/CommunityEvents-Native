@@ -1,7 +1,7 @@
 import React from 'react';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, spacing, typography } from '../theme';
 
 export function Action({ children, onPress, primary, disabled }) {
   return <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled) }} disabled={disabled} onPress={onPress} style={[styles.button, primary && styles.primary, disabled && styles.disabled]}><Text style={[styles.buttonText, primary && styles.primaryText]}>{children}</Text></Pressable>;
@@ -25,14 +25,14 @@ export function Answer({ field, value, onChange }) {
 export const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.md },
   panel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm },
-  title: { color: colors.navy, fontSize: 22, fontWeight: '700' },
-  label: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  text: { color: colors.text, fontSize: 15, lineHeight: 22 },
-  muted: { color: colors.muted, fontSize: 14, lineHeight: 21 },
+  title: { color: colors.navy, ...typography.sectionTitle },
+  label: { color: colors.text, ...typography.label },
+  text: { color: colors.text, ...typography.body },
+  muted: { color: colors.muted, ...typography.body },
   error: { color: colors.tealDark, backgroundColor: colors.tealSoft, padding: spacing.md, borderRadius: radius.md },
   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   flex: { flex: 1, color: colors.text }, group: { gap: spacing.sm, marginVertical: spacing.sm },
-  input: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, color: colors.text, borderRadius: radius.md, padding: spacing.md, minHeight: 48, fontSize: 16 },
+  input: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, color: colors.text, borderRadius: radius.md, padding: spacing.md, minHeight: 48, fontSize: typography.sectionTitle.fontSize },
   multiline: { minHeight: 90, textAlignVertical: 'top' },
   button: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, minHeight: 44, padding: spacing.md, justifyContent: 'center' },
   buttonText: { color: colors.tealDark, fontWeight: '600' }, primary: { backgroundColor: colors.blue }, primaryText: { color: colors.onPrimary },

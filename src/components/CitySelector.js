@@ -11,7 +11,7 @@ import {
 import SafeAreaView from './ModalSafeArea';
 import * as Location from 'expo-location';
 import { CITY_OPTIONS, cityCode, cityLabel, classifyMetroArea } from '../utils/cities';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import { useCityCatalogueVersion } from '../services/cityCatalogue';
 
 export default function CitySelector({ selectedCity, onChange, onLocationResolved, allowCurrentLocation = false, compact = false }) {
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   },
   triggerLabel: {
     color: colors.muted,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   },
   closeText: {
     color: colors.tealDark,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontWeight: '700',
   },
   locationButton: {
@@ -238,10 +238,10 @@ const styles = StyleSheet.create({
   locationCopy: { flex: 1, minWidth: 0 },
   locationButtonText: {
     color: colors.tealDark,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '700',
   },
-  locationButtonHint: { color: '#46706c', fontSize: 11, fontWeight: '700', marginTop: 2 },
+  locationButtonHint: { color: '#46706c', fontSize: typography.label.fontSize, fontWeight: '700', marginTop: 2 },
   locationArrow: { color: colors.tealDark, fontSize: 28, lineHeight: 28, fontWeight: '700' },
   locationError: {
     color: colors.danger,

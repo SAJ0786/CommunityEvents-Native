@@ -6,7 +6,7 @@ import { clearUserNotifications, listenUserNotifications, markBusinessNotificati
 import { sendFeedbackMessage } from '../services/messaging';
 import { listenBusinessModerationNotices, recordBusinessModerationAppeal } from '../services/businessSafety';
 import { friendlyError } from '../utils/errors';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import NativeBackButton from '../components/NativeBackButton';
 import MemberPageHeader from '../components/MemberPageHeader';
 
@@ -16,7 +16,7 @@ function createdLabel(value) {
   return date.toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 }
 
-export default function BusinessNotificationsScreen({ user, profile, onBack, renderHeader }) {
+export default function BusinessNotificationsScreen({ user, profile, onBack, renderHeader, onOpenNotification }) {
   const [rows, setRows] = useState([]);
   const [moderationRows, setModerationRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +39,7 @@ export default function BusinessNotificationsScreen({ user, profile, onBack, ren
   ), [user?.uid]);
 
   const openNotification = async notification => {
+    onOpenNotification?.(notification);
     if (notification.read === true) return;
     setRows(current => current.map(item => item.id === notification.id ? { ...item, read: true } : item));
     try {
@@ -151,27 +152,27 @@ const styles = StyleSheet.create({
   title: { marginTop: 4, color: colors.navy, fontSize: 25, fontWeight: '700' },
   subtitle: { marginTop: 4, color: colors.muted, fontSize: 12, fontWeight: '700' },
   clearButton: { alignSelf: 'flex-start', marginTop: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  clearButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
+  clearButtonText: { color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '700' },
   card: { flexDirection: 'row', gap: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   unreadCard: { borderColor: '#8bc9bf', backgroundColor: '#f2fbf9' },
   iconWrap: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.tealSoft },
   unreadIcon: { backgroundColor: colors.teal },
   copy: { flex: 1, minWidth: 0 },
   titleLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  cardTitle: { flex: 1, color: colors.navy, fontSize: 14, fontWeight: '700' },
+  cardTitle: { flex: 1, color: colors.navy, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
   unreadTitle: { fontWeight: '800' },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.teal },
-  cardBody: { marginTop: 5, color: colors.text, fontSize: 13, lineHeight: 19 },
+  cardBody: { marginTop: 5, color: colors.text, fontSize: typography.body.fontSize, lineHeight: 19 },
   cardTime: { marginTop: 8, color: colors.muted, fontSize: 10, fontWeight: '600' },
   emptyCard: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface },
   emptyTitle: { color: colors.navy, fontSize: 17, fontWeight: '700' },
-  emptyText: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  emptyText: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 19, textAlign: 'center' },
   errorCard: { padding: spacing.md, borderRadius: radius.md, backgroundColor: '#fff0ef' },
-  errorText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
+  errorText: { color: colors.danger, fontSize: typography.body.fontSize, fontWeight: '600' },
   moderationNotice: { padding: spacing.md, borderWidth: 1, borderColor: '#f1c7d4', borderRadius: radius.lg, backgroundColor: '#fff8fa', ...shadow },
   noticeHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   noticeBusiness: { marginTop: spacing.sm, color: colors.navy, fontSize: 15, fontWeight: '700' },
-  noticeDecision: { marginTop: spacing.sm, color: colors.danger, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  noticeDecision: { marginTop: spacing.sm, color: colors.danger, fontSize: typography.label.fontSize, fontWeight: '700', textTransform: 'uppercase' },
   appealButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md, borderRadius: radius.md, backgroundColor: '#3b82f6' },
   appealButtonText: { color: colors.surface, fontSize: 12, fontWeight: '700' },
   appealSubmitted: { marginTop: spacing.md, color: colors.tealDark, fontSize: 12, fontWeight: '600' },

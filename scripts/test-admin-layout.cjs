@@ -34,7 +34,7 @@ async function main() {
     './ModalSafeArea': 'SafeAreaView',
     react,
     'react-native': { Modal: 'Modal', Pressable: 'Pressable', SafeAreaView: 'SafeAreaView', ScrollView: 'ScrollView', Text: 'Text', View: 'View', StyleSheet: { create: value => value, absoluteFillObject: {} } },
-    '../theme': { colors: {}, radius: {}, shadow: {}, spacing: {} },
+    '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {}, radius: {}, shadow: {}, spacing: {} },
   }).default;
   const flatten = node => !node || typeof node !== 'object' ? [] : [node, ...(node.children || []).flatMap(flatten)];
   const options = [{ value: 'user', label: 'User' }, { value: 'admin', label: 'Admin' }, { value: 'superAdmin', label: 'Super Admin' }];

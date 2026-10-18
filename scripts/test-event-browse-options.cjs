@@ -115,7 +115,7 @@ async function main() {
   const EventPresetStrip = load('src/components/HomeFilters.js', {
     react, 'react-native': { ScrollView: 'ScrollView', Pressable: 'Pressable', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: value => value } },
     '@expo/vector-icons/MaterialCommunityIcons': 'Icon', '../utils/eventOptions': options,
-    '../utils/eventBrowseOptions': browse, '../theme': { colors: {}, radius: {}, spacing: {} }, './CompactSelect': 'CompactSelect',
+    '../utils/eventBrowseOptions': browse, '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {}, radius: {}, spacing: {} }, './CompactSelect': 'CompactSelect',
   }).EventPresetStrip;
   const selections = [];
   const filterTree = EventPresetStrip({ filters: noFilters,

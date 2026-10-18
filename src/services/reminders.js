@@ -3,6 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as IntentLauncher from 'expo-intent-launcher';
 import Constants from 'expo-constants';
+import { httpsCallable } from '@react-native-firebase/functions';
+import { auth, functions } from '../firebase/firebase';
 import { getEventSuburb, getEventTitle } from './events';
 import { calculatePrayerTimes, prayerLabel, prayerDateAt, prayerTimeInstant } from './prayerTimes';
 import { registrationInstant, registrationSchedule } from '../registration/eventSchedule';
@@ -417,6 +419,7 @@ export async function cancelEventReminder(eventId) {
   if (!eventId) return;
   const reminders = await readReminderMap();
   const existing = reminders[eventId];
+  if (existing?.source === 'server' && auth.currentUser?.uid) await httpsCallable(functions, 'registrationReminderStatus')({ eventId, remove: true });
   if (existing?.notificationId) {
     await Notifications.cancelScheduledNotificationAsync(existing.notificationId).catch(() => {});
   }
@@ -435,6 +438,11 @@ export async function scheduleEventReminder(event, minutesBefore) {
     throw new Error('That reminder time has already passed. Choose a later option.');
   }
 
+  if (event.registrationOnly) {
+    const result = await httpsCallable(functions, 'scheduleRegistrationNotice')({ eventId: event.id, minutesBefore: minutes });
+    const reminder = { eventId: event.id, minutesBefore: minutes, triggerAt: result.data.triggerAt, source: 'server', eventStartAt: start.toISOString() };
+    const reminders = await readReminderMap(); reminders[event.id] = reminder; await writeReminderMap(reminders); return reminder;
+  }
   const permitted = await ensureNotificationPermission();
   if (!permitted) {
     const permissionError = new Error('Notifications are disabled. Enable them in your phone settings to set a reminder.');
@@ -522,4 +530,9 @@ export function formatReminderLeadTime(minutes) {
   if (minutes === 24 * 60) return '1 day before';
   if (minutes >= 60 && minutes % 60 === 0) return `${minutes / 60} hour${minutes === 60 ? '' : 's'} before`;
   return `${minutes} minutes before`;
+}
+
+export async function clearAccountDeviceAlerts() {
+  await Notifications.cancelAllScheduledNotificationsAsync();
+  await AsyncStorage.multiRemove([REMINDER_STORAGE_KEY, PRAYER_REMINDER_STORAGE_KEY, AZAAN_ALARM_STORAGE_KEY]);
 }

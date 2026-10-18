@@ -85,6 +85,8 @@ function reminderFixture(platform) {
     'expo-notifications': notifications, 'expo-intent-launcher': {}, 'expo-constants': {}, './prayerTimes': {},
     './events': { getEventTitle: event => event.title, getEventSuburb: event => event.suburb },
     '../registration/eventSchedule': schedule,
+    '@react-native-firebase/functions': { httpsCallable: (_f,name) => async data => ({data: name === 'scheduleRegistrationNotice' ? {triggerAt:'2026-12-01T07:00:00.000Z'} : {removed:true}}) },
+    '../firebase/firebase': {auth:{currentUser:{uid:'member'}},functions:{}},
   }, { Date: Clock });
   return { api, scheduled, store };
 }
@@ -95,7 +97,8 @@ for (const platform of ['ios', 'android']) test(`${platform}: registration remin
   assert.equal(scheduled.size, 0);
   const reminder = await api.scheduleEventReminder(row, 30);
   assert.equal(reminder.triggerAt, '2026-12-01T07:00:00.000Z');
-  assert.equal([...scheduled.values()][0].content.data.eventKind, 'registration');
+  assert.equal(reminder.source, 'server');
+  assert.equal(scheduled.size, 0, 'registration uses approved remote push and bell channels without duplicate local alarm');
   assert.equal((await api.getEventReminder(row.id, row)).eventStartAt, '2026-12-01T07:30:00.000Z');
   assert.equal(await api.getEventReminder(row.id, { ...row, startTime: '19:30' }), null);
   assert.equal(scheduled.size, 0, 'changed times revoke old local reminder');

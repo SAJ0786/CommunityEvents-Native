@@ -1,3 +1,4 @@
+import { userMatchesSearch, normalisePhone } from '../utils/adminUserSearch';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -22,7 +23,7 @@ import * as Location from 'expo-location';
 import * as XLSX from 'xlsx';
 import RNShare from 'react-native-share';
 import { collection, getDocs, orderBy, query, where } from '@react-native-firebase/firestore';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import NativeDateTimeField from './NativeDateTimeField';
 import CityManagementPanel from './CityManagementPanel';
 import {
@@ -249,30 +250,6 @@ function canAdminAccessUser(profile, userRecord) {
   return normalizeCity(userRecord?.adminCity || userRecord?.defaultCity || DEFAULT_CITY) === getAdminCity(profile);
 }
 
-function normalisePhone(value) {
-  let digits = String(value || '').replace(/\D/g, '');
-  if (digits.startsWith('0061')) digits = digits.slice(2);
-  if (digits.startsWith('61') && digits.length >= 10) digits = `0${digits.slice(2)}`;
-  return digits;
-}
-
-function userMatchesSearch(userRecord, queryText) {
-  const textQuery = String(queryText || '').trim().toLowerCase();
-  if (!textQuery) return true;
-
-  const textFields = [
-    userRecord.fullName,
-    userRecord.displayName,
-    userRecord.name,
-    userRecord.email,
-  ];
-  if (textFields.some(value => String(value || '').toLowerCase().includes(textQuery))) return true;
-
-  const phoneQuery = normalisePhone(textQuery);
-  if (!phoneQuery) return false;
-  return [userRecord.phone, userRecord.phoneNumber, userRecord.mobile, userRecord.mobileNumber]
-    .some(value => normalisePhone(value).includes(phoneQuery));
-}
 
 function hasUserPhone(userRecord = {}) {
   return !!String(userRecord.phone || userRecord.phoneNumber || userRecord.mobile || userRecord.mobileNumber || '').trim();
@@ -3581,8 +3558,8 @@ const styles = StyleSheet.create({
   userActionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
   userRoleSelect: { width: 108 },
   userBadges: { alignItems: 'flex-end', gap: 4 },
-  userName: { color: colors.navy, fontSize: 14, lineHeight: 18, fontWeight: '700' },
-  userContact: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+  userName: { color: colors.navy, fontSize: typography.cardTitle.fontSize, lineHeight: 18, fontWeight: '700' },
+  userContact: { color: colors.muted, fontSize: typography.label.fontSize, lineHeight: 16 },
   userSynced: { color: colors.tealDark, fontSize: 10, lineHeight: 14 },
   compactUserCard: { padding: 12, gap: 6 },
   compactUserAction: { minWidth: 44, minHeight: 44, paddingHorizontal: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: colors.tealSoft },
@@ -3610,7 +3587,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   imageDropZoneIcon: { fontSize: 28 },
-  imageDropZoneText: { marginTop: spacing.sm, color: colors.tealDark, fontSize: 13, fontWeight: '700' },
+  imageDropZoneText: { marginTop: spacing.sm, color: colors.tealDark, fontSize: typography.body.fontSize, fontWeight: '700' },
   imagePreviewWrap: { gap: spacing.sm },
   imagePreview: {
     width: '100%',
@@ -3627,7 +3604,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.teal,
   },
-  addButtonText: { color: colors.tealDark, fontSize: 13, fontWeight: '700' },
+  addButtonText: { color: colors.tealDark, fontSize: typography.body.fontSize, fontWeight: '700' },
   removeButton: { alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   removeText: { color: colors.danger, fontSize: 12, fontWeight: '700' },
   fieldError: { color: colors.danger, fontSize: 12, fontWeight: '700', marginTop: spacing.xs },
@@ -3642,7 +3619,7 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   statisticsHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
-  statisticsTitle: { color: colors.navy, fontSize: 14, lineHeight: 19, fontWeight: '700' },
+  statisticsTitle: { color: colors.navy, fontSize: typography.cardTitle.fontSize, lineHeight: 19, fontWeight: '700' },
   statisticsMeta: { marginTop: 2, color: colors.muted, fontSize: 10, lineHeight: 14, fontWeight: '700' },
   statisticsShowing: { color: colors.blue || '#3478f6', fontSize: 10, lineHeight: 16, fontWeight: '700' },
   eventMetricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
@@ -3694,7 +3671,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dashboardAvatarText: {
-    color: '#ffffff',
+    color: colors.onPrimary,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -3711,7 +3688,7 @@ const styles = StyleSheet.create({
   },
   dashboardName: {
     color: colors.text,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     lineHeight: 18,
     fontWeight: '600',
     marginTop: 2,
@@ -3730,11 +3707,11 @@ const styles = StyleSheet.create({
   },
   dashboardRoleIcon: {
     color: '#d9fff8',
-    fontSize: 9,
+    fontSize: typography.eyebrow.fontSize,
   },
   dashboardRoleText: {
-    color: '#ffffff',
-    fontSize: 11,
+    color: colors.onPrimary,
+    fontSize: typography.label.fontSize,
     fontWeight: '700',
   },
   dashboardScopePill: {
@@ -3749,8 +3726,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(4,56,51,0.22)',
   },
   dashboardScopeIcon: {
-    color: '#ffffff',
-    fontSize: 22,
+    color: colors.onPrimary,
+    fontSize: typography.pageTitle.fontSize,
     fontWeight: '700',
   },
   dashboardScopeTextWrap: {
@@ -3759,13 +3736,13 @@ const styles = StyleSheet.create({
   },
   dashboardScopeLabel: {
     color: 'rgba(255,255,255,0.62)',
-    fontSize: 9,
+    fontSize: typography.eyebrow.fontSize,
     fontWeight: '700',
     letterSpacing: 1.2,
   },
   dashboardScopeValue: {
-    color: '#ffffff',
-    fontSize: 14,
+    color: colors.onPrimary,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '700',
   },
   dashboardIntroRow: {
@@ -3783,7 +3760,7 @@ const styles = StyleSheet.create({
   },
   dashboardSubtitle: {
     color: colors.muted,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     lineHeight: 19,
     fontWeight: '600',
     marginTop: 2,
@@ -3846,7 +3823,7 @@ const styles = StyleSheet.create({
   },
   dashboardMetricLabel: {
     color: colors.muted,
-    fontSize: 9,
+    fontSize: typography.eyebrow.fontSize,
     lineHeight: 12,
     fontWeight: '600',
     textAlign: 'center',
@@ -3884,7 +3861,7 @@ const styles = StyleSheet.create({
   },
   dashboardStatusText: {
     color: colors.text,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '600',
   },
   dashboardStatusMeta: {
@@ -3905,7 +3882,7 @@ const styles = StyleSheet.create({
   },
   dashboardToolsMeta: {
     color: colors.muted,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '600',
   },
   dashboardGroup: {
@@ -3913,7 +3890,7 @@ const styles = StyleSheet.create({
   },
   dashboardGroupTitle: {
     color: colors.muted,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '700',
     letterSpacing: 1.1,
     textTransform: 'uppercase',
@@ -3962,13 +3939,13 @@ const styles = StyleSheet.create({
   },
   dashboardActionTitle: {
     color: colors.navy,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     lineHeight: 18,
     fontWeight: '700',
   },
   dashboardActionDescription: {
     color: colors.muted,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     lineHeight: 16,
     fontWeight: '600',
   },
@@ -4079,24 +4056,24 @@ const styles = StyleSheet.create({
   cardList: {
     gap: spacing.md,
   },
-  submissionAttribution: { marginTop: -4, paddingHorizontal: 2, color: colors.muted, fontSize: 11, lineHeight: 16, fontStyle: 'italic', fontWeight: '700' },
+  submissionAttribution: { marginTop: -4, paddingHorizontal: 2, color: colors.muted, fontSize: typography.label.fontSize, lineHeight: 16, fontStyle: 'italic', fontWeight: '700' },
   ownerFilterBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  ownerFilterTitle: { color: colors.tealDark, fontSize: 14, lineHeight: 19, fontWeight: '700' },
-  ownerFilterMeta: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  ownerFilterTitle: { color: colors.tealDark, fontSize: typography.cardTitle.fontSize, lineHeight: 19, fontWeight: '700' },
+  ownerFilterMeta: { color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '700' },
   ownerFilterClear: { minHeight: 38, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: colors.surface },
-  ownerFilterClearText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
+  ownerFilterClearText: { color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '700' },
   userEventsLink: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  userEventsLinkText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
+  userEventsLinkText: { color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '700' },
   userEventsLinkArrow: { color: colors.tealDark, fontSize: 20, lineHeight: 22, fontWeight: '700' },
   inlineTransferPanel: { gap: spacing.sm, marginTop: spacing.xs, padding: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: '#f2fbf9' },
-  inlineTransferTitle: { color: colors.navy, fontSize: 16, fontWeight: '700' },
-  inlineTransferMeta: { color: colors.muted, fontSize: 11, lineHeight: 16, fontWeight: '700' },
-  inlineTransferHint: { paddingVertical: spacing.sm, color: colors.muted, fontSize: 11, fontStyle: 'italic', textAlign: 'center' },
+  inlineTransferTitle: { color: colors.navy, fontSize: typography.sectionTitle.fontSize, fontWeight: '700' },
+  inlineTransferMeta: { color: colors.muted, fontSize: typography.label.fontSize, lineHeight: 16, fontWeight: '700' },
+  inlineTransferHint: { paddingVertical: spacing.sm, color: colors.muted, fontSize: typography.label.fontSize, fontStyle: 'italic', textAlign: 'center' },
   inlineTransferLoading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   transferDropdown: { overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   transferResult: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   transferResultSelected: { backgroundColor: colors.teal },
-  transferResultName: { color: colors.navy, fontSize: 13, fontWeight: '700' },
+  transferResultName: { color: colors.navy, fontSize: typography.body.fontSize, fontWeight: '700' },
   transferResultMeta: { color: colors.muted, fontSize: 10, lineHeight: 14, fontWeight: '700' },
   transferResultTextSelected: { color: colors.surface },
   transferResultCheck: { color: colors.surface, fontSize: 18, fontWeight: '700' },
@@ -4134,8 +4111,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   importStepBadgeText: {
-    color: colors.surface,
-    fontSize: 13,
+    color: colors.onPrimary,
+    fontSize: typography.body.fontSize,
     fontWeight: '700',
   },
   importStepBody: {
@@ -4163,7 +4140,7 @@ const styles = StyleSheet.create({
   },
   readOnlyFieldText: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '600',
   },
   logoPickerBox: {
@@ -4180,7 +4157,7 @@ const styles = StyleSheet.create({
   },
   logoPickerTitle: {
     color: colors.tealDark,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '700',
   },
   logoPickerText: {
@@ -4233,13 +4210,13 @@ const styles = StyleSheet.create({
   },
   orgLogoFallback: {
     color: colors.muted,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '600',
   },
   cardTitle: {
     flex: 1,
     color: colors.navy,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     lineHeight: 19,
     fontWeight: '700',
   },
@@ -4263,7 +4240,7 @@ const styles = StyleSheet.create({
   },
   statusPillText: {
     color: colors.tealDark,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '700',
   },
   calendarSyncFilter: {
@@ -4295,11 +4272,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   calendarSyncFilterIconText: {
-    fontSize: 22,
+    fontSize: typography.pageTitle.fontSize,
   },
   calendarSyncFilterTitle: {
     color: colors.navy,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontWeight: '700',
   },
   calendarSyncFilterTitleActive: {
@@ -4308,7 +4285,7 @@ const styles = StyleSheet.create({
   calendarSyncFilterMeta: {
     marginTop: 2,
     color: colors.muted,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '700',
   },
   calendarSyncFilterMetaActive: {
@@ -4328,7 +4305,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   primaryButtonText: {
-    color: colors.surface,
+    color: colors.onPrimary,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -4387,7 +4364,7 @@ const styles = StyleSheet.create({
   },
   noticeText: {
     color: colors.tealDark,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     lineHeight: 19,
     fontWeight: '700',
   },
@@ -4401,7 +4378,7 @@ const styles = StyleSheet.create({
   },
   noticeInlineText: {
     color: colors.tealDark,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontWeight: '600',
   },
   inputLabel: {
@@ -4419,7 +4396,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     backgroundColor: colors.surface,
     color: colors.text,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontWeight: '700',
   },
   multilineInput: {
@@ -4444,18 +4421,18 @@ const styles = StyleSheet.create({
   },
   chipText: {
     color: colors.text,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '600',
   },
   chipTextActive: {
-    color: colors.surface,
+    color: colors.onPrimary,
   },
   stack: {
     gap: spacing.sm,
   },
   subsectionTitle: {
     color: colors.navy,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '700',
   },
   listRow: {
@@ -4483,7 +4460,7 @@ const styles = StyleSheet.create({
   },
   listTitle: {
     color: colors.navy,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     lineHeight: 20,
     fontWeight: '700',
   },
@@ -4573,7 +4550,7 @@ const styles = StyleSheet.create({
   },
   toggleBoxText: {
     color: colors.text,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontWeight: '600',
   },
   toggleBoxTextActive: {

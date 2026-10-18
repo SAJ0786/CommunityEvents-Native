@@ -6,7 +6,7 @@ import { functions } from '../firebase/firebase';
 import { getCityDefinitions, installCityCatalogue } from '../utils/cities';
 import { suggestCityCode } from '../utils/airportCodes';
 import { useCityCatalogueVersion } from '../services/cityCatalogue';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, spacing, typography } from '../theme';
 
 const BUILT_IN = new Set(['adelaide', 'brisbane', 'canberra', 'hobart', 'melbourne', 'perth', 'rest-of-australia', 'sydney']);
 
@@ -95,7 +95,7 @@ export default function CityManagementPanel({ profile }) {
 const styles = StyleSheet.create({
   card: { padding: spacing.lg, gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.lg },
   heading: { color: colors.text, fontWeight: '700', fontSize: 18 },
-  text: { color: colors.text, fontSize: 14, lineHeight: 21 },
+  text: { color: colors.text, fontSize: typography.cardTitle.fontSize, lineHeight: 21 },
   input: { padding: spacing.md, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, color: colors.text },
   button: { backgroundColor: colors.blue, padding: spacing.md, borderRadius: radius.md },
   buttonText: { color: colors.onPrimary, textAlign: 'center', fontWeight: '700' },

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import NativeDateTimeField from '../components/NativeDateTimeField';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, spacing, typography } from '../theme';
 import { BUSINESS_DAYS, applyHoursToDays, editableHoursDay, formatBusinessDay, validateBusinessHours } from '../utils/businessHours';
 
 const QUICK_DAYS = [
@@ -127,14 +127,14 @@ export default function BusinessHoursEditor({ hours = {}, onChange, error }) {
 const styles = StyleSheet.create({
   bulk: { padding: spacing.md, marginVertical: spacing.md, gap: spacing.sm, backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md },
   title: { color: colors.text, fontSize: 15, fontWeight: '700', marginTop: spacing.sm },
-  label: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  label: { color: colors.text, fontSize: typography.body.fontSize, fontWeight: '700' },
   helper: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   fields: { gap: spacing.sm, marginTop: spacing.sm },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: { minHeight: 44, paddingHorizontal: spacing.sm, paddingVertical: 9, justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, backgroundColor: colors.surface },
   chipText: { color: colors.text, fontSize: 12, fontWeight: '600' },
   selected: { backgroundColor: colors.blue, borderColor: colors.blue },
-  selectedText: { color: colors.surface, fontSize: 13, fontWeight: '700' },
+  selectedText: { color: colors.surface, fontSize: typography.body.fontSize, fontWeight: '700' },
   period: { gap: spacing.sm },
   timeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   timeField: { flexGrow: 1, flexBasis: 135, minWidth: 130, gap: 4 },
@@ -146,5 +146,5 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, fontSize: 12, lineHeight: 18, marginTop: spacing.sm },
   day: { paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  summary: { color: colors.muted, fontSize: 13, lineHeight: 21 },
+  summary: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 21 },
 });

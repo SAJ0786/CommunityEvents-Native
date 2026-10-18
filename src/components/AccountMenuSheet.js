@@ -11,7 +11,7 @@ import {
 import useMenuDrawerMotion from './useMenuDrawerMotion';
 import DrawerDragZone from './DrawerDragZone';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import { cityLabel, normalizeCity } from '../utils/cities';
 
 const EVENT_ITEMS = [
@@ -120,23 +120,23 @@ const styles = StyleSheet.create({
   dragZone: { paddingTop: spacing.xs, paddingBottom: spacing.xs },
   handle: { alignSelf: 'center', width: 54, height: 5, borderRadius: 3, backgroundColor: '#d5dce6', marginBottom: spacing.sm },
   headingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { color: colors.navy, fontSize: 22, fontWeight: '700', letterSpacing: -0.4 },
-  subtitle: { color: colors.muted, fontSize: 11, fontWeight: '500', marginTop: 2 },
+  title: { color: colors.navy, fontSize: typography.pageTitle.fontSize, fontWeight: '700', letterSpacing: -0.4 },
+  subtitle: { color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '500', marginTop: 2 },
   close: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 15, backgroundColor: colors.blueSoft, borderWidth: 1, borderColor: '#cbdcff' },
   identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, marginTop: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: '#d8e2ff', backgroundColor: '#f2f4ff' },
   initials: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: colors.purple },
-  initialsText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  initialsText: { color: '#fff', fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
   identityCopy: { flex: 1, minWidth: 0 },
   name: { color: colors.navy, fontSize: 15, fontWeight: '700' },
-  role: { color: colors.muted, fontSize: 11, marginTop: 3 },
+  role: { color: colors.muted, fontSize: typography.label.fontSize, marginTop: 3 },
   list: { gap: 7, paddingVertical: spacing.md, paddingBottom: spacing.lg },
   item: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, borderRadius: 18, borderWidth: 1, borderColor: '#edf0f5', backgroundColor: '#fff' },
   itemIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  itemText: { flex: 1, color: colors.text, fontSize: 13, fontWeight: '600' },
+  itemText: { flex: 1, color: colors.text, fontSize: typography.body.fontSize, fontWeight: '600' },
   action: { minHeight: 51, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderRadius: 18, marginTop: spacing.xs },
   login: { backgroundColor: colors.blue },
   logout: { backgroundColor: '#dc2626' },
-  actionText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  actionText: { color: '#fff', fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.76 },
 });

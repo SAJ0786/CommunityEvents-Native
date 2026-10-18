@@ -128,6 +128,8 @@ export async function updateUserPreferences(uid, changes = {}) {
   const payload = Object.fromEntries(
     Object.entries(changes).filter(([key]) => allowed.includes(key))
   );
+  if (typeof payload.emailNotificationsEnabled === 'boolean') payload.reminderEmailEnabled = payload.emailNotificationsEnabled;
+  else if (typeof payload.reminderEmailEnabled === 'boolean') payload.emailNotificationsEnabled = payload.reminderEmailEnabled;
   if (payload.email) {
     payload.email = String(payload.email).trim().toLowerCase();
     payload.emailLower = payload.email;

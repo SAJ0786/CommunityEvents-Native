@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import MemberPageHeader from './MemberPageHeader';
 
 export default function AddEventChoice({ canCreateRecurring, onChoose, registrationPreviewEnabled = false, registrationEnabled = false }) {
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
   },
   heroBadgeText: {
     color: colors.tealDark,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
@@ -106,9 +106,9 @@ const styles = StyleSheet.create({
   choiceText: { flex: 1 },
   choiceEyebrow: { color: colors.tealDark, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
   choiceTitle: { color: colors.navy, fontSize: 18, fontWeight: '700' },
-  choiceDescription: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: 4 },
-  choiceMeta: { color: colors.text, fontSize: 13, lineHeight: 18, marginTop: 8 },
-  adminOnly: { color: colors.muted, fontSize: 13, fontWeight: '700', marginTop: 10 },
+  choiceDescription: { color: colors.muted, fontSize: typography.cardTitle.fontSize, lineHeight: 20, marginTop: 4 },
+  choiceMeta: { color: colors.text, fontSize: typography.body.fontSize, lineHeight: 18, marginTop: 8 },
+  adminOnly: { color: colors.muted, fontSize: typography.body.fontSize, fontWeight: '700', marginTop: 10 },
   disabledText: { color: colors.muted },
   pressed: { opacity: 0.72 },
 });

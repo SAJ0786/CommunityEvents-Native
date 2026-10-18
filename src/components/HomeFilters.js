@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { AUDIENCE_TYPES } from '../utils/eventOptions';
 import { EVENT_BROWSE_PRESETS } from '../utils/eventBrowseOptions';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, spacing, typography } from '../theme';
 import CompactSelect from './CompactSelect';
 
 function FilterChoices({ label, options, value, onChange }) {
@@ -147,17 +147,17 @@ const styles = StyleSheet.create({
   wrap: { marginTop: spacing.md, marginBottom: 0 },
   searchRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.82)' },
   searchIcon: { color: colors.muted, fontSize: 20, fontWeight: '700' },
-  searchInput: { flex: 1, minWidth: 0, minHeight: 49, color: colors.text, fontSize: 14, fontWeight: '500', letterSpacing: 0 },
+  searchInput: { flex: 1, minWidth: 0, minHeight: 49, color: colors.text, fontSize: typography.cardTitle.fontSize, fontWeight: '500', letterSpacing: 0 },
   clearSearch: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: colors.border },
   clearSearchText: { color: colors.surface, fontSize: 20, lineHeight: 23, fontWeight: '700' },
   filterButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.blueSoft },
   filterButtonActive: { backgroundColor: colors.blue },
-  filterButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
+  filterButtonText: { color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '700' },
   filterButtonTextActive: { color: colors.surface },
   filterCount: { position: 'absolute', right: -3, top: -3, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderRadius: 8, backgroundColor: colors.rose },
   filterCountText: { color: colors.surface, fontSize: 8, fontWeight: '700' },
   panel: { gap: spacing.md, marginTop: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
-  panelTitle: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  panelTitle: { color: colors.text, fontSize: typography.body.fontSize, fontWeight: '600' },
   advancedFilters: { gap: spacing.md },
   group: { gap: 6 },
   label: { color: colors.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
@@ -165,12 +165,12 @@ const styles = StyleSheet.create({
   nearbyHelp: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   choice: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, paddingVertical: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.surface },
   choiceSelected: { borderColor: colors.blue, backgroundColor: colors.blue },
-  choiceText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
+  choiceText: { color: colors.muted, fontSize: typography.body.fontSize, fontWeight: '600' },
   choiceTextSelected: { color: colors.surface },
   twoColumns: { flexDirection: 'row', gap: spacing.sm },
   column: { flex: 1, minWidth: 0, gap: 6 },
-  input: { minHeight: 44, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text, backgroundColor: colors.surface, fontSize: 13 },
+  input: { minHeight: 44, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, color: colors.text, backgroundColor: colors.surface, fontSize: typography.body.fontSize },
   clearButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.blueSoft },
-  clearButtonText: { color: colors.blueDark, fontSize: 13, fontWeight: '700' },
+  clearButtonText: { color: colors.blueDark, fontSize: typography.body.fontSize, fontWeight: '700' },
   pressed: { opacity: 0.76 },
 });

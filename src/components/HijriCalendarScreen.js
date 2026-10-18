@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import ScrollView from './KeyboardAwareScrollView';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import {
   getCurrentHijriYear,
   getHijriDisplay,
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
   heroGlowSmall: { position: 'absolute', width: 72, height: 72, borderRadius: 36, right: 58, bottom: -54, backgroundColor: 'rgba(24,143,121,0.06)' },
   heroIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#b9dfd9', backgroundColor: '#dff5ef' },
   heroCopy: { flex: 1, gap: 2 },
-  heroEyebrow: { color: colors.tealDark, fontSize: 9, fontWeight: '500', letterSpacing: 1.1 },
+  heroEyebrow: { color: colors.tealDark, fontSize: typography.eyebrow.fontSize, fontWeight: '500', letterSpacing: 1.1 },
   title: {
     color: colors.navy,
     fontSize: 21,
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: colors.muted,
-    fontSize: 11.5,
+    fontSize: typography.subtitle.fontSize,
     lineHeight: 17,
     fontWeight: '400',
   },
@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
   todayTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   todayIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tealSoft, borderWidth: 1, borderColor: '#c7e7e1' },
   todayCopy: { flex: 1, gap: 1 },
-  todayLabel: { color: colors.tealDark, fontSize: 9, fontWeight: '500', letterSpacing: 1.2 },
+  todayLabel: { color: colors.tealDark, fontSize: typography.eyebrow.fontSize, fontWeight: '500', letterSpacing: 1.2 },
   cardTitle: {
     color: colors.navy,
     fontSize: 17,
@@ -594,12 +594,12 @@ const styles = StyleSheet.create({
   azaanHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: '#dcece8' },
   azaanIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.teal },
   azaanHeadingCopy: { flex: 1, minWidth: 0 },
-  azaanTitle: { color: colors.navy, fontSize: 14, fontWeight: '500' },
+  azaanTitle: { color: colors.navy, fontSize: typography.cardTitle.fontSize, fontWeight: '500' },
   azaanHelp: { marginTop: 2, color: colors.muted, fontSize: 10, lineHeight: 14, fontWeight: '400' },
   azaanRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.md, borderBottomWidth: 1, borderBottomColor: '#e3efec' },
   azaanRowCopy: { flex: 1, minWidth: 0 },
   azaanRowLabel: { color: colors.navy, fontSize: 12, fontWeight: '400' },
-  azaanRowTime: { marginTop: 2, color: colors.tealDark, fontSize: 11, fontWeight: '400' },
+  azaanRowTime: { marginTop: 2, color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '400' },
   azaanPrivacy: { padding: spacing.md, color: colors.muted, fontSize: 9.5, lineHeight: 14, fontWeight: '400' },
   primaryDate: {
     color: colors.muted,
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
   },
   secondaryDate: {
     color: colors.navy,
-    fontSize: 16,
+    fontSize: typography.sectionTitle.fontSize,
     lineHeight: 23,
     fontWeight: '500',
   },
@@ -633,12 +633,12 @@ const styles = StyleSheet.create({
   },
   highlightTitle: {
     color: colors.navy,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '500',
   },
   highlightText: {
     color: colors.text,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '400',
   },
   sectionBlock: {
@@ -657,12 +657,12 @@ const styles = StyleSheet.create({
   },
   sectionMeta: {
     color: colors.muted,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontWeight: '400',
   },
   cityPill: { maxWidth: '58%', minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, borderRadius: 999, backgroundColor: colors.tealSoft },
   cityPillText: { flexShrink: 1, color: colors.tealDark, fontSize: 10, fontWeight: '500' },
-  prayerHelp: { color: colors.muted, fontSize: 11, lineHeight: 16, fontWeight: '400' },
+  prayerHelp: { color: colors.muted, fontSize: typography.label.fontSize, lineHeight: 16, fontWeight: '400' },
   prayerJourney: { position: 'relative', overflow: 'hidden', padding: spacing.sm, borderWidth: 1, borderColor: '#9fd8d1', borderRadius: radius.md, backgroundColor: colors.tealSoft, gap: 6 },
   sunArc: { height: 36, marginHorizontal: spacing.md, marginBottom: -14 },
   sunArcLine: { position: 'absolute', top: 14, left: 0, right: 0, height: 54, borderTopWidth: 1.5, borderColor: colors.teal, borderTopLeftRadius: 180, borderTopRightRadius: 180, opacity: 0.75 },
@@ -674,8 +674,8 @@ const styles = StyleSheet.create({
   prayerStageRow: { flexDirection: 'row', gap: 6 },
   prayerStage: { position: 'relative', flex: 1, minHeight: 82, alignItems: 'center', justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 4, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   prayerStageActive: { borderColor: colors.teal, backgroundColor: '#f4fbfa' },
-  prayerStageLabel: { marginTop: 3, color: colors.muted, fontSize: 11, fontWeight: '400', textAlign: 'center' },
-  prayerStageTime: { marginTop: 2, color: colors.navy, fontSize: 16, lineHeight: 21, fontWeight: '500' },
+  prayerStageLabel: { marginTop: 3, color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '400', textAlign: 'center' },
+  prayerStageTime: { marginTop: 2, color: colors.navy, fontSize: typography.sectionTitle.fontSize, lineHeight: 21, fontWeight: '500' },
   prayerReminderIcon: { position: 'absolute', top: 7, right: 7 },
   toggleRow: {
     flexDirection: 'row',
@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     color: colors.text,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontWeight: '500',
     textAlign: 'center',
   },
@@ -723,7 +723,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     backgroundColor: colors.surface,
     color: colors.text,
-    fontSize: 16,
+    fontSize: typography.sectionTitle.fontSize,
     fontWeight: '400',
   },
   hijriInputRow: {
@@ -767,7 +767,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.background,
   },
-  categorySelectLabel: { color: colors.muted, fontSize: 9, fontWeight: '500', letterSpacing: 0.7 },
+  categorySelectLabel: { color: colors.muted, fontSize: typography.eyebrow.fontSize, fontWeight: '500', letterSpacing: 0.7 },
   categorySelectValue: { maxWidth: 240, marginTop: 3, color: colors.navy, fontSize: 12, fontWeight: '400' },
   categorySelectChevron: { color: colors.tealDark, fontSize: 12, fontWeight: '500' },
   categoryMenu: { marginTop: -spacing.xs, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, ...shadow },
@@ -779,7 +779,7 @@ const styles = StyleSheet.create({
   categoryOptionTextActive: { color: colors.tealDark, fontWeight: '500' },
   defaultMonthTitle: { color: colors.navy, fontSize: 15, fontWeight: '500' },
   clearFilters: { alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: 99, backgroundColor: colors.tealSoft },
-  clearFiltersText: { color: colors.tealDark, fontSize: 11, fontWeight: '500' },
+  clearFiltersText: { color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '500' },
   list: {
     gap: spacing.md,
   },
@@ -802,7 +802,7 @@ const styles = StyleSheet.create({
   listTitle: {
     flex: 1,
     color: colors.navy,
-    fontSize: 16,
+    fontSize: typography.sectionTitle.fontSize,
     lineHeight: 22,
     fontWeight: '500',
   },
@@ -816,17 +816,17 @@ const styles = StyleSheet.create({
   },
   categoryBadgeText: {
     color: colors.tealDark,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '500',
   },
   listDate: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '400',
   },
   listNotes: {
     color: colors.muted,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     lineHeight: 19,
     fontStyle: 'italic',
     fontWeight: '400',
@@ -841,12 +841,12 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     color: colors.navy,
-    fontSize: 16,
+    fontSize: typography.sectionTitle.fontSize,
     fontWeight: '500',
   },
   emptyText: {
     color: colors.muted,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '400',
   },
   pressed: { opacity: 0.78 },

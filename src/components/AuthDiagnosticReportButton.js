@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, Share, StyleSheet, Text } from 'react-native';
 import { getAuthenticationDiagnosticReport } from '../services/diagnostics/authFailures';
-import { colors, spacing } from '../theme';
+import { colors, spacing, typography } from '../theme';
 
 export default function AuthDiagnosticReportButton() {
   const [busy, setBusy] = useState(false);
@@ -26,5 +26,5 @@ export default function AuthDiagnosticReportButton() {
 
 const styles = StyleSheet.create({
   button: { minHeight: 44, paddingVertical: spacing.sm, justifyContent: 'center' },
-  text: { color: colors.tealDark, fontSize: 14, textDecorationLine: 'underline' },
+  text: { color: colors.tealDark, fontSize: typography.cardTitle.fontSize, textDecorationLine: 'underline' },
 });

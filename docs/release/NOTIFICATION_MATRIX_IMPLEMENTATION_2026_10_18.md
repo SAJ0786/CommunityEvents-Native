@@ -1,0 +1,31 @@
+# Approved notification matrix implementation — 18 October 2026
+
+Source: user-reviewed Notification Matrix and Audit workbook. The user confirmed N03 refers to confirmation of a changed profile email; event-edit OTP remains unchanged. All acceptance rows remain for the user after installing this tester build.
+
+## Policy
+
+- N01/N03 authentication: phone and edit OTP retained. Welcome runs only at profile completion. Profile email changes notify the new current address and scoped admins.
+- N04 creation: admin email preference. N05/N06 material event changes/deletions notify scoped admins, host and members who saved the event. Scheduled expiry is excluded.
+- N07/N09 optional digests intersect canonical email and Events category. Legacy fallback applies only if modern email choice is missing. Saving either control synchronizes both. N08 same-day push respects push and Events category. N10 community announcements are the approved national required-email exception.
+- N11 Hijri operational reminder unchanged. N12 live announcement adds national bell and host/admin email. Existing optional live push retains its permission/category policy. N13 private stream link is emailed individually to host and active superadmins.
+- N14/N15 host message notifications use push/bell only, without private message text. Participant and current host ownership are rechecked.
+- N16 ordinary explicit reminder remains native-local/web-push. N17 favourites add scheduled bell, retaining native-local alert. N18/N19 prayer and Azaan remain selected device alarms. Signout/account deletion clears previous-account device schedules.
+- N20/N22 registration submission/resubmission emails and pushes scoped admins. N21 publication emails organizer/admins. Review feedback additionally alerts the organizer. N23/N24 booking submission/edit/cancellation email, push and bell organizer/superadmins. N25–N28 approved changes/cancellation notify current attendees and scoped admins on all three channels. Already completed events do not enqueue cleanup notices. No answers or private venue appear in payloads.
+- N29 selected registration reminders use account-bound remote push and bell, with server-authoritative start times, replacement/cancellation and date-only rejection. Web activation is a separate environment gate.
+- N30–N33 service business workflow notifications retained; email now uses a durable per-recipient outbox. N34 enquiry email includes both current owner-profile email and business email, deduplicated, rechecked at send time. N35 private owner email never appears in customer mail.
+- N36/N38 submission/removal recipient scope retained. N37/N39 first approved promotion announces nationally regardless of optional switches, retaining active-account, valid-address, publication/expiry and canonical-account checks. Promotion workers are included in deployment. National scope is a deliberate exception approved by the workbook, not inferred consent.
+- N40 admin email preference covers profile changes and legacy preference fields. N41 support acknowledgement contains only a reference, not the private report. N42 admin report route retained. N43 AI reports route to support@siza.info. N44 diagnostics remain user initiated; provider acceptance is not inbox delivery proof.
+
+## Reliability and UI
+
+Central server campaigns enumerate users in bounded pages, create deterministic recipient/channel delivery records, and recheck accounts/preferences/ownership before sending. Email provider acceptance is recorded as accepted. Known temporary SMTP rejections may retry. Ambiguous timeouts, interrupted sends and accepted/writeback failures require operator review rather than blind replay. Bell and push are separate channel records.
+
+Native email saving no longer depends on phone permissions. Web observes live profile updates and caches modern preferences. Unsupported SMS-update switch removed; login OTP unaffected. Native admin setting added. Shared registration validation now matches backend/native. Both apps export all authorized registration pages as literal-cell Excel workbooks. Native initial feed paginates beyond 750; active listener no longer truncates. Registration typography uses semantic hierarchy, repeated feature colors/type sizes use shared tokens, shared headings permit accessibility scaling, and quick-access registration placement matches. Admin phone/search logic extracted into a pure module in both apps.
+
+The audit A06 requires clarification: ordinary-event full addresses are intentionally available to signed-in members in BOTH current clients (`getDisplayPrivacy(isGuest)` and native location policy). Registration addresses/posters require booking/manager authorization on the server. Changing ordinary-event addresses to organizer-only would change the established product policy. No such restriction is introduced by this notification release. Guest callable projection remains sanitized. This is a reviewed policy distinction, not a claim that UI redaction secures private registration data.
+
+Remaining visual/performance proof: largest OS text, narrow phones, installed iOS/Android foreground/background/taps and real provider/inbox tests require the user's acceptance run. Literal pixel values for icons/media/decorative geometry and third-party colors remain intentional; tokenizing those does not itself prove UI quality. Large admin modules remain candidates for further extraction; this release separates shared search and the new notification orchestration without rewriting unrelated admin behavior.
+
+## Deployment ownership
+
+Native backend/functions-events owns matrix workers and Events email entrypoints. Native business-workflow owns directory service/promotion workers. Native registration owns registration callables. Web functions owns existing streaming lifecycle/private-link endpoint and calendar. Deploy only named functions/hosting; never deploy/delete the complete web backend against functions owned by other packages. NOTIFICATION_MATRIX_ENABLED=true on matrix/registration packages selects the new three-channel path and prevents duplicate legacy registration delivery. PROMOTION_AUDIENCE_ENABLED=true enables approved national push fanout. Secrets stay in Secret Manager/local environment; no credentials are added to Git.

@@ -1,6 +1,7 @@
 const admin      = require("firebase-admin");
 const nodemailer = require("nodemailer");
 const { sendEventEmail } = require("./email-layout");
+const { queueEmail } = require("./queued-email");
 const { detailRows } = require("./email-template");
 const crypto     = require("crypto");
 const fs         = require("fs");
@@ -23,8 +24,8 @@ const REGION = "australia-southeast1";
 const SES_SNS_TOPIC_ARN = defineSecret("SES_SNS_TOPIC_ARN");
 
 function pushNotificationsEnabled(user = {}) {
-  if (user.pushNotificationsEnabled !== undefined) return user.pushNotificationsEnabled !== false;
-  return user.reminderEmailEnabled !== false;
+  if (user.pushNotificationsEnabled !== undefined) return user.pushNotificationsEnabled !== false && user.eventNotificationsEnabled !== false;
+  return user.pushNotificationsEnabled !== false && user.eventNotificationsEnabled !== false;
 }
 
 function getUserFcmTokens(user = {}) {
@@ -507,6 +508,7 @@ async function recordSesEmailIssue({ snsMessage = {}, message = {}, recipient = 
         emailLastIssueAt: issueAt,
         emailLastSesMessageId: mail.messageId || "",
         reminderEmailEnabled: false,
+        emailNotificationsEnabled: false,
         adminAlertEmailEnabled: false,
         updatedAt: issueAt,
       };
@@ -651,9 +653,11 @@ async function sendPrivateStreamLinkToHost({
   const dateTime = [eventData.eventDate || '', eventData.startTime || ''].filter(Boolean).join(' ');
   const now = admin.firestore.FieldValue.serverTimestamp();
 
-  await sendEventEmail(transporter, {
+  const admins = await db.collection('users').where('role', '==', 'superAdmin').get();
+  const recipients = [...new Set([to, ...admins.docs.filter(doc => isActiveDeliverableUser(doc.data())).map(doc => String(doc.data().email || '').trim()).filter(email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))])];
+  for (const recipient of recipients) await queueEmail(db, `private-stream:${sessionRef?.id || streamVideoRef?.id || watchUrl}:${recipient}`, '', {
     ...emailEnvelope(secrets, 'updates'),
-    to,
+    to: recipient,
     subject: 'Your private live stream link',
     text: [
       'Your private Community Events live stream is now live.',
@@ -683,18 +687,20 @@ async function sendPrivateStreamLinkToHost({
         <p style="color:#6b7280;font-size:13px">Community Events Australia</p>
       </div>
     `,
-  });
+  }, true);
 
   const update = {
     [sentFlagField]: now,
     privateLinkEmailRecipient: to,
+    privateLinkEmailState: 'queued',
+    privateLinkEmailQueuedAt: now,
   };
   await Promise.all([
     sessionRef ? sessionRef.set(update, { merge: true }) : Promise.resolve(),
     streamVideoRef ? streamVideoRef.set(update, { merge: true }) : Promise.resolve(),
   ]);
 
-  return { sent: true, to };
+  return { sent: false, queued: true, to };
 }
 
 const PROGRAMS_UPDATE_IMAGE_URL = "https://communityevents.siza.info/images/programs-update-header.jpg";
@@ -1623,7 +1629,7 @@ ${JSON.stringify(events)}`;
 // Daily email reminders - 7 PM Sydney, for tomorrow's events.
 exports.dailyEmailReminders = onSchedule(
   { schedule: "0 19 * * *", timeZone: "Australia/Sydney", region: REGION,
-    timeoutSeconds: 540,
+    timeoutSeconds: 540, retryCount: 3,
     secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM] },
   async () => {
     const transporter = buildTransporter({ SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS });
@@ -1675,9 +1681,9 @@ exports.dailyEmailReminders = onSchedule(
       if (!html) continue;
 
       // Send email if user has email
-      if (u.email && u.reminderEmailEnabled !== false) {
+      if (u.email && (u.emailNotificationsEnabled ?? u.reminderEmailEnabled) !== false && u.eventNotificationsEnabled !== false) {
         try {
-          await sendEventEmail(transporter, {
+          await queueEmail(db, `digest:${date}:${doc.id}`, doc.id, {
             ...emailEnvelope({ SMTP_HOST, SMTP_USER, EMAIL_FROM }, 'reminders'),
             to: u.email,
             subject: `${EMAIL_ICON_CALENDAR} Community Events - Tomorrow's Events (${date})`,
@@ -1685,10 +1691,10 @@ exports.dailyEmailReminders = onSchedule(
           });
           sent++;
           if (sent % 25 === 0) console.log(`Reminder email progress: ${sent} sent for ${date}`);
-        } catch(e) { console.warn('Email failed:', u.email, e.message); }
+        } catch(e) { throw Error('Digest queue write failed; retry with deterministic recipient IDs.'); }
       }
     }
-    console.log(`Sent ${sent} reminder emails for tomorrow ${date}`);
+    console.log(`Queued ${sent} reminder emails for tomorrow ${date}`);
     return null;
   }
 );
@@ -2309,7 +2315,7 @@ exports.bulkImportEvents = onCall({ region: REGION }, async (request) => {
   };
 });
 
-async function runManualReminderEmailSend({ payload = {}, callerData = {}, cityScope }) {
+async function runManualReminderEmailSend({ payload = {}, callerData = {}, cityScope, jobId }) {
   const transporter = buildTransporter({ SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM });
   if (!transporter) {
     throw new Error("Email is not configured. Please set SMTP_HOST, SMTP_USER and SMTP_PASS secrets.");
@@ -2413,10 +2419,10 @@ async function runManualReminderEmailSend({ payload = {}, callerData = {}, cityS
   for (const doc of usersSnap.docs) {
     const u = doc.data();
     if (!isActiveDeliverableUser(u)) continue;
-    if (u.reminderEmailEnabled === false) continue;
+    if (!customMode && ((u.emailNotificationsEnabled ?? u.reminderEmailEnabled) === false || u.eventNotificationsEnabled === false)) continue;
     let recipientHtml = singleCityHtml;
     if (customMode) {
-      if (!userInCityScope(u, safeCityScope)) continue;
+      // Approved community announcements reach every active account nationally.
     } else if (safeCityScope === "all") {
       recipientHtml = htmlByRecipientCity.get(getUserCity(u));
       if (!recipientHtml) continue;
@@ -2425,7 +2431,7 @@ async function runManualReminderEmailSend({ payload = {}, callerData = {}, cityS
     }
     if (!u.email) continue;
     try {
-      await sendEventEmail(transporter, {
+      await queueEmail(db, `manual:${jobId}:${doc.id}`, doc.id, {
         ...emailEnvelope(
           { SMTP_HOST, SMTP_USER, EMAIL_FROM },
           customMode ? 'updates' : 'reminders'
@@ -2433,7 +2439,7 @@ async function runManualReminderEmailSend({ payload = {}, callerData = {}, cityS
         to: u.email,
         subject: customMode
           ? (customTemplate === 'storeAnnouncement'
-              ? 'Community Events Australia is now on Google Play, the App Store and Microsoft Store'
+              ? 'Community Connect Australia is now on Google Play, the App Store and Microsoft Store'
               : 'Important Update from Community Connect Australia')
           : `${EMAIL_ICON_CALENDAR} Community Events - Events for ${label}`,
         html: customMode && customTemplate === 'storeAnnouncement'
@@ -2441,7 +2447,7 @@ async function runManualReminderEmailSend({ payload = {}, callerData = {}, cityS
           : customMode
           ? buildCustomMessageEmailBody(customMessage, customImageUrl) + unsubscribeFooter(doc.id)
           : recipientHtml + unsubscribeFooter(doc.id)
-      });
+      }, customMode);
       sent++;
       if (sent % 25 === 0) {
         console.log(`Manual reminder progress: ${sent} sent for ${label} (${scopeLabel})`);
@@ -2505,6 +2511,7 @@ exports.onReminderEmailJobCreated = onDocumentCreated(
     document: "reminderEmailJobs/{jobId}",
     region: REGION,
     timeoutSeconds: 540,
+    retry: true,
     secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM]
   },
   async (event) => {
@@ -2512,7 +2519,7 @@ exports.onReminderEmailJobCreated = onDocumentCreated(
     if (!snap) return null;
     const jobRef = snap.ref;
     const job = snap.data() || {};
-    if (job.status !== "queued") return null;
+    if (["queued-deliveries", "completed"].includes(job.status)) return null;
 
     await jobRef.set({
       status: "running",
@@ -2522,6 +2529,7 @@ exports.onReminderEmailJobCreated = onDocumentCreated(
 
     try {
       const result = await runManualReminderEmailSend({
+        jobId: event.params.jobId,
         payload: job.payload || {},
         cityScope: job.cityScope,
         callerData: {
@@ -2534,17 +2542,17 @@ exports.onReminderEmailJobCreated = onDocumentCreated(
       });
       await jobRef.set({
         ...result,
-        status: "completed",
+        status: "queued-deliveries",
         completedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
-      console.log(`Reminder email job ${event.params.jobId} completed: ${result.sent} sent, ${result.failed} failed.`);
+      console.log(`Reminder email job ${event.params.jobId}: ${result.sent} recipient deliveries queued, ${result.failed} queue failures.`);
       return null;
     } catch (error) {
       console.error(`Reminder email job ${event.params.jobId} failed:`, error);
       await jobRef.set({
         status: "failed",
-        error: error.message || String(error),
+        error: "Queue enumeration failed; retry required",
         completedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
@@ -2920,7 +2928,7 @@ exports.onAiReportCreated = onDocumentCreated(
 
     await sendEventEmail(transporter, {
       ...emailEnvelope({ SMTP_HOST, SMTP_USER, EMAIL_FROM }, 'admin'),
-      to: 'communityeventssydney@gmail.com',
+      to: 'support@siza.info',
       subject: `[AI Response Report] ${String(report.reason || 'Review required').slice(0, 120)}`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;color:#1f2937">
@@ -2943,7 +2951,7 @@ exports.onAiReportCreated = onDocumentCreated(
 
     await event.data.ref.update({
       emailNotificationSentAt: admin.firestore.FieldValue.serverTimestamp(),
-      emailNotificationRecipient: 'communityeventssydney@gmail.com',
+      emailNotificationRecipient: 'support@siza.info',
     });
     console.log(`[AI Report] Notification sent for ${reportId}`);
   }
@@ -3018,7 +3026,8 @@ async function notifySuperAdmin(subject, bodyHtml, secrets, scopeCity = "all") {
     const transporter = buildTransporter(secrets);
     await sendEventEmail(transporter, {
       ...emailEnvelope(secrets, 'admin'),
-      to:   emails.join(', '),
+      to: 'support@siza.info',
+      bcc: emails,
       subject,
       html: bodyHtml,
     });
@@ -3206,6 +3215,7 @@ exports.unsubscribeEmail = onRequest(
     try {
       await db.collection('users').doc(uid).update({
         reminderEmailEnabled: false,
+        emailNotificationsEnabled: false,
         unsubscribedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       res.set('Content-Type', 'text/html');

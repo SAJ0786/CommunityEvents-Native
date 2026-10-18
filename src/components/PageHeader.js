@@ -33,12 +33,12 @@ export default function PageHeader({
           <MaterialCommunityIcons name={icon} color={palette.icon} size={22} />
         </View>
         <View style={styles.copy}>
-          {eyebrow ? <Text maxFontSizeMultiplier={1.2} style={[styles.eyebrow, { color: palette.icon }]}>{eyebrow}</Text> : null}
-          <Text accessibilityRole="header" maxFontSizeMultiplier={1.2} style={styles.title}>{title}</Text>
+          {eyebrow ? <Text style={[styles.eyebrow, { color: palette.icon }]}>{eyebrow}</Text> : null}
+          <Text accessibilityRole="header" style={styles.title}>{title}</Text>
         </View>
         {children ? <View style={styles.actions}>{children}</View> : null}
       </View>
-      {subtitle ? <Text numberOfLines={2} maxFontSizeMultiplier={1.2} style={styles.subtitle}>{subtitle}</Text> : null}
+      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       {footer ? <View style={styles.footer}>{footer}</View> : null}
     </View>
   );

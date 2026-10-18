@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import SafeAreaView from './ModalSafeArea';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { colors, spacing } from '../theme';
+import { colors, spacing, typography } from '../theme';
 
 // Mount only while open. iOS wheels are embedded views, so present them above
 // the form instead of placing them below fields outside the visible viewport.
@@ -59,6 +59,6 @@ const styles = StyleSheet.create({
   picker: { width: '100%', height: 216 },
   actions: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
   button: { minHeight: 48, paddingHorizontal: spacing.lg, justifyContent: 'center' },
-  cancel: { fontSize: 16, color: colors.muted },
-  done: { fontSize: 16, fontWeight: '600', color: '#2563eb' },
+  cancel: { fontSize: typography.sectionTitle.fontSize, color: colors.muted },
+  done: { fontSize: typography.sectionTitle.fontSize, fontWeight: '600', color: colors.blue },
 });

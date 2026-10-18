@@ -29,6 +29,7 @@ exports.deliverRegistrationChanges = onSchedule({ schedule: 'every 1 minutes', r
   timeoutSeconds: 540, secrets: Object.values(smtp) }, async () => {
   // Separate delivery gate prevents a backend-only rollout from notifying users
   // before their native/PWA clients can open and edit a registration.
+  if (process.env.NOTIFICATION_MATRIX_ENABLED === 'true') return; // Central matrix owns all three approved channels.
   if (process.env.EVENT_REGISTRATION_ENABLED !== 'true' || process.env.EVENT_REGISTRATION_NOTICES_ENABLED !== 'true') return;
   const config = Object.fromEntries(Object.entries(smtp).map(([name, secret]) => [name, secret.value()]));
   if (!config.SMTP_HOST || !config.SMTP_USER || !config.SMTP_PASS) throw Error('Registration SMTP is not configured.');

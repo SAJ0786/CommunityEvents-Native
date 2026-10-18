@@ -60,61 +60,25 @@ function harness(options = {}) {
     setSmtp: mode => { smtp = mode; }, failUpdate: fn => { failUpdate = fn; }, failQuery: n => { failQuery = n; } };
 }
 
-test('explicit preferences, valid email, matching city and active account are required', () => {
-  assert.ok(eligibleRecipient(member, 'sydney'));
-  for (const patch of [{ defaultCity: '' }, { defaultCity: 'perth' }, { email: '' }, { email: 'bad' },
-    { emailNotificationsEnabled: false }, { emailNotificationsEnabled: undefined }, { businessNotificationsEnabled: false },
-    { businessNotificationsEnabled: undefined }, { active: false }, { isActive: false }, { accountStatus: 'banned' },
-    { accountStatus: 'deleted' }, { accountStatus: 'archived' }, { migratedToUid: 'new-user' }]) {
-    assert.equal(eligibleRecipient({ ...member, ...patch }, 'sydney'), false, JSON.stringify(patch));
-  }
+test('approved national promotion ignores optional preferences and city, but validates active identity and email', () => {
+  for (const patch of [{ defaultCity: '' }, { defaultCity:'perth' }, { emailNotificationsEnabled:false }, {businessNotificationsEnabled:false}]) assert.equal(eligibleRecipient({...member,...patch}, 'sydney'), true);
+  for (const patch of [{email:''},{email:'bad'},{active:false},{isActive:false},{accountStatus:'banned'},{accountStatus:'deleted'},{migratedToUid:'other'}]) assert.equal(eligibleRecipient({...member,...patch}, 'sydney'),false);
+  assert.equal(eligibleRecipient({...member,uid:'self',migratedToUid:'self'},'sydney'),true);
+});
+test('first approval announces nationwide over email and push regardless of optional preferences', async () => {
+  const h=harness({audienceEnabled:()=>true});const pushes=[];h.deps.admin.messaging=()=>({sendEachForMulticast:async p=>{pushes.push(p);return {failureCount:0};}});
+  h.records.set('users/perth',{...member,defaultCity:'perth',pushNotificationsEnabled:false,emailNotificationsEnabled:false,fcmTokens:['one']});
+  h.records.set('users/missing-city',{...member,email:'second@example.test',defaultCity:''});
+  await h.queue(h.approval());assert.equal(h.jobs().length,3);
+  await Promise.all(h.jobs().map(path=>h.deliver(h.delivery(path))));assert.equal(h.sent.length,2);assert.equal(pushes.length,1);assert.match(h.sent[0].subject,/Australia-wide/);
+  await Promise.all(h.jobs().map(path=>h.deliver(h.delivery(path))));assert.equal(pushes.length,1);
+});
+test('uncertain FCM outcomes are review-required and never blindly replayed',async()=>{
+  const h=harness({audienceEnabled:()=>true});h.records.set('users/u',{...member,fcmTokens:['one'],pushNotificationsEnabled:false});let attempts=0;h.deps.admin.messaging=()=>({sendEachForMulticast:async()=>{attempts++;throw Error('uncertain');}});
+  await h.queue(h.approval());const path=h.jobs().find(x=>x.includes('/push-'));await h.deliver(h.delivery(path));await h.deliver(h.delivery(path));assert.equal(attempts,1);assert.equal(h.records.get(path).status,'review-required');
 });
 
-test('Australia-wide requires trusted approval, and each channel respects explicit preferences', async () => {
-  const h = harness({ audienceEnabled: () => true });
-  const nationwide = { ...promotion, requestedAudience: 'australia', approvedAudience: 'australia' };
-  h.records.set('businessPromotions/promo', nationwide);
-  h.records.set('promotionAudienceApprovals/promo', { audience: 'australia', city: 'sydney', approvalRevision: '100000' });
-  h.records.set('users/perth', { ...member, defaultCity: 'perth', pushNotificationsEnabled: true, fcmTokens: ['test-token'] });
-  h.records.set('users/emailOnly', { ...member, email: 'second@example.test', defaultCity: 'melbourne', pushNotificationsEnabled: false });
-  h.records.set('users/pushOnly', { ...member, email: '', defaultCity: 'adelaide', emailNotificationsEnabled: false, pushNotificationsEnabled: true, fcmTokens: ['second-token'] });
-  h.records.set('users/optout', { ...member, businessNotificationsEnabled: false });
-  const pushes = []; h.deps.admin.messaging = () => ({ sendEachForMulticast: async payload => { pushes.push(payload); return { failureCount: 0 }; } });
-  await h.queue(h.approval({ status: 'pending' }, nationwide));
-  assert.equal(h.jobs().length, 4);
-  await Promise.all(h.jobs().map(path => h.deliver(h.delivery(path))));
-  assert.equal(h.sent.length, 2); assert.equal(pushes.length, 2);
-  assert.match(h.sent[0].subject, /Australia-wide/);
-  await Promise.all(h.jobs().map(path => h.deliver(h.delivery(path))));
-  assert.equal(pushes.length, 2);
-  for (const proof of [undefined, { audience: 'australia', city: 'perth', approvalRevision: '100000' },
-    { audience: 'australia', city: 'sydney', approvalRevision: 'wrong' }]) {
-    const noProof = harness({ audienceEnabled: () => true });
-    noProof.records.set('users/perth', { ...member, defaultCity: 'perth' });
-    if (proof) noProof.records.set('promotionAudienceApprovals/promo', proof);
-    await noProof.queue(noProof.approval({ status: 'pending' }, nationwide));
-    assert.equal(noProof.jobs().length, 0, 'owner fields alone cannot broaden audience');
-  }
-});
-
-test('audience revocation and push opt-out are rechecked; uncertain FCM outcome is not resent', async () => {
-  for (const mode of ['revoked', 'optout', 'failure']) {
-    const h = harness({ audienceEnabled: () => true });
-    const p = { ...promotion, requestedAudience: 'australia' };
-    h.records.set('businessPromotions/promo', p);
-    h.records.set('promotionAudienceApprovals/promo', { audience: 'australia', city: 'sydney', approvalRevision: '100000' });
-    h.records.set('users/perth', { ...member, defaultCity: 'perth', emailNotificationsEnabled: false, pushNotificationsEnabled: true, fcmTokens: ['t'] });
-    let attempts = 0; h.deps.admin.messaging = () => ({ sendEachForMulticast: async () => { attempts++; throw new Error('uncertain'); } });
-    await h.queue(h.approval({ status: 'pending' }, p));
-    if (mode === 'revoked') h.records.delete('promotionAudienceApprovals/promo');
-    if (mode === 'optout') h.records.get('users/perth').pushNotificationsEnabled = false;
-    const job = h.jobs()[0]; await h.deliver(h.delivery(job)); await h.deliver(h.delivery(job));
-    assert.equal(attempts, mode === 'failure' ? 1 : 0);
-    assert.equal(h.records.get(job).status, mode === 'failure' ? 'review-required' : 'skipped');
-  }
-});
-
-test('new server-managed city queues only matching members and disabled city blocks delivery', async () => {
+test('national campaign includes other cities; disabled source city blocks delivery', async () => {
   const { BUNDLED_CITY_CATALOGUE } = await import('../backend/functions-business-workflow/cityCatalogue.mjs');
   const catalogue = structuredClone(BUNDLED_CITY_CATALOGUE);
   catalogue.cities.push({ id: 'darwin', label: 'Darwin, Australia', code: 'DRW', enabled: true, order: 9,
@@ -123,7 +87,7 @@ test('new server-managed city queues only matching members and disabled city blo
   h.records.set('businesses/business', { ...business, location: { city: 'darwin' } });
   h.records.set('users/darwin', { ...member, defaultCity: 'darwin' });
   h.records.set('users/sydney', { ...member, email: 'other@example.test' });
-  await h.queue(h.approval()); assert.equal(h.jobs().length, 1);
+  await h.queue(h.approval()); assert.equal(h.jobs().length, 2);
   assert.equal(h.records.get('promotionEmailCampaigns/promo').city, 'darwin');
   catalogue.cities.at(-1).enabled = false;
   await h.deliver(h.delivery(h.jobs()[0]));
@@ -158,13 +122,13 @@ test('approval paginates, resumes after failure, deduplicates email and ignores 
   assert.equal(h.jobs().length, 0, 'active edits and existing offers do not broadcast');
   h.failQuery(2);
   await assert.rejects(h.queue(h.approval()), /page failure/);
-  assert.equal(h.jobs().length, 97, '100 profiles, one duplicate email and two ineligible members');
+  assert.equal(h.jobs().length, 98, 'first 100 national profiles deduplicate two repeated email addresses');
   assert.ok(h.records.get('promotionEmailCampaigns/promo').cursor);
   await Promise.all([h.queue(h.approval()), h.queue(h.approval())]);
-  assert.equal(h.jobs().length, 205);
+  assert.equal(h.jobs().length, 206);
   assert.equal(h.records.get('promotionEmailCampaigns/promo').status, 'queued');
   await h.queue(h.approval({ status: 'pending' }, { ...promotion, approvedAt: { seconds: 200 } }));
-  assert.equal(h.jobs().length, 205, 'reapproval never creates another campaign');
+  assert.equal(h.jobs().length, 206, 'reapproval never creates another campaign');
   const fresh = harness();
   await fresh.queue(fresh.approval({ status: 'pending' }, { ...promotion, businessId: '' }));
   assert.equal(fresh.jobs().length, 0);
@@ -183,7 +147,7 @@ test('concurrent/replayed delivery sends once, uses escaped email and includes d
   assert.ok(h.sent[0].html.includes('&lt;script&gt;'));
   assert.ok(!h.sent[0].html.includes('<script>'));
   assert.ok(h.sent[0].headers['List-Unsubscribe'].startsWith('<mailto:'));
-  assert.ok(h.sent[0].text.includes('turn off either preference'));
+  assert.ok(h.sent[0].text.includes('approved national community promotion'));
   assert.ok(![...h.records.keys()].some(key => key.startsWith('userNotifications/')), 'email only; existing push/in-app workflow unchanged');
   assert.equal(emailKey(member), emailKey({ ...member, email: ' MEMBER@example.test ' }));
   assert.ok(!messageFor({ ...promotion, title: 'Title\r\nBcc: test' }, business, 'sydney').title.includes('\n'));
@@ -201,11 +165,8 @@ test('failure after recipients are created can retry without duplicate jobs', as
 
 test('recheck opt-out, removal, changed address/city, withdrawal, expiry and reapproval at send time', async () => {
   for (const mutate of [
-    h => h.records.set('users/user', { ...member, businessNotificationsEnabled: false }),
-    h => h.records.set('users/user', { ...member, emailNotificationsEnabled: false }),
     h => h.records.delete('users/user'),
     h => h.records.set('users/user', { ...member, email: 'changed@example.test' }),
-    h => h.records.set('users/user', { ...member, defaultCity: 'perth' }),
     h => h.records.set('businessPromotions/promo', { ...promotion, status: 'pending' }),
     h => h.records.set('businessPromotions/promo', { ...promotion, endDate: '2026-10-01' }),
     h => h.records.set('businessPromotions/promo', { ...promotion, approvedAt: { seconds: 200 } }),

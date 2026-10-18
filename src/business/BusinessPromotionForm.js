@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import CompactSelect from '../components/CompactSelect';
 import NativeDateTimeField from '../components/NativeDateTimeField';
 import { validateBusinessPromotion } from '../services/businesses';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import MemberPageHeader from '../components/MemberPageHeader';
 import Constants from 'expo-constants';
 
@@ -152,30 +152,30 @@ const styles = StyleSheet.create({
   closeText: { color: colors.tealDark, fontSize: 18, fontWeight: '700' },
   card: { marginBottom: spacing.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   field: { marginBottom: spacing.md },
-  label: { marginBottom: 6, color: colors.navy, fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
+  label: { marginBottom: 6, color: colors.navy, fontSize: typography.label.fontSize, fontWeight: '700', letterSpacing: 0.3 },
   optional: { color: colors.muted, fontSize: 8.5 },
-  input: { minHeight: 50, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, color: colors.text, fontSize: 14, fontWeight: '600' },
+  input: { minHeight: 50, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, color: colors.text, fontSize: typography.cardTitle.fontSize, fontWeight: '600' },
   textArea: { minHeight: 116, paddingTop: spacing.md, textAlignVertical: 'top' },
   fieldError: { marginTop: 5, color: colors.danger, fontSize: 10.5, lineHeight: 15, fontWeight: '600' },
   dateRow: { flexDirection: 'row', gap: spacing.sm },
   dateField: { flex: 1, minWidth: 0 },
-  sectionTitle: { color: colors.navy, fontSize: 16, fontWeight: '700' },
-  sectionText: { marginTop: 4, color: colors.muted, fontSize: 11, lineHeight: 16, fontWeight: '700' },
+  sectionTitle: { color: colors.navy, fontSize: typography.sectionTitle.fontSize, fontWeight: '700' },
+  sectionText: { marginTop: 4, color: colors.muted, fontSize: typography.label.fontSize, lineHeight: 16, fontWeight: '700' },
   image: { width: '100%', height: 160, marginTop: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   imageEmpty: { height: 132, alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   imageEmptyIcon: { fontSize: 30 },
-  imageEmptyText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  imageEmptyText: { color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '600' },
   imageActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
   secondaryButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  secondaryButtonText: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
+  secondaryButtonText: { color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '700' },
   removeButton: { minHeight: 42, justifyContent: 'center', paddingHorizontal: spacing.sm },
-  removeText: { color: colors.danger, fontSize: 11, fontWeight: '700' },
+  removeText: { color: colors.danger, fontSize: typography.label.fontSize, fontWeight: '700' },
   notice: { padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.tealSoft },
-  noticeTitle: { color: colors.navy, fontSize: 13, fontWeight: '700' },
-  noticeText: { marginTop: 5, color: colors.text, fontSize: 11, lineHeight: 17, fontWeight: '700' },
+  noticeTitle: { color: colors.navy, fontSize: typography.body.fontSize, fontWeight: '700' },
+  noticeText: { marginTop: 5, color: colors.text, fontSize: typography.label.fontSize, lineHeight: 17, fontWeight: '700' },
   formError: { marginTop: spacing.md, color: colors.danger, fontSize: 12, lineHeight: 18, fontWeight: '700', textAlign: 'center' },
   submit: { minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md, borderRadius: radius.md, backgroundColor: colors.teal },
-  submitText: { color: colors.surface, fontSize: 13, fontWeight: '700' },
+  submitText: { color: colors.surface, fontSize: typography.body.fontSize, fontWeight: '700' },
   cancel: { minHeight: 46, alignItems: 'center', justifyContent: 'center' },
   cancelText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   disabled: { opacity: 0.55 },

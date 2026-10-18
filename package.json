@@ -17,7 +17,8 @@
     "test:inbox-rules": "node scripts/test-inbox-rules.cjs",
     "check:release": "node scripts/verify-release.js",
     "testlab:robo-script": "node scripts/generate-robo-script.js",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "test:notification-matrix": "node --test scripts/test-notification-matrix.cjs"
   },
   "dependencies": {
     "@api.video/react-native-livestream": "^2.0.2",

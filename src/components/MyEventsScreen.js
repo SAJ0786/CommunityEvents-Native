@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import EventCard from './EventCard';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import MemberPageHeader from './MemberPageHeader';
 
 function EmptyState({ title, text }) {
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   },
   seriesBannerText: {
     color: colors.tealDark,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '700',
   },
   visibilityRow: {
@@ -270,27 +270,27 @@ const styles = StyleSheet.create({
   },
   editText: {
     color: colors.tealDark,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontWeight: '700',
   },
   copyText: {
     color: colors.text,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontWeight: '700',
   },
   seriesText: {
     color: '#166534',
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontWeight: '700',
   },
   deleteText: {
     color: colors.danger,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontWeight: '700',
   },
   deleteSeriesText: {
     color: colors.danger,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontWeight: '700',
   },
   pressed: {
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   addEventText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
   error: {
     color: colors.danger,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '600',
     marginTop: spacing.md,
   },

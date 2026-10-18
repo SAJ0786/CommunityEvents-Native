@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { colors, shadow, spacing } from '../theme';
+import { colors, shadow, spacing, typography } from '../theme';
 import { userInitials } from '../components/AccountMenuSheet';
 
 const TABS = [
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
   label: { marginTop: 2, color: colors.muted, fontSize: 8.5, fontWeight: '600' },
   activeLabel: { color: colors.blueDark, fontWeight: '700' },
   primaryLabel: { marginTop: 4, color: colors.blueDark, fontWeight: '700' },
-  initialsText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
+  initialsText: { color: colors.surface, fontSize: typography.label.fontSize, fontWeight: '700' },
   guestInitials: { color: colors.purple },
   pressed: { opacity: 0.72 },
 });

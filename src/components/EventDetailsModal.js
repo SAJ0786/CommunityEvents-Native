@@ -24,7 +24,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import NativeShare from 'react-native-share';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import { formatEventDate, formatEventTime } from '../utils/formatters';
 import { buildEventShareMessage } from '../utils/eventShare';
 import { getEventSuburb, getEventTitle } from '../services/events';
@@ -667,7 +667,7 @@ const styles = StyleSheet.create({
   },
   headerHint: {
     color: colors.muted,
-    fontSize: 11,
+    fontSize: typography.label.fontSize,
     fontWeight: '700',
     marginTop: 2,
   },
@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.navy,
-    fontSize: 16,
+    fontSize: typography.sectionTitle.fontSize,
     lineHeight: 21,
     fontWeight: '700',
     letterSpacing: 0.35,
@@ -799,12 +799,12 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   detailIconCircle: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: colors.tealSoft },
-  detailIcon: { fontSize: 16 },
+  detailIcon: { fontSize: typography.sectionTitle.fontSize },
   detailValue: {
     flex: 1,
     minWidth: 0,
     color: colors.text,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     lineHeight: 19,
     fontWeight: '700',
   },
@@ -817,13 +817,13 @@ const styles = StyleSheet.create({
   },
   notes: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     lineHeight: 21,
     marginTop: spacing.xs,
   },
   privacyNote: {
     color: colors.muted,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     fontStyle: 'italic',
     lineHeight: 19,
     textAlign: 'center',
@@ -870,7 +870,7 @@ const styles = StyleSheet.create({
   },
   overlaySubtitle: {
     color: colors.muted,
-    fontSize: 13,
+    fontSize: typography.body.fontSize,
     lineHeight: 19,
     textAlign: 'center',
     marginTop: spacing.xs,
@@ -897,7 +897,7 @@ const styles = StyleSheet.create({
   },
   overlayCloseText: {
     color: colors.tealDark,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '700',
   },
   messageInput: {
@@ -929,7 +929,7 @@ const styles = StyleSheet.create({
   },
   messageSendText: {
     color: colors.surface,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '700',
   },
   reminderOptions: {
@@ -958,7 +958,7 @@ const styles = StyleSheet.create({
   },
   reminderOptionText: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '600',
   },
   reminderOptionTextActive: {
@@ -982,7 +982,7 @@ const styles = StyleSheet.create({
   },
   removeReminderText: {
     color: colors.danger,
-    fontSize: 14,
+    fontSize: typography.cardTitle.fontSize,
     fontWeight: '700',
   },
   posterModalRoot: {

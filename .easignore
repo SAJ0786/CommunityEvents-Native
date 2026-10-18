@@ -23,3 +23,6 @@ coverage/
 business-docs/
 docs/
 backend/
+
+# Local conversation handover is unrelated to the shipped application.
+codex-context.md

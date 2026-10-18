@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'rea
 import * as ImagePicker from 'expo-image-picker';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 import MemberPageHeader from './MemberPageHeader';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, spacing, typography } from '../theme';
 import { FIELD_TYPES, STANDARD_FIELDS, FORM_TEMPLATES, TERMS_LIMIT, NOTES_LIMIT, templateFields, consentLast, resolvedEventType, createDraft, makeField, moveField, validateDraft, validateAnswers, snapshotBooking } from '../registration/prototypeModel';
 import { closingDateError, publicNotesError, publicSuburbError, publicEvent } from '../registration/prototypeModel';
 import { EVENT_TYPES } from '../utils/eventOptions';
@@ -126,16 +126,16 @@ const styles = StyleSheet.create({
   summary: { backgroundColor: colors.blueSoft, padding: spacing.lg, borderRadius: radius.lg, marginVertical: spacing.md, gap: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm, marginVertical: spacing.sm },
   title: { color: colors.navy, fontSize: 21, fontWeight: '700' },
-  eyebrow: { color: colors.tealDark, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  text: { color: colors.text, fontSize: 15 }, muted: { color: colors.muted, fontSize: 13, lineHeight: 20 },
+  eyebrow: { color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '700', letterSpacing: 1 },
+  text: { color: colors.text, fontSize: 15 }, muted: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 20 },
   warning: { color: colors.text, backgroundColor: colors.amberSoft, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.md, fontSize: 12, lineHeight: 18 },
   message: { color: colors.tealDark, backgroundColor: colors.tealSoft, padding: spacing.md, borderRadius: radius.md, marginVertical: spacing.sm },
   flex: { flex: 1, color: colors.text }, inputGroup: { marginVertical: spacing.sm },
-  label: { color: colors.text, fontSize: 14, fontWeight: '600', marginBottom: spacing.sm },
+  label: { color: colors.text, fontSize: typography.cardTitle.fontSize, fontWeight: '600', marginBottom: spacing.sm },
   input: { backgroundColor: colors.background, color: colors.text, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, minHeight: 48, padding: spacing.md },
   multiline: { minHeight: 90, textAlignVertical: 'top' },
   button: { minHeight: 44, justifyContent: 'center', padding: spacing.md, borderRadius: radius.md, borderColor: colors.border, borderWidth: 1, backgroundColor: colors.surface, marginVertical: 3 },
-  buttonText: { color: colors.tealDark, fontSize: 13, fontWeight: '600' }, primary: { backgroundColor: colors.blue }, primaryText: { color: colors.onPrimary, textAlign: 'center' },
+  buttonText: { color: colors.tealDark, fontSize: typography.body.fontSize, fontWeight: '600' }, primary: { backgroundColor: colors.blue }, primaryText: { color: colors.onPrimary, textAlign: 'center' },
   selected: { backgroundColor: colors.blueSoft, borderColor: colors.blue }, disabled: { opacity: 0.4 },
   answer: { paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
 });

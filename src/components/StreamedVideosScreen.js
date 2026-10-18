@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { httpsCallable } from '@react-native-firebase/functions';
 import { functions } from '../firebase/firebase';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import NativeBackButton from './NativeBackButton';
 import MemberPageHeader from './MemberPageHeader';
 
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   headerActions: { gap: spacing.sm },
   title: { color: colors.navy, fontSize: 28, fontWeight: '700' },
-  subtitle: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: 4 },
+  subtitle: { color: colors.muted, fontSize: typography.cardTitle.fontSize, lineHeight: 20, marginTop: 4 },
   lightButton: {
     minHeight: 40,
     alignItems: 'center',
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.tealSoft,
   },
-  lightButtonText: { color: colors.tealDark, fontSize: 13, fontWeight: '700' },
+  lightButtonText: { color: colors.tealDark, fontSize: typography.body.fontSize, fontWeight: '700' },
   noticeCard: {
     padding: spacing.md,
     borderWidth: 1,
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: '#effcf9',
   },
-  noticeText: { color: '#115e59', fontSize: 13, lineHeight: 19, fontWeight: '700' },
+  noticeText: { color: '#115e59', fontSize: typography.body.fontSize, lineHeight: 19, fontWeight: '700' },
   errorCard: {
     padding: spacing.md,
     borderWidth: 1,
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fef2f2',
     gap: spacing.sm,
   },
-  errorText: { color: colors.danger, fontSize: 13, lineHeight: 19, fontWeight: '600' },
+  errorText: { color: colors.danger, fontSize: typography.body.fontSize, lineHeight: 19, fontWeight: '600' },
   stateCard: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   emptyTitle: { color: colors.navy, fontSize: 17, fontWeight: '700' },
-  stateText: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: spacing.sm, textAlign: 'center' },
+  stateText: { color: colors.muted, fontSize: typography.cardTitle.fontSize, lineHeight: 20, marginTop: spacing.sm, textAlign: 'center' },
   videoCard: {
     padding: spacing.md,
     borderWidth: 1,
@@ -217,16 +217,16 @@ const styles = StyleSheet.create({
   placeholderIcon: { color: colors.muted, fontSize: 34, fontWeight: '700' },
   videoBody: { gap: 6 },
   videoTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
-  videoTitle: { flex: 1, color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  videoTitle: { flex: 1, color: colors.text, fontSize: typography.sectionTitle.fontSize, lineHeight: 22, fontWeight: '700' },
   statusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   livePill: { backgroundColor: '#fee2e2' },
   scheduledPill: { backgroundColor: '#fef3c7' },
   completedPill: { backgroundColor: '#f1f5f9' },
-  statusPillText: { fontSize: 11, fontWeight: '700' },
+  statusPillText: { fontSize: typography.label.fontSize, fontWeight: '700' },
   livePillText: { color: '#991b1b' },
   scheduledPillText: { color: '#92400e' },
   completedPillText: { color: '#475569' },
-  videoHost: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  videoHost: { color: colors.text, fontSize: typography.body.fontSize, fontWeight: '700' },
   videoMeta: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   watchButton: {
     minHeight: 46,
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: '#ff0000',
   },
-  watchButtonText: { color: colors.surface, fontSize: 14, fontWeight: '700' },
+  watchButtonText: { color: colors.surface, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
   disabledButton: {
     minHeight: 46,
     alignItems: 'center',
@@ -243,6 +243,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: '#e5e7eb',
   },
-  disabledButtonText: { color: colors.muted, fontSize: 14, fontWeight: '600' },
+  disabledButtonText: { color: colors.muted, fontSize: typography.cardTitle.fontSize, fontWeight: '600' },
   pressed: { opacity: 0.8 },
 });

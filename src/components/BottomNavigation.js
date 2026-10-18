@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { colors, shadow, spacing } from '../theme';
+import { colors, shadow, spacing, typography } from '../theme';
 import { userInitials } from './AccountMenuSheet';
 
 const TABS = [
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   primaryLabelDisabled: {
     color: '#b6c6c4',
   },
-  initialsText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
+  initialsText: { color: colors.surface, fontSize: typography.label.fontSize, fontWeight: '700' },
   guestInitials: { color: colors.purple },
   pressed: { opacity: 0.7 },
 });

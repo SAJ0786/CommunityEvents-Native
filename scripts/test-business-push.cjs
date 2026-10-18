@@ -21,7 +21,7 @@ const collection = p => ({ doc: id => reference(p + '/' + (id || 'generated-' + 
 const db = { collection, batch: () => { const writes = []; return { set: (ref, data) => writes.push(() => ref.set(data)), commit: async () => { for (const write of writes) await write(); } }; },
   runTransaction: async fn => {
     const writes = [];
-    const result = await fn({ get: ref => ref.get(), set: (ref, value) => writes.push(() => ref.set(value)), update: (ref, value) => writes.push(() => ref.update(value)) });
+    const result = await fn({ get: ref => ref.get(), create: (ref, value) => writes.push(() => ref.set(value)), set: (ref, value) => writes.push(() => ref.set(value)), update: (ref, value) => writes.push(() => ref.update(value)) });
     for (const write of writes) await write(); return result;
   },
 };
@@ -38,7 +38,7 @@ async function testPush() {
   }
   for (const channel of ['inApp','email','push']) {
     assert.equal(allowsNotification({}, 'profile.updated', channel), true);
-    assert.equal(allowsNotification(off, 'profile.updated', channel), false);
+    assert.equal(allowsNotification({ ...off, adminAlertEmailEnabled: false }, 'profile.updated', channel), channel === 'inApp');
     assert.equal(allowsNotification({ ...off, accountStatus: 'banned' }, 'business-reply', channel), false);
   }
   assert.deepEqual(fcmTokens({ fcmTokens: { iphone: {}, web: true } }), ['iphone','web']);
@@ -80,6 +80,7 @@ async function testPush() {
 async function testWorkflow() {
   const exports = {};
   const mocks = {
+    'node:async_hooks': require('node:async_hooks'), 'node:crypto': require('node:crypto'),
     'firebase-admin': admin,
     nodemailer: { createTransport: () => ({ sendMail: async email => { emails.push(email); return { messageId: 'test', accepted: [email.to] }; } }) },
     'firebase-functions/v2/firestore': { onDocumentCreated: (_, fn) => fn, onDocumentUpdated: (_, fn) => fn, onDocumentDeleted: (_, fn) => fn },
@@ -93,32 +94,34 @@ async function testWorkflow() {
     './cityManagement': { register: () => ({}) }, './promotionAudience': { register: () => ({}) },
   };
   vm.runInNewContext(read('backend/functions-business-workflow/index.js'), { exports, require: name => { assert.ok(name in mocks, name); return mocks[name]; }, console });
-  const off = { businessNotificationsEnabled: false, emailNotificationsEnabled: false, pushNotificationsEnabled: false };
-  records.clear(); emails.length = 0;
+  const queuedEmails = () => [...records.entries()].filter(([key]) => key.startsWith('eventEmailOutbox/')).map(([,job]) => job.message);
+  const clearEmails = () => { for (const [key] of records) if (key.startsWith('eventEmailOutbox/')) records.delete(key); };
+  const off = { adminAlertEmailEnabled: false, businessNotificationsEnabled: false, emailNotificationsEnabled: false, pushNotificationsEnabled: false };
+  records.clear(); clearEmails();
   for (const [uid, role, city] of [['owner','user','sydney'],['actor','admin','sydney'],['city','admin','sydney'],['other','admin','perth'],['super','superAdmin','perth']]) {
     records.set('users/' + uid, { ...off, role, adminCity: city, email: uid + '@example.test' });
   }
   const business = { ownerId: 'owner', name: 'Example', location: { city: 'sydney' }, approvedBy: 'actor', rejectedBy: 'actor', archivedBy: 'actor', deletedBy: 'actor' };
   const update = (before, after) => ({ params: { businessId: 'business' }, data: { before: { data: () => before }, after: { data: () => after } } });
   await exports.nativeBusinessSubmissionUpdated(update({ status: 'pending' }, { ...business, status: 'approved' }));
-  assert.deepEqual(emails.map(email => email.to).sort(), ['city@example.test','owner@example.test','super@example.test']);
+  assert.deepEqual(queuedEmails().map(email => email.to).sort(), ['city@example.test','owner@example.test','super@example.test']);
   const noticeTypes = () => [...records.entries()].filter(([key]) => key.startsWith('userNotifications/')).map(([,value]) => value.type);
   assert.equal(noticeTypes().filter(type => type === 'business.approved').length, 3);
-  emails.length = 0;
+  clearEmails();
   await exports.nativeBusinessSubmissionUpdated(update({ status: 'approved' }, { ...business, status: 'archived', archiveReason: 'PRIVATE COMPLAINT DETAILS' }));
-  assert.equal(emails.length, 3);
-  assert.ok(!emails[0].text.includes('PRIVATE COMPLAINT DETAILS'));
+  assert.equal(queuedEmails().length, 3);
+  assert.ok(!queuedEmails()[0].text.includes('PRIVATE COMPLAINT DETAILS'));
   assert.equal(noticeTypes().filter(type => type === 'business.archived').length, 3);
-  emails.length = 0;
+  clearEmails();
   await exports.nativeBusinessSubmissionUpdated(update({ status: 'pending' }, { ...business, status: 'rejected' }));
-  assert.equal(emails.length, 3);
+  assert.equal(queuedEmails().length, 3);
   records.set('businesses/business', business);
-  emails.length = 0;
+  clearEmails();
   await exports.nativeBusinessPromotionUpdated({ params: { promotionId: 'promo' }, data: { before: { data: () => ({ status: 'pending' }) }, after: { data: () => ({ businessId: 'business', ownerId: 'owner', approvedBy: 'actor', title: 'Offer', status: 'active' }) } } });
-  assert.equal(emails.length, 3);
-  emails.length = 0;
+  assert.equal(queuedEmails().length, 3);
+  clearEmails();
   await exports.nativeBusinessProfileUpdated({ params: { userId: 'owner' }, data: { before: { data: () => ({ fullName: 'Before', defaultCity: 'sydney' }) }, after: { data: () => ({ fullName: 'After', defaultCity: 'sydney' }) } } });
-  assert.equal(emails.length, 0, 'ordinary profile updates respect opted-out admins');
+  assert.equal(queuedEmails().length, 0, 'ordinary profile updates respect opted-out admins');
   console.log('PASS workflow recipients: essential approvals/rejections/closures/promotions reach owner + correct admins, exclude actor/other cities, and preserve optional opt-outs.');
 }
 async function testNativeRegistration() {
@@ -139,7 +142,7 @@ async function testNativeRegistration() {
       getToken: async () => { requests++; return 'fcm-iphone'; }, getAPNSToken: async () => 'apns-token-not-for-storage',
       isDeviceRegisteredForRemoteMessages: () => false, registerDeviceForRemoteMessages: async () => { registration++; },
       onTokenRefresh: (_, fn) => { refreshed = fn; return () => {}; }, deleteToken: async () => { deleted++; },
-      onNotificationOpenedApp: (_, fn) => { opened = fn; return () => {}; }, getInitialNotification: async () => null,
+      onMessage: () => () => {}, onNotificationOpenedApp: (_, fn) => { opened = fn; return () => {}; }, getInitialNotification: async () => null,
     }, '../firebase/firebase': { db: {}, auth },
   };
   const exports = {};

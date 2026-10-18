@@ -34,12 +34,8 @@ function eligiblePromotion(promotion, business, now, zones = ZONES) {
 }
 function eligibleRecipient(user, city, zones = ZONES, audience = 'local', channel = 'email') {
   const email = emailOf(user);
-  // Explicit enabled preferences: legacy/missing preferences do not imply consent.
-  return isActiveRecipient(user) && !user.migratedToUid && Boolean(city)
-    && Boolean(cityOf(user.defaultCity, zones)) && (audience === 'australia' || cityOf(user.defaultCity, zones) === city)
-    && user.businessNotificationsEnabled === true
-    && (channel === 'push' ? user.pushNotificationsEnabled === true && fcmTokens(user).length > 0
-      : user.emailNotificationsEnabled === true && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+  return isActiveRecipient(user) && !user.emailDisabledByBounce && !['bounced','complained','suppressed'].includes(user.emailStatus) && (!user.migratedToUid || user.migratedToUid === user.uid)
+    && (channel === 'push' ? fcmTokens(user).length > 0 : email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
 }
 function messageFor(promotion, business, city, audience = 'local') {
   const title = `New ${audience === 'australia' ? 'Australia-wide' : 'local'} offer: ${clean(promotion.title).replace(/[\r\n]/g, ' ').slice(0, 150) || 'Business promotion'}`;
@@ -50,17 +46,14 @@ function messageFor(promotion, business, city, audience = 'local') {
     clean(promotion.fullDetails).slice(0, 4000),
     'An upcoming offer may not be available until its start date. Check the business listing for details and conditions.',
     'Open Community Connect Australia → Business Directory → Promotions. Download/open the app: https://download.communityconnect.siza.info',
-    'You are receiving this promotion announcement because business and email notifications are enabled in your profile. To stop these emails, turn off either preference in the app, or reply to support@siza.info with “Unsubscribe from promotion emails”.',
+    'This approved national community promotion announcement is sent under the Community Connect notification policy. Contact support@siza.info for assistance.',
   ].filter(Boolean).join('\n\n') };
 }
 
 function createHandlers({ admin, db, buildTransporter, sender, logger, now = () => new Date(), audienceEnabled = () => process.env.PROMOTION_AUDIENCE_ENABLED === 'true' }) {
   const stamp = () => admin.firestore.FieldValue.serverTimestamp();
   async function approvedAudience(id, promotion, city) {
-    if (!audienceEnabled()) return 'local';
-    const proof = (await db.collection('promotionAudienceApprovals').doc(id).get()).data();
-    return proof?.audience === 'australia' && promotion?.requestedAudience === 'australia'
-      && proof.approvalRevision === revision(promotion) && proof.city === city ? 'australia' : 'local';
+    return 'australia'; // Approved national announcement policy in reviewed matrix N37/N39.
   }
   async function cityZones() {
     const snapshot = await db.collection('settings').doc('cityCatalogue').get();
@@ -101,7 +94,7 @@ function createHandlers({ admin, db, buildTransporter, sender, logger, now = () 
       const page = await query.get();
       for (let offset = 0; offset < page.docs.length; offset += 10) {
         await Promise.all(page.docs.slice(offset, offset + 10).map(async userDoc => {
-          const user = userDoc.data();
+          const user = { ...userDoc.data(), uid: userDoc.id };
           for (const channel of campaign.pushEnabled ? ['email', 'push'] : ['email']) {
             if (!eligibleRecipient(user, campaign.city, zones, campaign.audience || 'local', channel)) continue;
             const ref = campaignRef.collection('recipients').doc(channel === 'push' ? `push-${hash(userDoc.id)}` : emailKey(user));
@@ -134,7 +127,7 @@ function createHandlers({ admin, db, buildTransporter, sender, logger, now = () 
       db.collection('businessPromotions').doc(campaign.promotionId).get(),
       db.collection('businesses').doc(campaign.businessId).get(),
     ]);
-    const user = userDoc.data(), promotion = promotionDoc.data(), business = businessDoc.data();
+    const user = { ...userDoc.data(), uid: userDoc.id }, promotion = promotionDoc.data(), business = businessDoc.data();
     const channel = job.channel || 'email';
     const currentAudience = await approvedAudience(campaign.promotionId, promotion, campaign.city);
     if ((campaign.audience || 'local') !== currentAudience || (channel === 'push' && !audienceEnabled())

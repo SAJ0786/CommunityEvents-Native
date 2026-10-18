@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 
 const CATEGORY_ART = {
   food: '🍽️', events: '🎉', retail: '🛍️', professional: '💼', health: '🩺',
@@ -123,21 +123,21 @@ const styles = StyleSheet.create({
   coverImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   categoryArtwork: { width: 68, height: 68, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.88)' },
   categoryArtworkIcon: { fontSize: 34 },
-  initials: { color: '#ffffff', fontSize: 28, fontWeight: '700', letterSpacing: 1 },
+  initials: { color: colors.onPrimary, fontSize: 28, fontWeight: '700', letterSpacing: 1 },
   copy: { padding: spacing.md },
   badgeRow: { minHeight: 22, flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
   tierBadge: { borderRadius: 99, paddingHorizontal: 7, paddingVertical: 3 },
   featuredBadge: { backgroundColor: '#fff0d4' },
   standardBadge: { backgroundColor: colors.tealSoft },
-  tierText: { fontSize: 9, fontWeight: '700' },
+  tierText: { fontSize: typography.eyebrow.fontSize, fontWeight: '700' },
   featuredText: { color: '#9a5c05' },
   standardText: { color: colors.tealDark },
   organisationBadge: { borderRadius: 99, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: '#eef3f2' },
-  organisationText: { color: colors.muted, fontSize: 9, fontWeight: '600' },
+  organisationText: { color: colors.muted, fontSize: typography.eyebrow.fontSize, fontWeight: '600' },
   name: { minHeight: 39, marginTop: 6, color: colors.navy, fontSize: 15, lineHeight: 19, fontWeight: '700' },
-  category: { marginTop: 3, color: colors.muted, fontSize: 11, fontWeight: '700' },
+  category: { marginTop: 3, color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '700' },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: spacing.sm },
-  meta: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  meta: { color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '700' },
   open: { color: '#318342' },
   closed: { color: colors.danger },
   saveButton: {

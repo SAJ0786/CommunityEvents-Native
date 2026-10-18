@@ -4,7 +4,7 @@ import * as Application from 'expo-application';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { readStoreRelease } from '../services/storeUpdate';
 import { storeUpdateNotice, UPDATE_SNOOZE_MS } from '../utils/storeUpdatePolicy';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, spacing, typography } from '../theme';
 
 export default function StoreUpdateNotice({ visible }) {
   const [notice, setNotice] = useState(null);
@@ -53,7 +53,7 @@ export default function StoreUpdateNotice({ visible }) {
 const styles = StyleSheet.create({
   banner: { marginHorizontal: spacing.md, marginVertical: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.blueSoft },
   title: { color: colors.navy, fontSize: 15, fontWeight: '700' },
-  text: { color: colors.text, fontSize: 13, marginTop: spacing.xs },
+  text: { color: colors.text, fontSize: typography.body.fontSize, marginTop: spacing.xs },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   update: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.lg, borderRadius: radius.sm, backgroundColor: colors.blue },
   updateText: { color: colors.onPrimary, fontWeight: '700' },

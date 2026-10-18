@@ -57,8 +57,13 @@ async function main() {
   assert.equal(email.replyTo, 'support@siza.info');
   const event = id => ({ data: snapshot(ref('supportEmailOutbox/' + id)), params: { reference: id } });
   rejectEmail = true;
-  await assert.rejects(funcs.deliverSupportEmail(event(report.reference)), /retry/);
-  assert.equal(records.get('supportEmailOutbox/' + report.reference).status, 'retrying');
+  await funcs.deliverSupportEmail(event(report.reference));
+  assert.equal(records.get('supportEmailOutbox/' + report.reference).status, 'review-required');
+  await funcs.deliverSupportEmail(event(report.reference));
+  assert.equal(sent.length, 0, 'uncertain SMTP must not be blindly retried');
+  // Controlled operator reconciliation: known unsent recipient can be requeued.
+  for (const [key] of records) if (key.startsWith('supportEmailOutbox/' + report.reference + '/deliveries/')) records.delete(key);
+  records.get('supportEmailOutbox/' + report.reference).status = 'queued';
   rejectEmail = false;
   await funcs.deliverSupportEmail(event(report.reference));
   assert.equal(sent.length, 2);

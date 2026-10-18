@@ -11,15 +11,19 @@ async function main() {
   assert.match(source, /Important Update from Community Connect Australia/);
   assert.doesNotMatch(source, /Important Update from Community Events/);
   assert.doesNotMatch(source, /temporaryStoreTesterLogin|transporter\.sendMail\(/);
-  assert.equal((source.match(/await sendEventEmail\(transporter,/g) || []).length, 7);
+  assert.match(source, /queueEmail\(db, `digest:/);
+  assert.match(source, /queueEmail\(db, `manual:/);
   assert.equal(fs.existsSync(path.join(folder, '.env')), false);
   const normalize = text => text.replace(/\r/g, '');
   assert.equal(normalize(fs.readFileSync(path.join(folder, 'email-template.js'), 'utf8')),
     normalize(fs.readFileSync(path.resolve(folder, '../functions-business-workflow/email-template.js'), 'utf8')));
-  const allowed = ['dailyEmailReminders', 'monthlyHijriReminder', 'sendRemindersNow', 'onReminderEmailJobCreated', 'onEventCreated', 'onEventDeleted', 'onUserCreated', 'onAiReportCreated', 'sendEditOtp', 'sendPrivateStreamLinkEmail'];
-  const entry = { exports: {}, require: () => Object.fromEntries(allowed.map(name => [name, name])) };
+  const allowed = ['dailyEmailReminders', 'dailyPushReminders', 'monthlyHijriReminder', 'sendRemindersNow', 'onReminderEmailJobCreated', 'onEventCreated', 'onEventDeleted', 'onUserCreated', 'onAiReportCreated', 'sendEditOtp'];
+  const matrix = ['registrationReminderStatus','scheduleRegistrationNotice','onEventCreated','onEventDeleted','matrixEventUpdated','matrixProfileWritten','matrixHostMessage','matrixRegistrationWritten','matrixRegistrationBooking','matrixRegistrationChange','deliverNotificationMatrix'];
+  const queue = ['deliverQueuedEventEmail','reconcileQueuedEventEmail'];
+  const values = names => Object.fromEntries(names.map(name => [name, name]));
+  const entry = { exports: {}, require: name => name === './notification-matrix' ? { register: () => values(matrix) } : name === './queued-email' ? { register: () => values(queue) } : name.includes('firestore') ? { onDocumentCreated: (_options,handler) => handler } : values(allowed) };
   vm.runInNewContext(fs.readFileSync(path.join(folder, 'email-entrypoints.js'), 'utf8'), entry);
-  assert.deepEqual(Object.keys(entry.exports).sort(), allowed.sort());
+  assert.deepEqual(Object.keys(entry.exports).sort(), [...new Set([...allowed,...matrix,...queue])].sort());
   assert.equal(JSON.parse(fs.readFileSync(path.join(folder, 'package.json'))).main, 'email-entrypoints.js');
   const message = { from: 'sender@example.test', to: 'recipient@example.test', replyTo: 'support@siza.info',
     subject: 'Test <subject>', headers: { 'X-Test': 'true' }, attachments: [{ filename: 'example.txt', content: 'test' }],
@@ -43,7 +47,8 @@ async function main() {
   }
   assert.match(samples['events-reminder'].html, /&lt;script&gt;/);
   assert.match(samples['events-reminder'].text, /unsubscribeEmail\?uid=synthetic-user/);
-  assert.equal(samples['events-created'].to, 'admin@example.test');
+  assert.equal(samples['events-created'].to, 'support@siza.info');
+  assert.ok(samples['events-created'].bcc.includes('admin@example.test'));
   assert.equal(samples['events-otp'].to, 'host@example.test');
   for (const name of ['events-created', 'events-deleted', 'events-user-created', 'events-otp']) {
     assert.equal(samples[name].from, '"Community Connect | Events" <support@siza.info>');

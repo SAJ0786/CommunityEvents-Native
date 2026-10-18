@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import ScrollView from './KeyboardAwareScrollView';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing, typography } from '../theme';
 import { LEGAL_URLS } from '../config/legal';
 import { openExternalUrl } from '../utils/openExternalUrl';
 import NativeBackButton from './NativeBackButton';
@@ -216,21 +216,21 @@ const styles = StyleSheet.create({
   brand: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginBottom: spacing.lg },
   logo: { width: 54, height: 54 }, brandCopy: { minWidth: 0 }, brandLine: { color: colors.navy, fontSize: 20, lineHeight: 24, fontWeight: '700' },
   welcome: { alignItems: 'center', marginBottom: spacing.lg }, eyebrow: { color: colors.tealDark, fontSize: 10, letterSpacing: 1.5, fontWeight: '700' },
-  title: { marginTop: 5, color: colors.navy, fontSize: 22, lineHeight: 27, fontWeight: '700', textAlign: 'center' },
-  subtitle: { maxWidth: 420, marginTop: 8, color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  title: { marginTop: 5, color: colors.navy, fontSize: typography.pageTitle.fontSize, lineHeight: 27, fontWeight: '700', textAlign: 'center' },
+  subtitle: { maxWidth: 420, marginTop: 8, color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 19, textAlign: 'center' },
   moduleCard: { marginBottom: spacing.md }, fieldLabel: { marginBottom: 7, color: colors.navy, fontSize: 10, letterSpacing: 0.7, fontWeight: '700' },
   moduleChoice: { flexDirection: 'row', gap: spacing.sm }, moduleButton: { flex: 1, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
-  moduleButtonActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft }, moduleIcon: { fontSize: 17 }, moduleText: { color: colors.muted, fontSize: 11, fontWeight: '600' }, moduleTextActive: { color: colors.tealDark, fontWeight: '700' },
+  moduleButtonActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft }, moduleIcon: { fontSize: 17 }, moduleText: { color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '600' }, moduleTextActive: { color: colors.tealDark, fontWeight: '700' },
   card: { padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.xl, backgroundColor: colors.surface, ...shadow },
   cardHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg }, phoneIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.tealSoft }, phoneIconText: { fontSize: 23 },
-  cardHeadingCopy: { flex: 1 }, cardTitle: { color: colors.navy, fontSize: 17, fontWeight: '700' }, cardSubtitle: { marginTop: 2, color: colors.muted, fontSize: 11, fontWeight: '600' },
+  cardHeadingCopy: { flex: 1 }, cardTitle: { color: colors.navy, fontSize: 17, fontWeight: '700' }, cardSubtitle: { marginTop: 2, color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '600' },
   consentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  consentCopy: { flex: 1 }, consentText: { color: colors.navy, fontSize: 11, lineHeight: 16, fontWeight: '600' }, legalLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: 5 }, legalLink: { color: colors.tealDark, fontSize: 10, fontWeight: '700', textDecorationLine: 'underline' },
-  input: { minHeight: 52, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: '#ffffff', color: colors.navy, fontSize: 17 }, otpInput: { letterSpacing: 8, textAlign: 'center', fontWeight: '700' },
-  error: { marginTop: spacing.sm, color: colors.danger, fontSize: 11, lineHeight: 16, fontWeight: '600' },
-  primary: { minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg, borderRadius: radius.md, backgroundColor: colors.teal }, primaryText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
-  otpActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md }, textAction: { color: colors.tealDark, fontSize: 11, fontWeight: '700' },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginVertical: spacing.lg }, divider: { flex: 1, height: 1, backgroundColor: colors.border }, or: { color: colors.muted, fontSize: 9, fontWeight: '700' },
-  guestButton: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface }, guestIcon: { fontSize: 24 }, guestCopy: { flex: 1 }, guestTitle: { color: colors.navy, fontSize: 14, fontWeight: '700' }, guestText: { marginTop: 2, color: colors.muted, fontSize: 10, lineHeight: 14 }, chevron: { color: colors.tealDark, fontSize: 28, lineHeight: 30 },
+  consentCopy: { flex: 1 }, consentText: { color: colors.navy, fontSize: typography.label.fontSize, lineHeight: 16, fontWeight: '600' }, legalLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: 5 }, legalLink: { color: colors.tealDark, fontSize: 10, fontWeight: '700', textDecorationLine: 'underline' },
+  input: { minHeight: 52, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, color: colors.navy, fontSize: 17 }, otpInput: { letterSpacing: 8, textAlign: 'center', fontWeight: '700' },
+  error: { marginTop: spacing.sm, color: colors.danger, fontSize: typography.label.fontSize, lineHeight: 16, fontWeight: '600' },
+  primary: { minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg, borderRadius: radius.md, backgroundColor: colors.teal }, primaryText: { color: colors.surface, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
+  otpActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md }, textAction: { color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '700' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginVertical: spacing.lg }, divider: { flex: 1, height: 1, backgroundColor: colors.border }, or: { color: colors.muted, fontSize: typography.eyebrow.fontSize, fontWeight: '700' },
+  guestButton: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface }, guestIcon: { fontSize: 24 }, guestCopy: { flex: 1 }, guestTitle: { color: colors.navy, fontSize: typography.cardTitle.fontSize, fontWeight: '700' }, guestText: { marginTop: 2, color: colors.muted, fontSize: 10, lineHeight: 14 }, chevron: { color: colors.tealDark, fontSize: 28, lineHeight: 30 },
   pressed: { opacity: 0.76 }, disabled: { opacity: 0.5 },
 });
