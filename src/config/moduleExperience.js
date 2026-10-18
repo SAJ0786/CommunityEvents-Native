@@ -1,3 +1,4 @@
+import { colors } from '../theme';
 export const MODULE_EXPERIENCES = {
   events: {
     id: 'events',
@@ -7,8 +8,8 @@ export const MODULE_EXPERIENCES = {
     loginDescription: 'Sign in to personalise events, reminders and favourites.',
     guestDescription: 'Browse public community events without signing in.',
     icon: 'calendar-month',
-    iconBackground: '#eee4ff',
-    iconColor: '#6941b8',
+    iconBackground: colors.indigoSoft,
+    iconColor: colors.purple,
   },
   directory: {
     id: 'directory',
@@ -18,8 +19,8 @@ export const MODULE_EXPERIENCES = {
     loginDescription: 'Sign in to manage favourites, enquiries and business listings.',
     guestDescription: 'Browse public businesses and promotions without signing in.',
     icon: 'storefront-outline',
-    iconBackground: '#dff5ef',
-    iconColor: '#08766a',
+    iconBackground: colors.successSoft,
+    iconColor: colors.tealDark,
   },
 };
 

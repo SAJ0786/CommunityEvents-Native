@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, PanResponder, Platform, Pressable, StyleSheet, StatusBar, Text, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 
 const HEADER_TOP_PADDING = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 4 : spacing.sm;
 
@@ -51,9 +51,9 @@ export default function AppHeaderModern({ activeModule = 'events', logoSource, o
 }
 
 const styles = StyleSheet.create({
-  shell: { paddingTop: HEADER_TOP_PADDING, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, backgroundColor: 'rgba(250,253,252,0.94)', borderBottomWidth: 1, borderBottomColor: colors.glassBorder, ...shadow },
+  shell: { paddingTop: HEADER_TOP_PADDING, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, backgroundColor: withAlpha(colors.glass, 0.94), borderBottomWidth: 1, borderBottomColor: colors.glassBorder, ...shadow },
   header: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  brandMark: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 15, borderWidth: 1, borderColor: '#d9e5ff', backgroundColor: colors.blueSoft, transform: [{ rotate: '-2deg' }] },
+  brandMark: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 15, borderWidth: 1, borderColor: colors.blueSoft, backgroundColor: colors.blueSoft, transform: [{ rotate: '-2deg' }] },
   logo: { width: 35, height: 35, transform: [{ rotate: '2deg' }] },
   brandCopy: { flex: 1, minWidth: 0 },
   brand: { color: colors.muted, fontSize: 9.5, lineHeight: 12, letterSpacing: 1, fontWeight: '700' },
@@ -62,11 +62,11 @@ const styles = StyleSheet.create({
   badge: { position: 'absolute', right: -2, top: -2, minWidth: 17, height: 17, paddingHorizontal: 3, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: colors.rose },
   badgeText: { color: colors.surface, fontSize: 8, fontWeight: '800' },
   pressed: { opacity: 0.72 },
-  switcher: { position: 'relative', minHeight: 43, flexDirection: 'row', padding: 3, marginTop: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: 17, backgroundColor: 'rgba(228,238,236,0.72)' },
-  slider: { position: 'absolute', left: 3, top: 3, bottom: 3, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.96)', ...shadow },
+  switcher: { position: 'relative', minHeight: 43, flexDirection: 'row', padding: 3, marginTop: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: 17, backgroundColor: withAlpha(colors.glassBorder, 0.72) },
+  slider: { position: 'absolute', left: 3, top: 3, bottom: 3, borderRadius: 13, backgroundColor: withAlpha(colors.onPrimary, 0.96), ...shadow },
   button: { flex: 1, minWidth: 0, minHeight: 37, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 4, overflow: 'hidden' },
   iconFrame: { width: 22, height: 22, flexShrink: 0, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   icon: { width: 22, height: 22, color: colors.navy, fontSize: 15, lineHeight: 20, textAlign: 'center', includeFontPadding: false },
-  label: { minWidth: 0, flexShrink: 1, color: '#7b848c', fontSize: typography.subtitle.fontSize, fontWeight: '600' },
+  label: { minWidth: 0, flexShrink: 1, color: colors.muted, fontSize: typography.subtitle.fontSize, fontWeight: '600' },
   labelActive: { color: colors.blue, fontWeight: '700' },
 });

@@ -1,3 +1,5 @@
+import EventPosterPicker from '../components/EventPosterPicker';
+import { registrationPosterAsset } from './posterAsset';
 import React, { useEffect, useRef, useState } from 'react';
 import { Image, Switch, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -79,12 +81,12 @@ export default function RegistrationEditor({
   };
   const selectPoster = async () => {
     try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) throw Error('Allow photo access to choose an event poster.');
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8, base64: true });
       if (result.canceled) return;
-      const asset = result.assets[0];
-      // Expo base64 image data is JPEG. Confirm limits again on the server.
-      if (!asset.base64 || asset.base64.length > Math.ceil(5 * 1024 * 1024 / 3) * 4) throw Error('Choose an image up to 5 MB.');
-      update('poster', { uri: asset.uri, base64: asset.base64, mime: 'image/jpeg' });
+      update('poster', registrationPosterAsset(result.assets[0]));
+      setError('');
     } catch (failure) { setError(failure.message || 'Could not select poster.'); }
   };
   return <View style={styles.group} pointerEvents={busy ? 'none' : 'auto'}>
@@ -92,6 +94,7 @@ export default function RegistrationEditor({
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
     {step === 'event' && <View>
       <CreateEventForm registrationMode registrationTitle={draft.title} onRegistrationTitleChange={value => update('title', value)} defaultCity={city} defaultHostName={defaultHostName} defaultHostPhone={defaultHostPhone}
+        registrationPosterControl={<EventPosterPicker uri={draft.poster?.uri} hasPoster={hasPoster} privatePoster onChoose={selectPoster} onRemove={draft.poster ? () => update('poster', null) : onRemovePoster} disabled={busy} />}
         initialEvent={normalEventFromRegistrationDraft(draft, eventId)} allowUnchangedSubmit submitting={busy}
         title="Event details" subtitle="Registration event — private venue and poster" submitLabel="Continue to registration settings"
         onSubmit={acceptEvent} onCancel={onCancel} />
@@ -136,10 +139,6 @@ export default function RegistrationEditor({
         </>}
       </View>}
       <View style={styles.row}><Text style={styles.flex}>Allow attendee cancellation before event day</Text><Switch value={draft.allowCancellation} onValueChange={value => update('allowCancellation', value)} /></View>
-      <Action onPress={selectPoster}>Select private poster</Action>
-      {hasPoster && <Action onPress={onRemovePoster}>Remove existing private poster</Action>}
-      {draft.poster && <><Image source={{ uri: draft.poster.uri }} style={styles.poster} resizeMode="contain" /><Action onPress={() => update('poster', null)}>Discard selected poster</Action></>}
-      <Text style={styles.muted}>A newly selected poster uploads after event details save. Only registrants, the host and authorised admins can see it.</Text>
       <Action primary onPress={() => setStep('templates')}>Choose registration form</Action>
     </View>}
     {step === 'templates' && <View style={styles.panel}>
@@ -166,7 +165,7 @@ export default function RegistrationEditor({
         if (type === 'consent') setError(`Write your own terms and conditions (up to ${TERMS_LIMIT} characters). The agreement remains at the end.`);
       }}>{label}</Action>)}</View></View>
       <View style={styles.panel}><Input label="Save reusable template as" value={templateName} maxLength={80} onChangeText={setTemplateName} /><Action disabled={!templateName.trim()} onPress={() => onSaveTemplate({ name: templateName, fields: draft.fields, purpose: draft.purpose })}>Save template (no venue or answers)</Action></View>
-      <Text style={styles.muted}>New events and changes to approved events require super administrator approval. While changes are reviewed, the published event and registration form remain live and unchanged. No notifications or emails are sent.</Text>
+      <Text style={styles.muted}>New events and changes to approved events require super administrator approval. While changes are reviewed, the published event and registration form remain live and unchanged. The organiser and authorised admins receive the applicable status notifications.</Text>
       <Action primary onPress={save}>Save event and registration form</Action>
     </>}
   </View>;

@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surface,
   },
-  inputInvalid: { borderColor: colors.danger, backgroundColor: '#fffafa' },
+  inputInvalid: { borderColor: colors.danger, backgroundColor: colors.onPrimary },
   searchIcon: { color: colors.tealDark, fontSize: typography.pageTitle.fontSize, fontWeight: '700' },
   input: { flex: 1, minHeight: 50, color: colors.text, fontSize: 15 },
   suggestions: {

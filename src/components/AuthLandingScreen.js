@@ -186,7 +186,7 @@ export default function AuthLandingScreen({
           onPress={step === 'otp' ? verifyCode : sendCode}
           style={({ pressed }) => [styles.primary, pressed && styles.pressed, busy && styles.disabled]}
         >
-          {busy ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.primaryText}>{step === 'otp' ? 'Verify and continue' : 'Send verification code'}</Text>}
+          {busy ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.primaryText}>{step === 'otp' ? 'Verify and continue' : 'Send verification code'}</Text>}
         </Pressable>
         {step === 'otp' ? (
           <View style={styles.otpActions}>
@@ -210,7 +210,7 @@ export default function AuthLandingScreen({
 }
 
 const styles = StyleSheet.create({
-  content: { flexGrow: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxl, backgroundColor: colors.background },
+  content: { flexGrow: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xl, backgroundColor: colors.background },
   backButton: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', marginBottom: spacing.sm },
   backText: { color: colors.tealDark, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   brand: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginBottom: spacing.lg },

@@ -224,7 +224,7 @@ function register(deps = {}) {
           if (user.emailDisabledByBounce || ['bounced','complained','suppressed'].includes(user.emailStatus)) return doc.ref.update({ state: 'skipped', reason: 'email-suppressed-by-provider-feedback' });
           if (!emailValid(user.email)) return doc.ref.update({ state: 'skipped', reason: 'no-valid-email' });
           const result = await require('./email-layout').sendEventEmail(mailer, { from: { name: 'Community Connect Australia', address: 'support@siza.info' }, replyTo: 'support@siza.info', to: clean(user.email),
-            subject: job.title, text: `${job.body}\n\nOpen Community Connect Australia: https://communityconnect.siza.info\nContact support@siza.info for assistance.`, messageId: `<${doc.id}@siza.info>` });
+            subject: job.title, ...(job.module === 'registration' ? require('./email-layout').registrationEmailContent(job.body) : { text: `${job.body}\n\nOpen Community Connect Australia: https://communityconnect.siza.info\nContact support@siza.info for assistance.` }), messageId: `<${doc.id}@siza.info>` });
           providerAccepted = Boolean(result.accepted?.length); if (!providerAccepted) throw Object.assign(Error('Recipient rejected'), { responseCode: 550 });
         } else {
           const tokens = [...new Set((Array.isArray(user.fcmTokens) ? user.fcmTokens : Object.keys(user.fcmTokens || {})).filter(Boolean))];

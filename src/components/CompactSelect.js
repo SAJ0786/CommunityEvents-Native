@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import SafeAreaView from './ModalSafeArea';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 
 function normaliseOption(option) {
   if (typeof option === 'string') return { value: option, label: option, group: '' };
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
   triggerText: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '700' },
   placeholder: { color: colors.muted, fontWeight: '500' },
   chevron: { color: colors.tealDark, fontSize: 18, fontWeight: '700' },
-  modalRoot: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.38)' },
+  modalRoot: { flex: 1, justifyContent: 'flex-end', backgroundColor: withAlpha(colors.navy, 0.38) },
   backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: { maxHeight: '74%', padding: spacing.lg, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface, ...shadow },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, marginBottom: spacing.md },

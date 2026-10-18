@@ -131,7 +131,7 @@ async function testNativeRegistration() {
   const Platform = { OS: 'ios' }, auth = { currentUser: { uid, isAnonymous: false } };
   let permission = { status: 'granted' };
   const mocks = {
-    'react-native': { Platform },
+    '../theme': require('./theme-fixture.cjs'), 'react-native': { Platform },
     'expo-notifications': { IosAuthorizationStatus: { PROVISIONAL: 3 }, AndroidImportance: { HIGH: 4 },
       getPermissionsAsync: async () => permission, requestPermissionsAsync: async () => permission,
       setNotificationChannelAsync: async () => {}, addNotificationResponseReceivedListener: fn => { expoOpened = fn; return { remove() {} }; } },

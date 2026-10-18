@@ -77,7 +77,7 @@ import { getPrayerLocation } from './src/utils/prayerLocations';
 import { EVENT_TYPE_GROUPS } from './src/utils/eventOptions';
 import { canArrangeEventNiaz, matchesEventPeriod } from './src/utils/eventBrowseOptions';
 import { DEFAULT_CITY, cityLabel, getEventMetroArea, normalizeCity } from './src/utils/cities';
-import { colors, radius, shadow, spacing } from './src/theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from './src/theme';
 import { friendlyError } from './src/utils/errors';
 import { LEGAL_DOCUMENT_VERSION } from './src/config/legal';
 import { buildAppShareContent } from './src/utils/storeLinks';
@@ -569,15 +569,15 @@ function MainApp() {
     let active = true;
     if (!REGISTRATION_ENABLED) return undefined;
     const api = firebaseRegistration({ enabled: true });
-    Promise.all([
-      registrationEventFeed(api, 'public', selectedCity),
-      currentUser?.uid && !currentUser.isAnonymous ? registrationEventFeed(api, 'mine') : Promise.resolve([]),
-      currentUser?.uid && !currentUser.isAnonymous ? registrationEventFeed(api, 'attending') : Promise.resolve([]),
-    ]).then(async ([publicRows, ownRows, attendingRows]) => {
-      for (const event of new Map([...publicRows, ...ownRows, ...attendingRows].map(event => [event.id, event])).values()) {
-        await getEventReminder(event.id, event);
-      }
-      if (active) { setRegistrationEvents(publicRows); setHostRegistrationEvents(ownRows); setAttendingRegistrationEvents(attendingRows); setRegistrationError(''); }
+    const publish = setter => rows => { if (active) setter(rows); };
+    const publicLoad = registrationEventFeed(api, 'public', selectedCity, publish(setRegistrationEvents));
+    const mineLoad = currentUser?.uid && !currentUser.isAnonymous ? registrationEventFeed(api, 'mine', undefined, publish(setHostRegistrationEvents)) : Promise.resolve([]);
+    const attendingLoad = currentUser?.uid && !currentUser.isAnonymous ? registrationEventFeed(api, 'attending', undefined, publish(setAttendingRegistrationEvents)) : Promise.resolve([]);
+    Promise.all([publicLoad, mineLoad, attendingLoad]).then(([publicRows, ownRows, attendingRows]) => {
+      if (active) setRegistrationError('');
+      // Device reminders are independent of drawing the event list.
+      const rows = [...new Map([...publicRows, ...ownRows, ...attendingRows].map(event => [event.id, event])).values()];
+      Promise.allSettled(rows.map(event => getEventReminder(event.id, event)));
     }).catch(err => { if (active) setRegistrationError(friendlyError(err, 'Could not load registration events.')); });
     const timer = setInterval(() => { if (active) setRegistrationRefresh(value => value + 1); }, AUTO_EVENT_REFRESH_MS);
     return () => { active = false; clearInterval(timer); };
@@ -1351,7 +1351,7 @@ function MainApp() {
           onClear={() => { setHomeFilters({ ...EMPTY_HOME_FILTERS }); setNearbyEventsOnly(false); }}
         />
       <View style={styles.sectionHeadingRow}><Text style={styles.homeSectionTitle}>Quick access</Text></View>
-      <View style={styles.quickGrid}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickGrid}>
         {[
           ...(REGISTRATION_ENABLED ? [['clipboard-text-outline', registrationOnly ? 'All events' : 'Registration\nonly', colors.tealSoft, colors.tealDark, () => setRegistrationOnly(value => !value)]] : []),
           [homeViewMode === 'map' ? 'format-list-bulleted' : 'map-outline', homeViewMode === 'map' ? 'List' : 'Map', colors.blueSoft, colors.blue, () => setHomeViewMode(current => current === 'map' ? 'list' : 'map')],
@@ -1359,12 +1359,12 @@ function MainApp() {
           ['moon-waning-crescent', 'Hijri', colors.purpleSoft, colors.purple, () => requestTabChange('hijri-calendar')],
           ['calendar-month-outline', 'Calendar', colors.tealSoft, colors.tealDark, () => requestTabChange('calendar')],
         ].map(([icon, label, backgroundColor, color, onPress]) => (
-          <Pressable key={label} accessibilityRole="button" accessibilityState={{ selected: icon === 'clipboard-text-outline' && registrationOnly }} onPress={onPress} style={({ pressed }) => [styles.quickAction, pressed && styles.eventShortcutPressed]}>
+          <Pressable key={label} accessibilityRole="button" accessibilityState={{ selected: icon === 'clipboard-text-outline' && registrationOnly }} onPress={onPress} style={({ pressed }) => [styles.quickAction, { width: 94 * Math.max(1, fontScale) }, pressed && styles.eventShortcutPressed]}>
             <View style={[styles.quickOrb, { backgroundColor }]}><MaterialCommunityIcons color={color} name={icon} size={22} /></View>
-            <Text numberOfLines={2} maxFontSizeMultiplier={1.15} style={styles.quickLabel}>{label}</Text>
+            <Text style={styles.quickLabel}>{label}</Text>
           </Pressable>
         ))}
-      </View>
+      </ScrollView>
       <View style={styles.sectionHeadingRow}>
         <Text style={styles.homeSectionTitle}>Browse events</Text>
         <Text style={styles.resultCount}>{displayedEvents.length} in {cityLabel(selectedCity).replace(', Australia', '')}</Text>
@@ -1436,7 +1436,7 @@ function MainApp() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <ExpoStatusBar style="dark" />
-        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+        <StatusBar barStyle="dark-content" backgroundColor={colors.surface} />
         {profileError ? <View style={{ paddingHorizontal: spacing.lg }}><AuthDiagnosticReportButton /></View> : null}
         <ModuleEntryScreen
           logoSource={logo}
@@ -1456,7 +1456,7 @@ function MainApp() {
   return (
     <SafeAreaView ref={menuLayout.rootRef} onLayout={menuLayout.measure} edges={['top', 'right', 'bottom', 'left']} style={styles.safeArea}>
       <ExpoStatusBar style="dark" />
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.surface} />
       <AppHeader
         activeModule={appModule}
         logoSource={logo}
@@ -1691,7 +1691,8 @@ function MainApp() {
         user={currentUser}
         profile={profile}
         isGuest={isGuest}
-        onClose={() => { setSelectedEvent(null); setRegistrationRefresh(value => value + 1); }}
+        onClose={() => setSelectedEvent(null)}
+        onChanged={() => setRegistrationRefresh(value => value + 1)}
         onRequireSignIn={requestSignIn}
         onEdit={handleEditMyEvent}
         onDelete={event => { setSelectedEvent(null); handleDeleteMyEvent(event); }}
@@ -1818,13 +1819,13 @@ const styles = StyleSheet.create({
   eventShortcutsCompact: { gap: 6, marginTop: 6 },
   eventShortcut: { flex: 1, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: spacing.sm, borderWidth: 1, borderRadius: 12, backgroundColor: colors.surface },
   eventShortcutCompact: { minHeight: 39, gap: 5, paddingHorizontal: 5 },
-  streamShortcut: { borderColor: '#ffc4c4' },
-  hijriShortcut: { borderColor: '#d9cff8' },
+  streamShortcut: { borderColor: colors.dangerBorder },
+  hijriShortcut: { borderColor: colors.primaryBorder },
   eventShortcutIcon: { width: 27, height: 27, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  streamShortcutIcon: { backgroundColor: '#ff0000' },
-  hijriShortcutIcon: { backgroundColor: '#5b3fb5' },
+  streamShortcutIcon: { backgroundColor: colors.danger },
+  hijriShortcutIcon: { backgroundColor: colors.purple },
   streamShortcutIconText: { color: colors.surface, fontSize: 12, fontWeight: '700' },
-  hijriShortcutIconText: { color: '#ffd66b', fontSize: 17, fontWeight: '700' },
+  hijriShortcutIconText: { color: colors.gold, fontSize: 17, fontWeight: '700' },
   eventShortcutText: { color: colors.navy, fontSize: 11.5, fontWeight: '700' },
   eventShortcutTextCompact: { fontSize: 10.5 },
   eventShortcutPressed: { opacity: 0.76 },
@@ -1835,7 +1836,7 @@ const styles = StyleSheet.create({
     marginTop: 0,
     marginBottom: 0,
     borderRadius: 11,
-    backgroundColor: '#edf2f1',
+    backgroundColor: colors.neutralSoft,
   },
   viewToggleButton: {
     flex: 1,
@@ -1866,8 +1867,8 @@ const styles = StyleSheet.create({
   },
   sectionTitleCompact: { fontSize: 21, lineHeight: 26 },
   cityControl: { maxWidth: 146, minWidth: 112 },
-  liveFilter: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, borderRadius: 19, backgroundColor: '#ef4444' },
-  liveFilterActive: { backgroundColor: '#b91c1c' },
+  liveFilter: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, borderRadius: 19, backgroundColor: colors.danger },
+  liveFilterActive: { backgroundColor: colors.danger },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.surface },
   liveFilterText: { color: colors.surface, fontSize: 11, fontWeight: '700' },
   sectionSubtitle: { color: colors.muted, fontSize: 13, fontWeight: '500', marginTop: 2 },
@@ -1886,11 +1887,11 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#acd9d5',
-    backgroundColor: '#eaf7f5',
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.tealSoft,
   },
   guestNoticeText: {
-    color: '#09645f',
+    color: colors.tealDark,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '500',
@@ -1899,11 +1900,11 @@ const styles = StyleSheet.create({
   homeSectionTitle: { color: colors.navy, fontSize: 16, lineHeight: 21, fontWeight: '700', letterSpacing: -0.2 },
   resultCount: { flexShrink: 1, color: colors.muted, fontSize: 10.5, fontWeight: '600', textAlign: 'right' },
   quickGrid: { flexDirection: 'row', gap: 7 },
-  quickAction: { flex: 1, minWidth: 0, minHeight: 70, alignItems: 'center', justifyContent: 'center', gap: 5, padding: 5, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.72)' },
+  quickAction: { width: 94, minHeight: 96, alignItems: 'center', justifyContent: 'flex-start', gap: spacing.sm, padding: spacing.sm, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.lg, backgroundColor: colors.glass },
   quickOrb: { width: 39, height: 39, alignItems: 'center', justifyContent: 'center', borderRadius: 15, transform: [{ rotate: '-2deg' }] },
-  quickLabel: { color: colors.text, fontSize: 10, lineHeight: 13, minHeight: 26, fontWeight: '600', textAlign: 'center' },
+  quickLabel: { width: '100%', color: colors.text, ...typography.label, minHeight: typography.label.lineHeight * 2, textAlign: 'center' },
   browseChips: { gap: 7, paddingRight: spacing.lg },
-  browseChip: { minHeight: 34, justifyContent: 'center', paddingHorizontal: 13, borderWidth: 1, borderColor: colors.border, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.7)' },
+  browseChip: { minHeight: 34, justifyContent: 'center', paddingHorizontal: 13, borderWidth: 1, borderColor: colors.border, borderRadius: 17, backgroundColor: withAlpha(colors.glassBorder, 0.7) },
   browseChipActive: { borderColor: colors.blue, backgroundColor: colors.blue },
   browseChipText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   browseChipTextActive: { color: colors.surface, fontWeight: '700' },
@@ -1936,7 +1937,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: withAlpha(colors.glass, 0.9),
     ...shadow,
   },
   floatingCtaPressed: { opacity: 0.82 },

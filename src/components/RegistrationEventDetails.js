@@ -4,11 +4,12 @@ import EventDetailsModal from './EventDetailsModal';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 import MemberPageHeader from './MemberPageHeader';
 import { firebaseRegistration, REGISTRATION_ENABLED } from '../registration/firebaseRegistration';
+import { colors } from '../theme';
 import { Action, Input, styles } from '../registration/RegistrationControls';
 import SafeAreaView from './ModalSafeArea';
 import { registrationEventCard } from '../registration/eventFeed';
 
-export default function RegistrationEventDetails({ event, user, profile, isGuest, onClose, onOperation, onRequireSignIn, onEdit, onDelete, onManageStream, initialReview = false }) {
+export default function RegistrationEventDetails({ event, user, profile, isGuest, onClose, onOperation, onRequireSignIn, onEdit, onDelete, onManageStream, initialReview = false, onChanged }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState('');
   const [posterError, setPosterError] = useState('');
@@ -75,11 +76,9 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
     return () => { active = false; };
   }, [event?.id, event?.revision, user?.uid, foreground, refresh, reviewing]);
   if (!event) return null;
-  if (!detail) return <Modal transparent onRequestClose={onClose}><View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#ffffff' }}>
-    {error ? <Text accessibilityRole="alert">{error}</Text> : <ActivityIndicator />}
-    {error ? <Pressable onPress={() => setRefresh(value => value + 1)}><Text>Retry</Text></Pressable> : null}
-    <Pressable onPress={onClose}><Text>Back to events</Text></Pressable>
-  </View></Modal>;
+  if (!detail) return <EventDetailsModal event={{ ...registrationEventCard(event), imageUrl: '', hostPhone: '', hostContactOptional: '', registrationPrivate: false }} visible user={user} profile={profile} isGuest={isGuest} onClose={onClose}
+    registrationDetail={{}} registrationLoading={!error} registrationNotice={error}
+    onRetryRegistration={error ? () => setRefresh(value => value + 1) : undefined} />;
   const operation = action => {
     if (isGuest && action === 'entry') { onRequireSignIn(); return; }
     onOperation(detail.card, action);
@@ -90,7 +89,7 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
       setApproving(true);
       try {
         await firebaseRegistration({ enabled: REGISTRATION_ENABLED }).approve(detail.event.id, detail.event.revision);
-        setDetail(null); setReviewing(false); setRefresh(value => value + 1);
+        onChanged?.(); setDetail(null); setReviewing(false); setRefresh(value => value + 1);
       } catch (err) { Alert.alert('Approval failed', err.message); }
       finally { setApproving(false); }
     } },
@@ -101,7 +100,7 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
     setApproving(true);
     try {
       await firebaseRegistration({ enabled: REGISTRATION_ENABLED }).review(detail.event.id, detail.event.revision, decision, feedback.trim());
-      onClose();
+      onChanged?.(); onClose();
     } catch (err) { Alert.alert('Review failed', err.message); }
     finally { setApproving(false); }
   };
@@ -121,22 +120,22 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
       ['Host phone — private', submitted.privateDetails?.hostPhone], ['Host contact — private', submitted.privateDetails?.hostContactOptional],
     ];
     return <Modal onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1 }}><KeyboardAwareScrollView contentContainerStyle={styles.content}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}><KeyboardAwareScrollView contentContainerStyle={styles.content}>
         <MemberPageHeader title="Review submitted changes" subtitle={detail.pendingChanges ? 'Published event remains live until approval' : 'Unpublished event and registration form'} icon="clipboard-check-outline" tone="teal" />
         <Action disabled={approving} onPress={onClose}>Back to events</Action>
-        {detail.pendingChanges && <Text>Submitted {detail.pendingChanges.submittedAt || ''} by {detail.pendingChanges.submittedBy || 'organiser'}</Text>}
+        {detail.pendingChanges && <Text style={styles.text}>Submitted {detail.pendingChanges.submittedAt || ''} by {detail.pendingChanges.submittedBy || 'organiser'}</Text>}
         {values.filter(([, value]) => value !== undefined && value !== '').map(([label, value]) => <View key={label} style={styles.panel}><Text style={styles.label}>{label}</Text><Text selectable style={styles.text}>{String(value)}</Text></View>)}
-        <Text style={{ fontWeight: '700' }}>Private poster</Text>
-        {detail.reviewPoster ? <Image accessibilityLabel="Submitted private poster" source={{ uri: detail.reviewPoster }} style={{ width: '100%', height: 360 }} resizeMode="contain" /> : <Text>{detail.reviewPosterFailed ? 'Could not load submitted poster. Approval is blocked until it can be reviewed.' : 'No poster in this submitted version.'}</Text>}
-        {posterError ? <Text accessibilityRole="alert">{posterError}</Text> : null}
-        <Text style={{ fontWeight: '700' }}>Registration purpose</Text><Text>{submitted.form?.purpose}</Text>
+        <Text style={styles.label}>Private poster</Text>
+        {detail.reviewPoster ? <Image accessibilityLabel="Submitted private poster" source={{ uri: detail.reviewPoster }} style={{ width: '100%', height: 360 }} resizeMode="contain" /> : <Text style={styles.text}>{detail.reviewPosterFailed ? 'Could not load submitted poster. Approval is blocked until it can be reviewed.' : 'No poster in this submitted version.'}</Text>}
+        {posterError ? <Text accessibilityRole="alert" style={styles.error}>{posterError}</Text> : null}
+        <Text style={styles.label}>Registration purpose</Text><Text style={styles.text}>{submitted.form?.purpose}</Text>
         {(submitted.form?.fields || []).map((field, index) => <View key={field.id} style={styles.panel}>
-          <Text style={{ fontWeight: '700' }}>{index + 1}. {field.label} ({field.type}, {field.required ? 'required' : 'optional'})</Text>
-          {field.description ? <Text>{field.description}</Text> : null}
-          {(field.options || []).map((option, optionIndex) => <Text key={optionIndex}>{option}</Text>)}
-          {field.terms ? <Text selectable>Terms: {field.terms}</Text> : null}
+          <Text style={styles.label}>{index + 1}. {field.label} ({field.type}, {field.required ? 'required' : 'optional'})</Text>
+          {field.description ? <Text style={styles.text}>{field.description}</Text> : null}
+          {(field.options || []).map((option, optionIndex) => <Text key={optionIndex} style={styles.text}>{option}</Text>)}
+          {field.terms ? <Text selectable style={styles.text}>Terms: {field.terms}</Text> : null}
         </View>)}
-        {!complete ? <Text accessibilityRole="alert">Reload complete private details, form and poster before approving.</Text> : null}
+        {!complete ? <Text accessibilityRole="alert" style={styles.error}>Reload complete private details, form and poster before approving.</Text> : null}
         <Action disabled={approving} onPress={() => setRefresh(value => value + 1)}>Reload submitted changes</Action>
         {detail.canApprove && <View style={styles.group}>
           <Action primary disabled={!complete || approving} onPress={approve}>{approving ? 'Please wait…' : 'Approve event and form'}</Action>
@@ -148,7 +147,7 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
   }
   return <EventDetailsModal event={detail.card} visible onClose={onClose} user={user} profile={profile} isGuest={isGuest}
     registrationDetail={detail}
-    registrationNotice={detail.reviewFeedback ? `Review: ${detail.reviewFeedback.decision === 'rejected' ? 'Rejected' : 'Changes requested'} — ${detail.reviewFeedback.message}. Edit and save to resubmit.` : detail.canManage && detail.event.hasPendingChanges ? <Text>Submitted changes await approval. The published event and form remain live and unchanged. <Text accessibilityRole="button" onPress={() => setReviewing(true)}>Review submitted changes</Text>{posterError ? `\n${posterError}` : ''}</Text> : posterError}
+    registrationNotice={detail.reviewFeedback ? `Review: ${detail.reviewFeedback.decision === 'rejected' ? 'Rejected' : 'Changes requested'} — ${detail.reviewFeedback.message}. Edit and save to resubmit.` : detail.canManage && detail.event.hasPendingChanges ? <Text style={styles.text}>Submitted changes await approval. The published event and form remain live and unchanged. <Text accessibilityRole="button" onPress={() => setReviewing(true)}>Review submitted changes</Text>{posterError ? `\n${posterError}` : ''}</Text> : posterError}
     canManageStream={!isGuest && detail.canManage && detail.event.status === 'approved' && Boolean(onManageStream)}
     onManageStream={detail.canManage && detail.event.status === 'approved' ? onManageStream : undefined}
     onRegister={() => operation('entry')}

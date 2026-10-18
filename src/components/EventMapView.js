@@ -3,15 +3,15 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from '
 import * as Location from 'expo-location';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { getEventTitle } from '../services/events';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import { formatEventTime } from '../utils/formatters';
 
 const AUDIENCE_COLORS = {
-  ladies: '#ec4899',
-  gents: '#2563eb',
-  family: '#0f766e',
-  kids: '#f97316',
-  other: '#64748b',
+  ladies: colors.rose,
+  gents: colors.blue,
+  family: colors.tealDark,
+  kids: colors.amber,
+  other: colors.muted,
 };
 
 function audienceKey(value = '') {
@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   mapLoading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.tealSoft },
   mapLoadingText: { color: colors.tealDark, fontSize: typography.body.fontSize, fontWeight: '700' },
-  mapProblem: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, backgroundColor: 'rgba(239,247,246,0.96)' },
+  mapProblem: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, backgroundColor: withAlpha(colors.background, 0.96) },
   mapProblemTitle: { color: colors.navy, fontSize: 18, fontWeight: '700', textAlign: 'center' },
   mapProblemText: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 19, textAlign: 'center', marginTop: spacing.sm },
   retryButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.teal, marginTop: spacing.md },

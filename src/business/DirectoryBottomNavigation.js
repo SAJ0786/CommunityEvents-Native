@@ -1,15 +1,15 @@
 import React, { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { colors, shadow, spacing, typography } from '../theme';
+import { colors, shadow, spacing, typography, withAlpha } from '../theme';
 import { userInitials } from '../components/AccountMenuSheet';
 
 const TABS = [
-  { key: 'home', icon: 'home-variant', label: 'Home', color: '#176b87', soft: '#e5f5fb' },
-  { key: 'promotions', icon: 'tag', label: 'Promotions', color: '#d88700', soft: '#fff4d8' },
+  { key: 'home', icon: 'home-variant', label: 'Home', color: colors.tealDark, soft: colors.blueSoft },
+  { key: 'promotions', icon: 'tag', label: 'Promotions', color: colors.amber, soft: colors.amberSoft },
   { key: 'add', icon: 'plus', label: 'Add Business', primary: true, color: colors.blue, soft: colors.blueSoft },
-  { key: 'my-businesses', icon: 'briefcase', label: 'My Business', color: '#8a4dba', soft: '#f2e8fa' },
-  { key: 'profile', icon: 'account-circle', label: 'Menu', color: '#7357d9', soft: '#eef0ff' },
+  { key: 'my-businesses', icon: 'briefcase', label: 'My Business', color: colors.purple, soft: colors.purpleSoft },
+  { key: 'profile', icon: 'account-circle', label: 'Menu', color: colors.purple, soft: colors.indigoSoft },
 ];
 
 export default function DirectoryBottomNavigation({ activeTab, onChange, onOpenMenu, user, profile, isGuest = false, onNavigationLayout }) {
@@ -64,13 +64,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.glassBorder,
     borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.91)',
+    backgroundColor: withAlpha(colors.glass, 0.91),
     ...shadow,
     zIndex: 100,
     elevation: 100,
   },
   tab: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 12, paddingHorizontal: 2 },
-  activeTab: { backgroundColor: 'rgba(232,240,255,0.72)' },
+  activeTab: { backgroundColor: withAlpha(colors.glassBorder, 0.72) },
   primaryTab: { marginHorizontal: 2, marginTop: -15 },
   iconWrap: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   primaryIcon: {

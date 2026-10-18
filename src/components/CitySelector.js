@@ -11,10 +11,10 @@ import {
 import SafeAreaView from './ModalSafeArea';
 import * as Location from 'expo-location';
 import { CITY_OPTIONS, cityCode, cityLabel, classifyMetroArea } from '../utils/cities';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import { useCityCatalogueVersion } from '../services/cityCatalogue';
 
-export default function CitySelector({ selectedCity, onChange, onLocationResolved, allowCurrentLocation = false, compact = false }) {
+export default function CitySelector({ selectedCity, onChange, onLocationResolved, allowCurrentLocation = false, compact = false, disabled = false }) {
   const catalogueVersion = useCityCatalogueVersion();
   const [open, setOpen] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -56,7 +56,7 @@ export default function CitySelector({ selectedCity, onChange, onLocationResolve
 
   return (
     <>
-      <Pressable onPress={() => setOpen(true)} style={({ pressed }) => [styles.trigger, compact && styles.triggerCompact, pressed && styles.pressed]}>
+      <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={() => setOpen(true)} style={({ pressed }) => [styles.trigger, compact && styles.triggerCompact, pressed && styles.pressed]}>
         <View style={[styles.triggerCode, compact && styles.triggerCodeCompact]}>
           <Text maxFontSizeMultiplier={1} style={styles.triggerMarker}>{'\u{1F4CD}'}</Text>
           <Text maxFontSizeMultiplier={1.05} style={styles.triggerCodeText}>{cityCode(selectedCity)}</Text>
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   modalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    backgroundColor: withAlpha(colors.navy, 0.35),
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -221,9 +221,9 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingHorizontal: spacing.md,
     borderWidth: 1,
-    borderColor: '#73c9c0',
+    borderColor: colors.borderStrong,
     borderRadius: radius.lg,
-    backgroundColor: '#e4f7f4',
+    backgroundColor: colors.tealSoft,
     marginBottom: spacing.md,
   },
   locationIconCircle: {
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     fontSize: typography.cardTitle.fontSize,
     fontWeight: '700',
   },
-  locationButtonHint: { color: '#46706c', fontSize: typography.label.fontSize, fontWeight: '700', marginTop: 2 },
+  locationButtonHint: { color: colors.neutralStrong, fontSize: typography.label.fontSize, fontWeight: '700', marginTop: 2 },
   locationArrow: { color: colors.tealDark, fontSize: 28, lineHeight: 28, fontWeight: '700' },
   locationError: {
     color: colors.danger,
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 8,
     borderRadius: 12,
-    backgroundColor: '#eef7f5',
+    backgroundColor: colors.background,
     alignItems: 'center',
   },
   optionCodeText: {

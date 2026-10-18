@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import ScrollView from '../components/KeyboardAwareScrollView';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import NativeBackButton from '../components/NativeBackButton';
 import { SupportModal } from '../components/SupportForm';
 import { sendBusinessMessage } from '../services/messaging';
@@ -23,10 +23,10 @@ function DetailAction({ icon, label, onPress }) {
 
 function SocialBrandIcon({ brand }) {
   if (brand === 'facebook') {
-    return <View style={[styles.brandTile, styles.facebookTile]}><FontAwesome name="facebook-f" size={29} color="#ffffff" /></View>;
+    return <View style={[styles.brandTile, styles.facebookTile]}><FontAwesome name="facebook-f" size={29} color={colors.onPrimary} /></View>;
   }
   if (brand === 'instagram') {
-    return <View style={[styles.brandTile, styles.instagramTile]}><FontAwesome name="instagram" size={28} color="#ffffff" /></View>;
+    return <View style={[styles.brandTile, styles.instagramTile]}><FontAwesome name="instagram" size={28} color={colors.onPrimary} /></View>;
   }
   if (brand === 'x') return <View style={[styles.brandTile, styles.xTile]}><Text maxFontSizeMultiplier={1} style={styles.xMark}>X</Text></View>;
   return <View style={[styles.brandTile, styles.websiteTile]}><FontAwesome name="globe" size={25} color={colors.tealDark} /></View>;
@@ -305,31 +305,31 @@ const styles = StyleSheet.create({
   backButton: { minHeight: 42, justifyContent: 'center', paddingHorizontal: 4 },
   backText: { color: colors.tealDark, fontSize: 15, fontWeight: '700' },
   saveButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
-  saveButtonActive: { backgroundColor: '#fff0f4', borderColor: '#f1c7d4' },
+  saveButtonActive: { backgroundColor: colors.dangerSoft, borderColor: colors.dangerBorder },
   saveIcon: { color: colors.muted, fontSize: 27, fontWeight: '700' },
-  saveIconActive: { color: '#d43867' },
+  saveIconActive: { color: colors.rose },
   cover: { height: 188, marginHorizontal: -spacing.lg, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  coverOrb: { position: 'absolute', width: 210, height: 210, right: -70, bottom: -115, borderRadius: 105, backgroundColor: 'rgba(255,255,255,0.12)' },
+  coverOrb: { position: 'absolute', width: 210, height: 210, right: -70, bottom: -115, borderRadius: 105, backgroundColor: withAlpha(colors.glassBorder, 0.12) },
   coverImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
-  coverFallback: { padding: 40, backgroundColor: '#dff3ef' },
+  coverFallback: { padding: 40, backgroundColor: colors.successSoft },
   coverInitials: { color: colors.onPrimary, fontSize: 58, fontWeight: '700', letterSpacing: 2 },
   logo: { width: 76, height: 76, marginTop: -38, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderRadius: 22, backgroundColor: colors.surface, ...shadow },
   logoText: { fontSize: 23, fontWeight: '700' },
   logoImage: { width: '100%', height: '100%', borderRadius: 18 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: spacing.md },
   badge: { borderRadius: 99, paddingHorizontal: 9, paddingVertical: 5, backgroundColor: colors.tealSoft },
-  featuredBadge: { backgroundColor: '#fff0d4' },
+  featuredBadge: { backgroundColor: colors.amberSoft },
   badgeText: { color: colors.tealDark, fontSize: 10, fontWeight: '700' },
-  featuredText: { color: '#9a5c05' },
+  featuredText: { color: colors.warningText },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
   title: { flex: 1, minWidth: 0, color: colors.navy, fontSize: 27, lineHeight: 32, fontWeight: '700' },
-  promotionPulse: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 99, backgroundColor: '#fff0d4' },
+  promotionPulse: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 99, backgroundColor: colors.amberSoft },
   promotionPulseIcon: { fontSize: typography.body.fontSize },
-  promotionPulseText: { color: '#9a5c05', fontSize: 8, fontWeight: '700' },
+  promotionPulseText: { color: colors.warningText, fontSize: 8, fontWeight: '700' },
   metaSummary: { marginTop: 5, color: colors.muted, fontSize: typography.body.fontSize, fontWeight: '700' },
-  verified: { alignSelf: 'flex-start', marginTop: spacing.sm, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: '#eaf5ea' },
-  verifiedText: { color: '#337641', fontSize: typography.label.fontSize, fontWeight: '700' },
-  disclaimerCard: { marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: '#bfded7', borderRadius: radius.md, backgroundColor: colors.tealSoft },
+  verified: { alignSelf: 'flex-start', marginTop: spacing.sm, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: colors.successSoft },
+  verifiedText: { color: colors.success, fontSize: typography.label.fontSize, fontWeight: '700' },
+  disclaimerCard: { marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   disclaimerTitle: { color: colors.tealDark, fontSize: 12, fontWeight: '700' },
   disclaimerText: { marginTop: 4, color: colors.text, fontSize: typography.label.fontSize, lineHeight: 17, fontWeight: '600' },
   actionGrid: { flexDirection: 'row', gap: 7, marginTop: spacing.lg },
@@ -339,9 +339,9 @@ const styles = StyleSheet.create({
   socialRow: { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.md },
   socialButton: { width: 54, height: 54, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.surface, ...shadow },
   brandTile: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 11, overflow: 'hidden' },
-  facebookTile: { backgroundColor: '#1877F2' },
-  instagramTile: { backgroundColor: '#D62976', borderColor: '#F9CE34', borderWidth: 2 },
-  xTile: { backgroundColor: '#050505' },
+  facebookTile: { backgroundColor: colors.blue },
+  instagramTile: { backgroundColor: colors.rose, borderColor: colors.gold, borderWidth: 2 },
+  xTile: { backgroundColor: colors.mediaBackground },
   xMark: { color: colors.onPrimary, fontSize: 20, fontWeight: '700' },
   websiteTile: { backgroundColor: colors.tealSoft },
   tabs: { flexDirection: 'row', marginTop: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
@@ -351,37 +351,37 @@ const styles = StyleSheet.create({
   activeTabText: { color: colors.tealDark, fontWeight: '700' },
   section: { paddingVertical: spacing.lg },
   description: { marginBottom: spacing.lg, color: colors.text, fontSize: 15, lineHeight: 23, fontWeight: '600' },
-  servicesAction: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm, padding: spacing.sm, borderWidth: 1, borderColor: '#b9ddd6', borderRadius: radius.md, backgroundColor: colors.tealSoft },
+  servicesAction: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm, padding: spacing.sm, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   servicesActionIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.surface },
   servicesActionIconText: { fontSize: 20 },
   servicesActionCopy: { flex: 1, minWidth: 0 },
   servicesActionTitle: { color: colors.tealDark, fontSize: typography.body.fontSize, fontWeight: '700' },
   servicesActionText: { marginTop: 2, color: colors.muted, fontSize: 10.5, fontWeight: '700' },
   servicesActionChevron: { color: colors.tealDark, fontSize: 20, fontWeight: '700' },
-  servicesPanel: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: spacing.md, padding: spacing.sm, borderRadius: radius.md, backgroundColor: '#f7fbfa' },
+  servicesPanel: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: spacing.md, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.background },
   serviceChip: { paddingHorizontal: 9, paddingVertical: 7, borderRadius: 99, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   serviceChipText: { color: colors.text, fontSize: 10.5, fontWeight: '600' },
   servicesEmpty: { color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '700' },
-  infoRow: { flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: '#edf2f1' },
+  infoRow: { flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.neutralSoft },
   infoIconWrap: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.tealSoft },
   infoIcon: { color: colors.tealDark, fontSize: 17, fontWeight: '700' },
   infoCopy: { flex: 1, minWidth: 0 },
   infoTitle: { color: colors.navy, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
   infoText: { marginTop: 3, color: colors.muted, fontSize: 12, lineHeight: 18, fontWeight: '600' },
   infoChevron: { alignSelf: 'center', color: colors.tealDark, fontSize: typography.pageTitle.fontSize, fontWeight: '700' },
-  hoursRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: '#edf2f1' },
+  hoursRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.neutralSoft },
   hoursDay: { color: colors.navy, fontSize: typography.body.fontSize, fontWeight: '600' },
   hoursValue: { flex: 1, color: colors.muted, fontSize: typography.body.fontSize, fontWeight: '700', textAlign: 'right' },
-  promotionCard: { marginBottom: spacing.md, padding: spacing.lg, borderWidth: 1, borderColor: '#f0d6aa', borderRadius: radius.md, backgroundColor: '#fff7e9' },
-  promotionEyebrow: { color: '#9a5c05', fontSize: 10, fontWeight: '700' },
+  promotionCard: { marginBottom: spacing.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.dangerBorder, borderRadius: radius.md, backgroundColor: colors.dangerSoft },
+  promotionEyebrow: { color: colors.warningText, fontSize: 10, fontWeight: '700' },
   promotionTitle: { marginTop: 5, color: colors.navy, fontSize: 17, fontWeight: '700' },
-  promotionOffer: { marginTop: 4, color: '#aa6507', fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
+  promotionOffer: { marginTop: 4, color: colors.amber, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
   promotionDetails: { marginTop: spacing.sm, color: colors.text, fontSize: 12, lineHeight: 18, fontWeight: '600' },
   promotionEnd: { marginTop: spacing.sm, color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '700' },
   emptyCard: { alignItems: 'center', padding: spacing.xl, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   emptyTitle: { color: colors.navy, fontSize: 18, fontWeight: '700' },
   emptyText: { marginTop: spacing.sm, color: colors.muted, fontSize: typography.body.fontSize, fontWeight: '700', textAlign: 'center' },
-  contactModal: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', padding: spacing.md, backgroundColor: 'rgba(15,23,42,0.46)' },
+  contactModal: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', padding: spacing.md, backgroundColor: withAlpha(colors.navy, 0.46) },
   contactKeyboard: { flex: 1, width: '100%', justifyContent: 'flex-end' },
   contactScroll: { flex: 1, minHeight: 0, width: '100%' },
   contactScrollContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'flex-end', paddingVertical: spacing.sm },

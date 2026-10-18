@@ -61,7 +61,7 @@ test('entry points stay release gated; public cards do not render private venue;
   assert.match(details, /registrationPrivate: Boolean\(result.privateDetails\)/);
   assert.match(details, /await api.poster\(event.id\)/);
   assert.match(editor, /accessibilityLabel="Registration closing date"[^\n]+\n\s*\{closingDateError\(draft\)/);
-  assert.match(screen, /getDynamicEventOptions\(\)/);
+  assert.match(fs.readFileSync(path.join(root, 'src/components/CreateEventForm.js'), 'utf8'), /getDynamicEventOptions\(\)/);
   assert.match(screen, /answersForReview\(fresh\)/);
   assert.match(details, /\.cancel\(detail.event.id, detail.ownRegistration.revision\)/);
 });
@@ -116,13 +116,13 @@ test('unified native discovery and operations replace the separate registration 
   assert.match(modal, /'Edit registrations' : 'Register for event'/);
   assert.match(modal, /label="Edit Registration form"/);
   assert.match(modal, /label="Registration responses"/);
-  assert.match(card, /event.status === 'pending' && event.canManage/);
-  assert.match(card, />UnApproved</);
+  assert.match(card, /event.canManage && \(event.status === 'pending' \|\| event.hasPendingChanges/);
+  assert.match(card, /Needs approval/);
   assert.match(card, /if \(event.registrationOnly\)/);
   assert.match(panel, /profile\?\.role !== 'superAdmin'/);
-  assert.match(panel, /review \? undefined : city/);
-  assert.match(dashboard, /<RegistrationManagementPanel user=\{user\} profile=\{profile\} review/);
-  assert.match(source('src/registration/RegistrationEditor.js'), /Remove existing private poster/);
+  assert.match(panel, /registrationEventFeed\(api, 'management', city/);
+  assert.equal((dashboard.match(/<RegistrationManagementPanel /g) || []).length, 1);
+  assert.match(source('src/registration/RegistrationEditor.js'), /registrationPosterControl=\{<EventPosterPicker/);
 });
 
 function detailsFixture(detail, isGuest = false) {
@@ -222,7 +222,9 @@ test('host normal modal fetches private poster, routes form/responses/edit and c
   assert.equal(fixture.calls.some(call => call[0] === 'approve' && call[1] === 'event' && call[2] === 7), true);
   fixture.listeners[0]('background');
   const obscured = fixture.render();
-  assert.equal(obscured.type, 'Modal');
+  assert.equal(obscured.type, 'NormalDetails');
+  assert.equal(obscured.props.event.registrationPrivate, false);
+  assert.equal(JSON.stringify(obscured).includes('1 Private Lane'), false);
   assert.equal(JSON.stringify(obscured).includes('PRIVATE_BYTES'), false);
 });
 test('registered attendee edits own booking and cancellation sends latest booking revision', async () => {
@@ -268,7 +270,7 @@ test('My Events preserves attendee history without exposing host edit/delete con
     'react-native': { ActivityIndicator: 'ActivityIndicator', FlatList: 'FlatList', Pressable: 'Pressable', Text: 'Text', View: 'View', StyleSheet: { create: value => value } },
     './EventCard': { __esModule: true, default: 'EventCard' },
     './MemberPageHeader': { __esModule: true, default: 'MemberPageHeader' },
-    '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {}, radius: {}, shadow: {}, spacing: {} },
+    '../theme': require('./theme-fixture.cjs'),
   };
   const exports = {};
   const code = babel.transformSync(fs.readFileSync(path.join(root, 'src/components/MyEventsScreen.js'), 'utf8'), {
@@ -474,12 +476,13 @@ function normalFormFixture(initialEvent, registrationMode) {
   const fixture = componentFixture('src/components/CreateEventForm.js', {
     'react-native': { ...native, StyleSheet: { create: value => value }, Alert: { alert() {} } },
     'expo-image-picker': {},
+    './EventPosterPicker': 'EventPosterPicker',
     './EventDateTimePicker': 'EventDateTimePicker',
     './KeyboardAwareScrollView': 'ScrollView',
     './MemberPageHeader': 'MemberPageHeader',
     './AddressAutocomplete': 'AddressAutocomplete',
     './CompactSelect': 'CompactSelect',
-    '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {}, radius: {}, shadow: {}, spacing: {} },
+    '../theme': require('./theme-fixture.cjs'),
     '../services/cityCatalogue': { useCityCatalogueVersion: () => 0 },
     '../services/hijri': { getHijriDisplay: () => '', getHijriParts: () => ({ day: 1, month: 1, year: 1448 }), HIJRI_MONTHS: [] },
     '../services/prayerTimes': { calculatePrayerTimes: () => null },
@@ -528,6 +531,8 @@ test('editor renders the actual shared form in registration mode and keeps dedic
   const fixture = componentFixture('src/registration/RegistrationEditor.js', {
     'react-native': { Image: 'Image', Switch: 'Switch', Text: 'Text', View: 'View' },
     'expo-image-picker': {},
+    '../components/EventPosterPicker': 'EventPosterPicker',
+    './posterAsset': load(path.join(root, 'src/registration/posterAsset.js')),
     '../components/CreateEventForm': { __esModule: true, default: 'ActualCreateEventForm' },
     '../components/NativeDateTimeField': 'DateTimeField',
     './RegistrationControls': { Action: 'Action', Input: 'Input', styles: {} },
@@ -543,8 +548,9 @@ test('editor renders the actual shared form in registration mode and keeps dedic
   form.props.onSubmit({ ...form.props.initialEvent, eventDate: '2027-12-02', startTime: '', endTime: '' });
   const settings = fixture.render();
   assert.match(JSON.stringify(settings), /Registration settings/);
-  assert.match(JSON.stringify(settings), /Select private poster/);
-  assert.match(JSON.stringify(settings), /Remove existing private poster/);
+  assert.equal(form.props.registrationPosterControl.type, 'EventPosterPicker');
+  assert.equal(form.props.registrationPosterControl.props.privatePoster, true);
+  assert.equal(form.props.registrationPosterControl.props.hasPoster, true);
   assert.match(JSON.stringify(settings), /Capacity \(places\)/);
 });
 
@@ -565,6 +571,8 @@ function recurrenceEditorFixture(extra = {}, overrides = {}) {
   const fixture = componentFixture('src/registration/RegistrationEditor.js', {
     'react-native': { Image: 'Image', Switch: 'Switch', Text: 'Text', View: 'View' },
     'expo-image-picker': {},
+    '../components/EventPosterPicker': 'EventPosterPicker',
+    './posterAsset': load(path.join(root, 'src/registration/posterAsset.js')),
     '../components/CreateEventForm': { __esModule: true, default: 'ActualCreateEventForm' },
     '../components/NativeDateTimeField': 'DateTimeField',
     './RegistrationControls': { Action: 'Action', Input: 'Input', styles: {} },
@@ -646,7 +654,7 @@ function recurrenceScreenFixture(transport, extra = {}) {
     '../services/registrationExport': { exportRegistrationWorkbook: async () => {} },
     '../registration/registrationViewModel': view, '../registration/prototypeModel': load(path.join(root, 'src/registration/prototypeModel.js')),
     '../utils/eventOptions': { EVENT_TYPES: ['Majlis'] }, '../services/eventOptionsAdmin': { getDynamicEventOptions: async () => ({ eventTypes: [] }) },
-    '../utils/cities': { cityLabel: value => value }, '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {} },
+    '../utils/cities': { cityLabel: value => value }, '../theme': require('./theme-fixture.cjs'),
   }, { enabled: true, user: { uid: 'host' }, city: 'sydney', initialCreate: true, transport, ...extra });
 }
 async function screenEditor(fixture) {
@@ -749,7 +757,7 @@ test('series poster quota stops uploads and identifies failed and unattempted oc
   await editor.props.onSave({ ...editor.props.initialDraft, poster: { mime: 'image/png', base64: 'PRIVATE' } }, series);
   assert.deepEqual(uploads, ['one', 'two']);
   const output = JSON.stringify(fixture.render());
-  assert.match(output, /2027-01-15 \(two\): failed/);
+  assert.match(output, /2027-01-15 \(two\): Quota/);
   assert.match(output, /2027-01-29 \(three\): pending, not attempted/);
   assert.match(output, /after the upload quota resets/);
   assert.doesNotMatch(output, /PRIVATE/);
@@ -815,7 +823,7 @@ test('host screen edits pending draft but self-registration stays on published f
     '../services/registrationExport': { exportRegistrationWorkbook: async () => {} },
     '../registration/registrationViewModel': view, '../registration/prototypeModel': load(path.join(root, 'src/registration/prototypeModel.js')),
     '../utils/eventOptions': { EVENT_TYPES: ['Majlis'] }, '../services/eventOptionsAdmin': { getDynamicEventOptions: async () => ({ eventTypes: [] }) },
-    '../utils/cities': { cityLabel: value => value }, '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {} },
+    '../utils/cities': { cityLabel: value => value }, '../theme': require('./theme-fixture.cjs'),
   };
   const props = { enabled: true, user: { uid: 'host' }, city: 'perth', initialEventId: 'event', transport };
   const editorFixture = componentFixture('src/components/RegistrationScreen.js', mocks, { ...props, initialAction: 'editor' });
@@ -863,4 +871,27 @@ test('response list initially shows names and reveals answers only when expanded
   assert.equal(flatten(tree).some(node => node.type === 'Text' && node.props.children.includes('Age')), false);
   names.props.onPress();
   assert.equal(flatten(fixture.render()).some(node => node.type === 'Text' && node.props.children.includes('Age')), true);
+});
+
+test('poster selection preserves actual PNG, JPEG and WebP encoding instead of guessing JPEG', () => {
+  const { registrationPosterAsset } = load(path.join(root, 'src/registration/posterAsset.js'));
+  const png = Buffer.from([137,80,78,71,13,10,26,10,1,2,3]).toString('base64');
+  const jpeg = Buffer.from([255,216,255,224,1,2,3]).toString('base64');
+  const webp = Buffer.from('RIFF0000WEBPfake').toString('base64');
+  assert.equal(registrationPosterAsset({ uri:'file://png', base64:png, mimeType:'image/jpeg' }).mime, 'image/png');
+  assert.equal(registrationPosterAsset({ uri:'file://jpg', base64:jpeg }).mime, 'image/jpeg');
+  assert.equal(registrationPosterAsset({ uri:'file://webp', base64:webp }).mime, 'image/webp');
+  assert.throws(() => registrationPosterAsset({ base64:Buffer.from('not an image').toString('base64') }), /JPEG, PNG or WebP/);
+  assert.throws(() => registrationPosterAsset({ base64:png.slice(0,-4) + 'A'.repeat(8*1024*1024) }), /up to 5 MB/);
+});
+test('registration feed publishes first-page cards before the next page finishes', async () => {
+  let release; const published = [];
+  const pending = feed.registrationEventFeed({ list: async ({cursor}) => cursor
+    ? new Promise(resolve => { release = resolve; })
+    : { events:[{ id:'first', status:'approved' }], nextCursor:'next' }
+  }, 'public', 'sydney', rows => published.push(rows));
+  await new Promise(setImmediate);
+  assert.equal(published[0][0].id, 'first');
+  release({ events:[{id:'second',status:'approved'}], nextCursor:null });
+  assert.equal((await pending).length, 2);
 });

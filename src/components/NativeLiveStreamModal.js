@@ -19,7 +19,7 @@ import ScrollView from './KeyboardAwareScrollView';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import { getEventTitle } from '../services/events';
 import { logDiagnostic, recordNonFatalError } from '../services/diagnostics';
 import NativeBackButton from './NativeBackButton';
@@ -704,7 +704,7 @@ const minimiseStream = () => {
             </View> : null}
 
             {!minimized && !systemPip && !ending ? <View pointerEvents="none" style={styles.micMeter}>
-              <MaterialCommunityIcons color={muted ? '#94a3b8' : '#d1fae5'} name={muted ? 'microphone-off' : 'microphone'} size={17} />
+              <MaterialCommunityIcons color={muted ? colors.borderStrong : colors.successSoft} name={muted ? 'microphone-off' : 'microphone'} size={17} />
               <View style={styles.micMeterTrack}>
                 <View style={[styles.micMeterFill, { height: muted ? '0%' : '72%' }]} />
               </View>
@@ -714,35 +714,35 @@ const minimiseStream = () => {
             {!minimized && !systemPip && !ending && controlsVisible ? <>
               <View style={styles.streamTopActions}>
                 {hasActiveNativeSession ? <Pressable accessibilityLabel="Minimise streaming" onPress={minimiseStream} style={[styles.roundControl, styles.minimiseControl]}>
-                  <MaterialCommunityIcons color="#fff" name="arrow-collapse-down" size={22} />
+                  <MaterialCommunityIcons color={colors.onPrimary} name="arrow-collapse-down" size={22} />
                 </Pressable> : null}
                 <Pressable accessibilityLabel="Close streaming" onPress={closeSafely} style={[styles.roundControl, styles.closeStreamControl]}>
-                  <MaterialCommunityIcons color="#fff" name="close" size={23} />
+                  <MaterialCommunityIcons color={colors.onPrimary} name="close" size={23} />
                 </Pressable>
               </View>
 
               <View style={styles.streamControlDock}>
                 <Pressable accessibilityLabel="Swap camera" onPress={() => setCamera(value => value === 'back' ? 'front' : 'back')} style={styles.streamControlItem}>
-                  <View style={[styles.roundControl, styles.cameraFlipControl]}><MaterialCommunityIcons color="#fff" name="camera-flip" size={23} /></View>
+                  <View style={[styles.roundControl, styles.cameraFlipControl]}><MaterialCommunityIcons color={colors.onPrimary} name="camera-flip" size={23} /></View>
                   <Text style={styles.streamControlLabel}>Camera</Text>
                 </Pressable>
                 <Pressable accessibilityLabel={muted ? 'Unmute microphone' : 'Mute microphone'} onPress={() => setMuted(value => !value)} style={styles.streamControlItem}>
-                  <View style={[styles.roundControl, muted ? styles.mutedControl : styles.microphoneControl]}><MaterialCommunityIcons color="#fff" name={muted ? 'microphone-off' : 'microphone'} size={23} /></View>
+                  <View style={[styles.roundControl, muted ? styles.mutedControl : styles.microphoneControl]}><MaterialCommunityIcons color={colors.onPrimary} name={muted ? 'microphone-off' : 'microphone'} size={23} /></View>
                   <Text style={styles.streamControlLabel}>{muted ? 'Unmute' : 'Mute'}</Text>
                 </Pressable>
                 {!streaming && !connecting ? <Pressable disabled={busy} accessibilityLabel={hasActiveNativeSession ? 'Resume same stream' : 'Start streaming'} onPress={startPhoneStream} style={[styles.streamControlItem, busy && styles.disabled]}>
-                  <View style={[styles.roundControl, styles.goLiveControl]}><MaterialCommunityIcons color="#fff" name="broadcast" size={25} /></View>
+                  <View style={[styles.roundControl, styles.goLiveControl]}><MaterialCommunityIcons color={colors.onPrimary} name="broadcast" size={25} /></View>
                   <Text style={styles.streamControlLabel}>{busy ? 'Preparing' : hasActiveNativeSession ? 'Resume' : 'Go Live'}</Text>
                 </Pressable> : null}
                 {(connecting || streaming || hasActiveNativeSession) ? <Pressable disabled={busy} accessibilityLabel="End live stream" onPress={confirmEndStream} style={[styles.streamControlItem, busy && styles.disabled]}>
-                  <View style={[styles.roundControl, styles.endStreamControl]}><MaterialCommunityIcons color="#fff" name="stop-circle-outline" size={25} /></View>
+                  <View style={[styles.roundControl, styles.endStreamControl]}><MaterialCommunityIcons color={colors.onPrimary} name="stop-circle-outline" size={25} /></View>
                   <Text style={styles.streamControlLabel}>End</Text>
                 </Pressable> : null}
               </View>
 
               {!streaming && !hasActiveNativeSession ? (
                 <NativeBackButton
-                  color="#fff"
+                  color={colors.onPrimary}
                   onPress={leavePhoneCamera}
                   style={styles.cameraBackButton}
                 />
@@ -908,9 +908,9 @@ floatingStreamController: {
   gap: 9,
   padding: 12,
   borderWidth: 2,
-  borderColor: '#ef4444',
+  borderColor: colors.danger,
   borderRadius: radius.lg,
-  backgroundColor: '#050b12',
+  backgroundColor: colors.overlay,
   ...shadow,
 },
 
@@ -919,21 +919,21 @@ floatingStreamCopy: {
 },
 
 floatingStreamTitle: {
-  color: '#fff',
+  color: colors.onPrimary,
   fontSize: typography.label.fontSize,
   fontWeight: '900',
   letterSpacing: 0.5,
 },
 
 floatingStreamText: {
-  color: '#dbeafe',
+  color: colors.blueSoft,
   fontSize: 10,
   fontWeight: '700',
   marginTop: 3,
 },
 
 floatingStreamExpand: {
-  color: '#fff',
+  color: colors.onPrimary,
   fontSize: typography.pageTitle.fontSize,
   lineHeight: 24,
   fontWeight: '900',
@@ -942,8 +942,8 @@ floatingStreamExpand: {
   headerCopy: { flex: 1 },
   eyebrow: { color: colors.danger, fontSize: typography.label.fontSize, fontWeight: '700', letterSpacing: 1.2 },
   title: { color: colors.navy, fontSize: 18, lineHeight: 23, fontWeight: '700', marginTop: 2 },
-  minimizeButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: '#fee2e2' },
-  minimizeText: { color: '#b91c1c', fontSize: 28, lineHeight: 30, fontWeight: '700' },
+  minimizeButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: colors.roseSoft },
+  minimizeText: { color: colors.danger, fontSize: 28, lineHeight: 30, fontWeight: '700' },
   closeButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: colors.tealSoft },
   closeText: { color: colors.tealDark, fontSize: 29, lineHeight: 31, fontWeight: '600' },
   content: { padding: spacing.lg, paddingBottom: 56, gap: spacing.md },
@@ -951,7 +951,7 @@ floatingStreamExpand: {
   sectionText: { color: colors.muted, fontSize: typography.cardTitle.fontSize, lineHeight: 21, marginBottom: spacing.sm },
   visibilityRow: { gap: spacing.sm, marginBottom: spacing.sm },
   choice: { minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
-  choiceActive: { borderWidth: 2, borderColor: colors.teal, backgroundColor: '#edf9f7' },
+  choiceActive: { borderWidth: 2, borderColor: colors.teal, backgroundColor: colors.background },
   choiceIcon: { width: 34, fontSize: 27, textAlign: 'center' },
   choiceCopy: { flex: 1 },
   choiceTitle: { color: colors.navy, fontSize: typography.sectionTitle.fontSize, fontWeight: '700' },
@@ -969,46 +969,46 @@ floatingStreamExpand: {
   primaryButtonText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
   secondaryButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.tealSoft },
   secondaryButtonText: { color: colors.tealDark, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
-  cameraStage: { flex: 1, backgroundColor: '#050b12' },
-  camera: { flex: 1, alignSelf: 'stretch', backgroundColor: '#050b12' },
+  cameraStage: { flex: 1, backgroundColor: colors.overlay },
+  camera: { flex: 1, alignSelf: 'stretch', backgroundColor: colors.overlay },
   controlsWakeLayer: { ...StyleSheet.absoluteFillObject, zIndex: 2 },
-  liveBadge: { position: 'absolute', top: spacing.md, left: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 99, backgroundColor: 'rgba(5,11,18,0.72)' },
+  liveBadge: { position: 'absolute', top: spacing.md, left: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 99, backgroundColor: withAlpha(colors.overlay, 0.72) },
   liveBadgeMinimized: { top: 7, left: 7, paddingHorizontal: 7, paddingVertical: 5 },
-  liveDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#94a3b8' },
-  liveDotConnected: { backgroundColor: '#ef4444' },
-  liveBadgeText: { color: '#fff', fontSize: typography.label.fontSize, fontWeight: '700', letterSpacing: 0.7 },
-  orientationBadge: { position: 'absolute', top: spacing.md, right: spacing.md, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 99, backgroundColor: 'rgba(5,11,18,0.72)' },
-  orientationBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.6 },
+  liveDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.borderStrong },
+  liveDotConnected: { backgroundColor: colors.danger },
+  liveBadgeText: { color: colors.onPrimary, fontSize: typography.label.fontSize, fontWeight: '700', letterSpacing: 0.7 },
+  orientationBadge: { position: 'absolute', top: spacing.md, right: spacing.md, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 99, backgroundColor: withAlpha(colors.overlay, 0.72) },
+  orientationBadgeText: { color: colors.onPrimary, fontSize: 10, fontWeight: '700', letterSpacing: 0.6 },
   streamTopActions: { position: 'absolute', top: 48, right: spacing.md, flexDirection: 'row', gap: 9 },
-  streamControlDock: { position: 'absolute', left: 14, right: 14, bottom: 18, minHeight: 74, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: 14, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', borderRadius: 24, backgroundColor: 'rgba(5,11,18,0.82)' },
+  streamControlDock: { position: 'absolute', left: 14, right: 14, bottom: 18, minHeight: 74, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: 14, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: withAlpha(colors.glassBorder, 0.18), borderRadius: 24, backgroundColor: withAlpha(colors.overlay, 0.82) },
   streamControlItem: { width: 54, alignItems: 'center' },
   roundControl: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 23, ...shadow },
   minimiseControl: { backgroundColor: colors.blue },
-  closeStreamControl: { backgroundColor: '#475569' },
+  closeStreamControl: { backgroundColor: colors.neutralStrong },
   cameraFlipControl: { backgroundColor: colors.teal },
-  microphoneControl: { backgroundColor: '#d97706' },
-  mutedControl: { backgroundColor: '#64748b' },
-  goLiveControl: { backgroundColor: '#dc2626' },
-  endStreamControl: { backgroundColor: '#b91c1c' },
-  cameraBackButton: { position: 'absolute', top: 48, left: spacing.md, zIndex: 4, alignItems: 'center', borderRadius: 22, backgroundColor: 'rgba(5,11,18,0.72)' },
-  streamControlLabel: { color: '#fff', fontSize: typography.eyebrow.fontSize, lineHeight: 12, fontWeight: '700', textAlign: 'center', marginTop: 4 },
-  streamStatusOverlay: { position: 'absolute', left: 52, right: 52, bottom: 106, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(5,11,18,0.78)' },
-  streamStatusText: { color: '#d1fae5', fontSize: typography.label.fontSize, lineHeight: 15, fontWeight: '600', textAlign: 'center' },
-  streamErrorText: { color: '#fecaca', fontSize: typography.label.fontSize, lineHeight: 15, fontWeight: '600', textAlign: 'center' },
-  micMeter: { position: 'absolute', top: '27%', right: 13, width: 34, height: 158, alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', borderRadius: 17, backgroundColor: 'rgba(5,11,18,0.76)' },
-  micMeterTrack: { width: 8, height: 96, justifyContent: 'flex-end', overflow: 'hidden', borderRadius: 5, backgroundColor: '#374151' },
-  micMeterFill: { width: '100%', borderRadius: 5, backgroundColor: '#ff4d5e' },
-  micMeterLabel: { color: '#d1fae5', fontSize: 8, fontWeight: '700', letterSpacing: 0.5 },
-  minimizedTapTarget: { position: 'absolute', right: 6, bottom: 6, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 99, backgroundColor: 'rgba(5,11,18,0.78)' },
-  minimizedTapText: { color: '#fff', fontSize: typography.eyebrow.fontSize, fontWeight: '700', letterSpacing: 0.5 },
-  dangerButton: { minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, borderWidth: 1, borderColor: '#fecaca', backgroundColor: '#fee2e2' },
-  dangerButtonText: { color: '#b91c1c', fontSize: 15, fontWeight: '700' },
-  liveCard: { alignItems: 'center', padding: spacing.xl, borderWidth: 1, borderColor: '#fecaca', borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
+  microphoneControl: { backgroundColor: colors.amber },
+  mutedControl: { backgroundColor: colors.muted },
+  goLiveControl: { backgroundColor: colors.danger },
+  endStreamControl: { backgroundColor: colors.danger },
+  cameraBackButton: { position: 'absolute', top: 48, left: spacing.md, zIndex: 4, alignItems: 'center', borderRadius: 22, backgroundColor: withAlpha(colors.overlay, 0.72) },
+  streamControlLabel: { color: colors.onPrimary, fontSize: typography.eyebrow.fontSize, lineHeight: 12, fontWeight: '700', textAlign: 'center', marginTop: 4 },
+  streamStatusOverlay: { position: 'absolute', left: 52, right: 52, bottom: 106, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: withAlpha(colors.overlay, 0.78) },
+  streamStatusText: { color: colors.successSoft, fontSize: typography.label.fontSize, lineHeight: 15, fontWeight: '600', textAlign: 'center' },
+  streamErrorText: { color: colors.dangerBorder, fontSize: typography.label.fontSize, lineHeight: 15, fontWeight: '600', textAlign: 'center' },
+  micMeter: { position: 'absolute', top: '27%', right: 13, width: 34, height: 158, alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderWidth: 1, borderColor: withAlpha(colors.glassBorder, 0.18), borderRadius: 17, backgroundColor: withAlpha(colors.overlay, 0.76) },
+  micMeterTrack: { width: 8, height: 96, justifyContent: 'flex-end', overflow: 'hidden', borderRadius: 5, backgroundColor: colors.neutralStrong },
+  micMeterFill: { width: '100%', borderRadius: 5, backgroundColor: colors.rose },
+  micMeterLabel: { color: colors.successSoft, fontSize: 8, fontWeight: '700', letterSpacing: 0.5 },
+  minimizedTapTarget: { position: 'absolute', right: 6, bottom: 6, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 99, backgroundColor: withAlpha(colors.overlay, 0.78) },
+  minimizedTapText: { color: colors.onPrimary, fontSize: typography.eyebrow.fontSize, fontWeight: '700', letterSpacing: 0.5 },
+  dangerButton: { minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, borderWidth: 1, borderColor: colors.dangerBorder, backgroundColor: colors.roseSoft },
+  dangerButtonText: { color: colors.danger, fontSize: 15, fontWeight: '700' },
+  liveCard: { alignItems: 'center', padding: spacing.xl, borderWidth: 1, borderColor: colors.dangerBorder, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   liveCardIcon: { fontSize: 42 },
   liveCardTitle: { color: colors.navy, fontSize: 23, fontWeight: '700', marginTop: spacing.sm },
   liveCardText: { color: colors.muted, fontSize: typography.cardTitle.fontSize, lineHeight: 21, textAlign: 'center', marginTop: spacing.xs, marginBottom: spacing.lg },
-  youtubeButton: { width: '100%', minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: '#ff0000', marginBottom: spacing.sm },
-  youtubeButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  youtubeButton: { width: '100%', minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.danger, marginBottom: spacing.sm },
+  youtubeButtonText: { color: colors.onPrimary, fontSize: 15, fontWeight: '700' },
   messageBar: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
   statusText: { color: colors.tealDark, fontSize: 12, lineHeight: 18, fontWeight: '600', textAlign: 'center' },
   errorText: { color: colors.danger, fontSize: 12, lineHeight: 18, fontWeight: '600', textAlign: 'center' },

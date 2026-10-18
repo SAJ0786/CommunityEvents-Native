@@ -24,7 +24,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import NativeShare from 'react-native-share';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import { formatEventDate, formatEventTime } from '../utils/formatters';
 import { buildEventShareMessage } from '../utils/eventShare';
 import { getEventSuburb, getEventTitle } from '../services/events';
@@ -82,7 +82,7 @@ function ActionButton({ label, icon, iconNode, variant = 'subtle', onPress, disa
         variant === 'danger' && styles.actionIconBubbleDanger,
         variant === 'live' && styles.actionIconBubbleLive,
       ]}>
-        {iconNode || <MaterialCommunityIcons color={variant === 'danger' ? colors.danger : variant === 'live' ? '#ffffff' : colors.blue} name={icon} size={22} />}
+        {iconNode || <MaterialCommunityIcons color={variant === 'danger' ? colors.danger : variant === 'live' ? colors.onPrimary : colors.blue} name={icon} size={22} />}
       </View>
       <Text maxFontSizeMultiplier={1} numberOfLines={2} style={[
         styles.actionLabel,
@@ -158,6 +158,8 @@ export default function EventDetailsModal({
   onManageStream,
   registrationDetail,
   registrationNotice,
+  registrationLoading = false,
+  onRetryRegistration,
   onRegister,
   onEditRegistrationForm,
   onRegistrationResponses,
@@ -426,11 +428,13 @@ export default function EventDetailsModal({
                   <Text maxFontSizeMultiplier={1.08} style={styles.title}>{getEventTitle(event).toUpperCase()}</Text>
                 </View>
 
+                {registrationLoading && <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}><ActivityIndicator color={colors.tealDark} /><Text style={styles.notes}>Loading registration details…</Text></View>}
+                {onRetryRegistration && <ActionButton icon="reload" label="Retry registration details" onPress={onRetryRegistration} />}
                 <View style={styles.actionGrid}>
                   {registrationDetail && <ActionButton icon="clipboard-edit-outline" label={registrationDetail.ownRegistration?.status === 'registered' ? 'Edit registrations' : 'Register for event'} onPress={onRegister} disabled={!registrationDetail.canRegister && !registrationDetail.canEditRegistration} />}
                   {onEditRegistrationForm && <ActionButton icon="form-select" label="Edit Registration form" onPress={onEditRegistrationForm} />}
                   {onRegistrationResponses && <ActionButton icon="clipboard-list-outline" label="Registration responses" onPress={onRegistrationResponses} />}
-                  {onApproveRegistration && <ActionButton icon="check-decagram-outline" label="Approve Event" onPress={onApproveRegistration} />}
+                  {onApproveRegistration && <ActionButton icon="check-decagram-outline" label="Review event" onPress={onApproveRegistration} />}
                   {onCancelRegistration && <ActionButton icon="clipboard-remove-outline" label="Delete my registration" variant="danger" onPress={onCancelRegistration} />}
                   {onToggleVisibility ? <ActionButton icon={event.hidden ? 'eye-outline' : 'eye-off-outline'} label={event.hidden ? 'Make Visible' : 'Hide Event'} onPress={() => onToggleVisibility(event)} /> : null}
                   {onTransfer ? <ActionButton icon="account-switch-outline" label="Transfer" variant="primary" onPress={() => onTransfer(event)} /> : null}
@@ -438,11 +442,11 @@ export default function EventDetailsModal({
                   <ActionButton icon="share-variant-outline" label="Share" variant="share" onPress={() => setShareOpen(true)} />
                   <ActionButton icon="map-marker-path" label="Directions" variant="primary" onPress={openDirections} disabled={isGuest || !fullAddress || (event.registrationOnly && !event.registrationPrivate)} />
                   <ActionButton icon="email-outline" label="Contact Host" disabled={!canConnectHost} onPress={() => { setHostMessageStatus(''); setHostMessageOpen(true); }} />
-                  {!isGuest && event.isLive && hasPlayableLiveUrl && event.liveAppVisibility !== 'private' && !(canManageStream && onManageStream) ? <ActionButton iconNode={<FontAwesome name="youtube-play" size={22} color="#dc2626" />} label="Watch on YouTube" variant="danger" onPress={openLiveVideo} /> : null}
+                  {!isGuest && event.isLive && hasPlayableLiveUrl && event.liveAppVisibility !== 'private' && !(canManageStream && onManageStream) ? <ActionButton iconNode={<FontAwesome name="youtube-play" size={22} color={colors.danger} />} label="Watch on YouTube" variant="danger" onPress={openLiveVideo} /> : null}
                   {canManageStream && onManageStream ? (
                     <ActionButton
                       icon={event.isLive && hasPlayableLiveUrl ? undefined : 'broadcast'}
-                      iconNode={event.isLive && hasPlayableLiveUrl ? <FontAwesome name="youtube-play" size={22} color="#ffffff" /> : undefined}
+                      iconNode={event.isLive && hasPlayableLiveUrl ? <FontAwesome name="youtube-play" size={22} color={colors.onPrimary} /> : undefined}
                       label={event.registrationOnly && event.isLive ? 'Manage Live' : event.isLive && hasPlayableLiveUrl ? 'Watch on YouTube' : event.isLive ? 'Manage Live' : 'Go Live'}
                       variant="live"
                       onPress={!event.registrationOnly && event.isLive && hasPlayableLiveUrl ? openLiveVideo : () => onManageStream(event)}
@@ -614,7 +618,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15, 23, 42, 0.36)',
+    backgroundColor: withAlpha(colors.navy, 0.36),
     zIndex: 1000,
     elevation: 1000,
   },
@@ -693,7 +697,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 132,
     borderRadius: radius.lg,
-    backgroundColor: '#eff5f4',
+    backgroundColor: colors.background,
     overflow: 'hidden',
     marginTop: spacing.md,
     marginBottom: spacing.sm,
@@ -708,7 +712,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingVertical: 6,
-    backgroundColor: 'rgba(7, 23, 51, 0.62)',
+    backgroundColor: withAlpha(colors.navy, 0.62),
   },
   posterHintText: {
     color: colors.surface,
@@ -730,7 +734,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: colors.teal,
     borderRadius: radius.md,
-    backgroundColor: '#edf8f6',
+    backgroundColor: colors.background,
   },
   title: {
     color: colors.navy,
@@ -760,13 +764,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 5,
   },
-  actionIconBubble: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: '#eef2f7' },
-  actionIconBubbleShare: { backgroundColor: '#dcfce7' },
-  actionIconBubblePrimary: { backgroundColor: '#dbeafe' },
-  actionIconBubbleDanger: { backgroundColor: '#fee2e2' },
+  actionIconBubble: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: colors.neutralSoft },
+  actionIconBubbleShare: { backgroundColor: colors.successSoft },
+  actionIconBubblePrimary: { backgroundColor: colors.blueSoft },
+  actionIconBubbleDanger: { backgroundColor: colors.roseSoft },
   actionIconBubbleLive: {
-    backgroundColor: '#dc2626',
-    shadowColor: '#dc2626',
+    backgroundColor: colors.danger,
+    shadowColor: colors.danger,
     shadowOpacity: 0.35,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
@@ -783,7 +787,7 @@ const styles = StyleSheet.create({
   actionLabelDanger: {
     color: colors.danger,
   },
-  actionLabelLive: { color: '#b91c1c' },
+  actionLabelLive: { color: colors.danger },
   detailsPanel: {
     marginTop: spacing.sm,
     borderTopWidth: 1,
@@ -834,7 +838,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.lg,
-    backgroundColor: 'rgba(15, 23, 42, 0.46)',
+    backgroundColor: withAlpha(colors.navy, 0.46),
   },
   overlayScrollContent: {
     flexGrow: 1,
@@ -978,7 +982,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: '#fee2e2',
+    backgroundColor: colors.roseSoft,
   },
   removeReminderText: {
     color: colors.danger,
@@ -989,7 +993,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.92)',
+    backgroundColor: withAlpha(colors.mediaBackground, 0.92),
   },
   posterBackdrop: {
     ...StyleSheet.absoluteFillObject,

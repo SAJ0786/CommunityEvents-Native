@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
   loader: { marginVertical: 24 },
   ruleText: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 19, marginBottom: spacing.md },
   error: { color: colors.danger, fontSize: typography.body.fontSize, fontWeight: '600', lineHeight: 19, marginBottom: spacing.md },
-  preview: { backgroundColor: colors.tealSoft, borderWidth: 1, borderColor: '#b7ded7', borderRadius: 13, padding: spacing.md, marginBottom: spacing.lg },
+  preview: { backgroundColor: colors.tealSoft, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: 13, padding: spacing.md, marginBottom: spacing.lg },
   previewTitle: { color: colors.tealDark, fontSize: typography.cardTitle.fontSize, fontWeight: '700', marginBottom: 8 },
   previewDates: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   dateChip: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 6 },

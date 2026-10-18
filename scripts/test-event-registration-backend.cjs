@@ -934,3 +934,23 @@ test('review decisions are superadmin-only, revision checked, private, and reset
     assert.equal(hostView.pendingChanges.event.title, 'Changed title');
   }
 });
+
+test('list pages batch current access checks and never load forms, pending drafts or answer payloads', async () => {
+  const f = fixture(), saved = await f.create(); await f.approve(saved);
+  const original = f.records.get(`registrationEvents/${saved.eventId}`);
+  for (let i = 0; i < 24; i++) {
+    const id = `summary-${String(i).padStart(2, '0')}`;
+    f.records.set(`registrationEvents/${id}`, { ...original, title: `Summary ${i}` });
+    f.records.set(`registrationEventPrivate/${id}`, { address: '99 Hidden Private Road', posterPath: 'private-object' });
+    f.records.set(`registrationForms/${id}`, { fields: [{ id:'secret', label:'Private form not needed by cards' }] });
+  }
+  const reads = [], transaction = f.db.runTransaction.bind(f.db);
+  f.db.runTransaction = work => transaction(tx => work({ ...tx, get: ref => { reads.push(ref.path); return tx.get(ref); } }));
+  const page = await f.handlers.listRegistrationEvents(f.request('member', { scope:'public', city:'sydney' }));
+  assert.equal(page.events.length, 25);
+  assert.equal(reads.filter(path => path === 'users/member').length, 1);
+  assert.equal(reads.some(path => path.startsWith('registrationForms/') || path.startsWith('registrationPendingChanges/')), false);
+  assert.ok(reads.length <= 76, `Bounded summary reads: ${reads.length}`);
+  assert.doesNotMatch(JSON.stringify(page), /99 Hidden Private Road|private-object|Private form not needed/);
+  assert.ok(page.events.every(event => event.canManage === false && !event.hasPoster));
+});

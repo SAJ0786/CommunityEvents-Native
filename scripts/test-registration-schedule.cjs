@@ -47,7 +47,7 @@ test('device calendar is exact across device zones; date-only is all-day without
   const calls = [];
   const calendar = load('src/services/calendar.js', {
     'react-native': { Linking: {}, Platform: {} }, 'expo-calendar': { createEventInCalendarAsync: value => calls.push(value) },
-    'expo-clipboard': {}, './events': { getEventTitle: event => event.title || 'Normal' }, '../registration/eventSchedule': schedule,
+    'expo-clipboard': {}, './events': { getEventTitle: event => event.title || 'Normal' }, '../registration/eventSchedule': schedule, '../theme': require('./theme-fixture.cjs'), '../theme': require('./theme-fixture.cjs'),
   });
   const previous = process.env.TZ;
   try {
@@ -84,7 +84,7 @@ function reminderFixture(platform) {
     '@react-native-async-storage/async-storage': { getItem: async key => store.get(key), setItem: async (key, value) => store.set(key, value) },
     'expo-notifications': notifications, 'expo-intent-launcher': {}, 'expo-constants': {}, './prayerTimes': {},
     './events': { getEventTitle: event => event.title, getEventSuburb: event => event.suburb },
-    '../registration/eventSchedule': schedule,
+    '../registration/eventSchedule': schedule, '../theme': require('./theme-fixture.cjs'), '../theme': require('./theme-fixture.cjs'),
     '@react-native-firebase/functions': { httpsCallable: (_f,name) => async data => ({data: name === 'scheduleRegistrationNotice' ? {triggerAt:'2026-12-01T07:00:00.000Z'} : {removed:true}}) },
     '../firebase/firebase': {auth:{currentUser:{uid:'member'}},functions:{}},
   }, { Date: Clock });

@@ -77,7 +77,7 @@ async function main() {
   native.StyleSheet = { create: styles => styles };
   const Component = load('src/components/CompleteProfileScreen.js', {
     react: React, 'react-native': native, './KeyboardAwareScrollView': { __esModule: true, default: 'ScrollView' },
-    '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {}, radius: {}, spacing: {} }, '../config/legal': { LEGAL_URLS: {}, LEGAL_DOCUMENT_VERSION: LEGAL_VERSION },
+    '../theme': require('./theme-fixture.cjs'), '../config/legal': { LEGAL_URLS: {}, LEGAL_DOCUMENT_VERSION: LEGAL_VERSION },
     '../utils/openExternalUrl': { openExternalUrl() {} }, '../utils/memberProfile': helper,
   }).default;
   const flat = value => Array.isArray(value) ? value.flatMap(flat) : value && typeof value === 'object' ? [value, ...flat(value.children)] : [];

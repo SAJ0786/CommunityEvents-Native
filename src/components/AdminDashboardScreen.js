@@ -1,3 +1,4 @@
+import SegmentedControl from './SegmentedControl';
 import { userMatchesSearch, normalisePhone } from '../utils/adminUserSearch';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -23,7 +24,7 @@ import * as Location from 'expo-location';
 import * as XLSX from 'xlsx';
 import RNShare from 'react-native-share';
 import { collection, getDocs, orderBy, query, where } from '@react-native-firebase/firestore';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import NativeDateTimeField from './NativeDateTimeField';
 import CityManagementPanel from './CityManagementPanel';
 import {
@@ -115,21 +116,21 @@ const ADMIN_ACTION_GROUPS = [
 ];
 
 const ADMIN_ACTION_META = {
-  businesses: { icon: '\u{1F3EA}', tone: '#e4f7f2' },
-  users: { icon: '👥', tone: '#e8f4ff' },
-  orgs: { icon: '🏢', tone: '#eef0ff' },
-  feedback: { icon: '✦', tone: '#fff1ea' },
-  inbox: { icon: '✉', tone: '#f0ecff' },
-  events: { icon: '🗓', tone: '#e4f7f2' },
-  import: { icon: '⇧', tone: '#e8f4ff' },
-  bulk_share: { icon: '↗', tone: '#fff1ea' },
-  streams: { icon: '▶', tone: '#ffebef' },
-  settings: { icon: '⚙', tone: '#edf0f4' },
-  repair: { icon: '⚒', tone: '#fff6df' },
-  'hijri-calendar': { icon: '☾', tone: '#eeeaff' },
-  messaging: { icon: '\u{1F4E8}', tone: '#fff1ea' },
-  troubleshooting: { icon: '\u{1F6E0}', tone: '#edf0f4' },
-  tools: { icon: '\u{1F9F0}', tone: '#fff6df' },
+  businesses: { icon: '\u{1F3EA}', tone: colors.tealSoft },
+  users: { icon: '👥', tone: colors.blueSoft },
+  orgs: { icon: '🏢', tone: colors.indigoSoft },
+  feedback: { icon: '✦', tone: colors.dangerSoft },
+  inbox: { icon: '✉', tone: colors.purpleSoft },
+  events: { icon: '🗓', tone: colors.tealSoft },
+  import: { icon: '⇧', tone: colors.blueSoft },
+  bulk_share: { icon: '↗', tone: colors.dangerSoft },
+  streams: { icon: '▶', tone: colors.roseSoft },
+  settings: { icon: '⚙', tone: colors.neutralSoft },
+  repair: { icon: '⚒', tone: colors.amberSoft },
+  'hijri-calendar': { icon: '☾', tone: colors.indigoSoft },
+  messaging: { icon: '\u{1F4E8}', tone: colors.dangerSoft },
+  troubleshooting: { icon: '\u{1F6E0}', tone: colors.neutralSoft },
+  tools: { icon: '\u{1F9F0}', tone: colors.amberSoft },
 };
 
 const LIVE_ACTIONS = [
@@ -2394,14 +2395,12 @@ export default function AdminDashboardScreen({
         </View>
       ) : panel === 'events' ? (
         <View style={styles.section}>
-          <AdminPageHeader title={"Events"} subtitle={"Admin event management"} icon="calendar-outline" onBack={() => setPanel('overview')} />
-          <View style={styles.chipRow}>
-            {[['events', 'Events'], ['registration', 'Registration only Events']].map(([value, label]) => <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected: eventCollection === value }} onPress={() => setEventCollection(value)} style={[styles.chip, eventCollection === value && styles.chipActive]}><Text style={[styles.chipText, eventCollection === value && styles.chipTextActive]}>{label}</Text></Pressable>)}
-          </View>
-          {eventCollection === 'registration' ? <>
-            <RegistrationManagementPanel user={user} profile={profile} review onOperation={onOpenRegistration} />
-            <RegistrationManagementPanel user={user} profile={profile} onOperation={onOpenRegistration} />
-          </> : <>
+          {eventCollection === 'events' && <AdminPageHeader title="Events" subtitle="Admin event management" icon="calendar-outline" onBack={() => setPanel('overview')} />}
+          <SegmentedControl label="Event management" value={eventCollection} onChange={setEventCollection} options={[
+            { value: 'events', label: 'Events', icon: 'calendar-outline' },
+            { value: 'registration', label: 'Registration only events', icon: 'clipboard-text-outline' },
+          ]} />
+          {eventCollection === 'registration' ? <RegistrationManagementPanel user={user} profile={profile} onOperation={onOpenRegistration} /> : <>
 
           <View style={styles.statisticsCard}>
             <View style={styles.statisticsHead}>
@@ -3583,7 +3582,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     borderColor: colors.teal,
     borderRadius: radius.md,
-    backgroundColor: '#eef8f6',
+    backgroundColor: colors.background,
     padding: spacing.lg,
   },
   imageDropZoneIcon: { fontSize: 28 },
@@ -3615,13 +3614,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.lg,
-    backgroundColor: 'rgba(255,255,255,0.94)',
+    backgroundColor: withAlpha(colors.glass, 0.94),
     ...shadow,
   },
   statisticsHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
   statisticsTitle: { color: colors.navy, fontSize: typography.cardTitle.fontSize, lineHeight: 19, fontWeight: '700' },
   statisticsMeta: { marginTop: 2, color: colors.muted, fontSize: 10, lineHeight: 14, fontWeight: '700' },
-  statisticsShowing: { color: colors.blue || '#3478f6', fontSize: 10, lineHeight: 16, fontWeight: '700' },
+  statisticsShowing: { color: colors.blue || colors.blue, fontSize: 10, lineHeight: 16, fontWeight: '700' },
   eventMetricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   eventMetric: { flexBasis: '30%', flexGrow: 1, minWidth: 0, minHeight: 56, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, paddingVertical: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   eventMetricActive: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
@@ -3634,8 +3633,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#d8e2ff',
-    backgroundColor: '#f2f4ff',
+    borderColor: colors.blueSoft,
+    backgroundColor: colors.purpleSoft,
     gap: spacing.md,
     ...shadow,
   },
@@ -3646,7 +3645,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     right: -90,
     top: -105,
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: withAlpha(colors.glassBorder, 0.1),
   },
   dashboardGlowSmall: {
     position: 'absolute',
@@ -3655,7 +3654,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     left: -45,
     bottom: -70,
-    backgroundColor: 'rgba(0,45,40,0.14)',
+    backgroundColor: withAlpha(colors.border, 0.14),
   },
   dashboardProfileTop: {
     flexDirection: 'row',
@@ -3681,7 +3680,7 @@ const styles = StyleSheet.create({
   },
   dashboardPanelTitle: { color: colors.navy, fontSize: 17, lineHeight: 22, fontWeight: '700' },
   dashboardEyebrow: {
-    color: 'rgba(255,255,255,0.72)',
+    color: withAlpha(colors.glassBorder, 0.72),
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1.4,
@@ -3703,10 +3702,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: withAlpha(colors.glassBorder, 0.16),
   },
   dashboardRoleIcon: {
-    color: '#d9fff8',
+    color: colors.tealSoft,
     fontSize: typography.eyebrow.fontSize,
   },
   dashboardRoleText: {
@@ -3722,8 +3721,8 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(4,56,51,0.22)',
+    borderColor: withAlpha(colors.glassBorder, 0.18),
+    backgroundColor: withAlpha(colors.border, 0.22),
   },
   dashboardScopeIcon: {
     color: colors.onPrimary,
@@ -3735,7 +3734,7 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   dashboardScopeLabel: {
-    color: 'rgba(255,255,255,0.62)',
+    color: withAlpha(colors.glassBorder, 0.62),
     fontSize: typography.eyebrow.fontSize,
     fontWeight: '700',
     letterSpacing: 1.2,
@@ -3778,7 +3777,7 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 999,
-    backgroundColor: '#19a974',
+    backgroundColor: colors.teal,
   },
   dashboardLiveText: {
     color: colors.tealDark,
@@ -3844,7 +3843,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    backgroundColor: '#fbfdfd',
+    backgroundColor: colors.onPrimary,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
@@ -3857,7 +3856,7 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 999,
-    backgroundColor: '#19a974',
+    backgroundColor: colors.teal,
   },
   dashboardStatusText: {
     color: colors.text,
@@ -3913,12 +3912,12 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   dashboardActionPressed: {
-    backgroundColor: '#f1f8f7',
+    backgroundColor: colors.background,
   },
   dashboardActionDivider: {
     height: 1,
     marginLeft: 76,
-    backgroundColor: '#e8efee',
+    backgroundColor: colors.tealSoft,
   },
   dashboardActionIcon: {
     width: 46,
@@ -3950,7 +3949,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   dashboardActionChevron: {
-    color: '#a7b5b3',
+    color: colors.borderStrong,
     fontSize: 28,
     lineHeight: 30,
     fontWeight: '500',
@@ -3992,7 +3991,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: colors.tealSoft,
     borderWidth: 1,
-    borderColor: '#b7e8d7',
+    borderColor: colors.borderStrong,
   },
   rolePillText: {
     color: colors.tealDark,
@@ -4065,7 +4064,7 @@ const styles = StyleSheet.create({
   userEventsLink: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   userEventsLinkText: { color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '700' },
   userEventsLinkArrow: { color: colors.tealDark, fontSize: 20, lineHeight: 22, fontWeight: '700' },
-  inlineTransferPanel: { gap: spacing.sm, marginTop: spacing.xs, padding: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: '#f2fbf9' },
+  inlineTransferPanel: { gap: spacing.sm, marginTop: spacing.xs, padding: spacing.md, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, backgroundColor: colors.background },
   inlineTransferTitle: { color: colors.navy, fontSize: typography.sectionTitle.fontSize, fontWeight: '700' },
   inlineTransferMeta: { color: colors.muted, fontSize: typography.label.fontSize, lineHeight: 16, fontWeight: '700' },
   inlineTransferHint: { paddingVertical: spacing.sm, color: colors.muted, fontSize: typography.label.fontSize, fontStyle: 'italic', textAlign: 'center' },
@@ -4148,7 +4147,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: '#b9ccc8',
+    borderColor: colors.borderStrong,
     backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
@@ -4181,7 +4180,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: radius.md,
-    backgroundColor: '#f4f9f8',
+    backgroundColor: colors.background,
   },
   logoPreviewActions: {
     flex: 1,
@@ -4200,7 +4199,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: '#f4f9f8',
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -4236,7 +4235,7 @@ const styles = StyleSheet.create({
   },
   statusLive: {
     backgroundColor: colors.tealSoft,
-    borderColor: '#b7e8d7',
+    borderColor: colors.borderStrong,
   },
   statusPillText: {
     color: colors.tealDark,
@@ -4266,7 +4265,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    backgroundColor: '#eef2ff',
+    backgroundColor: colors.blueSoft,
   },
   calendarSyncFilterIconActive: {
     backgroundColor: colors.surface,
@@ -4332,8 +4331,8 @@ const styles = StyleSheet.create({
     minHeight: 42,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#e2b5b5',
-    backgroundColor: '#fff1f0',
+    borderColor: colors.dangerBorder,
+    backgroundColor: colors.dangerSoft,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
@@ -4356,11 +4355,11 @@ const styles = StyleSheet.create({
   },
   noticeSuccess: {
     backgroundColor: colors.tealSoft,
-    borderColor: '#b7e8d7',
+    borderColor: colors.borderStrong,
   },
   noticeError: {
-    backgroundColor: '#fff1f0',
-    borderColor: '#f3c6c2',
+    backgroundColor: colors.dangerSoft,
+    borderColor: colors.dangerBorder,
   },
   noticeText: {
     color: colors.tealDark,
@@ -4495,8 +4494,8 @@ const styles = StyleSheet.create({
     minHeight: 38,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#f3c6c2',
-    backgroundColor: '#fff1f0',
+    borderColor: colors.dangerBorder,
+    backgroundColor: colors.dangerSoft,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
@@ -4512,7 +4511,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: '#fbfffe',
+    backgroundColor: colors.onPrimary,
     gap: spacing.sm,
   },
   formRow: {

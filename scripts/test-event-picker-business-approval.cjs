@@ -95,7 +95,7 @@ function testPicker() {
     react,
     'react-native': { ...native, Platform: platform, Keyboard: { dismiss: () => dismissals++ }, StyleSheet: { create: x => x, absoluteFillObject: {} } },
     '@react-native-community/datetimepicker': 'NativePicker',
-    '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {}, spacing: {} },
+    '../theme': require('./theme-fixture.cjs'),
   }).default;
   function flatten(node) {
     return node && typeof node === 'object' ? [node, ...node.props.children.flat(Infinity).flatMap(flatten)] : [];

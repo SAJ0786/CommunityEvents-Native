@@ -34,7 +34,7 @@ async function main() {
   const filterComponents = load('src/components/HomeFilters.js', {
     react, 'react-native': { ScrollView: 'ScrollView', Pressable: 'Pressable', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: value => value } },
     '@expo/vector-icons/MaterialCommunityIcons': 'Icon', '../utils/eventOptions': options,
-    '../utils/eventBrowseOptions': presets, '../theme': { typography: require('./theme-fixture.cjs').typography, colors: { blue: '#2563eb' }, radius: {}, spacing: {} }, './CompactSelect': 'CompactSelect',
+    '../utils/eventBrowseOptions': presets, '../theme': require('./theme-fixture.cjs'), './CompactSelect': 'CompactSelect',
   });
   const { default: HomeFilters, EventPresetStrip } = filterComponents;
   const filters = { period: '', eventType: '', audienceType: '', organiser: '', hostName: '', suburb: '' };

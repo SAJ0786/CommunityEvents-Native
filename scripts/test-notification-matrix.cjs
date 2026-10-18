@@ -48,6 +48,7 @@ test('registration bookings route to organizer and superadmins only, and expose 
  h.records.set('registrationEvents/e',{ownerUid:'organizer',city:'sydney',title:'Workshop'});h.records.set('registrationEvents/e/registrations/attendee',{revision:1,status:'registered',answers:{secret:'private'}});
  const e={id:'booking',params:{eventId:'e',uid:'attendee'},data:{before:{data:()=>undefined},after:h.snap('registrationEvents/e/registrations/attendee')}};
  await h.functions.matrixRegistrationBooking(e);await h.flush();assert.deepEqual(h.mails.map(x=>x.to).sort(),['organizer@example.test','sa@example.test']);assert.equal(h.pushes.length,2);assert.ok(!JSON.stringify(h.pushes).includes('private'));
+ for (const mail of h.mails) { assert.equal((mail.html.match(/data-app-button/g)||[]).length,3); assert.ok(!mail.html.includes('>https://')); assert.match(mail.text,/https:\/\/play.google.com/); }
 });
 test('host message has bell and push only; ownership transfer stops stale delivery', async () => {
  const h=harness();h.user('host');h.user('customer');h.records.set('events/e',{createdByUserId:'host'});h.records.set('hostMessageThreads/t',{hostUid:'host',senderUid:'customer',participantUids:['host','customer'],eventId:'e'});h.records.set('hostMessageThreads/t/messages/m',{kind:'text',senderUid:'customer',text:'private message'});

@@ -6,7 +6,7 @@ import { clearUserNotifications, listenUserNotifications, markBusinessNotificati
 import { sendFeedbackMessage } from '../services/messaging';
 import { listenBusinessModerationNotices, recordBusinessModerationAppeal } from '../services/businessSafety';
 import { friendlyError } from '../utils/errors';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import NativeBackButton from '../components/NativeBackButton';
 import MemberPageHeader from '../components/MemberPageHeader';
 
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
   clearButton: { alignSelf: 'flex-start', marginTop: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   clearButtonText: { color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '700' },
   card: { flexDirection: 'row', gap: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
-  unreadCard: { borderColor: '#8bc9bf', backgroundColor: '#f2fbf9' },
+  unreadCard: { borderColor: colors.borderStrong, backgroundColor: colors.background },
   iconWrap: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.tealSoft },
   unreadIcon: { backgroundColor: colors.teal },
   copy: { flex: 1, minWidth: 0 },
@@ -167,20 +167,20 @@ const styles = StyleSheet.create({
   emptyCard: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface },
   emptyTitle: { color: colors.navy, fontSize: 17, fontWeight: '700' },
   emptyText: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 19, textAlign: 'center' },
-  errorCard: { padding: spacing.md, borderRadius: radius.md, backgroundColor: '#fff0ef' },
+  errorCard: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.dangerSoft },
   errorText: { color: colors.danger, fontSize: typography.body.fontSize, fontWeight: '600' },
-  moderationNotice: { padding: spacing.md, borderWidth: 1, borderColor: '#f1c7d4', borderRadius: radius.lg, backgroundColor: '#fff8fa', ...shadow },
+  moderationNotice: { padding: spacing.md, borderWidth: 1, borderColor: colors.dangerBorder, borderRadius: radius.lg, backgroundColor: colors.onPrimary, ...shadow },
   noticeHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   noticeBusiness: { marginTop: spacing.sm, color: colors.navy, fontSize: 15, fontWeight: '700' },
   noticeDecision: { marginTop: spacing.sm, color: colors.danger, fontSize: typography.label.fontSize, fontWeight: '700', textTransform: 'uppercase' },
-  appealButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md, borderRadius: radius.md, backgroundColor: '#3b82f6' },
+  appealButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md, borderRadius: radius.md, backgroundColor: colors.blue },
   appealButtonText: { color: colors.surface, fontSize: 12, fontWeight: '700' },
   appealSubmitted: { marginTop: spacing.md, color: colors.tealDark, fontSize: 12, fontWeight: '600' },
-  modalBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(12,20,38,0.45)' },
+  modalBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: withAlpha(colors.overlay, 0.45) },
   appealCard: { padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface, ...shadow },
   appealTitle: { color: colors.navy, fontSize: 17, fontWeight: '700' },
   appealInput: { minHeight: 130, marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, color: colors.text, textAlignVertical: 'top' },
-  appealSubmit: { minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md, borderRadius: radius.md, backgroundColor: '#3b82f6' },
+  appealSubmit: { minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md, borderRadius: radius.md, backgroundColor: colors.blue },
   appealSubmitText: { color: colors.surface, fontWeight: '700' },
   appealCancel: { minHeight: 42, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
   appealCancelText: { color: colors.tealDark, fontWeight: '600' },

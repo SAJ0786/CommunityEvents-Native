@@ -78,8 +78,8 @@ const styles = StyleSheet.create({
   stateText: { color: colors.muted, fontSize: 15, lineHeight: 21, fontWeight: '700', marginTop: spacing.sm, textAlign: 'center' },
   browseButton: { minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md, paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.teal },
   browseText: { color: colors.surface, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
-  removeButton: { alignSelf: 'flex-start', marginBottom: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: radius.sm, backgroundColor: '#fef3c7' },
-  removeText: { color: '#92400e', fontSize: 12, fontWeight: '700' },
+  removeButton: { alignSelf: 'flex-start', marginBottom: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: radius.sm, backgroundColor: colors.amberSoft },
+  removeText: { color: colors.warningText, fontSize: 12, fontWeight: '700' },
   pressed: { opacity: 0.78 },
   disabled: { opacity: 0.55 },
 });

@@ -1,3 +1,4 @@
+import { colors } from '../theme';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { doc, runTransaction, serverTimestamp } from '@react-native-firebase/firestore';
@@ -27,7 +28,7 @@ async function ensureBusinessAlertChannel() {
     name: 'Business Directory alerts',
     description: 'Business messages, administrative decisions, listings and promotions.',
     importance: Notifications.AndroidImportance.HIGH,
-    vibrationPattern: [0, 250, 180, 250], lightColor: '#129182', sound: 'default',
+    vibrationPattern: [0, 250, 180, 250], lightColor: colors.teal, sound: 'default',
   });
 }
 

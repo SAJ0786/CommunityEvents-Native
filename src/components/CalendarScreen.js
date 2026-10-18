@@ -20,11 +20,11 @@ function ymd(date) {
 
 function audienceColor(value = '') {
   const text = String(value).toLowerCase();
-  if (text.includes('ladies')) return '#db2777';
-  if (text.includes('gents')) return '#0f766e';
-  if (text.includes('kids')) return '#d97706';
-  if (text.includes('family') || text.includes('mixed')) return '#2563eb';
-  return '#16a34a';
+  if (text.includes('ladies')) return colors.rose;
+  if (text.includes('gents')) return colors.tealDark;
+  if (text.includes('kids')) return colors.amber;
+  if (text.includes('family') || text.includes('mixed')) return colors.blue;
+  return colors.success;
 }
 
 function NavButton({ direction = 'left', onPress, accessibilityLabel }) {
@@ -263,15 +263,15 @@ export default function CalendarScreen({
 
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: 120 },
-  screenHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md, padding: spacing.sm, borderWidth: 1, borderColor: '#cbdcff', borderRadius: radius.lg, backgroundColor: '#f2f5ff' },
+  screenHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.primaryBorder, borderRadius: radius.lg, backgroundColor: colors.background },
   screenTitle: { color: colors.navy, fontSize: 20, fontWeight: '700', letterSpacing: -0.25 },
-  navButton: { width: 40, height: 40, borderRadius: 14, borderWidth: 1, borderColor: '#cbdcff', backgroundColor: colors.blueSoft, alignItems: 'center', justifyContent: 'center' },
+  navButton: { width: 40, height: 40, borderRadius: 14, borderWidth: 1, borderColor: colors.primaryBorder, backgroundColor: colors.blueSoft, alignItems: 'center', justifyContent: 'center' },
   syncButton: { minHeight: 52, backgroundColor: colors.blue, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md, ...shadow },
   syncButtonText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
-  disabledButton: { backgroundColor: '#eef4f3', shadowOpacity: 0 },
+  disabledButton: { backgroundColor: colors.neutralSoft, shadowOpacity: 0 },
   disabledText: { color: colors.muted },
   guestText: { color: colors.muted, fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 18, marginTop: -5, marginBottom: spacing.md },
-  toggleRow: { flexDirection: 'row', gap: 6, padding: 3, borderRadius: 11, backgroundColor: '#edf2f1', marginBottom: spacing.md },
+  toggleRow: { flexDirection: 'row', gap: 6, padding: 3, borderRadius: 11, backgroundColor: colors.neutralSoft, marginBottom: spacing.md },
   toggle: { flex: 1, minHeight: 39, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   toggleActive: { backgroundColor: colors.surface, ...shadow },
   toggleText: { color: colors.muted, fontSize: typography.body.fontSize, fontWeight: '600' },
@@ -300,13 +300,13 @@ const styles = StyleSheet.create({
   weekDay: { color: colors.text, fontSize: 12, fontWeight: '700', marginTop: spacing.md, marginBottom: 6 },
   syncHero: { padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.tealDark, marginBottom: spacing.md },
   syncHeroTitle: { color: colors.surface, fontSize: 17, fontWeight: '700' },
-  syncHeroText: { color: 'rgba(255,255,255,0.88)', fontSize: typography.cardTitle.fontSize, lineHeight: 20, marginTop: 5 },
+  syncHeroText: { color: colors.glass, fontSize: typography.cardTitle.fontSize, lineHeight: 20, marginTop: 5 },
   card: { padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, marginBottom: spacing.md, ...shadow },
   cardTitle: { color: colors.navy, fontSize: 19, fontWeight: '700', marginBottom: 5 },
   cardText: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 19, marginBottom: spacing.md },
   primaryButton: { minHeight: 48, borderRadius: 13, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center' },
   primaryText: { color: colors.surface, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
-  secondaryButton: { minHeight: 43, borderRadius: 11, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginTop: 7 },
+  secondaryButton: { minHeight: 43, borderRadius: 11, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', marginTop: 7 },
   secondaryText: { color: colors.muted, fontSize: typography.body.fontSize, fontWeight: '600' },
   notice: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: spacing.md },
   feedUrl: { color: colors.tealDark, fontSize: 12, lineHeight: 18, padding: spacing.md, backgroundColor: colors.background, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md },

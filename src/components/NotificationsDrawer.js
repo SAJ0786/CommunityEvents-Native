@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import BusinessNotificationsScreen from '../business/BusinessNotificationsScreen';
 import useMenuDrawerMotion from './useMenuDrawerMotion';
 import DrawerDragZone from './DrawerDragZone';
-import { colors } from '../theme';
+import { colors, withAlpha } from '../theme';
 
 export default function NotificationsDrawer({ visible, onClose, user, profile, onOpenNotification }) {
   const { translateY, requestClose, panHandlers } = useMenuDrawerMotion({ visible, onClose });
@@ -37,7 +37,7 @@ export default function NotificationsDrawer({ visible, onClose, user, profile, o
 }
 
 const styles = StyleSheet.create({
-  layer: { ...StyleSheet.absoluteFillObject, flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.46)', zIndex: 1000, elevation: 1000 },
+  layer: { ...StyleSheet.absoluteFillObject, flex: 1, justifyContent: 'flex-end', backgroundColor: withAlpha(colors.navy, 0.46), zIndex: 1000, elevation: 1000 },
   sheet: { height: '85%', backgroundColor: colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },
   dragZone: { minHeight: 78, paddingTop: 10, paddingHorizontal: 12, paddingBottom: 8, justifyContent: 'center' },
   handle: { alignSelf: 'center', width: 54, height: 5, borderRadius: 3, backgroundColor: colors.border, marginBottom: 8 },

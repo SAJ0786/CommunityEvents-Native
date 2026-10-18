@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, AppState, Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import { formatEventTime } from '../utils/formatters';
 import { getEventPoster, getEventSuburb } from '../services/events';
 import { getImmediatePosterSource, resolvePosterSource } from '../services/images';
@@ -25,14 +25,14 @@ function dateChip(dateValue) {
 
 function organiserBadge(event) {
   if (event.organiserType === 'private' || event.organisationType === 'private') {
-    return { label: 'Private', backgroundColor: '#f1f5f9', color: '#475569' };
+    return { label: 'Private', backgroundColor: colors.background, color: colors.neutralStrong };
   }
   const type = String(event.organisationType || event.organiserCategory || 'centre').toLowerCase() === 'org'
     ? 'org'
     : 'centre';
   return type === 'org'
-    ? { label: 'Org', backgroundColor: '#e0f2fe', color: '#075985' }
-    : { label: 'Centre', backgroundColor: '#fef9c3', color: '#854d0e' };
+    ? { label: 'Org', backgroundColor: colors.blueSoft, color: colors.tealDark }
+    : { label: 'Centre', backgroundColor: colors.amberSoft, color: colors.warningText };
 }
 
 export default function EventCard({ event, onPress, onToggleSaved, isSaved, saving }) {
@@ -66,7 +66,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
     setPosterError('');
     if (event.registrationOnly) {
       setPoster('');
-      if (event.hasPoster && foreground) firebaseRegistration({ enabled: REGISTRATION_ENABLED }).poster(event.id)
+      if (event.hasPoster && foreground && posterOpen) firebaseRegistration({ enabled: REGISTRATION_ENABLED }).poster(event.id)
         .then(result => { if (alive) setPoster(`data:${result.mime};base64,${result.base64}`); })
         .catch(() => { if (alive) setPosterError('Poster unavailable. Open event to retry.'); });
       return () => { alive = false; };
@@ -81,7 +81,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
     return () => {
       alive = false;
     };
-  }, [event, foreground, posterRefresh]);
+  }, [event.id, event.revision, event.hasPoster, event.imageUrl, event.posterUrl, event.imagePath, foreground, posterRefresh, event.registrationOnly && posterOpen]);
 
   return (
     <>
@@ -92,7 +92,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
       <Pressable
-        disabled={!hasUploadedPoster || !poster}
+        disabled={!hasUploadedPoster}
         onPress={pressEvent => {
           pressEvent.stopPropagation?.();
           setPosterOpen(true);
@@ -113,12 +113,12 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
         ) : null}
         {event.isLive ? <Text maxFontSizeMultiplier={1} style={styles.liveBadge}>LIVE</Text> : null}
         <View style={styles.posterCalendarIcon}>
-          <MaterialCommunityIcons color="#ffffff" name="calendar-blank-outline" size={15} />
+          <MaterialCommunityIcons color={colors.onPrimary} name="calendar-blank-outline" size={15} />
         </View>
       </Pressable>
 
       <View style={styles.content}>
-        {event.registrationOnly && event.status === 'pending' && event.canManage ? <Text accessibilityRole="alert" style={{ color: colors.danger, fontSize: 20, fontWeight: '800' }}>UnApproved</Text> : null}
+        {event.registrationOnly && event.canManage && (event.status === 'pending' || event.hasPendingChanges || event.reviewDecision) ? <View style={{ backgroundColor: colors.amberSoft, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, alignSelf: 'flex-start' }}><Text style={{ color: colors.danger, ...typography.label }}>{event.reviewDecision === 'rejected' ? 'Unapproved' : event.reviewDecision === 'changes-requested' ? 'Changes requested' : 'Needs approval'}</Text></View> : null}
         {event.registrationOnly && event.status === 'cancelled' ? <Text style={styles.metaText}>Event no longer available</Text> : null}
         {posterError ? <Text accessibilityRole="alert" style={styles.metaText}>{posterError}</Text> : null}
         <View style={styles.titlePanel}>
@@ -165,7 +165,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
 
     <Modal transparent visible={posterOpen} animationType="fade" onRequestClose={() => setPosterOpen(false)}>
       <Pressable accessibilityLabel="Close full-screen event poster" onPress={() => setPosterOpen(false)} style={styles.posterModal}>
-        {poster ? <Image source={{ uri: poster }} style={styles.posterFullscreen} resizeMode="contain" /> : null}
+        {poster ? <Image source={{ uri: poster }} style={styles.posterFullscreen} resizeMode="contain" /> : posterError ? <><Text accessibilityRole="alert" style={{ color: colors.onPrimary }}>{posterError}</Text><Pressable onPress={event => { event.stopPropagation?.(); setPosterRefresh(value => value + 1); }}><Text style={{ color: colors.onPrimary }}>Retry poster</Text></Pressable></> : <ActivityIndicator color={colors.onPrimary} />}
         <Text maxFontSizeMultiplier={1.1} style={styles.posterCloseHint}>Tap anywhere to close</Text>
       </Pressable>
     </Modal>
@@ -176,7 +176,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
 const styles = StyleSheet.create({
   card: { minHeight: 94, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: 8, marginBottom: spacing.sm, backgroundColor: colors.glass, borderColor: colors.glassBorder, borderWidth: 1, borderRadius: 24, ...shadow },
   cardPressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
-  posterFrame: { width: 78, height: 78, position: 'relative', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: '#f0f4f3' },
+  posterFrame: { width: 78, height: 78, position: 'relative', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: colors.neutralSoft },
   posterFrameCompact: { width: 70, height: 74 },
   poster: { width: '100%', height: '100%' },
   dateChip: { position: 'absolute', top: 4, left: 4, minWidth: 31, alignItems: 'center', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 7, backgroundColor: colors.surface, ...shadow },
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   dateDay: { color: colors.text, fontSize: typography.cardTitle.fontSize, lineHeight: 14, fontWeight: '700' },
   dateWeekday: { color: colors.muted, fontSize: 7, fontWeight: '600' },
   liveBadge: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingVertical: 2, color: colors.surface, backgroundColor: colors.teal, fontSize: typography.eyebrow.fontSize, fontWeight: '700', textAlign: 'center' },
-  posterCalendarIcon: { position: 'absolute', right: 5, bottom: 5, width: 25, height: 25, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: 'rgba(37,99,235,0.88)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.76)' },
+  posterCalendarIcon: { position: 'absolute', right: 5, bottom: 5, width: 25, height: 25, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: withAlpha(colors.blue, 0.88), borderWidth: 1, borderColor: withAlpha(colors.glassBorder, 0.76) },
   content: { flex: 1, minWidth: 0, position: 'relative', justifyContent: 'center' },
   titlePanel: { alignSelf: 'stretch', minHeight: 30, justifyContent: 'center', paddingRight: 46, marginBottom: 3 },
   title: { color: colors.navy, fontSize: typography.body.fontSize, lineHeight: 17, fontWeight: '700', letterSpacing: -0.15 },
@@ -192,17 +192,17 @@ const styles = StyleSheet.create({
   metaRow: { minWidth: 0, flexDirection: 'row', alignItems: 'center', paddingRight: 25, gap: 3, overflow: 'hidden' },
   metaText: { flexShrink: 0, color: colors.muted, fontSize: 9.5, lineHeight: 13, fontWeight: '600' },
   locationText: { flex: 1, minWidth: 0 },
-  metaDot: { color: '#aab4c2', fontSize: 10, lineHeight: 13, marginHorizontal: 1 },
+  metaDot: { color: colors.borderStrong, fontSize: 10, lineHeight: 13, marginHorizontal: 1 },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingRight: 28, marginTop: 5, overflow: 'hidden' },
   badge: { maxWidth: '48%', minHeight: 19, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
-  typeBadge: { backgroundColor: '#eee6ff' },
-  typeText: { color: '#6941c6', fontSize: 8.5, lineHeight: 11, fontWeight: '700' },
+  typeBadge: { backgroundColor: colors.indigoSoft },
+  typeText: { color: colors.purple, fontSize: 8.5, lineHeight: 11, fontWeight: '700' },
   disclosureIcon: { position: 'absolute', right: 1, bottom: 9 },
   saveButton: { position: 'absolute', right: 0, top: -2, width: 32, height: 32, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   saveButtonPressed: { opacity: 0.65 },
-  saveText: { color: '#cbd5d3', fontSize: 21, lineHeight: 25 },
-  saveTextActive: { color: '#d43867' },
-  posterModal: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(0,0,0,0.94)' },
+  saveText: { color: colors.borderStrong, fontSize: 21, lineHeight: 25 },
+  saveTextActive: { color: colors.rose },
+  posterModal: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: withAlpha(colors.mediaBackground, 0.94) },
   posterFullscreen: { width: '100%', height: '88%' },
   posterCloseHint: { position: 'absolute', bottom: 34, color: colors.surface, fontSize: typography.body.fontSize, fontWeight: '600' },
 });

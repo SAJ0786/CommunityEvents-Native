@@ -1,10 +1,9 @@
+import SegmentedControl from './SegmentedControl';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Animated,
   Image,
   Modal,
-  PanResponder,
   Platform,
   Pressable,
   SafeAreaView,
@@ -15,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 
 const EVENT_AUTH_ITEMS = [
   { key: 'home', label: 'Home', icon: '\u{1F3E0}' },
@@ -84,8 +83,6 @@ export default function AppHeader({
   authBusy = false,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [switcherWidth, setSwitcherWidth] = useState(0);
-  const sliderPosition = useRef(new Animated.Value(activeModule === 'directory' ? 1 : 0)).current;
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superAdmin';
   const displayName = profile?.fullName || user?.displayName || user?.email || '';
   const roleLabel = profile?.role === 'superAdmin'
@@ -119,57 +116,6 @@ export default function AppHeader({
     ? `business-${activeTab === 'home' ? 'home' : activeTab}`
     : activeTab === 'bulk_share' ? 'bulk_share' : activeTab;
 
-  useEffect(() => {
-    Animated.spring(sliderPosition, {
-      toValue: activeModule === 'directory' ? 1 : 0,
-      useNativeDriver: true,
-      damping: 20,
-      stiffness: 220,
-      mass: 0.7,
-    }).start();
-  }, [activeModule, sliderPosition]);
-
-  const panResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, gesture) => (
-      Math.abs(gesture.dx) > 6 && Math.abs(gesture.dx) > Math.abs(gesture.dy)
-    ),
-    onPanResponderMove: (_, gesture) => {
-      if (!switcherWidth) return;
-      const halfWidth = Math.max(1, (switcherWidth - 6) / 2);
-      const origin = activeModule === 'directory' ? 1 : 0;
-      sliderPosition.setValue(Math.max(0, Math.min(1, origin + gesture.dx / halfWidth)));
-    },
-    onPanResponderRelease: (_, gesture) => {
-      const nextModule = gesture.dx > 22
-        ? 'directory'
-        : gesture.dx < -22
-          ? 'events'
-          : activeModule;
-      onModuleChange?.(nextModule);
-      Animated.spring(sliderPosition, {
-        toValue: nextModule === 'directory' ? 1 : 0,
-        useNativeDriver: true,
-        damping: 20,
-        stiffness: 220,
-        mass: 0.7,
-      }).start();
-    },
-    onPanResponderTerminate: () => {
-      Animated.spring(sliderPosition, {
-        toValue: activeModule === 'directory' ? 1 : 0,
-        useNativeDriver: true,
-        damping: 20,
-        stiffness: 220,
-        mass: 0.7,
-      }).start();
-    },
-  }), [activeModule, onModuleChange, sliderPosition, switcherWidth]);
-
-  const sliderTranslate = sliderPosition.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, Math.max(0, (switcherWidth - 6) / 2)],
-  });
   const brandProduct = activeModule === 'directory' ? 'Businesses Australia' : 'Events Australia';
 
   return (
@@ -195,43 +141,10 @@ export default function AppHeader({
       </View>
 
       <View style={styles.moduleSwitcherWrap}>
-        <View
-          onLayout={event => setSwitcherWidth(event.nativeEvent.layout.width)}
-          style={styles.moduleSwitcher}
-          {...panResponder.panHandlers}
-        >
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.moduleSlider,
-              { width: Math.max(0, (switcherWidth - 6) / 2), transform: [{ translateX: sliderTranslate }] },
-            ]}
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: activeModule === 'events' }}
-            onPress={() => onModuleChange?.('events')}
-            style={({ pressed }) => [
-              styles.moduleButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={styles.moduleIcon}>{'\u{1F4C5}'}</Text>
-            <Text style={[styles.moduleLabel, activeModule === 'events' && styles.moduleLabelActive]}>Events</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: activeModule === 'directory' }}
-            onPress={() => onModuleChange?.('directory')}
-            style={({ pressed }) => [
-              styles.moduleButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={styles.moduleIcon}>{'\u{1F3EA}'}</Text>
-            <Text style={[styles.moduleLabel, activeModule === 'directory' && styles.moduleLabelActive]}>Business Directory</Text>
-          </Pressable>
-        </View>
+        <SegmentedControl value={activeModule} onChange={onModuleChange} label="Choose community experience" options={[
+          { value: 'events', label: 'Events', icon: 'calendar-outline' },
+          { value: 'directory', label: 'Business Directory', icon: 'storefront-outline' },
+        ]} />
       </View>
 
       <Modal animationType="fade" transparent visible={menuOpen} onRequestClose={() => setMenuOpen(false)}>
@@ -382,10 +295,10 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
   },
-  youtubeMenuIcon: { backgroundColor: '#ff0000', borderColor: '#ff0000' },
-  hijriMenuIcon: { backgroundColor: '#5b3fb5', borderColor: '#5b3fb5' },
+  youtubeMenuIcon: { backgroundColor: colors.danger, borderColor: colors.danger },
+  hijriMenuIcon: { backgroundColor: colors.purple, borderColor: colors.purple },
   specialMenuIcon: { color: colors.onPrimary },
-  hijriMenuIconText: { color: '#ffd66b' },
+  hijriMenuIconText: { color: colors.gold },
   moduleSwitcherWrap: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
@@ -400,7 +313,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 3,
     borderRadius: 14,
-    backgroundColor: '#eef4f3',
+    backgroundColor: colors.neutralSoft,
   },
   moduleSlider: {
     position: 'absolute',
@@ -435,7 +348,7 @@ const styles = StyleSheet.create({
   },
   modalRoot: {
     flex: 1,
-    backgroundColor: 'rgba(8, 18, 28, 0.18)',
+    backgroundColor: withAlpha(colors.overlay, 0.18),
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -482,7 +395,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 99,
     borderWidth: 1,
-    borderColor: '#b7d8d4',
+    borderColor: colors.borderStrong,
     backgroundColor: colors.surface,
   },
   rolePillText: {
@@ -510,7 +423,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f4',
+    borderTopColor: colors.background,
   },
   menuItemContent: {
     flexDirection: 'row',
@@ -526,7 +439,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tealSoft,
   },
   menuIconWrapActive: {
-    backgroundColor: '#cdeee7',
+    backgroundColor: colors.successSoft,
   },
   menuIcon: {
     fontSize: typography.sectionTitle.fontSize,
@@ -564,12 +477,12 @@ const styles = StyleSheet.create({
     fontSize: typography.cardTitle.fontSize,
     fontWeight: '700',
   },
-  logoutButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: '#fff1f0' },
+  logoutButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.dangerSoft },
   identityLogout: {
     position: 'absolute', top: spacing.sm, right: spacing.sm,
     width: 44, height: 44, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#991b1b', borderRadius: 22,
-    backgroundColor: '#dc2626', ...shadow,
+    borderWidth: 2, borderColor: colors.danger, borderRadius: 22,
+    backgroundColor: colors.danger, ...shadow,
   },
   pressed: {
     opacity: 0.78,

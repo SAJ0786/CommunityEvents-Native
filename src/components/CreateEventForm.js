@@ -1,3 +1,4 @@
+import EventPosterPicker from './EventPosterPicker';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useCityCatalogueVersion } from '../services/cityCatalogue';
 import * as ImagePicker from 'expo-image-picker';
@@ -287,6 +288,7 @@ export default function CreateEventForm({
   registrationMode = false,
   registrationTitle,
   onRegistrationTitleChange,
+  registrationPosterControl,
 }) {
   const cityCatalogueVersion = useCityCatalogueVersion();
   const defaults = useMemo(() => ({
@@ -831,29 +833,9 @@ export default function CreateEventForm({
       ) : null}
 
       <View style={styles.card}>
+        {registrationMode && registrationPosterControl ? <Field label="Upload Event Poster" optional>{registrationPosterControl}</Field> : null}
         {!registrationMode && <Field label="Upload Event Poster" optional error={attempted ? validation.imageUrl : ''}>
-          <Pressable onPress={choosePoster} style={({ pressed }) => [styles.posterDropZone, pressed && styles.pressed]}>
-            {localImage?.uri || (isWebUrl(form.imageUrl) && form.imageUrl.trim()) ? (
-              <Image source={{ uri: localImage?.uri || form.imageUrl.trim() }} resizeMode="cover" style={styles.posterPreview} />
-            ) : (
-              <View style={styles.posterPlaceholder}>
-                <Text style={styles.posterPlaceholderIcon}>{'\u{1F4F7}'}</Text>
-                <Text style={styles.posterPlaceholderTitle}>Tap to add event poster</Text>
-                <Text style={styles.posterPlaceholderText}>Choose a clear image from your phone</Text>
-              </View>
-            )}
-          </Pressable>
-          <View style={styles.posterActions}>
-            <Pressable onPress={choosePoster} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
-              <Text style={styles.addButtonText}>{localImage || form.imageUrl ? 'Choose another photo' : 'Upload your event poster'}</Text>
-            </Pressable>
-            {localImage || form.imageUrl ? (
-              <Pressable onPress={removePoster} style={styles.removeButton}>
-                <Text style={styles.removeText}>Remove poster</Text>
-              </Pressable>
-            ) : null}
-          </View>
-          {pickerError ? <Text style={styles.fieldError}>{pickerError}</Text> : null}
+          <EventPosterPicker uri={localImage?.uri || (isWebUrl(form.imageUrl) ? form.imageUrl.trim() : '')} onChoose={choosePoster} onRemove={removePoster} error={pickerError} disabled={submitting} />
           <Text style={styles.orText}>or use an image URL</Text>
           <TextInput
             autoCapitalize="none"
@@ -1277,7 +1259,7 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1, padding: spacing.lg, paddingBottom: 48 },
   title: { color: colors.navy, fontSize: typography.pageTitle.fontSize, lineHeight: 27, fontWeight: '700' },
   subtitle: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 19, fontWeight: '500', marginTop: spacing.xs, marginBottom: spacing.lg },
-  accountNotice: { padding: spacing.lg, marginBottom: spacing.lg, borderRadius: radius.lg, backgroundColor: '#fff8e1', borderWidth: 1, borderColor: '#efcf73' },
+  accountNotice: { padding: spacing.lg, marginBottom: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.amberSoft, borderWidth: 1, borderColor: colors.gold },
   accountNoticeTitle: { color: colors.navy, fontSize: 18, fontWeight: '700' },
   accountNoticeText: { color: colors.text, fontSize: typography.cardTitle.fontSize, lineHeight: 20, marginTop: spacing.xs },
   accountButton: { alignSelf: 'flex-start', marginTop: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: colors.teal },
@@ -1287,11 +1269,11 @@ const styles = StyleSheet.create({
   label: { color: colors.navy, fontSize: typography.label.fontSize, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.35 },
   sectionLabel: { color: colors.tealDark, fontSize: typography.cardTitle.fontSize, fontWeight: '700', paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 12, backgroundColor: colors.surface, color: colors.text, fontSize: 15 },
-  inputInvalid: { borderColor: colors.danger, backgroundColor: '#fffafa' },
+  inputInvalid: { borderColor: colors.danger, backgroundColor: colors.onPrimary },
   fieldError: { color: colors.danger, fontSize: 12, fontWeight: '700' },
   helper: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   posterPreview: { width: '100%', height: 180, borderRadius: radius.md, backgroundColor: colors.tealSoft },
-  posterDropZone: { minHeight: 180, overflow: 'hidden', borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.teal, borderRadius: radius.md, backgroundColor: '#eef8f6' },
+  posterDropZone: { minHeight: 180, overflow: 'hidden', borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.teal, borderRadius: radius.md, backgroundColor: colors.background },
   posterPlaceholder: { minHeight: 180, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   posterPlaceholderIcon: { fontSize: 34 },
   posterPlaceholderTitle: { marginTop: spacing.sm, color: colors.tealDark, fontSize: 15, fontWeight: '700' },
@@ -1343,10 +1325,10 @@ const styles = StyleSheet.create({
   prayerResult: { padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   prayerResultTitle: { color: colors.navy, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
   prayerResultTime: { color: colors.tealDark, fontSize: 12, fontWeight: '700', marginTop: spacing.xs },
-  duplicateNotice: { gap: 5, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#f59e0b', backgroundColor: '#fffbeb' },
-  duplicateTitle: { color: '#92400e', fontSize: typography.body.fontSize, fontWeight: '700' },
-  duplicateText: { color: '#78350f', fontSize: 12, lineHeight: 17 },
-  duplicateHelp: { color: '#92400e', fontSize: typography.label.fontSize, fontWeight: '700', marginTop: 2 },
+  duplicateNotice: { gap: 5, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.amber, backgroundColor: colors.dangerSoft },
+  duplicateTitle: { color: colors.warningText, fontSize: typography.body.fontSize, fontWeight: '700' },
+  duplicateText: { color: colors.warningText, fontSize: 12, lineHeight: 17 },
+  duplicateHelp: { color: colors.warningText, fontSize: typography.label.fontSize, fontWeight: '700', marginTop: 2 },
   twoColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   column: { flex: 1, minWidth: 0 },
   religiousBox: { gap: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },

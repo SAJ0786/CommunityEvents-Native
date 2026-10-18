@@ -9,7 +9,6 @@ import { createSubmission } from '../registration/registrationClient';
 import { answersForReview, eventDraftFromDetail, mergeRegistrationPage } from '../registration/registrationViewModel';
 import { createDraft, validateAnswers } from '../registration/prototypeModel';
 import { EVENT_TYPES } from '../utils/eventOptions';
-import { getDynamicEventOptions } from '../services/eventOptionsAdmin';
 import { cityLabel } from '../utils/cities';
 import { colors } from '../theme';
 import { responseName, responseAnswer } from '../registration/responsePresentation';
@@ -50,12 +49,12 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       if (!requireMember()) return;
       setAnswers(answersForReview(result)); setPlaces(String(result.ownRegistration?.status === 'registered' ? result.ownRegistration.places : 1)); setStage('entry');
     } else if (action === 'editor' || action === 'form' || action === 'copy') {
-      const options = await getDynamicEventOptions();
+      const options = {};
       if (!valid()) return;
       const eventTypes = [...new Set([...EVENT_TYPES, ...(options.eventTypes || [])])];
       setTypes(eventTypes); setDraft(eventDraftFromDetail(result, eventTypes)); setStage('editor');
       if (action === 'copy') { createKey.current = newReference(); currentId.current = null; setDetail(null); }
-      await loadTemplates(valid);
+      loadTemplates(valid).catch(error => { if (valid()) setNotice(error.message || 'Saved templates could not be loaded. Built-in templates are available.'); });
     } else if (action === 'responses') {
       const page = responseResult;
       if (valid()) { setResponses(page.registrations); setResponseCursor(page.nextCursor); setStage('responses'); }
@@ -68,7 +67,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
   const edit = (isNew = false) => {
     if (!requireMember()) return;
     run(async valid => {
-      const options = await getDynamicEventOptions();
+      const options = {};
       const eventTypes = [...new Set([...EVENT_TYPES, ...(options.eventTypes || [])])];
       const fresh = isNew ? null : await api.load(detail.event.id);
       if (!valid()) return;
@@ -76,7 +75,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       else setDetail(fresh);
       setTypes(eventTypes); setDraft(isNew ? { ...createDraft(), title: '', eventType: eventTypes[0], customEventType: '' } : eventDraftFromDetail(fresh, eventTypes));
       setStage('editor'); setPendingPoster(null);
-      await loadTemplates(valid);
+      loadTemplates(valid).catch(error => { if (valid()) setNotice(error.message || 'Saved templates could not be loaded. Built-in templates are available.'); });
     });
   };
   useEffect(() => {
@@ -133,7 +132,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
         try { await api.uploadPoster(event.eventId, event.revision, pending.poster.mime, pending.poster.base64); }
         catch (error) {
           quotaReached = String(error?.code || '').includes('resource-exhausted');
-          failures.push(`${label}: failed${quotaReached ? ' (poster upload quota reached)' : ''}`);
+          failures.push(`${label}: ${error.message || 'upload failed'}${quotaReached ? ' (poster upload quota reached)' : ''}`);
         }
         if (!valid()) return;
       }
@@ -141,7 +140,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       if (failures.length) {
         pending.posterError = pending.isSeries
           ? `${events.length} events were saved. Private poster upload failed for ${failures.length} occurrence(s), including any unattempted pending uploads: ${failures.join('; ')}. Open those individual events in My Events and select the poster again${quotaReached ? ' after the upload quota resets' : ''}. No events were recreated.`
-          : 'Event saved, but poster upload failed. Open the event card to retry.';
+          : `Event saved, but poster upload failed: ${failures.join('; ')}. Use Retry poster upload below.`;
         if (!pending.isSeries) setPendingPoster(pending.poster);
       } else setPendingPoster(null);
     }

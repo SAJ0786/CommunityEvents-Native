@@ -145,7 +145,7 @@ export default function HomeFilters({
 
 const styles = StyleSheet.create({
   wrap: { marginTop: spacing.md, marginBottom: 0 },
-  searchRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.82)' },
+  searchRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: colors.glassBorder },
   searchIcon: { color: colors.muted, fontSize: 20, fontWeight: '700' },
   searchInput: { flex: 1, minWidth: 0, minHeight: 49, color: colors.text, fontSize: typography.cardTitle.fontSize, fontWeight: '500', letterSpacing: 0 },
   clearSearch: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: colors.border },

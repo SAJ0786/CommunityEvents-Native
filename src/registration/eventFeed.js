@@ -13,7 +13,7 @@ export function registrationEventCard(event) {
   };
 }
 
-export async function registrationEventFeed(api, scope, city) {
+export async function registrationEventFeed(api, scope, city, onPage) {
   const events = new Map();
   const cursors = new Set();
   let cursor = null;
@@ -22,6 +22,7 @@ export async function registrationEventFeed(api, scope, city) {
     for (const event of page.events) {
       if (scope !== 'public' || event.status === 'approved') events.set(event.id, registrationEventCard(event));
     }
+    onPage?.([...events.values()]);
     cursor = page.nextCursor;
     if (cursor && cursors.has(cursor)) throw new Error('Event pagination did not advance. Reload and try again.');
     if (cursor) cursors.add(cursor);

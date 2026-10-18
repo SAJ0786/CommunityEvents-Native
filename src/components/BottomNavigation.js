@@ -1,15 +1,15 @@
 import React, { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { colors, shadow, spacing, typography } from '../theme';
+import { colors, shadow, spacing, typography, withAlpha } from '../theme';
 import { userInitials } from './AccountMenuSheet';
 
 const TABS = [
-  { key: 'home', icon: 'home-variant', label: 'Home', color: '#176b87', soft: '#e5f5fb' },
-  { key: 'my_events', icon: 'calendar-month', label: 'My Events', restricted: true, color: '#8a4dba', soft: '#f2e8fa' },
+  { key: 'home', icon: 'home-variant', label: 'Home', color: colors.tealDark, soft: colors.blueSoft },
+  { key: 'my_events', icon: 'calendar-month', label: 'My Events', restricted: true, color: colors.purple, soft: colors.purpleSoft },
   { key: 'create', icon: 'plus', label: 'Add Event', restricted: true, primary: true },
-  { key: 'favourites', icon: 'heart', label: 'Favourites', restricted: true, color: '#d43867', soft: '#fdeaf0' },
-  { key: 'profile', icon: 'account-circle', label: 'Menu', color: '#7357d9', soft: '#eef0ff' },
+  { key: 'favourites', icon: 'heart', label: 'Favourites', restricted: true, color: colors.rose, soft: colors.roseSoft },
+  { key: 'profile', icon: 'account-circle', label: 'Menu', color: colors.purple, soft: colors.indigoSoft },
 ];
 
 export default function BottomNavigation({ activeTab, onChange, onOpenMenu, user, profile, isGuest = false, onNavigationLayout }) {
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.glassBorder,
     borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.91)',
+    backgroundColor: withAlpha(colors.glass, 0.91),
     ...shadow,
     zIndex: 100,
     elevation: 100,
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 2,
   },
-  activeTab: { backgroundColor: 'rgba(232,240,255,0.72)' },
+  activeTab: { backgroundColor: withAlpha(colors.glassBorder, 0.72) },
   primaryTab: {
     marginHorizontal: 2,
     marginTop: -15,
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     overflow: 'hidden',
-    backgroundColor: '#9bb8b4',
+    backgroundColor: colors.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   primaryLabelDisabled: {
-    color: '#b6c6c4',
+    color: colors.borderStrong,
   },
   initialsText: { color: colors.surface, fontSize: typography.label.fontSize, fontWeight: '700' },
   guestInitials: { color: colors.purple },

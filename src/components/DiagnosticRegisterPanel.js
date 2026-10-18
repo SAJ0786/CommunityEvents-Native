@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import ScrollView from './KeyboardAwareScrollView';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import { listenDiagnosticSessions, updateDiagnosticAdminReview } from '../services/diagnostics';
 
 const CRASHLYTICS_URL = 'https://console.firebase.google.com/project/community-event-8b639/crashlytics';
@@ -39,11 +39,11 @@ function dateTimeLabel(value, fallback = '') {
 }
 
 function statusTone(record) {
-  if (record.archived) return { backgroundColor: '#edf0f4', color: colors.muted, label: 'Archived' };
+  if (record.archived) return { backgroundColor: colors.neutralSoft, color: colors.muted, label: 'Archived' };
   if (record.adminStatus === 'resolved') return { backgroundColor: colors.tealSoft, color: colors.tealDark, label: 'Resolved' };
   if (record.adminStatus === 'investigating') return { backgroundColor: colors.blueSoft, color: colors.blue, label: 'Investigating' };
   if (record.crashDetected || record.severity === 'fatal' || record.previousCrashDetected) {
-    return { backgroundColor: '#fee9e7', color: colors.danger, label: 'Crash' };
+    return { backgroundColor: colors.roseSoft, color: colors.danger, label: 'Crash' };
   }
   if (record.severity === 'error' || Number(record.errorCount) > 0) {
     return { backgroundColor: colors.amberSoft, color: colors.amber, label: 'Error' };
@@ -279,11 +279,11 @@ export default function DiagnosticRegisterPanel({ user, profile, users = [] }) {
 
 const styles = StyleSheet.create({
   container: { gap: spacing.md },
-  introCard: { padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.blueSoft, borderWidth: 1, borderColor: 'rgba(37,99,235,0.12)' },
+  introCard: { padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.blueSoft, borderWidth: 1, borderColor: withAlpha(colors.border, 0.12) },
   cardTitle: { color: colors.navy, fontSize: typography.cardTitle.fontSize, lineHeight: 19, fontWeight: '700' },
   body: { marginTop: spacing.xs, color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 19, fontWeight: '400' },
   crashlyticsButton: { alignSelf: 'flex-start', marginTop: spacing.md, minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.lg, borderRadius: 99, backgroundColor: colors.blue },
-  crashlyticsButtonText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  crashlyticsButtonText: { color: colors.onPrimary, fontSize: 12, fontWeight: '600' },
   statsRow: { flexDirection: 'row', gap: spacing.sm },
   statCard: { flex: 1, minHeight: 62, alignItems: 'center', justifyContent: 'center', padding: spacing.xs, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   statValue: { color: colors.navy, fontSize: 18, lineHeight: 22, fontWeight: '700' },
@@ -293,10 +293,10 @@ const styles = StyleSheet.create({
   filterChip: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: 99, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   filterChipActive: { backgroundColor: colors.blue, borderColor: colors.blue },
   filterText: { color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '500' },
-  filterTextActive: { color: '#fff' },
+  filterTextActive: { color: colors.onPrimary },
   loader: { marginVertical: spacing.xl },
   noticeCard: { padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  errorCard: { padding: spacing.md, borderRadius: radius.md, backgroundColor: '#fee9e7' },
+  errorCard: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.roseSoft },
   errorText: { color: colors.danger, fontSize: 12, lineHeight: 18, fontWeight: '500' },
   recordStack: { gap: spacing.md },
   recordCard: { overflow: 'hidden', borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, ...shadow },
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 10, fontWeight: '600' },
   meta: { marginTop: spacing.xs, color: colors.muted, fontSize: typography.label.fontSize, lineHeight: 16, fontWeight: '400' },
   currentScreen: { marginTop: spacing.sm, color: colors.text, fontSize: 12, lineHeight: 17, fontWeight: '500' },
-  details: { padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: '#fbfcfd', gap: spacing.sm },
+  details: { padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.onPrimary, gap: spacing.sm },
   detailLabel: { marginTop: spacing.xs, color: colors.muted, fontSize: typography.eyebrow.fontSize, letterSpacing: 0.8, fontWeight: '600' },
   detailValue: { color: colors.text, fontSize: typography.label.fontSize, lineHeight: 16, fontWeight: '400' },
   eventRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs },
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
   actionButton: { minHeight: 38, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: 99 },
   investigateButton: { backgroundColor: colors.blue },
   resolveButton: { backgroundColor: colors.tealDark },
-  archiveButton: { backgroundColor: '#edf0f4' },
-  actionButtonText: { color: '#fff', fontSize: typography.label.fontSize, fontWeight: '600' },
+  archiveButton: { backgroundColor: colors.neutralSoft },
+  actionButtonText: { color: colors.onPrimary, fontSize: typography.label.fontSize, fontWeight: '600' },
   archiveButtonText: { color: colors.text },
 });

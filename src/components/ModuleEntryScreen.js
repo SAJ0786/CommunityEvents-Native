@@ -88,7 +88,7 @@ export default function ModuleEntryScreen({
                 <Text {...cappedText} style={styles.optionDescription}>{item.choiceDescription}</Text>
               </View>
               <View style={[styles.check, selected && styles.checkSelected]}>
-                {selected ? <MaterialCommunityIcons color="#ffffff" name="check" size={17} /> : null}
+                {selected ? <MaterialCommunityIcons color={colors.onPrimary} name="check" size={17} /> : null}
               </View>
             </Pressable>
           );
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     width: 230,
     height: 230,
     borderRadius: 115,
-    backgroundColor: '#fff0b9',
+    backgroundColor: colors.amberSoft,
     opacity: 0.65,
   },
   ambientTeal: {

@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import ScrollView from './KeyboardAwareScrollView';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import {
   getCurrentHijriYear,
   getHijriDisplay,
@@ -39,11 +39,11 @@ import MemberPageHeader from './MemberPageHeader';
 
 const CATEGORIES = ['Wiladat', 'Shahadat', 'Wafat', 'Eid', 'Ayyam-e-Aza', 'Amaal', 'Season', 'Event'];
 const PRAYER_VISUALS = {
-  fajr: { icon: 'weather-night-partly-cloudy', color: '#0f766e' },
-  sunrise: { icon: 'weather-sunset-up', color: '#e99718' },
-  zohrain: { icon: 'white-balance-sunny', color: '#e99718' },
-  sunset: { icon: 'weather-sunset-down', color: '#e17726' },
-  maghreb: { icon: 'weather-night', color: '#17213f' },
+  fajr: { icon: 'weather-night-partly-cloudy', color: colors.tealDark },
+  sunrise: { icon: 'weather-sunset-up', color: colors.amber },
+  zohrain: { icon: 'white-balance-sunny', color: colors.amber },
+  sunset: { icon: 'weather-sunset-down', color: colors.amber },
+  maghreb: { icon: 'weather-night', color: colors.text },
 };
 const SUN_ENDPOINTS = ['sunrise', 'sunset'];
 const PRAYER_STAGES = ['fajr', 'zohrain', 'maghreb'];
@@ -508,9 +508,9 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
 }
 
 const toneStyles = StyleSheet.create({
-  happy: { backgroundColor: '#ebfaf5', borderColor: '#b7e8d7' },
-  sad: { backgroundColor: '#fff1f0', borderColor: '#f3c6c2' },
-  occasion: { backgroundColor: colors.tealSoft, borderColor: '#cae7e0' },
+  happy: { backgroundColor: colors.tealSoft, borderColor: colors.borderStrong },
+  sad: { backgroundColor: colors.dangerSoft, borderColor: colors.dangerBorder },
+  occasion: { backgroundColor: colors.tealSoft, borderColor: colors.borderStrong },
 });
 
 const styles = StyleSheet.create({
@@ -535,13 +535,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#b9dfd9',
-    backgroundColor: '#effaf7',
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.background,
     ...shadow,
   },
-  heroGlowLarge: { position: 'absolute', width: 130, height: 130, borderRadius: 65, right: -35, top: -70, backgroundColor: 'rgba(24,143,121,0.08)' },
-  heroGlowSmall: { position: 'absolute', width: 72, height: 72, borderRadius: 36, right: 58, bottom: -54, backgroundColor: 'rgba(24,143,121,0.06)' },
-  heroIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#b9dfd9', backgroundColor: '#dff5ef' },
+  heroGlowLarge: { position: 'absolute', width: 130, height: 130, borderRadius: 65, right: -35, top: -70, backgroundColor: withAlpha(colors.border, 0.08) },
+  heroGlowSmall: { position: 'absolute', width: 72, height: 72, borderRadius: 36, right: 58, bottom: -54, backgroundColor: withAlpha(colors.border, 0.06) },
+  heroIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.borderStrong, backgroundColor: colors.successSoft },
   heroCopy: { flex: 1, gap: 2 },
   heroEyebrow: { color: colors.tealDark, fontSize: typography.eyebrow.fontSize, fontWeight: '500', letterSpacing: 1.1 },
   title: {
@@ -580,9 +580,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     ...shadow,
   },
-  todayCard: { overflow: 'hidden', borderColor: '#b9dfd9', backgroundColor: '#fbfefd' },
+  todayCard: { overflow: 'hidden', borderColor: colors.borderStrong, backgroundColor: colors.onPrimary },
   todayTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  todayIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tealSoft, borderWidth: 1, borderColor: '#c7e7e1' },
+  todayIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tealSoft, borderWidth: 1, borderColor: colors.borderStrong },
   todayCopy: { flex: 1, gap: 1 },
   todayLabel: { color: colors.tealDark, fontSize: typography.eyebrow.fontSize, fontWeight: '500', letterSpacing: 1.2 },
   cardTitle: {
@@ -590,13 +590,13 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '500',
   },
-  azaanPanel: { marginTop: spacing.sm, overflow: 'hidden', borderWidth: 1, borderColor: '#b9ddd6', borderRadius: radius.md, backgroundColor: '#f4fbf9' },
-  azaanHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: '#dcece8' },
+  azaanPanel: { marginTop: spacing.sm, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.md, backgroundColor: colors.background },
+  azaanHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.successSoft },
   azaanIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.teal },
   azaanHeadingCopy: { flex: 1, minWidth: 0 },
   azaanTitle: { color: colors.navy, fontSize: typography.cardTitle.fontSize, fontWeight: '500' },
   azaanHelp: { marginTop: 2, color: colors.muted, fontSize: 10, lineHeight: 14, fontWeight: '400' },
-  azaanRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.md, borderBottomWidth: 1, borderBottomColor: '#e3efec' },
+  azaanRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.successSoft },
   azaanRowCopy: { flex: 1, minWidth: 0 },
   azaanRowLabel: { color: colors.navy, fontSize: 12, fontWeight: '400' },
   azaanRowTime: { marginTop: 2, color: colors.tealDark, fontSize: typography.label.fontSize, fontWeight: '400' },
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     gap: spacing.sm,
   },
-  observanceIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.76)' },
+  observanceIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: withAlpha(colors.glassBorder, 0.76) },
   observanceCopy: { flex: 1, gap: 1 },
   highlightLabel: {
     color: colors.muted,
@@ -663,17 +663,17 @@ const styles = StyleSheet.create({
   cityPill: { maxWidth: '58%', minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, borderRadius: 999, backgroundColor: colors.tealSoft },
   cityPillText: { flexShrink: 1, color: colors.tealDark, fontSize: 10, fontWeight: '500' },
   prayerHelp: { color: colors.muted, fontSize: typography.label.fontSize, lineHeight: 16, fontWeight: '400' },
-  prayerJourney: { position: 'relative', overflow: 'hidden', padding: spacing.sm, borderWidth: 1, borderColor: '#9fd8d1', borderRadius: radius.md, backgroundColor: colors.tealSoft, gap: 6 },
+  prayerJourney: { position: 'relative', overflow: 'hidden', padding: spacing.sm, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.md, backgroundColor: colors.tealSoft, gap: 6 },
   sunArc: { height: 36, marginHorizontal: spacing.md, marginBottom: -14 },
   sunArcLine: { position: 'absolute', top: 14, left: 0, right: 0, height: 54, borderTopWidth: 1.5, borderColor: colors.teal, borderTopLeftRadius: 180, borderTopRightRadius: 180, opacity: 0.75 },
-  sunArcDot: { position: 'absolute', width: 13, height: 13, marginLeft: -6, borderRadius: 7, backgroundColor: '#e99718', shadowColor: '#e99718', shadowOpacity: 0.45, shadowRadius: 5, elevation: 3 },
+  sunArcDot: { position: 'absolute', width: 13, height: 13, marginLeft: -6, borderRadius: 7, backgroundColor: colors.amber, shadowColor: colors.amber, shadowOpacity: 0.45, shadowRadius: 5, elevation: 3 },
   sunEndpointRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
   sunEndpoint: { position: 'relative', flex: 1, minHeight: 90, alignItems: 'center', justifyContent: 'center', padding: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   sunEndpointLabel: { marginTop: 3, color: colors.muted, fontSize: 12, fontWeight: '400' },
   sunEndpointTime: { marginTop: 1, color: colors.navy, fontSize: 18, lineHeight: 22, fontWeight: '500' },
   prayerStageRow: { flexDirection: 'row', gap: 6 },
   prayerStage: { position: 'relative', flex: 1, minHeight: 82, alignItems: 'center', justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 4, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
-  prayerStageActive: { borderColor: colors.teal, backgroundColor: '#f4fbfa' },
+  prayerStageActive: { borderColor: colors.teal, backgroundColor: colors.background },
   prayerStageLabel: { marginTop: 3, color: colors.muted, fontSize: typography.label.fontSize, fontWeight: '400', textAlign: 'center' },
   prayerStageTime: { marginTop: 2, color: colors.navy, fontSize: typography.sectionTitle.fontSize, lineHeight: 21, fontWeight: '500' },
   prayerReminderIcon: { position: 'absolute', top: 7, right: 7 },
@@ -791,7 +791,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: spacing.md,
     gap: spacing.xs,
-    backgroundColor: '#f7fbfb',
+    backgroundColor: colors.background,
   },
   listTopRow: {
     flexDirection: 'row',

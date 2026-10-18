@@ -97,7 +97,7 @@ function harness(exportName, initialProps) {
     createElement: (type, properties, ...children) => ({ type, props: properties || {}, children: children.flat() }), Fragment: 'Fragment' };
   const mod = load('src/business/BusinessHoursEditor.js', { react,
     'react-native': { Alert: { alert: (...args) => alerts.push(args) }, Pressable: 'Pressable', Text: 'Text', View: 'View', StyleSheet: { create: value => value } },
-    '../components/NativeDateTimeField': 'TimeField', '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {}, radius: {}, spacing: {} }, '../utils/businessHours': hours });
+    '../components/NativeDateTimeField': 'TimeField', '../theme': require('./theme-fixture.cjs'), 'expo-constants': { expoConfig: {extra:{}} }, '../utils/businessHours': hours });
   return { alerts, render(nextProps) { if (nextProps) props = nextProps; index = 0; return mod[exportName](props); } };
 }
 function testEditor() {
@@ -153,7 +153,7 @@ function testEditor() {
 }
 function testWiringAndPersistence() {
   const service = load('src/services/businesses.js', { '@react-native-firebase/firestore': { serverTimestamp: () => 'timestamp' },
-    '@react-native-firebase/functions': {}, '../firebase/firebase': {}, '../utils/businessHours': hours },
+    '@react-native-firebase/functions': {}, '../firebase/firebase': {}, 'expo-constants': { expoConfig: {extra:{}} }, '../utils/businessHours': hours },
   'submissionFields, publicBusinessFields, publishedPrivateSnapshot');
   const legacy = { mon: { closed: false, open: '09:00', close: '17:00' } };
   for (const value of [legacy, { mon: split, tue: { ...split, open24Hours: true }, wed: { ...split, closed: true } }]) {

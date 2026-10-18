@@ -1,3 +1,4 @@
+import { colors } from '../theme';
 import { Linking, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
@@ -67,7 +68,7 @@ async function ensureNotificationPermission() {
       description: 'Reminders you choose for Community Connect Australia events.',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 180, 250],
-      lightColor: '#129182',
+      lightColor: colors.teal,
       sound: 'default',
     });
   }
@@ -150,7 +151,7 @@ async function ensurePrayerNotificationPermission() {
       description: 'Prayer-time reminders selected in Community Connect Australia.',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 180, 250],
-      lightColor: '#5b3fb5',
+      lightColor: colors.purple,
       sound: 'default',
     });
   }
@@ -205,7 +206,7 @@ async function ensureAzaanNotificationPermission() {
       description: 'Azaan alarms selected in the Community Connect Australia Hijri Calendar.',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 300, 180, 300, 180, 500],
-      lightColor: '#129182',
+      lightColor: colors.teal,
       sound: AZAAN_SOUND_FILE,
       audioAttributes: {
         usage: Notifications.AndroidAudioUsage.NOTIFICATION,

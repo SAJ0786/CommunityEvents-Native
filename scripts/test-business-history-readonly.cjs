@@ -28,7 +28,7 @@ const firestore = {
   writeBatch: () => { writes++; return { update() {}, set() {}, delete() {}, commit: async () => {} }; },
 };
 const services = load('src/services/businesses.js', {
-  '../utils/businessHours': load('src/utils/businessHours.js', {}),
+  'expo-constants': { expoConfig: {extra:{}} }, '../utils/businessHours': load('src/utils/businessHours.js', {}),
   '@react-native-firebase/firestore': firestore,
   '@react-native-firebase/functions': { httpsCallable: () => async () => { calls++; return { data: {} }; } },
   '../firebase/firebase': { db: {}, functions: {}, ensureFirebaseSession: async () => ({ uid: 'owner', isAnonymous: false }) },
@@ -46,7 +46,7 @@ const mocks = {
   react,
   'react-native': { ...native, Alert: { alert() {} }, Linking: {}, StyleSheet: { create: value => value }, useWindowDimensions: () => ({ width: 400, fontScale: 1 }) },
   '../services/businesses': services,
-  '../theme': { typography: require('./theme-fixture.cjs').typography, colors: {}, radius: {}, shadow: {}, spacing: {} },
+  '../theme': require('./theme-fixture.cjs'),
   '../utils/errors': { friendlyError: error => error.message },
   '../components/MemberPageHeader': 'MemberPageHeader',
   '../components/AdminPageHeader': 'AdminPageHeader',

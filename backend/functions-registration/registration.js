@@ -397,22 +397,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       return { eventId: event.id, revision, status: 'cancelled', deleted: true };
     });
   }
-  async function getRegistrationEvent(request) {
-    gate();
-    return db.runTransaction(async tx => {
-      const caller = request.auth && request.auth.token?.firebase?.sign_in_provider !== 'anonymous' ? await actor(request, tx) : null;
-      const event = await readEvent(request.data?.eventId, tx);
-      const manager = caller && manages(caller, event);
-      const ownSnap = caller ? await tx.get(bookingRef(event.id, caller.uid)) : null;
-      const own = ownSnap?.exists ? ownSnap.data() : null;
-      const registered = own?.status === 'registered';
-      if (event.status !== 'approved' && !manager && !registered) fail('not-found', 'Event not available.');
-      const form = await tx.get(formRef(event.id));
-      const details = await tx.get(privateRef(event.id));
-      const pending = manager && event.hasPendingChanges && event.status === 'approved' && !event.deletedAt ? (await tx.get(pendingRef(event.id))).data() : null;
-      if (manager && event.hasPendingChanges && event.status === 'approved' && !event.deletedAt && !pending) fail('failed-precondition', 'The submitted changes are unavailable. Contact an administrator before editing.');
-      const schedule = (await scheduleModel).registrationSchedule({ ...event, timeZone: event.timeZone });
-      const live = event.status === 'approved' && !event.deletedAt ? {
+  const liveProjection = event => event.status === 'approved' && !event.deletedAt ? {
         isLive: event.isLive === true,
         liveUrl: /^[A-Za-z0-9_-]{1,128}$/.test(event.liveUrl || '') ? event.liveUrl : null,
         liveWatchUrl: event.liveAppVisibility === 'public' && /^https:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[A-Za-z0-9_-]+$/.test(event.liveWatchUrl || '') ? event.liveWatchUrl : null,
@@ -421,6 +406,19 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         liveStartedAt: typeof event.liveStartedAt === 'string' ? event.liveStartedAt : null,
         liveVideoRecordId: /^[A-Za-z0-9_-]{1,200}$/.test(event.liveVideoRecordId || '') ? event.liveVideoRecordId : null,
       } : { isLive: false };
+  async function getRegistrationEvent(request) {
+    gate();
+    return db.runTransaction(async tx => {
+      const [caller, event] = await Promise.all([request.auth && request.auth.token?.firebase?.sign_in_provider !== 'anonymous' ? actor(request, tx) : Promise.resolve(null), readEvent(request.data?.eventId, tx)]);
+      const manager = caller && manages(caller, event);
+      const [ownSnap, form, details] = await Promise.all([caller ? tx.get(bookingRef(event.id, caller.uid)) : Promise.resolve(null), tx.get(formRef(event.id)), tx.get(privateRef(event.id))]);
+      const own = ownSnap?.exists ? ownSnap.data() : null;
+      const registered = own?.status === 'registered';
+      if (event.status !== 'approved' && !manager && !registered) fail('not-found', 'Event not available.');
+      const pending = manager && event.hasPendingChanges && event.status === 'approved' && !event.deletedAt ? (await tx.get(pendingRef(event.id))).data() : null;
+      if (manager && event.hasPendingChanges && event.status === 'approved' && !event.deletedAt && !pending) fail('failed-precondition', 'The submitted changes are unavailable. Contact an administrator before editing.');
+      const schedule = (await scheduleModel).registrationSchedule({ ...event, timeZone: event.timeZone });
+      const live = liveProjection(event);
       const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), ...schedule, ...live, id: event.id, ownerUid: event.ownerUid, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
       result.canApprove = Boolean(caller && !event.deletedAt && !event.reviewDecision && (event.status === 'pending' || pending) && approves(caller, event));
       result.canRegister = event.status === 'approved' && localMinute(now(), event.timeZone) < (event.closes || `${event.date}T00:00`);
@@ -445,38 +443,58 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       return result;
     });
   }
+  // List cards need only the public projection and current access flags. Never
+  // load full forms, pending drafts or submitted answers while discovering cards.
+  async function registrationListPage(request, scope, city, ids) {
+    return db.runTransaction(async tx => {
+      const signedIn = request.auth && request.auth.token?.firebase?.sign_in_provider !== 'anonymous';
+      const caller = signedIn ? await actor(request, tx) : null;
+      if (scope !== 'public' && !caller) fail('unauthenticated', 'Sign in to continue.');
+      if (scope === 'review' && !approves(caller)) fail('permission-denied', 'You cannot review events.');
+      if (scope === 'management' && caller.profile.role !== 'superAdmin'
+        && !(caller.profile.role === 'admin' && (caller.profile.adminCity || caller.profile.defaultCity) === city)) fail('permission-denied', 'You cannot manage events in this city.');
+      const snapshots = await Promise.all(ids.map(value => tx.get(eventRef(value))));
+      const rows = await Promise.all(snapshots.map(async snapshot => {
+        if (!snapshot.exists) return null;
+        const event = { ...snapshot.data(), id: snapshot.id };
+        if ((event.deletedAt && scope !== 'attending') || (city && event.city !== city) || (scope === 'mine' && event.ownerUid !== caller.uid)) return null;
+        if (scope === 'public' && (event.status !== 'approved' || event.date < localMinute(now(), event.timeZone).slice(0, 10))) return null;
+        const manager = Boolean(caller && manages(caller, event));
+        const canApprove = Boolean(manager && !event.reviewDecision && (event.status === 'pending' || event.hasPendingChanges) && approves(caller, event));
+        if (scope === 'review' && !canApprove) return null;
+        const [privateSnap, ownSnap] = await Promise.all([
+          tx.get(privateRef(event.id)), caller ? tx.get(bookingRef(event.id, caller.uid)) : Promise.resolve(null),
+        ]);
+        const registered = ownSnap?.data()?.status === 'registered';
+        if ((scope === 'attending' && !registered) || (event.status !== 'approved' && !manager && !registered)) return null;
+        const schedule = (await scheduleModel).registrationSchedule(event);
+        const row = { ...(await model).publicEvent({ ...event, address: privateSnap.data()?.address || '' }), ...schedule,
+          id: event.id, city: event.city, timeZone: event.timeZone, ownerUid: event.ownerUid,
+          status: event.status, revision: event.revision, formVersion: event.formVersion,
+          allowCancellation: event.allowCancellation === true, registrationOnly: true,
+          canManage: manager, canApprove, isRegistered: registered,
+          canRegister: event.status === 'approved' && localMinute(now(), event.timeZone) < (event.closes || `${event.date}T00:00`),
+          canEditRegistration: Boolean(registered && event.status === 'approved' && localMinute(now(), event.timeZone).slice(0, 10) < event.date),
+          ...liveProjection(event),
+        };
+        if (manager) { row.hasPendingChanges = Boolean(event.hasPendingChanges); row.reviewDecision = event.reviewDecision || null; }
+        if (manager || (registered && event.status !== 'cancelled')) row.hasPoster = Boolean(privateSnap.data()?.posterPath);
+        return row;
+      }));
+      return rows.filter(Boolean);
+    });
+  }
   async function listRegistrationEvents(request) {
     gate();
     const scope = request.data?.scope || 'public';
     if (!['public', 'mine', 'review', 'attending', 'management'].includes(scope)) fail('invalid-argument', 'Choose a valid event list.');
-    const hasSignedInCaller = Boolean(request.auth && request.auth.token?.firebase?.sign_in_provider !== 'anonymous');
-    const caller = scope === 'public' && !hasSignedInCaller ? null : await actor(request);
-    const listRow = detail => {
-      const { registrationCount, ...event } = detail.event;
-      const row = {
-        ...event,
-        registrationOnly: true,
-        canManage: detail.canManage,
-        canApprove: detail.canApprove,
-        isRegistered: detail.ownRegistration?.status === 'registered',
-        canRegister: detail.canRegister,
-        canEditRegistration: detail.canEditRegistration,
-      };
-      if (detail.privateDetails) row.hasPoster = detail.privateDetails.hasPoster;
-      return row;
-    };
+    const signedIn = request.auth && request.auth.token?.firebase?.sign_in_provider !== 'anonymous';
+    const caller = scope === 'public' && !signedIn ? null : await actor(request);
     if (scope === 'attending') {
       let query = db.collection('registrationMemberEvents').doc(caller.uid).collection('events').orderBy('__name__').limit(25);
       if (request.data?.cursor) query = query.startAfter(id(request.data.cursor));
-      const page = await query.get(); const events = [];
-      for (const entry of page.docs) {
-        try {
-          const detail = await getRegistrationEvent({ ...request, data: { eventId: entry.id } });
-          if (detail.ownRegistration?.status !== 'registered') continue;
-          events.push(listRow(detail));
-        } catch (error) { if (error.code !== 'not-found') throw error; }
-      }
-      return { events, nextCursor: page.docs.length === 25 ? page.docs.at(-1).id : null };
+      const page = await query.get();
+      return { events: await registrationListPage(request, scope, null, page.docs.map(doc => doc.id)), nextCursor: page.docs.length === 25 ? page.docs.at(-1).id : null };
     }
     const city = scope === 'mine' ? null : (scope === 'review' && request.data?.city == null ? null : id(request.data?.city));
     if (scope === 'review' && !approves(caller, { city })) fail('permission-denied', 'You cannot review events.');
@@ -491,25 +509,8 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     else if (scope !== 'review' || city) query = query.where('city', '==', city);
     query = query.orderBy('__name__').limit(25);
     if (request.data?.cursor) query = query.startAfter(id(request.data.cursor));
-    const page = await query.get(); const events = [];
-    for (let offset = 0; offset < page.docs.length; offset += 5) {
-      const rows = await Promise.all(page.docs.slice(offset, offset + 5).map(async doc => {
-      const event = doc.data();
-      if (event.deletedAt) return null;
-      if (scope === 'public' && (event.status !== 'approved' || event.date < localMinute(now(), event.timeZone).slice(0, 10))) return null;
-      if (scope === 'review' && (event.reviewDecision || (event.status !== 'pending' && !(event.status === 'approved' && event.hasPendingChanges)))) return null;
-      // Re-read through the transactional detail policy to handle approval/access
-      // changes during pagination. Only the public allowlist leaves this endpoint.
-      try {
-        const result = await getRegistrationEvent({ ...request, data: { eventId: doc.id } });
-        if (scope === 'public' && (result.event.status !== 'approved' || result.event.date < localMinute(now(), result.event.timeZone).slice(0, 10))) return null;
-        if (scope === 'review' && !result.canApprove) return null;
-        return listRow(result);
-      } catch (error) { if (error.code !== 'not-found') throw error; return null; }
-      }));
-      events.push(...rows.filter(Boolean));
-    }
-    return { events, nextCursor: page.docs.length === 25 ? page.docs.at(-1).id : null };
+    const page = await query.get();
+    return { events: await registrationListPage(request, scope, city, page.docs.map(doc => doc.id)), nextCursor: page.docs.length === 25 ? page.docs.at(-1).id : null };
   }
   async function listEventRegistrations(request) {
     const caller = await actor(request); const event = await readEvent(request.data?.eventId);
@@ -602,21 +603,31 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     if (!staged && previousPath && previousPath !== path && previousPath.startsWith(`registration-private/${event.id}/`)) await bucket.file(previousPath).delete({ ignoreNotFound: true }).catch(() => {});
     return { uploaded: true, revision: nextRevision, status: nextStatus, hasPendingChanges: staged };
   }
+  async function posterAccess(request, staged) {
+    return db.runTransaction(async tx => {
+      const [caller, event] = await Promise.all([actor(request, tx), readEvent(request.data?.eventId, tx)]);
+      const manager = manages(caller, event);
+      if (staged && (!manager || event.status !== 'approved' || !event.hasPendingChanges)) fail('permission-denied', 'Only managers can review a pending poster.');
+      if (!manager) {
+        const own = await tx.get(bookingRef(event.id, caller.uid));
+        if (own.data()?.status !== 'registered' || event.status !== 'approved') fail('permission-denied', 'Register before viewing the poster.');
+      }
+      const snapshot = await tx.get(staged ? pendingRef(event.id) : privateRef(event.id));
+      return staged ? snapshot.data()?.privateDetails : snapshot.data();
+    });
+  }
   async function getRegistrationPoster(request) {
+    gate();
     if (request.data?.view !== undefined && !['published', 'pending'].includes(request.data.view)) fail('invalid-argument', 'Choose a published or pending poster.');
+    if (!request.auth || request.auth.token?.firebase?.sign_in_provider === 'anonymous') fail('permission-denied', 'Register before viewing the poster.');
     const staged = request.data?.view === 'pending';
-    const details = await getRegistrationEvent(request);
-    if (!details.privateDetails) fail('permission-denied', 'Register before viewing the poster.');
-    if (staged && !details.canManage) fail('permission-denied', 'Only managers can review a pending poster.');
-    const reference = staged ? pendingRef(details.event.id) : privateRef(details.event.id);
-    const snapshot = await reference.get(); const data = staged ? snapshot.data()?.privateDetails : snapshot.data();
+    const data = await posterAccess(request, staged);
     if (!data?.posterPath) fail('not-found', 'No poster has been uploaded.');
     const [bytes] = await bucket.file(data.posterPath).download();
-    // Download may take time: cancellation or removal must revoke subsequent delivery.
-    const current = await getRegistrationEvent(request);
-    const latest = await reference.get();
-    const latestData = staged ? latest.data()?.privateDetails : latest.data();
-    if (!current.privateDetails || (staged && !current.pendingChanges) || latestData?.posterPath !== data.posterPath) fail('permission-denied', 'Poster access changed. Reload the event.');
+    // Recheck active account, city/ownership, registration and current object
+    // after storage I/O. Forms and answers are not part of poster authorisation.
+    const latest = await posterAccess(request, staged);
+    if (latest?.posterPath !== data.posterPath) fail('permission-denied', 'Poster access changed. Reload the event.');
     return { mime: data.posterMime, base64: bytes.toString('base64') };
   }
   async function removeRegistrationPoster(request) {

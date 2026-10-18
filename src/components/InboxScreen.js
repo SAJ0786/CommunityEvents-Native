@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import ScrollView from './KeyboardAwareScrollView';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import NativeBackButton from './NativeBackButton';
 import MemberPageHeader from './MemberPageHeader';
 import {
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
   messageText: { color: colors.text, fontSize: typography.cardTitle.fontSize, lineHeight: 20 },
   messageTextMine: { color: colors.surface },
   messageTime: { color: colors.muted, fontSize: typography.label.fontSize, marginTop: 6 },
-  messageTimeMine: { color: 'rgba(255,255,255,0.72)' },
+  messageTimeMine: { color: withAlpha(colors.glassBorder, 0.72) },
   textarea: { minHeight: 110, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, color: colors.text, backgroundColor: colors.surface, fontSize: 15 },
   primaryButton: { minHeight: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.teal, paddingHorizontal: spacing.lg, marginTop: spacing.md },
   primaryButtonText: { color: colors.surface, fontSize: 15, fontWeight: '700' },

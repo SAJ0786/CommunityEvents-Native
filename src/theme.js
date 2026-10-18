@@ -24,6 +24,17 @@
   glass: 'rgba(255,255,255,0.88)',
   glassBorder: 'rgba(255,255,255,0.82)',
   danger: '#c8342c',
+  dangerSoft: '#fff0ee',
+  dangerBorder: '#fecaca',
+  success: '#16824a',
+  successSoft: '#e4f5e9',
+  warningText: '#78530b',
+  neutralSoft: '#edf0f4',
+  neutralStrong: '#475569',
+  borderStrong: '#b9dfd9',
+  primaryBorder: '#c3d4fb',
+  overlay: '#08121c',
+  mediaBackground: '#000000',
   gold: '#f7d76b',
 };
 
@@ -122,3 +133,15 @@ export const panelTones = {
     glowSoft: 'rgba(49,95,168,0.06)',
   },
 };
+
+// Alpha surfaces follow the selected palette instead of freezing an RGB value in UI.
+export function withAlpha(color, alpha) {
+  const value = String(color).trim();
+  let rgb;
+  if (value.startsWith('#')) {
+    const hex = value.slice(1); const full = hex.length === 3 ? hex.split('').map(c => c + c).join('') : hex;
+    rgb = [0, 2, 4].map(offset => parseInt(full.slice(offset, offset + 2), 16));
+  } else rgb = value.match(/[\d.]+/g)?.slice(0, 3).map(Number);
+  if (!rgb || rgb.some(n => !Number.isFinite(n))) throw new Error('Theme colour must be a hexadecimal or RGB value.');
+  return `rgba(${rgb.join(',')},${Math.max(0, Math.min(1, alpha))})`;
+}
