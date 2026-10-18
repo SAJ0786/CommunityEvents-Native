@@ -17,7 +17,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ScrollView from './KeyboardAwareScrollView';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { ApiVideoLiveStreamView } from '@api.video/react-native-livestream';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { colors, radius, shadow, spacing, typography } from '../theme';
@@ -36,6 +35,9 @@ import {
 
 const STREAM_KEEP_AWAKE_TAG = 'community-connect-live-stream';
 const StreamingPip = NativeModules.StreamingPip;
+const ApiVideoLiveStreamView = Platform.OS === 'ios'
+  ? require('@api.video/react-native-livestream').ApiVideoLiveStreamView
+  : null;
 const AndroidRootEncoderLiveStreamView = Platform.OS === 'android'
   ? require('./AndroidRootEncoderLiveStreamView').default
   : null;
