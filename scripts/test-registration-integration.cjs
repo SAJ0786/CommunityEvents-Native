@@ -154,7 +154,7 @@ function detailsFixture(detail, isGuest = false) {
     'react-native': { ActivityIndicator: 'ActivityIndicator', Image: 'Image', Modal: 'Modal', Pressable: 'Pressable', Text: 'Text', View: 'View',
       AppState: { currentState: 'active', addEventListener: (_, callback) => { listeners.push(callback); return { remove() {} }; } },
       Alert: { alert: (...args) => alerts.push(args) } },
-    './EventDetailsModal': { __esModule: true, default: 'NormalDetails' },
+    '../theme': require('./theme-fixture.cjs'), './EventDetailsModal': { __esModule: true, default: 'NormalDetails' },
     './ModalSafeArea': { __esModule: true, default: 'SafeAreaView' },
     '../registration/RegistrationControls': { Action: 'Action', Input: 'Input', styles: {} },
     './KeyboardAwareScrollView': { __esModule: true, default: 'ScrollView' },
