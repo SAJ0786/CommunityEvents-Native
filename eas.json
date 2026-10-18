@@ -87,6 +87,13 @@
         "APP_RELEASE_MODE": "production",
         "APP_CHECK_PROVIDER": "production"
       }
+    },
+    "play-internal": {
+      "extends": "registration-testflight",
+      "distribution": "store",
+      "android": {
+        "buildType": "app-bundle"
+      }
     }
   },
   "submit": {
@@ -99,6 +106,12 @@
       "ios": {
         "appleTeamId": "D36Y75H5BU",
         "ascAppId": "6782770347"
+      }
+    },
+    "play-internal": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "completed"
       }
     }
   }
