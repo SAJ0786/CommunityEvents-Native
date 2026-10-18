@@ -20,6 +20,7 @@ export default function RegistrationEditor({
  initialDraft, eventId, city, defaultHostName = '', defaultHostPhone = '', savedTemplates, hasMoreTemplates, onMoreTemplates, busy, onSave, onSaveTemplate, onCancel, hasPoster = false, onRemovePoster, initialStep = 'event' }) {
   const [draft, setDraft] = useState(initialDraft);
   const [step, setStep] = useState(initialStep);
+  const [previewPlaces, setPreviewPlaces] = useState(2);
   const [error, setError] = useState('');
   const [templateName, setTemplateName] = useState('');
   const [recurring, setRecurring] = useState(false);
@@ -157,6 +158,7 @@ export default function RegistrationEditor({
         <Input label="Help text" value={field.description || ''} maxLength={500} onChangeText={value => change(field.id, { description: value })} />
         {['select', 'radio', 'checkboxes'].includes(field.type) && <Input label="Options (one per line)" value={field.options.join('\n')} multiline onChangeText={value => change(field.id, { options: value.split('\n') })} />}
         {field.type === 'consent' && <><Input label="Your terms and conditions" value={field.terms || ''} multiline maxLength={TERMS_LIMIT} onChangeText={value => change(field.id, { terms: value })} /><Text style={styles.muted}>{(field.terms || '').length}/{TERMS_LIMIT}. Describe exactly what attendees agree to. Agreement stays last.</Text></>}
+        {field.type !== 'consent' && <View style={styles.row}><Text style={styles.flex}>Per participant (repeat for each place)</Text><Switch value={Boolean(field.perParticipant)} onValueChange={value => change(field.id, {perParticipant:value})} /></View>}
         <View style={styles.row}><Text style={styles.flex}>Required</Text><Switch disabled={field.type === 'consent'} value={field.required} onValueChange={value => change(field.id, { required: value })} /></View>
         <View style={styles.row}><IconAction icon="arrow-up" label="Move question up" disabled={index === 0 || field.type === 'consent'} onPress={() => update('fields', moveField(draft.fields, index, -1))} /><IconAction icon="arrow-down" label="Move question down" disabled={index === draft.fields.length - 1 || field.type === 'consent'} onPress={() => update('fields', moveField(draft.fields, index, 1))} /><IconAction icon="delete-outline" label="Delete question" onPress={() => update('fields', draft.fields.filter(item => item.id !== field.id))} /></View>
       </View>)}
@@ -164,6 +166,7 @@ export default function RegistrationEditor({
         update('fields', consentLast([...draft.fields, makeField(type, `q-${Date.now()}-${++serial.current}`)]));
         if (type === 'consent') setError(`Write your own terms and conditions (up to ${TERMS_LIMIT} characters). The agreement remains at the end.`);
       }}>{label}</Action>)}</View></View>
+      {draft.fields.some(field => field.perParticipant) && <View style={styles.panel}><Text style={styles.title}>Participant form preview</Text><View style={styles.row}>{[1,2,3,4,5].map(count => <Action key={count} primary={previewPlaces === count} onPress={() => setPreviewPlaces(count)}>{count}</Action>)}</View>{registrationFieldGroups(draft.fields, previewPlaces).map(group => <View key={group.id} style={styles.panel}><Text style={styles.title}>{group.label}</Text>{group.fields.map(field => <Text key={field.id} style={styles.text}>{field.originalLabel || field.label}{field.required ? ' *' : ''}</Text>)}</View>)}</View>}
       <View style={styles.panel}><Input label="Save reusable template as" value={templateName} maxLength={80} onChangeText={setTemplateName} /><Action disabled={!templateName.trim()} onPress={() => onSaveTemplate({ name: templateName, fields: draft.fields, purpose: draft.purpose })}>Save template (no venue or answers)</Action></View>
       <Text style={styles.muted}>New events and changes to approved events require super administrator approval. While changes are reviewed, the published event and registration form remain live and unchanged. The organiser and authorised admins receive the applicable status notifications.</Text>
       <Action primary onPress={save}>Save event and registration form</Action>

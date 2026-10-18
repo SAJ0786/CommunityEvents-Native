@@ -1,4 +1,4 @@
-import { createDraft, validateDraft } from './prototypeModel';
+import { createDraft, validateDraft, registrationFields } from './prototypeModel';
 
 const EVENT_METADATA = ['hostName', 'organiserType', 'organiserId', 'organiserName', 'organisationType', 'isOnBehalfOf', 'eventSubject', 'audienceType', 'speakerName', 'reciters', 'timeMode', 'prayerName', 'prayerLabel', 'prayerOffsetMinutes', 'prayerTimeZone', 'hijriDate', 'enteredAsHijri', 'hijriDay', 'hijriMonth', 'hijriYear'];
 const eventMetadata = source => Object.fromEntries(EVENT_METADATA.filter(key => source[key] !== undefined).map(key => [key, source[key]]));
@@ -70,7 +70,7 @@ export function validateRegistrationOccurrences(draft, rows, prayer, cityDefinit
 export function answersForReview(detail) {
   const previous = detail.ownRegistration;
   const answers = {};
-  for (const field of detail.form?.fields || []) {
+  for (const field of registrationFields(detail.form?.fields || [], previous?.places || 1)) {
     const oldField = previous?.fields?.find(item => item.id === field.id);
     if (field.type === 'consent') { answers[field.id] = false; continue; }
     if (!oldField || oldField.type !== field.type || oldField.label !== field.label) continue;

@@ -350,6 +350,10 @@ function MainApp() {
       const loginConsent = loginConsentRef.current || {};
       loginConsentRef.current = null;
       const profilePromise = withTimeout((async () => {
+        const authoritative = ensureUserProfile(user.uid, {
+          email: user.email || '', phone: user.phoneNumber || '', phoneVerified: Boolean(user.phoneNumber), ...loginConsent,
+        });
+        authoritative.catch(() => {}); // Observe early failure while the independent device-cache read settles.
         // Firestore's device cache lets completed members enter immediately.
         // Still refresh authoritative roles/account state in the background.
         try {
@@ -358,9 +362,7 @@ function MainApp() {
             setProfile(cached); setProfileLoading(false);
           }
         } catch { /* A first login has no cached profile. */ }
-        const current = await ensureUserProfile(user.uid, {
-          email: user.email || '', phone: user.phoneNumber || '', phoneVerified: Boolean(user.phoneNumber), ...loginConsent,
-        });
+        const current = await authoritative;
         if (memberEntryState(user, current, false) === 'complete-profile' && user.phoneNumber) {
           if (activeRequest === profileRequestRef.current) { setProfile(current); setProfileLoading(false); }
           try { await migratePhoneAccount(); return await getUserProfile(user.uid); }

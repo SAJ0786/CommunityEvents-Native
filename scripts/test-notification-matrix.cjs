@@ -34,7 +34,7 @@ test('optional digest intersects canonical email, category and active identity; 
  assert.equal(recipientMatches({role:'superAdmin'}, 'u', {audience:'admins',city:'sydney'}),true);
 });
 test('welcome waits for complete profile, sends once, and does not welcome existing complete accounts', async () => {
- const h=harness(); h.user('member'); const e=h.event('users/member'); await h.functions.matrixProfileWritten(e); await h.flush(); assert.equal(h.mails.length,1); assert.equal((h.mails[0].html.match(/data-app-button/g)||[]).length,3); assert.doesNotMatch(h.mails[0].html, />[^<]*https:\/\/communityconnect/);
+ const h=harness(); h.user('member'); const e=h.event('users/member'); await h.functions.matrixProfileWritten(e); await h.flush(); assert.equal(h.mails.length,1); assert.equal((h.mails[0].html.match(/data-app-button/g)||[]).length,1); assert.doesNotMatch(h.mails[0].html, />[^<]*https:\/\/communityconnect/);
  await h.functions.matrixProfileWritten(e); await h.flush(); assert.equal(h.mails.length,1);
  const before = {...h.records.get('users/member')}; const later=h.event('users/member','later');later.data.before={exists:true,data:()=>before}; await h.functions.matrixProfileWritten(later);await h.flush();assert.equal(h.mails.length,1);
  h.user('incomplete',{fullName:''});await h.functions.matrixProfileWritten(h.event('users/incomplete','incomplete'));await h.flush();assert.equal(h.mails.length,1);
@@ -48,7 +48,7 @@ test('registration bookings route to organizer and superadmins only, and expose 
  h.records.set('registrationEvents/e',{ownerUid:'organizer',city:'sydney',title:'Workshop'});h.records.set('registrationEvents/e/registrations/attendee',{revision:1,status:'registered',answers:{secret:'private'}});
  const e={id:'booking',params:{eventId:'e',uid:'attendee'},data:{before:{data:()=>undefined},after:h.snap('registrationEvents/e/registrations/attendee')}};
  await h.functions.matrixRegistrationBooking(e);await h.flush();assert.deepEqual(h.mails.map(x=>x.to).sort(),['organizer@example.test','sa@example.test']);assert.equal(h.pushes.length,2);assert.ok(!JSON.stringify(h.pushes).includes('private'));
- for (const mail of h.mails) { assert.equal((mail.html.match(/data-app-button/g)||[]).length,3); assert.ok(!mail.html.includes('>https://')); assert.match(mail.text,/https:\/\/play.google.com/); }
+ for (const mail of h.mails) { assert.equal((mail.html.match(/data-app-button/g)||[]).length,1); assert.ok(!mail.html.includes('>https://')); assert.match(mail.text,/https:\/\/download.communityconnect.siza.info/); }
 });
 test('host message has bell and push only; ownership transfer stops stale delivery', async () => {
  const h=harness();h.user('host');h.user('customer');h.records.set('events/e',{createdByUserId:'host'});h.records.set('hostMessageThreads/t',{hostUid:'host',senderUid:'customer',participantUids:['host','customer'],eventId:'e'});h.records.set('hostMessageThreads/t/messages/m',{kind:'text',senderUid:'customer',text:'private message'});
@@ -82,4 +82,11 @@ test('durable event email respects latest preference, preserves Directory brandi
 test('temporary SMTP rejection retries safely, while ambiguous failure requires operator review',async()=>{
  const h=mailHarness();h.user('u');const job=await h.queue(h.db,'retry','u',{to:'u@example.test',subject:'Digest',text:'Tomorrow'});h.fail(Object.assign(Error('Temporary rejection'),{responseCode:451}));await assert.rejects(h.deliverQueuedEventEmail(h.delivery(job.reference)),/Retry/);assert.equal(h.records.get('eventEmailOutbox/'+job.reference).state,'pending');h.fail(null);await h.deliverQueuedEventEmail(h.delivery(job.reference));assert.equal(h.mails.length,1);
  const ambiguous=await h.queue(h.db,'ambiguous','u',{to:'u@example.test',subject:'Digest',text:'Tomorrow'});h.fail(Error('Timeout'));await h.deliverQueuedEventEmail(h.delivery(ambiguous.reference));h.fail(null);await h.deliverQueuedEventEmail(h.delivery(ambiguous.reference));assert.equal(h.mails.length,1);assert.equal(h.records.get('eventEmailOutbox/'+ambiguous.reference).state,'review-required');
+});
+
+
+test('registration conversation delivery uses its explicit event collection even when normal event IDs collide',async()=>{
+ const h=harness();h.user('host');h.user('customer');h.records.set('events/same',{createdByUserId:'different-host'});h.records.set('registrationEvents/same',{ownerUid:'host',status:'approved'});
+ h.records.set('hostMessageThreads/t',{eventCollection:'registrationEvents',hostUid:'host',senderUid:'customer',participantUids:['host','customer'],eventId:'same'});h.records.set('hostMessageThreads/t/messages/m',{kind:'text',senderUid:'customer',text:'private'});
+ await h.functions.matrixHostMessage({id:'same-message',params:{threadId:'t',messageId:'m'},data:h.snap('hostMessageThreads/t/messages/m')});await h.flush();assert.equal(h.pushes.length,1);assert.equal(h.pushes[0].data.recipientUid,'host');assert.equal(h.mails.length,0);
 });

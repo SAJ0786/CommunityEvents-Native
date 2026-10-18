@@ -51,7 +51,7 @@ export function userInitials(user, profile) {
 }
 
 export default function AccountMenuSheet({ visible, activeModule = 'events', isGuest = false, user, profile, authBusy = false, onClose, onNavigate, onSignOut, bottomInset = 120 }) {
-  const { translateY, requestClose, panHandlers } = useMenuDrawerMotion({ visible, onClose });
+  const { translateY, requestClose, panHandlers, onSheetLayout } = useMenuDrawerMotion({ visible, onClose, openingFraction:0.72 });
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superAdmin';
   const displayName = profile?.fullName || user?.displayName || user?.email || 'Community member';
   const role = profile?.role === 'superAdmin' ? 'Super Admin' : profile?.role === 'admin' ? 'Admin' : isGuest ? 'Guest access' : 'Member';
@@ -69,7 +69,7 @@ export default function AccountMenuSheet({ visible, activeModule = 'events', isG
   return (
     <View pointerEvents="box-none" style={[styles.layer, { paddingBottom: bottomInset }]}>
       <Pressable accessibilityLabel="Close menu" onPress={() => requestClose()} style={[styles.backdrop, { bottom: bottomInset }]} />
-      <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+      <Animated.View onLayout={onSheetLayout} style={[styles.sheet, { transform: [{ translateY }] }]}>
         <DrawerDragZone panHandlers={panHandlers} style={styles.dragZone}>
           <View style={styles.handle} />
           <View style={styles.headingRow}>

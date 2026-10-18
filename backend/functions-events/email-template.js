@@ -11,7 +11,14 @@ const emailBrand = module => module === 'events' ? 'Community Connect | Events'
   : module === 'directory' ? 'Community Connect | Business Directory' : 'Community Connect';
 
 function renderEmail({ module, title, bodyHtml, bodyText }) {
+  bodyHtml = String(bodyHtml || ''); bodyText = String(bodyText || '');
   const brand = emailBrand(module);
+  const downloadUrl = 'https://download.communityconnect.siza.info';
+  if (!bodyHtml.includes('data-app-button')) {
+    bodyHtml += `<p><a data-app-button href="${downloadUrl}" style="display:inline-block;background:#138477;color:#ffffff;border-radius:8px;padding:12px 20px;font-size:16px;font-weight:600;text-decoration:none">Explore Community Connect</a></p>`;
+    bodyText += `\n\nExplore Community Connect: ${downloadUrl}`;
+  }
+
   const footer = `This is an automated update from ${brand}. Replies are sent to ${SUPPORT_EMAIL}.`;
   return {
     attachments: [{ filename: 'community-connect.png', content: emailLogo, contentType: 'image/png', cid: EMAIL_LOGO_CID, contentDisposition: 'inline' }],

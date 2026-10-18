@@ -70,7 +70,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       purpose: text(raw.purpose, 1000),
       fields: raw.fields.map(field => {
         if (!field || typeof field !== 'object') fail('invalid-argument', 'Invalid question.');
-        return { id: id(field.id), type: text(field.type, 20), label: text(field.label, 200), description: text(field.description || '', 500, true), terms: text(field.terms || '', 1000, true), required: field.required === true,
+        return { ...(field.perParticipant === true ? {perParticipant:true} : {}), id: id(field.id), type: text(field.type, 20), label: text(field.label, 200), description: text(field.description || '', 500, true), terms: text(field.terms || '', 1000, true), required: field.required === true,
           options: Array.isArray(field.options) && field.options.length <= 20 ? field.options.map(option => text(option, 100)) : [] };
       }),
     };
@@ -324,7 +324,8 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const rawAnswers = request.data.answers;
       if (!rawAnswers || typeof rawAnswers !== 'object' || Array.isArray(rawAnswers)) fail('invalid-argument', 'Answers are required.');
       const answers = {};
-      for (const field of form.fields) {
+      const responseFields = (await model).registrationFields(form.fields, request.data.places);
+      for (const field of responseFields) {
         if (!Object.hasOwn(rawAnswers, field.id)) continue;
         const value = rawAnswers[field.id];
         if (!(typeof value === 'string' || typeof value === 'boolean' || (Array.isArray(value) && value.length <= 20 && value.every(item => typeof item === 'string' && item.length <= 100)))) fail('invalid-argument', 'Unsupported answer value.');
@@ -336,7 +337,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const reservedPlaces = event.reservedPlaces - previousPlaces + places;
       if (reservedPlaces > event.capacity) fail('resource-exhausted', 'Not enough places remain. Choose fewer places or try another event.');
       const result = { eventId, registrationId: caller.uid, revision: (previous?.revision || 0) + 1, status: 'registered', places, formVersion: form.version };
-      tx.set(ref, { ...result, uid: caller.uid, answers: clone(answers), fields: clone(form.fields), retentionPolicy: RETENTION.policy, submittedAt: previous?.status === 'registered' ? previous.submittedAt : now().toISOString(), updatedAt: now().toISOString() });
+      tx.set(ref, { ...result, uid: caller.uid, answers: clone(answers), fields: clone(responseFields), retentionPolicy: RETENTION.policy, submittedAt: previous?.status === 'registered' ? previous.submittedAt : now().toISOString(), updatedAt: now().toISOString() });
       tx.set(db.collection('registrationMemberEvents').doc(caller.uid).collection('events').doc(eventId), { eventId });
       tx.update(eventRef(eventId), { reservedPlaces, registrationCount: event.registrationCount + (previous?.status === 'registered' ? 0 : 1) });
       tx.set(receiptRef, { uid: caller.uid, hash, result, createdAt: now().toISOString() });

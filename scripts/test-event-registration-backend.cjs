@@ -23,7 +23,7 @@ function fixture() {
     limit: value => collection(path, filters, value, cursor, order), startAfter: value => collection(path, filters, maximum, value, order),
     get: async () => ({ docs: [...records.keys()].filter(key => key.startsWith(`${path}/`) && key.slice(path.length + 1).indexOf('/') === -1 && key.slice(path.length + 1) > cursor && filters.every(([field, value, op]) => op === '==' ? records.get(key)[field] === value : records.get(key)[field] <= value)).sort((a, b) => String(order === '__name__' ? a : records.get(a)[order]).localeCompare(String(order === '__name__' ? b : records.get(b)[order]))).slice(0, maximum).map(key => snap(reference(key))) }),
   });
-  const reference = path => ({ path, id: path.split('/').at(-1), get: async () => snap(reference(path)), collection: name => collection(`${path}/${name}`) });
+  const reference = path => ({ path, id: path.split('/').at(-1), get: async () => snap(reference(path)), set: async (data, options) => records.set(path, options?.merge ? {...records.get(path),...structuredClone(data)} : structuredClone(data)), collection: name => collection(`${path}/${name}`) });
   const db = { collection, runTransaction(fn) {
     // Serial execution models transaction retries: each concurrent request sees committed capacity.
     const promise = queue.then(async () => {
@@ -953,4 +953,26 @@ test('list pages batch current access checks and never load forms, pending draft
   assert.ok(reads.length <= 76, `Bounded summary reads: ${reads.length}`);
   assert.doesNotMatch(JSON.stringify(page), /99 Hidden Private Road|private-object|Private form not needed/);
   assert.ok(page.events.every(event => event.canManage === false && !event.hasPoster));
+});
+
+test('participant questions repeat exactly per place; booking contacts and consent remain single', async () => {
+  const f=fixture(); f.draft.capacity=10; f.draft.fields[0].perParticipant=true;
+  const event=await f.create(); await f.approve(event);
+  await assert.rejects(f.submit(event,'member',{places:2,answers:{name:'One shared name',consent:true}}),{code:'invalid-argument'});
+  const answers={'participant:1:name':'First child','participant:2:name':'Second child',consent:true,'participant:3:name':'Discard extra'};
+  const result=await f.submit(event,'member',{places:2,answers});
+  const saved=f.records.get(`registrationEvents/${event.eventId}/registrations/member`);
+  assert.equal(result.places,2);assert.equal(saved.answers['participant:1:name'],'First child');assert.equal(saved.answers['participant:2:name'],'Second child');assert.equal(saved.answers['participant:3:name'],undefined);
+  assert.deepEqual(saved.fields.filter(field=>field.participantIndex).map(field=>field.label),['Participant 1 — Name','Participant 2 — Name']);
+  assert.equal(saved.fields.filter(field=>field.type==='consent').length,1);
+  await assert.rejects(f.submit(event,'other',{places:6,answers,requestId:'too-many'}),{code:'invalid-argument'});
+  const reduced=await f.submit(event,'member',{places:1,expectedRevision:result.revision,requestId:'reduce',answers});
+  assert.equal(reduced.places,1);assert.equal(f.records.get(`registrationEvents/${event.eventId}/registrations/member`).answers['participant:2:name'],undefined);
+});
+
+test('participant templates preserve scope; agreement cannot become a repeated participant question',async()=>{
+  const f=fixture();f.draft.fields[0].perParticipant=true;
+  const template=await f.handlers.saveRegistrationTemplate(f.request('host',{templateId:'participants',name:'Children',purpose:'Arrange attendance',fields:f.draft.fields}));
+  const saved=[...f.records.values()].find(row=>row.name==='Children');assert.equal(saved.fields[0].perParticipant,true);
+  f.draft.fields[1].perParticipant=true;await assert.rejects(f.create(),{code:'invalid-argument'});
 });

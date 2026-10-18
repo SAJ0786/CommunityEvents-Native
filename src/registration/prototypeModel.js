@@ -106,6 +106,7 @@ export function validateDraft(draft) {
     if (!field.label.trim() || field.label.length > 200) errors.push('Question labels must contain 1–200 characters.');
     if (!FIELD_TYPES.some(([type]) => type === field.type)) errors.push('Choose a supported question type.');
     if (field.type === 'consent' && (!field.terms?.trim() || field.terms.length > TERMS_LIMIT)) errors.push(`Write the terms registrants must agree to (1–${TERMS_LIMIT} characters).`);
+    if (field.type === 'consent' && field.perParticipant) errors.push('Consent applies once to the booking, not separately to each participant.');
     if (field.type === 'consent' && !field.required) errors.push('Agreement must be required when included.');
     if (['select', 'radio', 'checkboxes'].includes(field.type)) {
       const options = field.options.map(o => o.trim());
@@ -113,12 +114,13 @@ export function validateDraft(draft) {
     }
   }
   if (draft.fields.some((field, index) => field.type === 'consent' && draft.fields.slice(index + 1).some(next => next.type !== 'consent'))) errors.push('Keep agreement fields at the end of the form.');
+  if (draft.fields.some(field => field.perParticipant) && !draft.fields.some(field => field.perParticipant && field.required)) errors.push('Make at least one participant question required, such as full name.');
   return [...new Set(errors)];
 }
 export function validateAnswers(fields, answers, places, capacity) {
   const errors = {};
-  if (!Number.isSafeInteger(Number(places)) || Number(places) < 1 || Number(places) > Number(capacity)) errors.places = 'Choose a whole number of places within capacity.';
-  for (const field of fields) {
+  if (!Number.isSafeInteger(Number(places)) || Number(places) < 1 || Number(places) > Math.min(MAX_BOOKING_PLACES, Number(capacity))) errors.places = 'Choose 1–5 places within the available capacity.';
+  for (const field of registrationFields(fields, places)) {
     const value = Object.prototype.hasOwnProperty.call(answers, field.id) ? answers[field.id] : undefined;
     const empty = value == null || value === false || (typeof value === 'string' && !value.trim()) || (Array.isArray(value) && !value.length);
     if (empty) { if (field.required) errors[field.id] = 'This answer is required.'; continue; }
@@ -142,4 +144,24 @@ function isCalendarDate(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(value + 'T12:00:00Z');
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+
+export const MAX_BOOKING_PLACES = 5;
+// Colon namespaces cannot collide with organiser question IDs (letters/digits/_/- only).
+export function registrationFields(fields, places) {
+  const count = Math.max(0, Math.min(MAX_BOOKING_PLACES, Number.isSafeInteger(Number(places)) ? Number(places) : 0));
+  const booking = fields.filter(field => !field.perParticipant && field.type !== 'consent');
+  const repeat = fields.filter(field => field.perParticipant);
+  const consent = fields.filter(field => field.type === 'consent' && !field.perParticipant);
+  return [...booking, ...Array.from({length:count}, (_, index) => repeat.map(field => ({ ...field,
+    id: `participant:${index + 1}:${field.id}`, sourceId:field.id, participantIndex:index + 1,
+    originalLabel:field.label, label:`Participant ${index + 1} — ${field.label}` }))).flat(), ...consent];
+}
+export function registrationFieldGroups(fields, places) {
+  const expanded = registrationFields(fields, places);
+  const groups = [{id:'booking',label:'Booking details',fields:expanded.filter(field => !field.participantIndex && field.type !== 'consent')}];
+  for (let index=1; index<=MAX_BOOKING_PLACES; index++) groups.push({id:`participant-${index}`,label:`Participant ${index}`,fields:expanded.filter(field => field.participantIndex === index)});
+  groups.push({id:'consent',label:'Agreement',fields:expanded.filter(field => field.type === 'consent')});
+  return groups.filter(group => group.fields.length);
 }

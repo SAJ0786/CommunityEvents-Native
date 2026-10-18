@@ -51,7 +51,7 @@ export async function sendHostMessage({ event, user, profile, text }) {
   if (hostUid === user.uid) throw new Error('This event is already managed by you.');
 
   const senderUid = user.uid;
-  const threadId = `${event.id}_${senderUid}_${hostUid}`;
+  const threadId = `${event.registrationOnly ? 'registration_' : ''}${event.id}_${senderUid}_${hostUid}`;
   const threadRef = doc(db, 'hostMessageThreads', threadId);
   const senderName = getSenderName(user, profile);
   const eventTitle = event.registrationOnly ? event.title : `${event.eventTypeDisplay || event.eventType || 'Event'} - ${event.hostName || 'Host'}`;
@@ -60,7 +60,7 @@ export async function sendHostMessage({ event, user, profile, text }) {
   const messageRef = doc(collection(threadRef, 'messages'));
   const batch = writeBatch(db);
   batch.set(threadRef, {
-    type: 'host',
+    type: 'host', ...(event.registrationOnly ? {eventCollection:'registrationEvents'} : {}),
     eventId: event.id,
     eventTitle,
     eventDate: event.eventDate || '',

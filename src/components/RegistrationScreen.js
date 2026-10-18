@@ -7,7 +7,7 @@ import { Action, Answer, Input, styles } from '../registration/RegistrationContr
 import { firebaseRegistration } from '../registration/firebaseRegistration';
 import { createSubmission } from '../registration/registrationClient';
 import { answersForReview, eventDraftFromDetail, mergeRegistrationPage } from '../registration/registrationViewModel';
-import { createDraft, validateAnswers } from '../registration/prototypeModel';
+import { createDraft, validateAnswers, registrationFieldGroups } from '../registration/prototypeModel';
 import { EVENT_TYPES } from '../utils/eventOptions';
 import { cityLabel } from '../utils/cities';
 import { colors } from '../theme';
@@ -208,8 +208,8 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       <Text style={styles.title}>{detail.ownRegistration?.status === 'registered' ? 'Edit registration' : 'Register'} · {detail.event.title}</Text>
       {detail.ownRegistration && detail.ownRegistration.formVersion !== detail.form.version && <Text style={styles.error}>The organiser changed the form. Review every question and agree to the current terms again.</Text>}
       <Text style={styles.text}>{detail.form.purpose}</Text><Text style={styles.muted}>{detail.retention?.notice}</Text>
-      <Input label="Number of places" value={places} keyboardType="number-pad" onChangeText={value => { submission.current = null; setPlaces(value); }} />
-      {detail.form.fields.map(field => <View key={field.id}><Answer field={field} value={answers[field.id]} onChange={value => { submission.current = null; setAnswers(current => ({ ...current, [field.id]: value })); }} />{field.description ? <Text style={styles.muted}>{field.description}</Text> : null}</View>)}
+      <Input label="Number of places (maximum 5)" value={places} keyboardType="number-pad" onChangeText={value => { submission.current = null; setPlaces(value); }} />
+      {registrationFieldGroups(detail.form.fields, places).map(group => <View key={group.id} style={styles.panel}><Text style={styles.title}>{group.label}</Text>{group.fields.map(field => <View key={field.id}><Answer field={{...field,label:field.originalLabel || field.label}} value={answers[field.id]} onChange={value => { submission.current = null; setAnswers(current => ({ ...current, [field.id]: value })); }} />{field.description ? <Text style={styles.muted}>{field.description}</Text> : null}</View>)}</View>)}
       <Action primary onPress={submit}>Submit registration</Action><Action onPress={onBack}>Back to events</Action>
     </View>}
     {detail && ['confirmation', 'host-confirmation'].includes(stage) && <View style={styles.panel}>

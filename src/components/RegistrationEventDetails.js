@@ -130,7 +130,7 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
         {posterError ? <Text accessibilityRole="alert" style={styles.error}>{posterError}</Text> : null}
         <Text style={styles.label}>Registration purpose</Text><Text style={styles.text}>{submitted.form?.purpose}</Text>
         {(submitted.form?.fields || []).map((field, index) => <View key={field.id} style={styles.panel}>
-          <Text style={styles.label}>{index + 1}. {field.label} ({field.type}, {field.required ? 'required' : 'optional'})</Text>
+          <Text style={styles.label}>{index + 1}. {field.label} ({field.type}, {field.required ? 'required' : 'optional'}{field.perParticipant ? ', per participant' : ''})</Text>
           {field.description ? <Text style={styles.text}>{field.description}</Text> : null}
           {(field.options || []).map((option, optionIndex) => <Text key={optionIndex} style={styles.text}>{option}</Text>)}
           {field.terms ? <Text selectable style={styles.text}>Terms: {field.terms}</Text> : null}

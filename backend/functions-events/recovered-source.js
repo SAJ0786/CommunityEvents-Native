@@ -2958,14 +2958,7 @@ exports.onAiReportCreated = onDocumentCreated(
 );
 
 function buildStoreAnnouncementEmail() {
-  const stores = [
-    ['App Store', 'Download for iPhone & iPad', 'https://apps.apple.com/au/app/community-events-australia/id6782770347'],
-    ['Google Play', 'Download for Android', 'https://play.google.com/store/apps/details?id=info.siza.communityevents.app'],
-    ['Microsoft Store', 'Download for Windows PC', 'https://apps.microsoft.com/detail/9NDGJZHL86KJ'],
-  ];
-  return `<p style="margin:0 0 16px">Community Connect is available on Google Play, the App Store and Microsoft Store.</p>
-    ${stores.map(([name, description, url]) => `<a href="${escapeHtml(url)}" style="display:block;margin:10px 0;padding:14px;border:1px solid #d7e4e1;border-radius:8px;color:#138477;text-decoration:none;overflow-wrap:anywhere"><strong style="display:block;font-size:18px">${escapeHtml(name)}</strong><span style="font-size:16px;color:#46545d">${escapeHtml(description)}</span></a>`).join('')}
-    <p>You can also use the web app on any device:<br><a href="https://communityevents.siza.info" style="color:#138477;overflow-wrap:anywhere">communityevents.siza.info</a></p>`;
+  return `<p>Discover community events and trusted local businesses with Community Connect Australia.</p><p>Explore the app using the button below.</p>`;
 }
 
 // Unsubscribe footer added to every user-facing email
@@ -2979,8 +2972,6 @@ function unsubscribeFooter(uid = '') {
       <p style="font-size:11px;color:#9ca3af;line-height:1.6;margin:0">
         You are receiving this email because you registered with Community Connect.<br/>
         <a href="${unsubUrl}" style="color:#6b7280;text-decoration:underline">Unsubscribe from reminder emails</a>
-        &nbsp;&middot;&nbsp;
-        <a href="${APP_DOWNLOAD_URL}" style="color:#6b7280;text-decoration:underline">Open / Download App</a>
         &nbsp;&middot;&nbsp;
         <a href="mailto:support@siza.info" style="color:#6b7280;text-decoration:underline">Contact Us</a>
       </p>

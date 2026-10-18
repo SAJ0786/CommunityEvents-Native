@@ -4,9 +4,10 @@ import { Animated, Easing, PanResponder, useWindowDimensions } from 'react-nativ
 // The Menu drawer's complete motion lifecycle, shared by all drawer headers.
 // Keep panHandlers outside the body ScrollView so scrolling never competes
 // with dragging the handle/title. Content remains independently scrollable.
-export default function useMenuDrawerMotion({ visible, onClose }) {
+export default function useMenuDrawerMotion({ visible, onClose, openingFraction = 1 }) {
   const { height: screenHeight } = useWindowDimensions();
   const translateY = useRef(new Animated.Value(screenHeight)).current;
+  const sheetHeight = useRef(0);
   const closeRef = useRef(onClose);
   const closingRef = useRef(false);
   const afterCloseRef = useRef(null);
@@ -19,7 +20,7 @@ export default function useMenuDrawerMotion({ visible, onClose }) {
     closingRef.current = false;
     afterCloseRef.current = null;
     if (visible) {
-      translateY.setValue(Math.max(620, screenHeight));
+      translateY.setValue(sheetHeight.current || screenHeight * openingFraction);
       Animated.spring(translateY, {
         toValue: 0, damping: 25, stiffness: 230, mass: 0.9, useNativeDriver: true,
       }).start();
@@ -28,7 +29,7 @@ export default function useMenuDrawerMotion({ visible, onClose }) {
       if (generation.current === current) generation.current++;
       translateY.stopAnimation();
     };
-  }, [screenHeight, translateY, visible]);
+  }, [screenHeight, translateY, visible, openingFraction]);
 
   const restoreSheet = useCallback(() => {
     if (closingRef.current) return;
@@ -81,5 +82,6 @@ export default function useMenuDrawerMotion({ visible, onClose }) {
     onPanResponderTerminationRequest: () => false,
   }), [releaseDrag, restoreSheet, shouldCaptureDrag, translateY]);
 
-  return { translateY, requestClose, panHandlers: responder.panHandlers };
+  const onSheetLayout = useCallback(event => { sheetHeight.current = event.nativeEvent.layout.height; }, []);
+  return { translateY, requestClose, onSheetLayout, panHandlers: responder.panHandlers };
 }

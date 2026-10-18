@@ -19,6 +19,8 @@ async function main() {
     const expected = name.startsWith('business') ? emailBrand('directory') : name.startsWith('events') ? emailBrand('events') : emailBrand();
     assert.ok(email.html.includes(expected), name + ' branding');
     assert.ok(email.text.startsWith(expected));
+    assert.equal((email.html.match(/data-app-button/g)||[]).length, 1, name+' uses one app button');
+    assert.match(email.html, /href="https:\/\/download\.communityconnect\.siza\.info"/);
     assert.match(email.html, /font-size:16px/);
     assert.match(email.html, /<h1 style="[^"]*font-size:18px/);
     assert.match(email.html, /data-email-brand style="font-size:20px/);

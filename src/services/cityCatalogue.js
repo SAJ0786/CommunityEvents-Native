@@ -20,8 +20,10 @@ export function refreshCityCatalogue() {
       const snapshot = await Promise.race([getDocFromServer(doc(db, 'settings', 'cityCatalogue')),
         new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('catalogue-timeout')), 8000); })]);
       const data = snapshot.exists() && validateCityCatalogue(snapshot.data());
-      if (data && installCityCatalogue(data)) await AsyncStorage.setItem(KEY, JSON.stringify(data));
-      lastCheck = now;
+      if (data) {
+        if (installCityCatalogue(data)) await AsyncStorage.setItem(KEY, JSON.stringify(data));
+        lastCheck = now;
+      }
     } catch { /* keep last-known-good catalogue; retry on next foreground */ }
     finally { clearTimeout(timer); }
   })().finally(() => { pending = null; });

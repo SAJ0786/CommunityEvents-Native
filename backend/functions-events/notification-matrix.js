@@ -35,6 +35,13 @@ function register(deps = {}) {
   const db = deps.db || admin.firestore(), region = 'australia-southeast1';
   const secrets = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'].map(name => defineSecret(name));
   const timestamp = () => admin.firestore.FieldValue.serverTimestamp();
+  async function hostEvent(thread) {
+    if (!thread) return null;
+    if (['events','registrationEvents'].includes(thread.eventCollection)) return (await db.collection(thread.eventCollection).doc(thread.eventId).get()).data();
+    // Older conversations predate the explicit collection discriminator.
+    return (await db.collection('events').doc(thread.eventId).get()).data() || (await db.collection('registrationEvents').doc(thread.eventId).get()).data();
+  }
+
   async function create(ref, value) { try { await ref.create(value); } catch (e) { if (e.code !== 6 && e.code !== 'already-exists') throw e; } }
   async function queue(key, value) {
     await create(db.collection('notificationCampaigns').doc(hash(key)), {
@@ -98,7 +105,7 @@ function register(deps = {}) {
     if (emailValid(after.email) && clean(after.fullName).length >= 2) {
       // Stable per-account key works even when profile completion arrives after creation.
       if (!event.data.before.exists || !emailValid(before.email) || clean(before.fullName).length < 2) await queue(`welcome:${uid}`,  { type: 'account.welcome', audience: 'ids', uids: [uid], channels: ['email'], title: 'Welcome to Community Connect Australia',
-        body: `Welcome ${clean(after.fullName)}. Discover community events and the Business Directory. Manage optional updates in Profile & Settings. https://communityconnect.siza.info` });
+        body: `Welcome ${clean(after.fullName)} to Community Connect Australia.\nDiscover local community events and connect with trusted businesses.\nFind what’s on near you, register and stay connected.\nExplore the app by clicking the button below.` });
       if (!emailValid(before.email)) await queue(`signup-admin:${uid}`, { type: 'account.created', audience: 'admins', city: cityOf(after), required: false, policy: 'admin', channels: ['email'], title: 'New member registered', body: 'A member completed their profile. Open User Management for details.' });
       if (emailValid(before.email) && clean(before.email).toLowerCase() !== clean(after.email).toLowerCase()) {
         await queue(`${event.id}:email`, { type: 'account.email_changed', audience: 'ids', uids: [uid], channels: ['email'], expectedEmail: clean(after.email).toLowerCase(), title: 'Your contact email was changed', body: 'This email confirms that your Community Connect Australia contact email has changed. If you did not make this change, contact support@siza.info.' });
@@ -109,7 +116,7 @@ function register(deps = {}) {
   const matrixHostMessage = onDocumentCreated(opts('hostMessageThreads/{threadId}/messages/{messageId}'), async event => {
     const message = event.data?.data(), thread = (await db.collection('hostMessageThreads').doc(event.params.threadId).get()).data();
     if (!thread || message?.kind !== 'text' || ![thread.hostUid, thread.senderUid].includes(message.senderUid)) return;
-    const currentEvent = (await db.collection('events').doc(thread.eventId).get()).data() || (await db.collection('registrationEvents').doc(thread.eventId).get()).data();
+    const currentEvent = await hostEvent(thread);
     if (!currentEvent || owner(currentEvent) !== thread.hostUid) return;
     const recipient = message.senderUid === thread.hostUid ? thread.senderUid : thread.hostUid;
     if (!recipient || recipient === message.senderUid || !thread.participantUids?.includes(recipient)) return;
@@ -158,7 +165,7 @@ function register(deps = {}) {
     if (job.expectedEmail && clean(user.email).toLowerCase() !== job.expectedEmail) return false;
     if (job.threadId) {
       const thread = (await db.collection('hostMessageThreads').doc(job.threadId).get()).data();
-      const value = thread && ((await db.collection('events').doc(thread.eventId).get()).data() || (await db.collection('registrationEvents').doc(thread.eventId).get()).data());
+      const value = await hostEvent(thread);
       if (!value || owner(value) !== thread.hostUid || !thread.participantUids?.includes(uid)) return false;
     }
     return Boolean(match);
@@ -224,7 +231,7 @@ function register(deps = {}) {
           if (user.emailDisabledByBounce || ['bounced','complained','suppressed'].includes(user.emailStatus)) return doc.ref.update({ state: 'skipped', reason: 'email-suppressed-by-provider-feedback' });
           if (!emailValid(user.email)) return doc.ref.update({ state: 'skipped', reason: 'no-valid-email' });
           const result = await require('./email-layout').sendEventEmail(mailer, { from: { name: 'Community Connect Australia', address: 'support@siza.info' }, replyTo: 'support@siza.info', to: clean(user.email),
-            subject: job.title, ...((job.module === 'registration' || job.type === 'account.welcome') ? require('./email-layout').registrationEmailContent(job.body) : { text: `${job.body}\n\nOpen Community Connect Australia: https://communityconnect.siza.info\nContact support@siza.info for assistance.` }), messageId: `<${doc.id}@siza.info>` });
+            subject: job.title, ...require('./email-layout').registrationEmailContent(job.type === 'account.welcome' ? require('./email-layout').welcomeEmailBody(user.fullName) : job.body), messageId: `<${doc.id}@siza.info>` });
           providerAccepted = Boolean(result.accepted?.length); if (!providerAccepted) throw Object.assign(Error('Recipient rejected'), { responseCode: 550 });
         } else {
           const tokens = [...new Set((Array.isArray(user.fcmTokens) ? user.fcmTokens : Object.keys(user.fcmTokens || {})).filter(Boolean))];

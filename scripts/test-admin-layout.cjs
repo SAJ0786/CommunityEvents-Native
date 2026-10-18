@@ -23,11 +23,11 @@ async function main() {
   assert.equal(layout.bottomInset, 120, 'safe fallback before layout');
   layout.rootRef.current = { measureInWindow: fn => fn(0, 0, 393, 852) };
   layout.onNavigationLayout({ measureInWindow: fn => fn(12, 745, 369, 66) });
-  assert.equal(measuredInset, 123, 'includes iPhone safe area and raised Add button');
+  assert.equal(measuredInset, 107, 'ends exactly at the navigation top without an extra raised-button gap');
   layout.rootRef.current = { measureInWindow: fn => fn(0, 24, 360, 776) };
   layout.onNavigationLayout({ measureInWindow: fn => fn(12, 710, 336, 80) });
-  assert.equal(measuredInset, 106, 'handles scaled footer and offset root');
-  assert.equal(hook.menuNavigationInset(0, 700, 690), 88);
+  assert.equal(measuredInset, 90, 'handles scaled footer and offset root');
+  assert.equal(hook.menuNavigationInset(0, 700, 690), 10);
 
   const react = { createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat() }), Fragment: 'Fragment', useState: value => [value, () => {}], useMemo: fn => fn() };
   const select = load('src/components/CompactSelect.js', {

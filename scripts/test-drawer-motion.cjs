@@ -54,9 +54,9 @@ function harness() {
     throw new Error(id);
   } });
   return { animations, calls,
-    render(visible = true) {
+    render(visible = true, openingFraction = 1) {
       index = 0;
-      const result = exports.default({ visible, onClose: () => calls.push('close') });
+      const result = exports.default({ visible, openingFraction, onClose: () => calls.push('close') });
       effects.splice(0).forEach(effect => effect());
       return result;
     },
@@ -121,7 +121,7 @@ interrupted.unmount();
 
 for (const name of ['AccountMenuSheet', 'EventDetailsModal', 'NotificationsDrawer']) {
   const source = read(`src/components/${name}.js`);
-  assert.match(source, /useMenuDrawerMotion\(\{ visible, onClose \}\)/);
+  assert.match(source, /useMenuDrawerMotion\(\{ visible, onClose(?:, openingFraction:0\.72)? \}\)/);
   assert.match(source, /DrawerDragZone/);
   assert.match(source, /panHandlers=\{panHandlers\}/);
   assert.doesNotMatch(source, /PanResponder.create|Animated.spring|Animated.timing/);
@@ -157,3 +157,11 @@ assert.match(read('src/components/EventDetailsModal.js'), /sheetHeader: \{\s*min
 assert.match(read('src/components/NotificationsDrawer.js'), /dragZone: \{ minHeight: 78,/, 'notifications drag zone must match the same minimum hit height');
 
 console.log('PASS shared drawers: Menu spring settings, drag ownership, snap-back, projected swipe, deferred/duplicate close, reopen interruption, navigation ordering and fixed notification header');
+
+const firstOpen = harness();
+let quickMenu = firstOpen.render(true, 0.72);
+assert.equal(quickMenu.translateY.value, 844 * 0.72, 'first menu starts close to its own height, avoiding a blank offscreen travel interval');
+quickMenu.onSheetLayout({nativeEvent:{layout:{height:420}}});
+firstOpen.render(false, 0.72);
+quickMenu = firstOpen.render(true, 0.72);
+assert.equal(quickMenu.translateY.value,420,'subsequent openings use measured sheet height');

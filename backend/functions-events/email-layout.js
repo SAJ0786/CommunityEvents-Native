@@ -14,11 +14,10 @@ function textAlternative(html) {
 }
 
 // Fixed destinations only: notification data cannot inject a button URL.
-const APP_DESTINATIONS = Object.freeze([
-  ['Open web app', 'https://communityconnect.siza.info'],
-  ['Download for iPhone / iPad', 'https://apps.apple.com/au/app/community-events-australia/id6782770347'],
-  ['Download for Android', 'https://play.google.com/store/apps/details?id=info.siza.communityevents.app'],
-]);
+const APP_DESTINATIONS = Object.freeze([['Explore Community Connect', 'https://download.communityconnect.siza.info']]);
+function welcomeEmailBody(name) {
+  return `Welcome ${String(name || '').trim()} to Community Connect Australia.\nDiscover local community events and connect with trusted businesses.\nFind what’s on near you, register and stay connected.\nExplore the app by clicking the button below.`;
+}
 function registrationEmailContent(body) {
   // Older queued welcome messages contain this URL in their body too.
   const message = String(body ?? '').replace(/https:\/\/communityconnect\.siza\.info\/?/g, '').trim();
@@ -41,4 +40,4 @@ function sendEventEmail(transporter, message) {
     attachments: [...(message.attachments || []), ...rendered.attachments],
   });
 }
-module.exports = { sendEventEmail, textAlternative, registrationEmailContent };
+module.exports = { sendEventEmail, textAlternative, registrationEmailContent, welcomeEmailBody };

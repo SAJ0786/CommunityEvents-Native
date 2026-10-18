@@ -2,9 +2,9 @@ import { useCallback, useRef, useState } from 'react';
 
 // Both navigation bars sit inside the app's SafeAreaView. Measure in the same
 // window coordinates so the home indicator, font scaling and raised Add button
-// are included instead of assuming a fixed footer height.
+// are measured without adding a second visual gap above the navigation.
 export const menuNavigationInset = (rootY, rootHeight, navigationY) =>
-  Math.max(88, Math.ceil(rootY + rootHeight - navigationY + 16));
+  Math.max(0, Math.ceil(rootY + rootHeight - navigationY));
 
 export default function useMenuNavigationInset() {
   const rootRef = useRef(null);
