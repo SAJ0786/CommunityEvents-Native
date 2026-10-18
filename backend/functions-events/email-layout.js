@@ -20,9 +20,11 @@ const APP_DESTINATIONS = Object.freeze([
   ['Download for Android', 'https://play.google.com/store/apps/details?id=info.siza.communityevents.app'],
 ]);
 function registrationEmailContent(body) {
+  // Older queued welcome messages contain this URL in their body too.
+  const message = String(body ?? '').replace(/https:\/\/communityconnect\.siza\.info\/?/g, '').trim();
   return {
-    text: `${body}\n\n${APP_DESTINATIONS.map(([label,url]) => `${label}: ${url}`).join('\n')}\nContact support@siza.info for assistance.`,
-    html: `<p style="white-space:pre-wrap">${escapeHtml(body)}</p><table role="presentation" cellspacing="0" cellpadding="0">${APP_DESTINATIONS.map(([label,url]) => `<tr><td style="padding:0 0 10px"><a data-app-button href="${escapeHtml(url)}" style="display:inline-block;background:#138477;border:1px solid #138477;border-radius:8px;padding:12px 20px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;text-align:center">${escapeHtml(label)}</a></td></tr>`).join('')}</table><p>Contact support@siza.info for assistance.</p>`,
+    text: `${message}\n\n${APP_DESTINATIONS.map(([label,url]) => `${label}: ${url}`).join('\n')}\nContact support@siza.info for assistance.`,
+    html: `<p style="white-space:pre-wrap">${escapeHtml(message)}</p><table role="presentation" cellspacing="0" cellpadding="0">${APP_DESTINATIONS.map(([label,url]) => `<tr><td style="padding:0 0 10px"><a data-app-button href="${escapeHtml(url)}" style="display:inline-block;background:#138477;border:1px solid #138477;border-radius:8px;padding:12px 20px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;text-align:center">${escapeHtml(label)}</a></td></tr>`).join('')}</table><p>Contact support@siza.info for assistance.</p>`,
   };
 }
 

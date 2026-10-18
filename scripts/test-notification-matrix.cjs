@@ -34,7 +34,7 @@ test('optional digest intersects canonical email, category and active identity; 
  assert.equal(recipientMatches({role:'superAdmin'}, 'u', {audience:'admins',city:'sydney'}),true);
 });
 test('welcome waits for complete profile, sends once, and does not welcome existing complete accounts', async () => {
- const h=harness(); h.user('member'); const e=h.event('users/member'); await h.functions.matrixProfileWritten(e); await h.flush(); assert.equal(h.mails.length,1); assert.equal((h.mails[0].html.match(/data-app-button/g)||[]).length,3);
+ const h=harness(); h.user('member'); const e=h.event('users/member'); await h.functions.matrixProfileWritten(e); await h.flush(); assert.equal(h.mails.length,1); assert.equal((h.mails[0].html.match(/data-app-button/g)||[]).length,3); assert.doesNotMatch(h.mails[0].html, />[^<]*https:\/\/communityconnect/);
  await h.functions.matrixProfileWritten(e); await h.flush(); assert.equal(h.mails.length,1);
  const before = {...h.records.get('users/member')}; const later=h.event('users/member','later');later.data.before={exists:true,data:()=>before}; await h.functions.matrixProfileWritten(later);await h.flush();assert.equal(h.mails.length,1);
  h.user('incomplete',{fullName:''});await h.functions.matrixProfileWritten(h.event('users/incomplete','incomplete'));await h.flush();assert.equal(h.mails.length,1);
