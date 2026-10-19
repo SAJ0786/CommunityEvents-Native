@@ -1354,6 +1354,7 @@ function MainApp() {
           onClear={() => { setHomeFilters({ ...EMPTY_HOME_FILTERS }); setNearbyEventsOnly(false); }}
         />
       <View style={styles.sectionHeadingRow}><Text style={styles.homeSectionTitle}>Quick access</Text></View>
+      <View style={quickAccess.panel}>
       <HorizontalStrip accessibilityLabel="Quick access" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickGrid}>
         {[
           ...(REGISTRATION_ENABLED ? [['clipboard-text-outline', registrationOnly ? 'All events' : 'Registration\nonly', colors.tealSoft, colors.tealDark, () => setRegistrationOnly(value => !value)]] : []),
@@ -1368,6 +1369,7 @@ function MainApp() {
           </Pressable>
         ))}
       </HorizontalStrip>
+      </View>
       <View style={styles.sectionHeadingRow}>
         <Text style={styles.homeSectionTitle}>Browse events</Text>
         <Text style={styles.resultCount}>{displayedEvents.length} in {cityLabel(selectedCity).replace(', Australia', '')}</Text>

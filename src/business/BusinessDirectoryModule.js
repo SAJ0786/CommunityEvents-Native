@@ -232,6 +232,7 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
       </View>
 
       <SectionHeading title="Quick access" subtitle="Swipe for useful ways to explore" actionLabel={categoryId === 'all' && !openOnly && !favouritesOnly && !nearbyOnly && !recentOnly ? '' : 'Clear'} onAction={clearBrowseFilters} />
+      <View style={quickAccess.panel}>
       <HorizontalStrip accessibilityLabel="Business filters" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.browseChips}>
         {[
           ['view-grid-outline', 'All', colors.blueSoft, colors.blue, clearBrowseFilters, categoryId === 'all' && !openOnly && !favouritesOnly && !nearbyOnly && !recentOnly],
@@ -242,10 +243,11 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
         ].map(([icon, label, backgroundColor, color, onPress, active]) => (
           <Pressable key={label} accessibilityState={{ selected: active }} onPress={onPress} style={({ pressed }) => [styles.browseAccess, active && styles.browseAccessActive, pressed && styles.pressed]}>
             <View style={[styles.browseAccessIcon, { backgroundColor }]}><MaterialCommunityIcons color={color} name={icon} size={20} /></View>
-            <Text numberOfLines={1} style={[styles.browseAccessLabel, active && styles.browseAccessLabelActive]}>{label}</Text>
+            <Text style={[styles.browseAccessLabel, active && styles.browseAccessLabelActive]}>{label}</Text>
           </Pressable>
         ))}
       </HorizontalStrip>
+      </View>
 
       <SectionHeading title={favouritesOnly ? 'Favourite businesses' : 'Browse businesses'} subtitle={favouritesOnly ? 'Only businesses saved to your profile' : subcategoryId ? `Filtered: ${selectedCategory?.subcategories.find(item => item.id === subcategoryId)?.label || 'Selected service'}` : 'Browse by service'} actionLabel={categoryId === 'all' && !subcategoryId && !favouritesOnly ? '' : 'Clear'} onAction={() => { setCategoryId('all'); setSubcategoryId(''); setFavouritesOnly(false); }} />
       <HorizontalStrip accessibilityLabel="Business categories" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRail}>
