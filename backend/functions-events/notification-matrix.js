@@ -148,9 +148,11 @@ function register(deps = {}) {
     if (value.date < today || value.endAt && Date.parse(value.endAt) <= Date.now()) return;
     const { registrationInstant } = await import('./eventSchedule.mjs');
     const expiresAt = value.endAt ? Date.parse(value.endAt) : Date.parse(registrationInstant(value.date, '23:59', value.timeZone || 'Australia/Sydney'));
+    const cancelled = change.changes?.includes('cancelled');
     await queue(event.id, { expiresAt, type: 'registration.changed', module: 'registration', audience: 'registration', eventId: change.eventId,
-      city: eventCity(value), changeCreatedAt: change.createdAt, title: change.changes?.includes('cancelled') ? 'Registered event cancelled' : 'Registered event updated',
-      body: 'An event you registered for has changed. Open My Events, select the event and review its current status, details and registration form.' });
+      city: eventCity(value), changeCreatedAt: change.createdAt, title: cancelled ? `Event cancelled: ${title(value)}` : `Registered event updated: ${title(value)}`,
+      body: cancelled ? `${title(value)} has been cancelled or removed by the organiser. Your places are no longer reserved. Open My Events to review the event status.`
+        : `${title(value)} has changed. Open My Events to review the current event details and registration form.` });
   });
   async function matches(user, uid, job) {
     if (job.expiresAt && job.expiresAt <= Date.now()) return false;
@@ -205,6 +207,24 @@ function register(deps = {}) {
           campaignId: campaign.id, uid: doc.id, channel, state: 'pending', createdAt: timestamp(),
         });
       };
+      if (job.audience === 'registration') {
+        // Registration service notices target bookings and reviewers directly,
+        // rather than waiting behind every unrelated account in the database.
+        // Keep delivery IDs unchanged, including for campaigns already in progress.
+        if (!job.registrationAdminsQueued) {
+          for (const role of ['superAdmin','admin']) {
+            const reviewers = await db.collection('users').where('role','==',role).get();
+            for (const doc of reviewers.docs) await enqueue(doc);
+          }
+        }
+        let query = db.collection('registrationEvents').doc(job.eventId).collection('registrations').where('status','==','registered').orderBy('__name__').limit(50);
+        if (job.registrationCursor) query = query.startAfter(job.registrationCursor);
+        const bookings = await query.get();
+        for (const booking of bookings.docs) await enqueue(await db.collection('users').doc(booking.id).get());
+        for (const uid of [...new Set(job.uids || [])].filter(uid=>typeof uid==='string' && uid && !uid.includes('/'))) await enqueue(await db.collection('users').doc(uid).get());
+        await campaign.ref.update({registrationAdminsQueued:true,registrationCursor:bookings.docs.at(-1)?.id || job.registrationCursor || '',state:bookings.size<50?'queued':'pending'});
+        continue;
+      }
       // Direct recipients must not wait behind every unrelated user page.
       if (job.audience === 'ids' || job.includeUids) {
         for (const uid of [...new Set(job.uids || [])].filter(uid => typeof uid === 'string' && uid && !uid.includes('/'))) await enqueue(await db.collection('users').doc(uid).get());

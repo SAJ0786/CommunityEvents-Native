@@ -449,7 +449,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       tx.update(eventRef(event.id), { status: 'cancelled', revision, reservedPlaces: 0, cancelledAt: timestamp, cancelledBy: caller.uid, hasPendingChanges: false });
       tx.delete(pendingRef(event.id));
       if (pending?.privateDetails.posterPath) enqueuePosterCleanup(db, tx, event.id, pending.privateDetails.posterPath, now());
-      if (event.registrationCount > 0) tx.set(db.collection('registrationChanges').doc(`${event.id}-${revision}`), {
+      tx.set(db.collection('registrationChanges').doc(`${event.id}-${revision}`), {
         eventId: event.id, revision, formVersion: event.formVersion, changes: ['cancelled'], createdAt: timestamp, state: 'pending', cursor: null,
       });
       return { eventId: event.id, revision, status: 'cancelled' };
@@ -467,7 +467,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       tx.update(eventRef(event.id), { status: 'cancelled', deletedAt: timestamp, deletedBy: caller.uid, revision, reservedPlaces: 0, hasPendingChanges: false });
       tx.delete(pendingRef(event.id));
       if (pending?.privateDetails.posterPath) enqueuePosterCleanup(db, tx, event.id, pending.privateDetails.posterPath, now());
-      if (event.registrationCount > 0) tx.set(db.collection('registrationChanges').doc(`${event.id}-${revision}`), {
+      tx.set(db.collection('registrationChanges').doc(`${event.id}-${revision}`), {
         eventId: event.id, revision, formVersion: event.formVersion, changes: ['cancelled'], createdAt: timestamp, state: 'pending', cursor: null,
       });
       return { eventId: event.id, revision, status: 'cancelled', deleted: true };

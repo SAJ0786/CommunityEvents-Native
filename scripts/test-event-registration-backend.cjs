@@ -60,6 +60,12 @@ function seriesRequest(f, changes = {}) {
   };
 }
 
+test('deletion with no bookings still records a cancellation for required admin notices',async()=>{
+ const f=fixture(),event=await f.create();await f.approve(event);
+ const result=await f.handlers.deleteRegistrationEvent(f.request('host',{eventId:event.eventId,expectedRevision:1,confirmation:'DELETE EVENT'}));
+ assert.deepEqual(f.records.get(`registrationChanges/${event.eventId}-${result.revision}`).changes,['cancelled']);
+});
+
 test('series review lists only pending dates for superadmins and approves selected dates atomically',async()=>{
  const f=fixture(),series=await f.handlers.createRegistrationSeries(f.request('host',seriesRequest(f))),first=series.events[0].eventId;
  const review=await f.handlers.getRegistrationEvent(f.request('super',{eventId:first,includeSeriesReview:true}));assert.equal(review.reviewOccurrences.length,2);

@@ -102,3 +102,22 @@ test('organiser and superadmins receive booking alerts in the first worker tick,
  assert.equal([...h.records.entries()].filter(([p,v])=>p.startsWith('userNotifications/')&&v.type==='registration.booking').length,2);
  await h.flush();assert.equal(h.mails.length,2,'direct and role matches remain deduplicated');
 });
+
+test('registration deletion targets attendees and reviewers on first tick, bypasses preferences and deduplicates existing delivery',async()=>{
+ const h=harness();for(let i=0;i<180;i++)h.user('a'+String(i).padStart(3,'0'));
+ const off={emailNotificationsEnabled:false,pushNotificationsEnabled:false,eventNotificationsEnabled:false};
+ h.user('z-attendee',off);h.user('z-super',{...off,role:'superAdmin'});h.user('z-city',{...off,role:'admin',adminCity:'sydney'});h.user('z-wrong-city',{role:'admin',adminCity:'perth'});h.user('z-cancelled');
+ h.records.set('registrationEvents/e',{title:'Synthetic cancelled event',date:'2099-12-01',timeZone:'Australia/Sydney',city:'sydney',status:'cancelled'});
+ h.records.set('registrationEvents/e/registrations/z-attendee',{status:'registered',submittedAt:'2026-01-01T00:00:00Z'});
+ h.records.set('registrationEvents/e/registrations/z-cancelled',{status:'cancelled',submittedAt:'2026-01-01T00:00:00Z'});
+ h.records.set('registrationChanges/c',{eventId:'e',changes:['cancelled'],createdAt:'2026-10-19T00:00:00Z'});
+ await h.functions.matrixRegistrationChange({id:'deletion-change',data:h.snap('registrationChanges/c')});
+ await h.functions.deliverNotificationMatrix();
+ assert.deepEqual(h.mails.map(row=>row.to).sort(),['z-attendee@example.test','z-city@example.test','z-super@example.test']);
+ assert.ok(h.mails.every(row=>row.subject==='Event cancelled: Synthetic cancelled event'));
+ assert.equal(h.pushes.length,3);assert.equal([...h.records.keys()].filter(key=>key.startsWith('userNotifications/')).length,3);
+ const campaign=[...h.records.entries()].find(([key])=>key.startsWith('notificationCampaigns/'));
+ // Model a partially scanned old campaign with accepted deliveries already present.
+ campaign[1].state='pending';campaign[1].cursor='z-old-user-cursor';delete campaign[1].registrationAdminsQueued;delete campaign[1].registrationCursor;
+ await h.functions.deliverNotificationMatrix();assert.equal(h.mails.length,3);assert.equal(h.pushes.length,3);
+});
