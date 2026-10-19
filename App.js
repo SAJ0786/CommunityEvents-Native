@@ -78,7 +78,7 @@ import { getPrayerLocation } from './src/utils/prayerLocations';
 import { EVENT_TYPE_GROUPS } from './src/utils/eventOptions';
 import { canArrangeEventNiaz, matchesEventPeriod } from './src/utils/eventBrowseOptions';
 import { DEFAULT_CITY, cityLabel, getEventMetroArea, normalizeCity } from './src/utils/cities';
-import { colors, radius, shadow, spacing, typography, withAlpha } from './src/theme';
+import { colors, quickAccess, radius, shadow, spacing, typography, withAlpha } from './src/theme';
 import { friendlyError } from './src/utils/errors';
 import { LEGAL_DOCUMENT_VERSION } from './src/config/legal';
 import { buildAppShareContent } from './src/utils/storeLinks';
@@ -1362,8 +1362,8 @@ function MainApp() {
           ['moon-waning-crescent', 'Hijri', colors.purpleSoft, colors.purple, () => requestTabChange('hijri-calendar')],
           ['calendar-month-outline', 'Calendar', colors.tealSoft, colors.tealDark, () => requestTabChange('calendar')],
         ].map(([icon, label, backgroundColor, color, onPress]) => (
-          <Pressable key={label} accessibilityRole="button" accessibilityState={{ selected: icon === 'clipboard-text-outline' && registrationOnly }} onPress={onPress} style={({ pressed }) => [styles.quickAction, { width: 94 * Math.max(1, fontScale) }, pressed && styles.eventShortcutPressed]}>
-            <View style={[styles.quickOrb, { backgroundColor }]}><MaterialCommunityIcons color={color} name={icon} size={22} /></View>
+          <Pressable key={label} accessibilityRole="button" accessibilityState={{ selected: icon === 'clipboard-text-outline' && registrationOnly }} onPress={onPress} style={({ pressed }) => [styles.quickAction, { width: quickAccess.tile.width * Math.max(1, fontScale) }, pressed && styles.eventShortcutPressed]}>
+            <View style={[styles.quickOrb, { backgroundColor }]}><MaterialCommunityIcons color={color} name={icon} size={20} /></View>
             <Text style={styles.quickLabel}>{label}</Text>
           </Pressable>
         ))}
@@ -1904,9 +1904,9 @@ const styles = StyleSheet.create({
   homeSectionTitle: { color: colors.navy, fontSize: 16, lineHeight: 21, fontWeight: '700', letterSpacing: -0.2 },
   resultCount: { flexShrink: 1, color: colors.muted, fontSize: 10.5, fontWeight: '600', textAlign: 'right' },
   quickGrid: { flexDirection: 'row', gap: 7 },
-  quickAction: { width: 94, minHeight: 96, alignItems: 'center', justifyContent: 'flex-start', gap: spacing.sm, padding: spacing.sm, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.lg, backgroundColor: colors.glass },
-  quickOrb: { width: 39, height: 39, alignItems: 'center', justifyContent: 'center', borderRadius: 15, transform: [{ rotate: '-2deg' }] },
-  quickLabel: { width: '100%', color: colors.text, ...typography.label, minHeight: typography.label.lineHeight * 2, textAlign: 'center' },
+  quickAction: quickAccess.tile,
+  quickOrb: quickAccess.icon,
+  quickLabel: quickAccess.label,
   browseChips: { gap: 7, paddingRight: spacing.lg },
   browseChip: { minHeight: 34, justifyContent: 'center', paddingHorizontal: 13, borderWidth: 1, borderColor: colors.border, borderRadius: 17, backgroundColor: withAlpha(colors.glassBorder, 0.7) },
   browseChipActive: { borderColor: colors.blue, backgroundColor: colors.blue },

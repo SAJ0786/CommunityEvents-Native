@@ -19,7 +19,7 @@ import {
   filterAndRankBusinesses,
 } from './businessData';
 import { cityLabel, normalizeCity } from '../utils/cities';
-import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
+import { colors, quickAccess, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import {
   assertBusinessSubmissionConnectivity,
   isHistoricalBusiness,
@@ -912,10 +912,10 @@ const styles = StyleSheet.create({
   textButton: { padding: 6 },
   textButtonLabel: { color: colors.blue, fontSize: 12, fontWeight: '700' },
   browseChips: { gap: 9, paddingRight: spacing.lg },
-  browseAccess: { width: 72, minHeight: 61, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 3, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: 17, backgroundColor: withAlpha(colors.glassBorder, 0.78) },
+  browseAccess: quickAccess.tile,
   browseAccessActive: { borderColor: colors.blue, backgroundColor: colors.blueSoft },
-  browseAccessIcon: { width: 31, height: 31, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  browseAccessLabel: { color: colors.text, fontSize: 9.5, fontWeight: '600', textAlign: 'center' },
+  browseAccessIcon: quickAccess.icon,
+  browseAccessLabel: quickAccess.label,
   browseAccessLabelActive: { color: colors.blueDark, fontWeight: '700' },
   categoryRail: { gap: spacing.sm, paddingRight: spacing.lg },
   category: { width: 82, minHeight: 72, alignItems: 'center', justifyContent: 'center', gap: 5, padding: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: withAlpha(colors.glassBorder, 0.76) },

@@ -38,6 +38,12 @@
   gold: '#f7d76b',
 };
 
+export const quickAccess = {
+  tile: { width: 72, minHeight: 61, alignItems: 'center', justifyContent: 'center', gap: 2, paddingVertical: 2, paddingHorizontal: 3, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: 17, backgroundColor: withAlpha(colors.glassBorder, 0.78) },
+  icon: { width: 31, height: 31, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
+  label: { color: colors.text, fontSize: 9.5, lineHeight: 11, fontWeight: '600', textAlign: 'center' },
+};
+
 export const spacing = {
   xs: 4,
   sm: 8,

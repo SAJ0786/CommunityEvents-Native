@@ -17,7 +17,7 @@ export default forwardRef(function HorizontalStrip({ children, style, accessibil
   }}>
     <ScrollView {...props} ref={scroll} horizontal directionalLockEnabled alwaysBounceVertical={false}
       contentInsetAdjustmentBehavior="never" showsHorizontalScrollIndicator={false}
-      accessibilityLabel={accessibilityLabel} style={[styles.viewport, bounds.overflow && styles.gutters]}
+      accessibilityLabel={accessibilityLabel} style={styles.viewport}
       scrollEventThrottle={16} onContentSizeChange={(width, height) => {
         setLayout(current => current.content === width ? current : { ...current, content: width });
         onContentSizeChange?.(width, height);
@@ -32,7 +32,6 @@ export default forwardRef(function HorizontalStrip({ children, style, accessibil
 });
 const styles = StyleSheet.create({
   shell: { minWidth: 0, flexShrink: 1 }, viewport: { minWidth: 0, flexGrow: 0 },
-  gutters: { marginHorizontal: 44 },
-  edge: { position: 'absolute', top: 0, bottom: 0, width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  edge: { position: 'absolute', top: '50%', marginTop: -22, height: 44, width: 28, minHeight: 44, zIndex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   left: { left: 0 }, right: { right: 0 },
 });
