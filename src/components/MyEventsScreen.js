@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import EventCard from './EventCard';
 import { colors, radius, shadow, spacing, typography } from '../theme';
@@ -32,6 +32,11 @@ export default function MyEventsScreen({
   deletingSeriesId = '',
   onOpenRegistration,
 }) {
+  const [selection,setSelection] = useState(null);
+  const organising = events.filter(event => !event.registrationOnly || event.ownerUid === userUid);
+  const registrations = events.filter(event => event.registrationOnly && event.isRegistered);
+  const selected = selection && selection.uid === userUid ? selection.view : organising.length || !registrations.length ? 'organising' : 'attending';
+  const visibleEvents = selected === 'organising' ? organising : registrations;
   const renderEvent = ({ item: event }) => (
     <View style={styles.itemWrap}>
       {event.isRecurring || event.seriesId || event.recurringSeriesId ? (
@@ -67,7 +72,7 @@ export default function MyEventsScreen({
         <EventCard event={event} onPress={() => onPressEvent?.(event)} />
       </View>
       {event.registrationOnly && event.isRegistered ? <Pressable onPress={() => onPressEvent?.(event)} style={styles.editButton}><Text style={styles.editText}>{event.status === 'cancelled' ? 'View registration history' : 'View or edit my registration'}</Text></Pressable> : null}
-      {(!event.registrationOnly || (event.canManage ?? (event.ownerUid === userUid))) && <View style={styles.metaRow}>
+      {(!event.registrationOnly || selected === 'organising' && (event.canManage ?? (event.ownerUid === userUid))) && <View style={styles.metaRow}>
         <View style={styles.actionRow}>
           <Pressable disabled={event.registrationOnly && event.status === 'cancelled'} onPress={() => onEdit?.(event)} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}>
             <Text style={styles.editText}>Edit</Text>
@@ -112,7 +117,7 @@ export default function MyEventsScreen({
 
   return (
     <FlatList
-      data={loading ? [] : events}
+      data={loading ? [] : visibleEvents}
       keyExtractor={event => event.id}
       renderItem={renderEvent}
       contentContainerStyle={styles.content}
@@ -120,14 +125,16 @@ export default function MyEventsScreen({
       ListHeaderComponent={(
         <View style={styles.headerContent}>
           <MemberPageHeader title="My Events" subtitle="Events you created and your registrations. Manage your events or open a booking to review it." icon="calendar-check-outline" tone="teal" />
+          <View style={styles.listTabs} accessibilityRole="tablist">{[['organising',`Events I organise (${organising.length})`],['attending',`My registrations (${registrations.length})`]].map(([view,label]) => <Pressable key={view} accessibilityRole="tab" accessibilityState={{selected:selected === view}} onPress={() => setSelection({uid:userUid,view})} style={[styles.listTab,selected === view && styles.listTabSelected]}><Text style={[styles.listTabText,selected === view && styles.listTabTextSelected]}>{label}</Text></Pressable>)}</View>
+          <Text style={styles.visibilityText}>{selected === 'organising' ? 'Events you submitted. Manage your events and attendee responses.' : 'Events you booked places for. Open a card to manage your registration.'}</Text>
           {loading ? (
             <View style={styles.loadingCard}>
               <ActivityIndicator color={colors.teal} size="large" />
               <Text style={styles.loadingText}>Loading your events...</Text>
             </View>
           ) : null}
-          {!loading && events.length === 0 ? <EmptyState title="No events yet" text="You haven't added any events yet." /> : null}
-          {!loading && events.length === 0 ? (
+          {!loading && visibleEvents.length === 0 ? <EmptyState title={selected === 'organising' ? 'No submitted events' : 'No registrations yet'} text={selected === 'organising' ? 'Events you create appear here.' : 'Your event bookings appear here.'} /> : null}
+          {!loading && visibleEvents.length === 0 && selected === 'organising' ? (
             <Pressable onPress={onAddEvent} style={({ pressed }) => [styles.addEventButton, pressed && styles.pressed]}>
               <Text style={styles.addEventText}>+ Add Your First Event</Text>
             </Pressable>
@@ -146,6 +153,11 @@ export default function MyEventsScreen({
 }
 
 const styles = StyleSheet.create({
+  listTabs: { flexDirection:'row', gap:spacing.sm, padding:spacing.xs, borderRadius:radius.lg, borderWidth:1, borderColor:colors.border, backgroundColor:colors.surface },
+  listTab: { flex:1, minWidth:0, minHeight:48, padding:spacing.sm, borderRadius:radius.md, justifyContent:'center' },
+  listTabSelected: { backgroundColor:colors.blueSoft },
+  listTabText: { ...typography.body, color:colors.muted, textAlign:'center' },
+  listTabTextSelected: { color:colors.blueDark, fontWeight:'700' },
   content: {
     flexGrow: 1,
     padding: spacing.lg,

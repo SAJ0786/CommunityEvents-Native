@@ -25,6 +25,14 @@ function approves(actor, event) {
   return actor.profile.role === 'superAdmin';
 }
 function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Date(), enabled = () => false }) {
+  const displayName = value => typeof value === 'string' ? value.trim().slice(0,160) : '';
+  async function submitterName(tx, event, cache = new Map()) {
+    const saved = displayName(event.submittedByName);
+    if (saved || !event.ownerUid) return saved;
+    if (!cache.has(event.ownerUid)) cache.set(event.ownerUid, tx.get(db.collection('users').doc(event.ownerUid)).then(snapshot => displayName(snapshot.data()?.fullName)));
+    return cache.get(event.ownerUid);
+  }
+
   const fail = (code, message) => { throw new HttpsError(code, message); };
   const id = value => { if (typeof value !== 'string' || !ID.test(value) || ['__proto__', 'prototype', 'constructor'].includes(value)) fail('invalid-argument', 'Invalid record reference.'); return value; };
   const gate = () => { if (!enabled()) fail('failed-precondition', 'Event registration is not available yet.'); };
@@ -162,7 +170,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         if (draft.timeMode === 'prayer' && (!draft.prayerName || !schedule.startAt)) fail('invalid-argument', `Occurrence ${index + 1} needs its calculated prayer time.`);
         const event = { ...(await model).publicEvent(draft), ...schedule, city, timeZone,
           ...(draft.timeMode === 'prayer' ? { prayerTimeZone: timeZone } : {}),
-          ownerUid: caller.uid, revision: 1, formVersion: 1, status: 'pending', reservedPlaces: 0, registrationCount: 0,
+          ownerUid: caller.uid, submittedByName: displayName(caller.profile.fullName), revision: 1, formVersion: 1, status: 'pending', reservedPlaces: 0, registrationCount: 0,
           createdAt: timestamp, updatedAt: timestamp, allowCancellation: draft.allowCancellation,
           seriesId, occurrenceIndex: index, occurrenceCount: drafts.length, recurrenceRule: recurrence };
         const privateDetails = { address: draft.address, venue, hostPhone: draft.hostPhone ?? '', hostContactOptional: draft.hostContactOptional ?? '' };
@@ -222,7 +230,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (current?.registrationCount > 0 && formChanged && localMinute(now(), timeZone).slice(0, 10) >= draft.date) fail('failed-precondition', 'Registration questions cannot change on or after event day when attendees have registered.');
       const formVersion = formChanged ? revision : previousForm.version;
       const status = current?.status || 'pending';
-      const publicData = { ...(await model).publicEvent({ ...editingEvent, ...draft }), ...schedule, city, timeZone, ownerUid: current?.ownerUid || caller.uid, revision,
+      const publicData = { ...(await model).publicEvent({ ...editingEvent, ...draft }), ...schedule, city, timeZone, ownerUid: current?.ownerUid || caller.uid, submittedByName: current ? await submitterName(tx,current) : displayName(caller.profile.fullName), revision,
         formVersion, status, reservedPlaces: current?.reservedPlaces || 0, registrationCount: current?.registrationCount || 0,
         createdAt: current?.createdAt || now().toISOString(), updatedAt: now().toISOString(), allowCancellation: draft.allowCancellation, creationFingerprint: current?.creationFingerprint || fingerprint };
       if (current?.approvedAt) { publicData.approvedAt = current.approvedAt; publicData.approvedBy = current.approvedBy; }
@@ -421,6 +429,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const schedule = (await scheduleModel).registrationSchedule({ ...event, timeZone: event.timeZone });
       const live = liveProjection(event);
       const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), ...schedule, ...live, id: event.id, ownerUid: event.ownerUid, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
+      result.event.submittedByName = await submitterName(tx,event);
       result.canApprove = Boolean(caller && !event.deletedAt && !event.reviewDecision && (event.status === 'pending' || pending) && approves(caller, event));
       result.canRegister = event.status === 'approved' && localMinute(now(), event.timeZone) < (event.closes || `${event.date}T00:00`);
       result.canEditRegistration = Boolean(registered && event.status === 'approved' && localMinute(now(), event.timeZone).slice(0, 10) < event.date);
@@ -455,6 +464,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (scope === 'management' && caller.profile.role !== 'superAdmin'
         && !(caller.profile.role === 'admin' && (caller.profile.adminCity || caller.profile.defaultCity) === city)) fail('permission-denied', 'You cannot manage events in this city.');
       const snapshots = await Promise.all(ids.map(value => tx.get(eventRef(value))));
+      const submitterNames = new Map();
       const rows = await Promise.all(snapshots.map(async snapshot => {
         if (!snapshot.exists) return null;
         const event = { ...snapshot.data(), id: snapshot.id };
@@ -470,7 +480,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         if ((scope === 'attending' && !registered) || (event.status !== 'approved' && !manager && !registered)) return null;
         const schedule = (await scheduleModel).registrationSchedule(event);
         const row = { ...(await model).publicEvent({ ...event, address: privateSnap.data()?.address || '' }), ...schedule,
-          id: event.id, city: event.city, timeZone: event.timeZone, ownerUid: event.ownerUid,
+          id: event.id, city: event.city, timeZone: event.timeZone, ownerUid: event.ownerUid, submittedByName: await submitterName(tx,event,submitterNames),
           status: event.status, revision: event.revision, formVersion: event.formVersion,
           allowCancellation: event.allowCancellation === true, registrationOnly: true,
           canManage: manager, canApprove, isRegistered: registered,

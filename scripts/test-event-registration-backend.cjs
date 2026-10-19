@@ -976,3 +976,17 @@ test('participant templates preserve scope; agreement cannot become a repeated p
   const saved=[...f.records.values()].find(row=>row.name==='Children');assert.equal(saved.fields[0].perParticipant,true);
   f.draft.fields[1].perParticipant=true;await assert.rejects(f.create(),{code:'invalid-argument'});
 });
+
+test('my events keeps submissions separate from bookings and denies attendee organiser operations',async()=>{
+ const f=fixture();const one=await f.create();const two=await f.handlers.saveRegistrationEvent(f.request('other',{city:'sydney',createKey:'other-event',draft:f.draft}));await f.approve(one);await f.approve(two);await f.submit(one);
+ const mine=await f.handlers.listRegistrationEvents(f.request('member',{scope:'mine'}));assert.equal(mine.events.length,0);
+ const attending=await f.handlers.listRegistrationEvents(f.request('member',{scope:'attending'}));assert.deepEqual(attending.events.map(row=>row.id),[one.eventId]);assert.equal(attending.events[0].canManage,false);
+ assert.deepEqual((await f.handlers.listRegistrationEvents(f.request('host',{scope:'mine'}))).events.map(row=>row.id),[one.eventId]);
+ await assert.rejects(f.handlers.listEventRegistrations(f.request('member',{eventId:one.eventId})),{code:'permission-denied'});
+});
+test('submitter name comes from the authenticated creator and older events resolve it without exposing email',async()=>{
+ const f=fixture();f.records.get('users/host').fullName='Actual Creator';f.draft.submittedByName='Spoofed Name';const event=await f.create();assert.equal(f.records.get('registrationEvents/'+event.eventId).submittedByName,'Actual Creator');await f.approve(event);
+ const stored=f.records.get('registrationEvents/'+event.eventId);delete stored.submittedByName;
+ const listed=await f.handlers.listRegistrationEvents(f.request(null,{scope:'public',city:'sydney'}));assert.equal(listed.events[0].submittedByName,'Actual Creator');assert.equal(JSON.stringify(listed).includes('test@example.com'),false);
+ const detail=await f.handlers.getRegistrationEvent(f.request('member',{eventId:event.eventId}));assert.equal(detail.event.submittedByName,'Actual Creator');
+});

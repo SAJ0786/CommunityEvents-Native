@@ -131,6 +131,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
           <MaterialCommunityIcons color={colors.blue} name="map-marker-outline" size={13} />
           <Text maxFontSizeMultiplier={1.03} numberOfLines={1} style={[styles.metaText, styles.locationText]}>{suburb || 'TBC'}</Text>
         </View>
+        {event.registrationOnly && <Text style={styles.metaText}>Submitted by {event.submittedByName || 'Name unavailable'}</Text>}
         <View style={styles.badgeRow}>
           <View style={[styles.badge, styles.typeBadge]}>
             <Text maxFontSizeMultiplier={1.02} numberOfLines={1} style={styles.typeText}>{displayType}</Text>

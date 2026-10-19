@@ -264,7 +264,7 @@ test('poster access changes recheck detail and cannot retain an old private venu
   assert.equal(tree.props.registrationNotice, 'Poster access changed.');
 });
 test('My Events preserves attendee history without exposing host edit/delete controls', () => {
-  const react = { createElement: (type, props, ...children) => ({ type, props: { ...props, children } }) };
+  const react = { useState: value => [value, () => {}], createElement: (type, props, ...children) => ({ type, props: { ...props, children } }) };
   const mocks = {
     react,
     'react-native': { ActivityIndicator: 'ActivityIndicator', FlatList: 'FlatList', Pressable: 'Pressable', Text: 'Text', View: 'View', StyleSheet: { create: value => value } },
