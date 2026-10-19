@@ -85,7 +85,7 @@ function ActionButton({ label, icon, iconNode, variant = 'subtle', onPress, disa
       ]}>
         {iconNode || <MaterialCommunityIcons color={variant === 'danger' ? colors.danger : variant === 'live' ? colors.onPrimary : colors.blue} name={icon} size={22} />}
       </View>
-      <Text maxFontSizeMultiplier={1} numberOfLines={2} style={[
+      <Text maxFontSizeMultiplier={1} style={[
         styles.actionLabel,
         variant === 'danger' && styles.actionLabelDanger,
         variant === 'live' && styles.actionLabelLive,
@@ -760,9 +760,12 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     width: '20%',
+    minWidth: 64,
     minHeight: 70,
+    paddingHorizontal: 2,
+    paddingVertical: 4,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     gap: 5,
   },
   actionIconBubble: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: colors.neutralSoft },
@@ -779,6 +782,9 @@ const styles = StyleSheet.create({
   },
   actionIcon: { fontSize: 20 },
   actionLabel: {
+    width: '100%',
+    alignSelf: 'stretch',
+    minHeight: 24,
     color: colors.text,
     fontSize: 9.5,
     lineHeight: 12,
