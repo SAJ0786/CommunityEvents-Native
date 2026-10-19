@@ -1,3 +1,4 @@
+import HorizontalStrip from '../components/HorizontalStrip';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import ScrollView from '../components/KeyboardAwareScrollView';
@@ -329,7 +330,7 @@ export default function BusinessListingForm({
           {abrLookup ? <View style={styles.abrResult}><Text style={styles.abrResultTitle}>{'\u2713'} ABR details found</Text><Text style={styles.abrResultText}>{abrLookup.entityTypeName || 'Registered entity'}{abrLookup.state || abrLookup.postcode ? ` · ${[abrLookup.state, abrLookup.postcode].filter(Boolean).join(' ')}` : ''}</Text><Text style={styles.abrDisclaimer}>This assists data entry only. It does not verify the submitter’s identity, ownership, licences, insurance or service quality.</Text></View> : null}
         </Field>
         <Field label="Categories" error={attempted ? validation.categoryId : ''} helper="Choose every category that applies. Tap a selected category to show its services below.">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRail}>
+          <HorizontalStrip accessibilityLabel="Business categories" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRail}>
             {categories.map(item => {
               const selected = form.categoryIds.includes(item.id);
               const active = activeCategory?.id === item.id;
@@ -341,7 +342,7 @@ export default function BusinessListingForm({
                 });
               }} style={[styles.categoryTile, selected && styles.categoryTileSelected, active && styles.categoryTileActive]}><Text style={styles.categoryTileIcon}>{item.icon}</Text><Text numberOfLines={2} style={[styles.categoryTileText, active && styles.categoryTileTextActive]}>{selected ? '\u2713 ' : ''}{item.label}</Text></Pressable>;
             })}
-          </ScrollView>
+          </HorizontalStrip>
         </Field>
         {activeCategory ? <Field label={`${activeCategory.label} — Services / Subcategories`} error={attempted ? validation.subcategoryIds : ''} helper="Choose each service or product this business provides. Your other selected categories remain saved in the strip above.">
           <View style={styles.activeCategoryHead}><Text style={styles.activeCategorySummary}>{selectedCategories.length} categor{selectedCategories.length === 1 ? 'y' : 'ies'} selected</Text><Pressable onPress={() => {

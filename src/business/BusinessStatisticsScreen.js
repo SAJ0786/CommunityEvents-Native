@@ -1,3 +1,4 @@
+import HorizontalStrip from '../components/HorizontalStrip';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useCityCatalogueVersion } from '../services/cityCatalogue';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -95,12 +96,12 @@ export default function BusinessStatisticsScreen({ businesses = [], categories =
         <CompactSelect options={cityOptions} value={city} onChange={value => { setCity(value); setBusinessId('all'); }} />
         <View style={styles.searchBox}><Text style={styles.searchIcon}>{'⌕'}</Text><TextInput value={query} onChangeText={setQuery} placeholder="Search businesses or services" placeholderTextColor={colors.muted} style={styles.searchInput} /></View>
         <Text style={styles.filterLabel}>CATEGORY</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRail}>
+        <HorizontalStrip accessibilityLabel="Business categories" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRail}>
           {[{ id: 'all', label: 'All', icon: '✦' }, ...categories].map(item => {
             const active = categoryId === item.id;
             return <Pressable key={item.id} onPress={() => { setCategoryId(item.id); setSubcategoryId(''); setBusinessId('all'); }} style={[styles.category, active && styles.categoryActive]}><Text style={styles.categoryIcon}>{item.icon}</Text><Text numberOfLines={2} style={[styles.categoryText, active && styles.categoryTextActive]}>{item.label}</Text></Pressable>;
           })}
-        </ScrollView>
+        </HorizontalStrip>
         {categoryId !== 'all' ? <CompactSelect options={subcategoryOptions} value={subcategoryId} onChange={value => { setSubcategoryId(value); setBusinessId('all'); }} placeholder="All subcategories" /> : null}
         <Text style={styles.filterLabel}>BUSINESS</Text>
         <CompactSelect options={businessOptions} value={businessId} onChange={setBusinessId} placeholder="Overall filtered statistics" />

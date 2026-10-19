@@ -1,3 +1,4 @@
+import HorizontalStrip from './HorizontalStrip';
 import SegmentedControl from './SegmentedControl';
 import BusinessApprovalPanel from '../business/BusinessApprovalPanel';
 import { userMatchesSearch, normalisePhone } from '../utils/adminUserSearch';
@@ -2147,7 +2148,7 @@ export default function AdminDashboardScreen({
                     </View>
 
                     {!isEditing ? (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.userActionRow}>
+                      <HorizontalStrip accessibilityLabel="User actions" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.userActionRow}>
                         <View style={styles.userRoleSelect}>
                           <CompactSelect
                             compact
@@ -2179,7 +2180,7 @@ export default function AdminDashboardScreen({
                             <MaterialCommunityIcons name="account-reactivate-outline" size={21} color={colors.tealDark} />
                           </Pressable>
                         ) : null}
-                      </ScrollView>
+                      </HorizontalStrip>
                     ) : (
                       <View style={styles.formCard}>
                         <Text style={styles.subsectionTitle}>Edit User</Text>
@@ -2205,7 +2206,7 @@ export default function AdminDashboardScreen({
                         {profile?.role === 'superAdmin' ? (
                           <>
                             <Text style={styles.inputLabel}>Default location</Text>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                            <HorizontalStrip accessibilityLabel="Admin filters" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
                               {CITY_OPTIONS.map(city => {
                                 const active = editUserCity === city.value;
                                 return (
@@ -2220,7 +2221,7 @@ export default function AdminDashboardScreen({
                                   </Pressable>
                                 );
                               })}
-                            </ScrollView>
+                            </HorizontalStrip>
                           </>
                         ) : null}
 
@@ -3339,7 +3340,7 @@ export default function AdminDashboardScreen({
                 </View>
 
                 <Text style={styles.inputLabel}>Hijri month</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                <HorizontalStrip accessibilityLabel="Admin filters" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
                   {HIJRI_MONTHS.map(month => {
                     const active = String(month.value) === String(anchorMonth);
                     return (
@@ -3352,7 +3353,7 @@ export default function AdminDashboardScreen({
                       </Pressable>
                     );
                   })}
-                </ScrollView>
+                </HorizontalStrip>
 
                 <Text style={styles.inputLabel}>Hijri year</Text>
                 <TextInput
@@ -3457,7 +3458,7 @@ export default function AdminDashboardScreen({
                       </View>
 
                       <Text style={styles.inputLabel}>Category</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                      <HorizontalStrip accessibilityLabel="Admin filters" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
                         {HIJRI_OBSERVANCE_CATEGORIES.map(category => {
                           const active = hijriObsForm.category === category;
                           return (
@@ -3470,7 +3471,7 @@ export default function AdminDashboardScreen({
                             </Pressable>
                           );
                         })}
-                      </ScrollView>
+                      </HorizontalStrip>
 
                       <Text style={styles.inputLabel}>Notes</Text>
                       <TextInput

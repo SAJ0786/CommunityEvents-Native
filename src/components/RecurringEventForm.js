@@ -1,3 +1,4 @@
+import HorizontalStrip from './HorizontalStrip';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import ScrollView from './KeyboardAwareScrollView';
@@ -82,7 +83,7 @@ function HijriInputs({ label, value, onChange }) {
         />
       </View>
       <Text style={styles.monthLabel}>Month</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.months}>
+      <HorizontalStrip accessibilityLabel="Hijri months" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.months}>
         {HIJRI_MONTHS.map(month => {
           const selected = Number(value.month) === month.value;
           return (
@@ -95,7 +96,7 @@ function HijriInputs({ label, value, onChange }) {
             </Pressable>
           );
         })}
-      </ScrollView>
+      </HorizontalStrip>
     </Field>
   );
 }

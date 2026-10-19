@@ -1,3 +1,4 @@
+import HorizontalStrip from './HorizontalStrip';
 import EventPosterPicker from './EventPosterPicker';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useCityCatalogueVersion } from '../services/cityCatalogue';
@@ -102,7 +103,7 @@ function EventTypeSelector({ dynamicOptions, categories, value, onChange }) {
 
   return (
     <View style={styles.eventTypeSelector}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.eventCategoryStrip}>
+      <HorizontalStrip accessibilityLabel="Event categories" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.eventCategoryStrip}>
         {groups.map(group => {
           const selected = group.key === activeGroup.key;
           return (
@@ -120,7 +121,7 @@ function EventTypeSelector({ dynamicOptions, categories, value, onChange }) {
             </Pressable>
           );
         })}
-      </ScrollView>
+      </HorizontalStrip>
       <Text maxFontSizeMultiplier={1.1} style={styles.eventSubcategoryHelp}>Choose an event type</Text>
       <View style={styles.eventSubcategoryGrid}>
         {activeGroup.eventTypes.map(option => {
@@ -817,7 +818,7 @@ export default function CreateEventForm({
   return (
     <FormContainer
       keyboardShouldPersistTaps="handled"
-      {...(registrationMode ? { style: styles.content } : { contentContainerStyle: styles.content })}
+      {...(registrationMode ? { style: styles.registrationContent } : { contentContainerStyle: styles.content })}
     >
       {!registrationMode && <MemberPageHeader title={title} subtitle={subtitle} icon="calendar-edit" tone="teal" />}
       {registrationMode && <Field label="Event title"><TextInput accessibilityLabel="Event title" value={registrationTitle || ''} maxLength={160} onChangeText={onRegistrationTitleChange} style={styles.input} /></Field>}
@@ -1257,6 +1258,7 @@ export default function CreateEventForm({
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, padding: spacing.lg, paddingBottom: 48 },
+  registrationContent: { gap: spacing.md },
   title: { color: colors.navy, fontSize: typography.pageTitle.fontSize, lineHeight: 27, fontWeight: '700' },
   subtitle: { color: colors.muted, fontSize: typography.body.fontSize, lineHeight: 19, fontWeight: '500', marginTop: spacing.xs, marginBottom: spacing.lg },
   accountNotice: { padding: spacing.lg, marginBottom: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.amberSoft, borderWidth: 1, borderColor: colors.gold },

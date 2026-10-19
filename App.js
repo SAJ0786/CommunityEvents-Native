@@ -1,3 +1,4 @@
+import HorizontalStrip from './src/components/HorizontalStrip';
 import { clearAccountDeviceAlerts } from './src/services/reminders';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -1353,7 +1354,7 @@ function MainApp() {
           onClear={() => { setHomeFilters({ ...EMPTY_HOME_FILTERS }); setNearbyEventsOnly(false); }}
         />
       <View style={styles.sectionHeadingRow}><Text style={styles.homeSectionTitle}>Quick access</Text></View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickGrid}>
+      <HorizontalStrip accessibilityLabel="Quick access" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickGrid}>
         {[
           ...(REGISTRATION_ENABLED ? [['clipboard-text-outline', registrationOnly ? 'All events' : 'Registration\nonly', colors.tealSoft, colors.tealDark, () => setRegistrationOnly(value => !value)]] : []),
           [homeViewMode === 'map' ? 'format-list-bulleted' : 'map-outline', homeViewMode === 'map' ? 'List' : 'Map', colors.blueSoft, colors.blue, () => setHomeViewMode(current => current === 'map' ? 'list' : 'map')],
@@ -1366,7 +1367,7 @@ function MainApp() {
             <Text style={styles.quickLabel}>{label}</Text>
           </Pressable>
         ))}
-      </ScrollView>
+      </HorizontalStrip>
       <View style={styles.sectionHeadingRow}>
         <Text style={styles.homeSectionTitle}>Browse events</Text>
         <Text style={styles.resultCount}>{displayedEvents.length} in {cityLabel(selectedCity).replace(', Australia', '')}</Text>

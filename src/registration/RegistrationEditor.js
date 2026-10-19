@@ -17,7 +17,7 @@ import { getCityDefinition } from '../utils/cities';
 
 // No local persistence: private venue and answers must not enter an unencrypted draft cache.
 export default function RegistrationEditor({
- initialDraft, eventId, city, defaultHostName = '', defaultHostPhone = '', savedTemplates, hasMoreTemplates, onMoreTemplates, busy, onSave, onSaveTemplate, onCancel, hasPoster = false, onRemovePoster, initialStep = 'event' }) {
+ initialDraft, eventId, city, defaultHostName = '', defaultHostPhone = '', savedTemplates, hasMoreTemplates, onMoreTemplates, busy, onSave, onSaveTemplate, onCancel, hasPoster = false, onRemovePoster, initialStep = 'event', navigationInHeader = false }) {
   const [draft, setDraft] = useState(initialDraft);
   const [step, setStep] = useState(initialStep);
   const [previewPlaces, setPreviewPlaces] = useState(2);
@@ -90,7 +90,9 @@ export default function RegistrationEditor({
       setError('');
     } catch (failure) { setError(failure.message || 'Could not select poster.'); }
   };
+  const activeStep = step === 'event' ? 0 : step === 'settings' ? 1 : 2;
   return <View style={styles.group} pointerEvents={busy ? 'none' : 'auto'}>
+    <View style={styles.progress} accessibilityLabel={`Event setup, step ${activeStep + 1} of 3`}>{['Event details', 'Settings', 'Registration form'].map((label,index) => <View key={label} style={styles.progressStep}><Text style={[styles.progressNumber, index === activeStep && styles.progressActive, index < activeStep && styles.progressComplete]}>{index < activeStep ? '✓' : index + 1}</Text><Text style={[styles.progressLabel, index === activeStep && styles.progressLabelActive]}>{label}</Text></View>)}</View>
     {step !== 'event' && <Action onPress={() => setStep('event')}>Edit event details</Action>}
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
     {step === 'event' && <View>
@@ -98,7 +100,7 @@ export default function RegistrationEditor({
         registrationPosterControl={<EventPosterPicker uri={draft.poster?.uri} hasPoster={hasPoster} privatePoster showChooseButton={false} onChoose={selectPoster} onRemove={draft.poster ? () => update('poster', null) : onRemovePoster} disabled={busy} />}
         initialEvent={normalEventFromRegistrationDraft(draft, eventId)} allowUnchangedSubmit submitting={busy}
         title="Event details" subtitle="Registration event — private venue and poster" submitLabel="Continue to registration settings"
-        onSubmit={acceptEvent} onCancel={onCancel} />
+        onSubmit={acceptEvent} onCancel={navigationInHeader ? undefined : onCancel} />
     </View>}
     {step === 'settings' && <View style={styles.panel}>
       <Text style={styles.title}>Registration settings</Text>

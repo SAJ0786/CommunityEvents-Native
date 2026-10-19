@@ -1,3 +1,4 @@
+import HorizontalStrip from './HorizontalStrip';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -185,13 +186,13 @@ export default function DiagnosticRegisterPanel({ user, profile, users = [] }) {
         style={styles.searchInput}
       />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+      <HorizontalStrip accessibilityLabel="Diagnostic filters" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
         {FILTERS.map(([value, label]) => (
           <Pressable key={value} onPress={() => setFilter(value)} style={[styles.filterChip, filter === value && styles.filterChipActive]}>
             <Text style={[styles.filterText, filter === value && styles.filterTextActive]}>{label}</Text>
           </Pressable>
         ))}
-      </ScrollView>
+      </HorizontalStrip>
 
       {error ? <View style={styles.errorCard}><Text style={styles.errorText}>{error}</Text></View> : null}
       {loading ? <ActivityIndicator color={colors.blue} style={styles.loader} /> : null}

@@ -85,7 +85,7 @@ async function main() {
   assert.doesNotMatch(source, />Refresh<|Refresh Connection/);
   assert.match(source, /AppState.addEventListener/);
   assert.match(source, /userActionRow: \{ flexDirection: 'row'/);
-  assert.match(source, /<ScrollView horizontal[^>]*styles.userActionRow/);
+  assert.match(source, /<HorizontalStrip[^>]*styles.userActionRow/);
   assert.match(source, /<Text style=\{styles\.cardTitle\}>Important Hijri Events Adjustment<\/Text>/);
   assert.match(source, /getHijriObservances\(\)/);
   assert.match(source, /saveHijriObservances\(sorted\)/);

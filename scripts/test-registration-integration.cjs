@@ -476,6 +476,7 @@ function normalFormFixture(initialEvent, registrationMode) {
   const fixture = componentFixture('src/components/CreateEventForm.js', {
     'react-native': { ...native, StyleSheet: { create: value => value }, Alert: { alert() {} } },
     'expo-image-picker': {},
+    './HorizontalStrip': 'HorizontalStrip',
     './EventPosterPicker': 'EventPosterPicker',
     './EventDateTimePicker': 'EventDateTimePicker',
     './KeyboardAwareScrollView': 'ScrollView',
@@ -541,9 +542,10 @@ test('editor renders the actual shared form in registration mode and keeps dedic
     './privateVenue': load(path.join(root, 'src/registration/privateVenue.js')),
     './registrationViewModel': view,
     ...recurrenceEditorDependencies(),
-  }, { initialDraft: view.eventDraftFromDetail(detail, ['Majlis']), eventId: 'event', city: 'sydney', savedTemplates: [], onCancel() {}, hasPoster: true });
+  }, { initialDraft: view.eventDraftFromDetail(detail, ['Majlis']), eventId: 'event', city: 'sydney', savedTemplates: [], navigationInHeader: true, onCancel() {}, hasPoster: true });
   const form = flatten(fixture.render()).find(node => node.type === 'ActualCreateEventForm');
   assert.equal(form.props.registrationMode, true);
+  assert.equal(form.props.onCancel, undefined, 'header owns the sole page exit');
   assert.equal(form.props.defaultCity, 'sydney');
   assert.equal(form.props.initialEvent.hostPhone, 'private-phone');
   form.props.onSubmit({ ...form.props.initialEvent, eventDate: '2027-12-02', startTime: '', endTime: '' });

@@ -4,7 +4,7 @@ import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 import MemberPageHeader from './MemberPageHeader';
 import NativeBackButton from './NativeBackButton';
 import RegistrationEditor from '../registration/RegistrationEditor';
-import { Action, Answer, Input, styles } from '../registration/RegistrationControls';
+import { Action, Answer, Input, RegistrationIdentity, styles } from '../registration/RegistrationControls';
 import { firebaseRegistration } from '../registration/firebaseRegistration';
 import { createSubmission } from '../registration/registrationClient';
 import { answersForReview, eventDraftFromDetail, mergeRegistrationPage } from '../registration/registrationViewModel';
@@ -191,7 +191,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
   if (!enabled) return <View style={styles.panel}><NativeBackButton onPress={onBack} accessibilityLabel="Back to events" /><Text style={styles.text}>Registration is not enabled for this release.</Text></View>;
   if (obscured) return <View style={styles.panel}><Text style={styles.muted}>Private event details hidden while the app is inactive.</Text></View>;
   return <KeyboardAwareScrollView contentContainerStyle={styles.content}>
-    <MemberPageHeader title={stage === 'responses' ? 'Registration responses' : stage === 'editor' ? 'Edit event and registration form' : 'Event registration'} subtitle={cityLabel(city)} icon="clipboard-text-outline" tone="teal" onBack={onBack} backDisabled={busy} backAccessibilityLabel="Back to events" />
+    <MemberPageHeader title={stage === 'responses' ? 'Registration responses' : stage === 'editor' ? detail ? 'Edit event and registration form' : 'Create registration event' : 'Event registration'} subtitle={cityLabel(city)} icon="clipboard-text-outline" tone="teal" onBack={onBack} backDisabled={busy} backAccessibilityLabel="Back to events" />
     {busy && <ActivityIndicator color={colors.tealDark} />}
     {detail?.reviewFeedback && <Text style={styles.error}>{detail.reviewFeedback.message} Edit and save to resubmit for approval.</Text>}
     {notice ? <Text accessibilityRole="alert" style={styles.error}>{notice}</Text> : null}
@@ -200,21 +200,21 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       <Action primary onPress={() => save()}>Retry original save request</Action>
     </View>}
     <View pointerEvents={busy ? 'none' : 'auto'}>
-    {stage === 'editor' && draft && <RegistrationEditor initialDraft={draft} eventId={detail?.event.id} city={detail?.event.city || city} defaultHostName={profile?.fullName || user?.displayName || ''} defaultHostPhone={profile?.phone || user?.phoneNumber || ''}
+    {stage === 'editor' && draft && <RegistrationEditor navigationInHeader initialDraft={draft} eventId={detail?.event.id} city={detail?.event.city || city} defaultHostName={profile?.fullName || user?.displayName || ''} defaultHostPhone={profile?.phone || user?.phoneNumber || ''}
       initialStep={initialAction === 'form' ? 'form' : 'event'} eventTypes={types} savedTemplates={templates} hasMoreTemplates={Boolean(templateCursor)} onMoreTemplates={() => run(valid => loadTemplates(valid, templateCursor))} busy={busy || Boolean(pendingSave.current)} onSave={save} onCancel={onBack} hasPoster={(detail?.pendingChanges || detail)?.privateDetails?.hasPoster} onRemovePoster={() => posterChange(true)} onSaveTemplate={template => run(async valid => {
       await api.saveTemplate({ ...template, templateId: newReference() }); await loadTemplates(valid); if (valid()) setNotice('Template saved to your account.');
     })} />}
     {detail && stage === 'entry' && <View style={styles.panel}>
-      <Text style={styles.title}>{detail.ownRegistration?.status === 'registered' ? 'Edit registration' : 'Register'} · {detail.event.title}</Text>
+      <RegistrationIdentity event={detail.event} places={detail.ownRegistration?.status === 'registered' ? detail.ownRegistration.places : 0}/>
       {detail.ownRegistration && detail.ownRegistration.formVersion !== detail.form.version && <Text style={styles.error}>The organiser changed the form. Review every question and agree to the current terms again.</Text>}
       <Text style={styles.text}>{detail.form.purpose}</Text><Text style={styles.muted}>{detail.retention?.notice}</Text>
       <Input label="Number of places (maximum 5)" value={places} keyboardType="number-pad" onChangeText={value => { submission.current = null; setPlaces(value); }} />
-      {registrationFieldGroups(detail.form.fields, places).map(group => <View key={group.id} style={styles.panel}><Text style={styles.title}>{group.label}</Text>{group.fields.map(field => <View key={field.id}><Answer field={{...field,label:field.originalLabel || field.label}} value={answers[field.id]} onChange={value => { submission.current = null; setAnswers(current => ({ ...current, [field.id]: value })); }} />{field.description ? <Text style={styles.muted}>{field.description}</Text> : null}</View>)}</View>)}
+      {registrationFieldGroups(detail.form.fields, places).map(group => <View key={group.id} style={styles.insetPanel}><Text style={styles.title}>{group.label}</Text>{group.fields.map(field => <View key={field.id}><Answer field={{...field,label:field.originalLabel || field.label}} value={answers[field.id]} onChange={value => { submission.current = null; setAnswers(current => ({ ...current, [field.id]: value })); }} />{field.description ? <Text style={styles.muted}>{field.description}</Text> : null}</View>)}</View>)}
       <Action primary onPress={submit}>Submit registration</Action>
     </View>}
     {detail && ['confirmation', 'host-confirmation'].includes(stage) && <View style={styles.panel}>
       <Text style={styles.title}>{stage === 'confirmation' ? 'Registration confirmed' : 'Event and form saved'}</Text>
-      <Text style={styles.text}>{detail.event.title}</Text>
+      <RegistrationIdentity event={detail.event} places={stage === 'confirmation' ? detail.ownRegistration?.places : 0}/>
       {stage === 'host-confirmation' && (seriesSummary || detail.event.seriesId) && <Text style={styles.title}>{seriesSummary?.count || detail.event.occurrenceCount} independent occurrences — separate bookings, capacities, closing dates and approvals. Editing here changes only this occurrence.</Text>}
       <Text style={styles.muted}>{stage === 'confirmation' ? `${detail.ownRegistration?.places || 0} places reserved.` : detail.event.hasPendingChanges ? 'Changes await super administrator approval. The published event and form remain unchanged.' : detail.event.status === 'pending' ? 'Awaiting super administrator approval. Your event appears in My Events until approved.' : 'Changes saved.'}</Text>
       <Action onPress={() => stage === 'confirmation' ? startEntry() : edit()}>{stage === 'confirmation' ? 'Edit registration' : 'Edit event or form'}</Action>

@@ -1,3 +1,4 @@
+import HorizontalStrip from './HorizontalStrip';
 import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -18,7 +19,7 @@ function FilterChoices({ label, options, value, onChange }) {
 export function EventPresetStrip({ filters, nearby = false, onNearbyChange, onPresetChange }) {
   return (
     <View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+      <HorizontalStrip horizontal showsHorizontalScrollIndicator={false}
         directionalLockEnabled alwaysBounceVertical={false} contentInsetAdjustmentBehavior="never"
         style={{ flexGrow: 0, flexShrink: 0, minHeight: 44 }}
         accessibilityLabel="Customised event filters" contentContainerStyle={styles.choiceRow}>
@@ -32,7 +33,7 @@ export function EventPresetStrip({ filters, nearby = false, onNearbyChange, onPr
             </Pressable>
           );
         })}
-      </ScrollView>
+      </HorizontalStrip>
       {nearby ? <Text style={styles.nearbyHelp}>Nearest events first. Map shows matching events with available locations.</Text> : null}
     </View>
   );

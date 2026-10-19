@@ -5,7 +5,7 @@ import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 import MemberPageHeader from './MemberPageHeader';
 import { firebaseRegistration, REGISTRATION_ENABLED } from '../registration/firebaseRegistration';
 import { colors } from '../theme';
-import { Action, Input, styles } from '../registration/RegistrationControls';
+import { Action, Input, RegistrationIdentity, styles } from '../registration/RegistrationControls';
 import SafeAreaView from './ModalSafeArea';
 import { registrationEventCard } from '../registration/eventFeed';
 
@@ -123,7 +123,7 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}><KeyboardAwareScrollView contentContainerStyle={styles.content}>
         <MemberPageHeader title="Review submitted changes" subtitle={detail.pendingChanges ? 'Published event remains live until approval' : 'Unpublished event and registration form'} icon="clipboard-check-outline" tone="teal" onBack={onClose} backDisabled={approving} backAccessibilityLabel="Back to events" />
         {detail.pendingChanges && <Text style={styles.text}>Submitted {detail.pendingChanges.submittedAt || ''} by {detail.pendingChanges.submittedBy || 'organiser'}</Text>}
-        {values.filter(([, value]) => value !== undefined && value !== '').map(([label, value]) => <View key={label} style={styles.panel}><Text style={styles.label}>{label}</Text><Text selectable style={styles.text}>{String(value)}</Text></View>)}
+        <View style={styles.panel}><RegistrationIdentity event={submittedEvent}/><Text style={styles.title}>Submitted event details</Text><View style={styles.reviewGrid}>{values.filter(([label, value]) => label !== 'Title' && value !== undefined && value !== '').map(([label, value]) => <View key={label} style={styles.reviewField}><Text style={styles.label}>{label}</Text><Text selectable style={styles.text}>{String(value)}</Text></View>)}</View></View>
         <Text style={styles.label}>Private poster</Text>
         {detail.reviewPoster ? <Image accessibilityLabel="Submitted private poster" source={{ uri: detail.reviewPoster }} style={{ width: '100%', height: 360 }} resizeMode="contain" /> : <Text style={styles.text}>{detail.reviewPosterFailed ? 'Could not load submitted poster. Approval is blocked until it can be reviewed.' : 'No poster in this submitted version.'}</Text>}
         {posterError ? <Text accessibilityRole="alert" style={styles.error}>{posterError}</Text> : null}
@@ -139,7 +139,7 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
         {detail.canApprove && <View style={styles.group}>
           <Action primary disabled={!complete || approving} onPress={approve}>{approving ? 'Please wait…' : 'Approve event and form'}</Action>
           <Input label="Feedback for organiser" value={feedback} onChangeText={setFeedback} multiline maxLength={2000} />
-          <View style={styles.row}><Action disabled={approving} onPress={() => decide('changes-requested')}>Suggest changes</Action><Action disabled={approving} onPress={() => decide('rejected')}>Reject</Action></View>
+          <View style={styles.actions}><Action style={styles.actionInRow} disabled={approving} onPress={() => decide('changes-requested')}>Suggest changes</Action><Action style={styles.actionInRow} disabled={approving} onPress={() => decide('rejected')}>Reject</Action></View>
         </View>}
       </KeyboardAwareScrollView></SafeAreaView>
     </Modal>;

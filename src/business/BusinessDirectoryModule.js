@@ -1,3 +1,4 @@
+import HorizontalStrip from '../components/HorizontalStrip';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import ScrollView from '../components/KeyboardAwareScrollView';
@@ -231,7 +232,7 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
       </View>
 
       <SectionHeading title="Quick access" subtitle="Swipe for useful ways to explore" actionLabel={categoryId === 'all' && !openOnly && !favouritesOnly && !nearbyOnly && !recentOnly ? '' : 'Clear'} onAction={clearBrowseFilters} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.browseChips}>
+      <HorizontalStrip accessibilityLabel="Business filters" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.browseChips}>
         {[
           ['view-grid-outline', 'All', colors.blueSoft, colors.blue, clearBrowseFilters, categoryId === 'all' && !openOnly && !favouritesOnly && !nearbyOnly && !recentOnly],
           ['clock-check-outline', 'Open now', colors.successSoft || colors.tealSoft, colors.tealDark, () => { setOpenOnly(true); setFavouritesOnly(false); setNearbyOnly(false); setRecentOnly(false); }, openOnly],
@@ -244,10 +245,10 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
             <Text numberOfLines={1} style={[styles.browseAccessLabel, active && styles.browseAccessLabelActive]}>{label}</Text>
           </Pressable>
         ))}
-      </ScrollView>
+      </HorizontalStrip>
 
       <SectionHeading title={favouritesOnly ? 'Favourite businesses' : 'Browse businesses'} subtitle={favouritesOnly ? 'Only businesses saved to your profile' : subcategoryId ? `Filtered: ${selectedCategory?.subcategories.find(item => item.id === subcategoryId)?.label || 'Selected service'}` : 'Browse by service'} actionLabel={categoryId === 'all' && !subcategoryId && !favouritesOnly ? '' : 'Clear'} onAction={() => { setCategoryId('all'); setSubcategoryId(''); setFavouritesOnly(false); }} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRail}>
+      <HorizontalStrip accessibilityLabel="Business categories" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRail}>
         <Pressable onPress={() => { setCategoryId('all'); setSubcategoryId(''); }} style={[styles.category, categoryId === 'all' && styles.categoryActive]}>
           <Text style={[styles.categoryIcon, categoryId === 'all' && styles.categoryIconActive]}>{'\u2726'}</Text>
           <Text style={[styles.categoryLabel, categoryId === 'all' && styles.categoryLabelActive]}>All</Text>
@@ -261,7 +262,7 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
             </Pressable>
           );
         })}
-      </ScrollView>
+      </HorizontalStrip>
 
       {selectedCategory ? (
         <View style={styles.subcategoryPanel}>
