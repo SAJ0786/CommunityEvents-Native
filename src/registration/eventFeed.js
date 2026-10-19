@@ -1,4 +1,9 @@
 export function registrationEventCard(event) {
+  const latitude = Number(event.latitude);
+  const longitude = Number(event.longitude);
+  const mapPoint = Number.isFinite(latitude) && Number.isFinite(longitude)
+    ? { latitude, longitude }
+    : {};
   return {
     ...event,
     registrationOnly: true,
@@ -9,7 +14,7 @@ export function registrationEventCard(event) {
     metroArea: event.city,
     city: event.city,
     organiserType: event.organiserType || 'private',
-    address: { suburb: event.suburb, city: event.city },
+    address: { suburb: event.suburb, city: event.city, ...mapPoint },
   };
 }
 

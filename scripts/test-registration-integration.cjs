@@ -71,7 +71,7 @@ test('registration feed consumes sparse pages, excludes pending publicly and map
     calls.push(request);
     if (!request.cursor) return { events: [{ id: 'pending', status: 'pending' }], nextCursor: 'page2' };
     if (request.cursor === 'page2') return { events: [], nextCursor: 'page3' };
-    return { events: [{ id: 'approved', status: 'approved', date: '2026-12-01', city: 'sydney', suburb: 'Parramatta', title: 'Workshop', eventSubject: 'Community subject', organiserType: 'centre', hostName: 'Centre host', hasPoster: false }], nextCursor: null };
+    return { events: [{ id: 'approved', status: 'approved', date: '2026-12-01', city: 'sydney', suburb: 'Parramatta', latitude: -33.81, longitude: 151, title: 'Workshop', eventSubject: 'Community subject', organiserType: 'centre', hostName: 'Centre host', hasPoster: false }], nextCursor: null };
   } }, 'public', 'sydney');
   assert.equal(calls.length, 3);
   assert.equal(rows.length, 1);
@@ -81,7 +81,8 @@ test('registration feed consumes sparse pages, excludes pending publicly and map
   assert.equal(rows[0].registrationOnly, true);
   assert.equal(rows[0].address.suburb, 'Parramatta');
   assert.equal(rows[0].address.fullAddress, undefined);
-  assert.equal(rows[0].address.latitude, undefined);
+  assert.equal(rows[0].address.latitude, -33.81);
+  assert.equal(rows[0].address.longitude, 151);
   assert.equal(rows[0].imageUrl, undefined);
   assert.equal(rows[0].eventSubject, 'Community subject');
   assert.equal(rows[0].organiserType, 'centre');

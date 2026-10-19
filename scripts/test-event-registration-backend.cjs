@@ -129,7 +129,9 @@ test('occurrence selector hides unapproved/deleted dates and does not disclose o
 });
 
 test('series creation is atomic, authenticated, retry-safe and separate from public discovery until individual approval', async () => {
-  const f = fixture(); const data = seriesRequest(f);
+  const f = fixture();
+  const venue = { fullAddress: f.draft.address, suburb: f.draft.suburb, state: 'NSW', postcode: '2150', placeId: 'series-place', latitude: -33.815, longitude: 151.001 };
+  const data = seriesRequest(f, { draft: { ...f.draft, startTime: '10:00', endTime: '11:00', venue } });
   await assert.rejects(f.handlers.createRegistrationSeries(f.request(null, data)), { code: 'unauthenticated' });
   const [created, duplicate] = await Promise.all([f.handlers.createRegistrationSeries(f.request('host', data)), f.handlers.createRegistrationSeries(f.request('host', data))]);
   assert.deepEqual(created, duplicate);
@@ -145,6 +147,8 @@ test('series creation is atomic, authenticated, retry-safe and separate from pub
   await f.approve(created.events[0]);
   const page = await f.handlers.listRegistrationEvents(f.request(null, { scope: 'public', city: 'sydney' }));
   assert.equal(page.events.length, 1); assert.equal(page.events[0].seriesId, created.seriesId);
+  assert.equal(page.events[0].latitude, -33.81); assert.equal(page.events[0].longitude, 151);
+  assert.notEqual(page.events[0].latitude, venue.latitude, 'public map point must not expose the exact private venue');
   assert.equal(JSON.stringify(page).includes(f.draft.address), false);
   assert.equal(JSON.stringify(page).includes('privateDetails'), false);
 });

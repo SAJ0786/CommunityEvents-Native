@@ -545,6 +545,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
   // List cards need only the public projection and current access flags. Never
   // load full forms, pending drafts or submitted answers while discovering cards.
   async function registrationListPage(request, scope, city, ids) {
+    const { normalisePrivateVenue } = await venueModel;
     return db.runTransaction(async tx => {
       const signedIn = request.auth && request.auth.token?.firebase?.sign_in_provider !== 'anonymous';
       const caller = signedIn ? await actor(request, tx) : null;
@@ -568,7 +569,17 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         const registered = ownSnap?.data()?.status === 'registered';
         if ((scope === 'attending' && !registered) || (event.status !== 'approved' && !manager && !registered)) return null;
         const schedule = (await scheduleModel).registrationSchedule(event);
+        const venue = normalisePrivateVenue(privateSnap.data()?.venue);
+        // The map needs a location, but the exact registration venue remains
+        // private. Two decimal places locate the suburb without exposing the
+        // selected street address; authorised navigation still uses the exact
+        // private venue returned by getRegistrationEvent.
+        const publicMapPoint = venue ? {
+          latitude: Number(venue.latitude.toFixed(2)),
+          longitude: Number(venue.longitude.toFixed(2)),
+        } : {};
         const row = { ...(await model).publicEvent({ ...event, address: privateSnap.data()?.address || '' }), ...schedule,
+          ...publicMapPoint,
           id: event.id, city: event.city, timeZone: event.timeZone, ownerUid: event.ownerUid, submittedByName: await submitterName(tx,event,submitterNames),
           status: event.status, deleted: Boolean(event.deletedAt), revision: event.revision, formVersion: event.formVersion,
           allowCancellation: event.allowCancellation === true, registrationOnly: true,
