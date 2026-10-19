@@ -30,7 +30,7 @@ import {
   sortHijriObservances,
 } from '../services/hijriObservances';
 import { calculatePrayerTimes, PRAYER_OPTIONS, prayerDateAt, zonedPrayerClock } from '../services/prayerTimes';
-import { getAzaanAlarmSettings, getPrayerReminderSettings, initializeDefaultPrayerReminders, refreshAzaanAlarms, setAzaanAlarm, setPrayerReminder } from '../services/reminders';
+import { getAzaanAlarmSettings, getPrayerReminderSettings, initializeDefaultPrayerReminders, openDeviceNotificationSettings, refreshAzaanAlarms, setAzaanAlarm, setPrayerReminder } from '../services/reminders';
 import { DEFAULT_CITY, cityLabel, normalizeCity } from '../utils/cities';
 import { getPrayerLocation } from '../utils/prayerLocations';
 import CompactSelect from './CompactSelect';
@@ -235,7 +235,12 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
         ? 'This phone will play the bundled Azaan clip at the selected prayer time for the next 21 days. The alarm is stored only on this device.'
         : 'The selected Azaan alarms were removed from this phone.');
     } catch (error) {
-      Alert.alert('Azaan alarm', error?.message || 'Could not update this Azaan alarm.');
+      const actions = error?.code === 'EXACT_ALARM_BLOCKED'
+        ? [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open settings', onPress: () => openDeviceNotificationSettings({ exactAlarm: true }) },
+        ] : [{ text: 'OK' }];
+      Alert.alert('Azaan alarm', error?.message || 'We could not update this Azaan alarm.', actions);
     } finally {
       setAzaanAlarmBusy('');
     }

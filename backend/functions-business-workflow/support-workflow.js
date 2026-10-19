@@ -19,22 +19,27 @@ function adminEmails(users, city) {
 
 function buildEmail(job, reference) {
   const title = job.kind === 'business-report' ? 'Business problem report' : job.kind === 'business-enquiry' ? 'New business enquiry' : job.kind === 'business-reply' ? 'New reply from business' : 'App feedback / problem report';
-  const details = [
+  const isBusinessConversation = ['business-enquiry', 'business-reply'].includes(job.kind);
+  const contactName = clean(job.senderName) || 'Community Connect Australia user';
+  const contactedBy = isBusinessConversation && validEmail(clean(job.senderEmail))
+    ? `${contactName} (${clean(job.senderEmail)})` : contactName;
+  const auditDetails = [
     ['Reference', reference], ['Business', job.businessName], ['Business ID', job.businessId], ['City', job.city],
     ['Reporter / sender', job.senderName], ['Email', job.senderEmail || 'Not supplied'],
     ['Email verification', job.senderEmailVerified ? 'Verified account email' : 'User-provided / profile email'],
     ['Category', job.category], ['Submitted', job.submittedAt],
   ].filter(([, value]) => value);
+  const details = isBusinessConversation
+    ? [['Contacted by', contactedBy], ['Business', job.businessName]].filter(([, value]) => value)
+    : auditDetails;
   const module = ['business-report', 'business-enquiry', 'business-reply'].includes(job.kind) ? 'directory' : undefined;
   const subjectTitle = `${title}${job.businessName ? `: ${clean(job.businessName).replace(/[\r\n]/g, ' ').slice(0, 120)}` : ''}`;
-  const replyHint = ['business-enquiry', 'business-reply'].includes(job.kind)
-    ? 'Open Business Inbox in the app to reply. Replying to this email contacts support@siza.info, not the other participant.' : '';
   return {
     from: { name: emailBrand(module), address: SUPPORT }, replyTo: SUPPORT,
-    subject: `${subjectTitle} [${reference.slice(0, 12)}]`,
+    subject: isBusinessConversation ? subjectTitle : `${subjectTitle} [${reference.slice(0, 12)}]`,
     ...renderEmail({ module, title: subjectTitle,
-      bodyText: `${details.map(([k, v]) => `${k}: ${v}`).join('\n')}\n\nMessage:\n${job.message}${replyHint ? `\n\n${replyHint}` : ''}`,
-      bodyHtml: `${detailRows(details)}<h2 style="margin:20px 0 8px;font-size:18px;line-height:1.4">Message</h2><div style="white-space:pre-wrap;padding:16px;background:#f2f8f7;border-radius:8px;overflow-wrap:anywhere">${escapeHtml(job.message)}</div>${replyHint ? `<p>${escapeHtml(replyHint)}</p>` : ''}`,
+      bodyText: `${details.map(([k, v]) => `${k}: ${v}`).join('\n')}\n\nMessage:\n${job.message}`,
+      bodyHtml: `${detailRows(details)}<h2 style="margin:20px 0 8px;font-size:18px;line-height:1.4">Message</h2><div style="white-space:pre-wrap;padding:16px;background:#f2f8f7;border-radius:8px;overflow-wrap:anywhere">${escapeHtml(job.message)}</div>`,
     }),
     headers: { 'Auto-Submitted': 'auto-generated', 'X-Auto-Response-Suppress': 'All' },
   };

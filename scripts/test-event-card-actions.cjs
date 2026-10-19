@@ -54,7 +54,9 @@ function testVisibleActionContract() {
   assert.match(eventDetails, /KeyboardAvoidingView[\s\S]*behavior=\{Platform\.OS === 'ios' \? 'padding' : 'height'\}/);
   assert.match(eventDetails, /hostMessageOpen \?[\s\S]*ScrollView[\s\S]*keyboardShouldPersistTaps="handled"[\s\S]*automaticallyAdjustKeyboardInsets/);
   assert.match(businessDetails, /KeyboardAvoidingView[\s\S]*contactInput/);
+  assert.match(businessDetails, /behavior=\{Platform\.OS === 'ios' \? 'padding' : undefined\}/);
   assert.match(businessDetails, /contactKeyboard[\s\S]*contactScrollContent[\s\S]*keyboardShouldPersistTaps="handled"/);
+  assert.match(businessDetails, /automaticallyAdjustKeyboardInsets=\{Platform\.OS === 'ios'\}/);
   assert.match(businessInbox, /KeyboardAvoidingView[\s\S]*keyboardShouldPersistTaps="handled"/);
   assert.match(feedback, /KeyboardAvoidingView[\s\S]*keyboardShouldPersistTaps="handled"/);
   const firestoreRules = read('backend/firestore.rules');
@@ -62,6 +64,9 @@ function testVisibleActionContract() {
   assert.match(app, /<MyEventsScreen[\s\S]*onEditSeries=\{handleEditSeries\}/);
   assert.match(app, /selectedEvent\.createdByUserId === currentUser\.uid/);
   assert.match(myEvents, /disabled=\{!onEditSeries\} onPress=\{\(\) => onEditSeries\?\.\(event\)\}/);
+  assert.match(app, /onDeleteSeries=\{handleDeleteSeries\}/);
+  assert.doesNotMatch(app, /onDeleteSeries=\{profile\?\.role === 'admin'/);
+  assert.match(myEvents, /event\.createdByUserId === userUid \|\| event\.ownerUid === userUid \|\| event\.createdBy === userUid/);
   assert.match(recurringForm, /allowUnchangedSubmit=\{editing\}/);
   assert.match(createForm, /!initialEvent\?\.id \|\| isDirty \|\| allowUnchangedSubmit/);
 }

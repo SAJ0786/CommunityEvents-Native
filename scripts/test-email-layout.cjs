@@ -35,6 +35,14 @@ async function main() {
     assert.equal(logo.contentType, 'image/png');
     assert.deepEqual(logo.content, fs.readFileSync(path.join(root, 'assets/logo.png')));
   }
+  const enquiry = samples['business-enquiry'];
+  assert.match(enquiry.html, /Contacted by/);
+  assert.match(enquiry.html, /Test Customer/);
+  assert.match(enquiry.html, /Business[\s\S]*Example Business/);
+  assert.match(enquiry.html, /Message[\s\S]*What time do you open on Saturday/);
+  assert.doesNotMatch(enquiry.html, /Reference|Business ID|City|Email verification|Category|Submitted|Open Business Inbox/);
+  assert.doesNotMatch(enquiry.text, /Reference:|Business ID:|City:|Email verification:|Category:|Submitted:|Open Business Inbox/);
+  assert.doesNotMatch(enquiry.subject, /\[[a-f0-9]{12}\]/);
   const hostile = buildEmail({ kind: 'business-report', businessName: '<script>alert(1)</script>', message: '<img src=x onerror=alert(1)>', senderName: '<b>Fake</b>' }, '<reference>');
   assert.doesNotMatch(hostile.html, /<script|<img src=x|<b>/);
   assert.equal((hostile.html.match(/<img\b/g) || []).length, 1, 'only the trusted logo is an image');

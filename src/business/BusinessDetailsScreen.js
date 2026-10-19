@@ -272,7 +272,7 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
         <View style={styles.contactModal}>
           <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setContactOpen(false)} />
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
             style={styles.contactKeyboard}
           >
@@ -281,7 +281,7 @@ export default function BusinessDetailsScreen({ business, promotions = [], saved
             bounces={false}
             contentContainerStyle={styles.contactScrollContent}
             keyboardShouldPersistTaps="handled"
-            automaticallyAdjustKeyboardInsets
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           >
           <View style={styles.contactCard}>
             <Text style={styles.contactTitle}>Contact {business.name}</Text>

@@ -116,30 +116,23 @@ function notificationScheduleError(error) {
   const exactAlarm = Platform.OS === 'android'
     && /exact|alarm|securityexception|schedule_exact_alarm/i.test(message);
   const nextError = new Error(exactAlarm
-    ? 'Exact alarms are blocked for this app. Allow Alarms & reminders, then set the event reminder again.'
-    : 'The phone did not retain this reminder. Check Community Connect Australia notification settings and try again.');
+    ? 'Allow Alarms & reminders for Community Connect Australia, then try again.'
+    : 'We could not set this alarm. Check that notifications are allowed for Community Connect Australia, then try again.');
   nextError.code = exactAlarm ? 'EXACT_ALARM_BLOCKED' : 'REMINDER_NOT_SCHEDULED';
   return nextError;
 }
 
 async function scheduleVerifiedNotification(request) {
-  let notificationId = '';
   try {
-    notificationId = await Notifications.scheduleNotificationAsync(request);
-    // On iOS, scheduleNotificationAsync resolving with an identifier is the
-    // native confirmation. An immediate getAllScheduledNotificationsAsync
-    // read can lag behind the write and previously caused a valid reminder to
-    // be cancelled as "not retained".
-    if (Platform.OS === 'ios') return notificationId;
-    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    if (!scheduled.some(item => item.identifier === notificationId)) {
-      throw new Error('Scheduled notification was not retained by this device.');
+    const notificationId = await Notifications.scheduleNotificationAsync(request);
+    if (!notificationId) {
+      throw new Error('The notification service did not return an alarm identifier.');
     }
+    // A resolved native identifier is the scheduling confirmation. Reading the
+    // Android schedule registry immediately can lag behind the write and must
+    // not cancel a valid alarm as "not retained".
     return notificationId;
   } catch (error) {
-    if (notificationId) {
-      await Notifications.cancelScheduledNotificationAsync(notificationId).catch(() => {});
-    }
     throw notificationScheduleError(error);
   }
 }

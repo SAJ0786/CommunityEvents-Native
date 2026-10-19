@@ -103,14 +103,21 @@ async function main() {
     const toggle = extractFunction('enableNearbyEvents', {
       nearbyEventsOnly: false, setNearbyEventsOnly: value => { enabled = value; },
       setEventUserLocation: value => { location = value; }, Alert: { alert: () => { alerted = true; } },
-      Location: { Accuracy: { Balanced: 1 }, requestForegroundPermissionsAsync: async () => ({ status: status === 'denied' ? 'denied' : 'granted' }),
-        getCurrentPositionAsync: async () => { if (status === 'error') throw new Error('offline'); return { coords: { latitude: -33.8, longitude: 151.1 } }; } },
+      getNearbyPosition: async () => { if (status !== 'granted') throw Object.assign(new Error('unavailable'), { code: status === 'denied' ? 'LOCATION_PERMISSION_DENIED' : 'LOCATION_UNAVAILABLE' }); return { latitude: -33.8, longitude: 151.1 }; },
+      nearbyLocationMessage: error => error.message,
     }, 'arrow');
     await toggle();
     assert.equal(enabled, status === 'granted');
     assert.equal(Boolean(location), status === 'granted');
     assert.equal(alerted, status !== 'granted');
   }
+  const directorySource = read('src/business/BusinessDirectoryModule.js');
+  const locationSource = read('src/services/deviceLocation.js');
+  assert.match(appSource, /getNearbyPosition\(\)/);
+  assert.match(directorySource, /getNearbyPosition\(\)/);
+  assert.doesNotMatch(appSource, /Location\.getCurrentPositionAsync/);
+  assert.doesNotMatch(directorySource, /Location\.getCurrentPositionAsync/);
+  assert.match(locationSource, /getLastKnownPositionAsync[\s\S]*Accuracy\.Balanced[\s\S]*Accuracy\.Low/);
   const react = { useMemo: fn => fn(), createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat() }) };
   const EventPresetStrip = load('src/components/HomeFilters.js', {
     react, 'react-native': { ScrollView: 'ScrollView', Pressable: 'Pressable', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: value => value } },

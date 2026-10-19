@@ -2,7 +2,6 @@ import HorizontalStrip from '../components/HorizontalStrip';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import ScrollView from '../components/KeyboardAwareScrollView';
-import * as Location from 'expo-location';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import BusinessCard from './BusinessCard';
 import BusinessDetailsScreen from './BusinessDetailsScreen';
@@ -40,6 +39,7 @@ import CitySelector from '../components/CitySelector';
 import CompactSelect from '../components/CompactSelect';
 import { listenBusinessCategories } from '../services/businessCategoryAdmin';
 import { trackBusinessInteraction } from '../services/businessAnalytics';
+import { getNearbyPosition, nearbyLocationMessage } from '../services/deviceLocation';
 import NativeBackButton from '../components/NativeBackButton';
 import MemberPageHeader from '../components/MemberPageHeader';
 import { businessOpenState } from '../utils/businessHours';
@@ -182,18 +182,13 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
       return;
     }
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== 'granted') {
-        Alert.alert('Location needed', 'Allow location access to sort nearby businesses. Your current business order has not changed.');
-        return;
-      }
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      onLocationResolved?.({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+      const position = await getNearbyPosition();
+      onLocationResolved?.(position);
       setNearbyOnly(true);
       setFavouritesOnly(false);
       setRecentOnly(false);
-    } catch {
-      Alert.alert('Location unavailable', 'Your location could not be read. Your current business order has not changed.');
+    } catch (error) {
+      Alert.alert('Location unavailable', nearbyLocationMessage(error));
     }
   };
 

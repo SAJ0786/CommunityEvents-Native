@@ -22,7 +22,10 @@ async function check(platform) {
     getAllScheduledNotificationsAsync: async () => [...scheduled.keys()].map(identifier => ({ identifier })) };
   const mocks = { 'react-native': { Platform: { OS: platform }, Linking: {} },
     '@react-native-async-storage/async-storage': { getItem: async key => store.get(key), setItem: async (key, value) => store.set(key, value) },
-    'expo-notifications': notifications, 'expo-intent-launcher': {}, 'expo-constants': {}, './events': {}, './prayerTimes': prayer, '../registration/eventSchedule': registration };
+    'expo-notifications': notifications, 'expo-intent-launcher': {}, 'expo-constants': {},
+    '@react-native-firebase/functions': { httpsCallable: () => async () => ({ data: {} }) },
+    '../firebase/firebase': { auth: {}, functions: {} }, '../theme': { colors: { purple: '#6f42c1' } },
+    './events': {}, './prayerTimes': prayer, '../registration/eventSchedule': registration };
   function load() { const exports = {}; vm.runInNewContext(source, { exports, Date: Clock, require: name => { assert.ok(name in mocks, name); return mocks[name]; } }); return exports; }
   let api = load();
   await api.initializeDefaultPrayerReminders(location);

@@ -24,7 +24,6 @@ import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { appVersion, appBuild } from './src/services/appVersion';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onIdTokenChanged, signOut } from '@react-native-firebase/auth';
 import AppHeader from './src/components/AppHeaderModern';
@@ -74,6 +73,7 @@ import { uploadEventPoster } from './src/services/images';
 import { completeMemberProfile, deleteMyAccountAndEvents, ensureUserProfile, getUserProfile, migratePhoneAccount, toggleSavedEvent, updateUserPreferences } from './src/services/users';
 import { cancelFavouriteReminder, getEventReminder, initializeDefaultPrayerReminders, scheduleFavouriteReminder } from './src/services/reminders';
 import { listenForDevicePushTokenChanges, registerDevicePushNotifications, unregisterDevicePushNotifications, listenForBusinessPushOpens } from './src/services/pushNotifications';
+import { getNearbyPosition, nearbyLocationMessage } from './src/services/deviceLocation';
 import { getPrayerLocation } from './src/utils/prayerLocations';
 import { EVENT_TYPE_GROUPS } from './src/utils/eventOptions';
 import { canArrangeEventNiaz, matchesEventPeriod } from './src/utils/eventBrowseOptions';
@@ -626,16 +626,11 @@ function MainApp() {
       return;
     }
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== 'granted') {
-        Alert.alert('Location needed', 'Allow location access to sort nearby events. Your current event order has not changed.');
-        return;
-      }
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      setEventUserLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+      const position = await getNearbyPosition();
+      setEventUserLocation(position);
       setNearbyEventsOnly(true);
-    } catch {
-      Alert.alert('Location unavailable', 'Your location could not be read. Your current event order has not changed.');
+    } catch (error) {
+      Alert.alert('Location unavailable', nearbyLocationMessage(error));
     }
   };
 
@@ -1550,7 +1545,7 @@ function MainApp() {
           seriesCounts={myEventSeriesCounts}
           onEditSeries={handleEditSeries}
           onOpenRegistration={(event, action) => { setRegistrationTarget({ eventId: event.id, action, nonce: Date.now() }); setActiveTab('registration'); }}
-          onDeleteSeries={profile?.role === 'admin' || profile?.role === 'superAdmin' ? handleDeleteSeries : undefined}
+          onDeleteSeries={handleDeleteSeries}
           deletingSeriesId={deleteSeriesBusyId}
         />
       ) : activeTab === 'calendar' ? (

@@ -41,7 +41,11 @@ export default function MyEventsScreen({
   const historyOpen = historySelection === userUid;
   const selected = selection && selection.uid === userUid ? selection.view : organising.length || !(registrations.length || history.length) ? 'organising' : 'attending';
   const visibleEvents = selected === 'organising' ? organising : registrations;
-  const renderEvent = ({ item: event }) => (
+  const renderEvent = ({ item: event }) => {
+    const canDeleteSeries = Boolean(onDeleteSeries && userUid && (
+      event.createdByUserId === userUid || event.ownerUid === userUid || event.createdBy === userUid
+    ));
+    return (
     <View style={styles.itemWrap}>
       {event.isRecurring || event.seriesId || event.recurringSeriesId ? (
         <View style={styles.seriesBanner}>
@@ -91,8 +95,8 @@ export default function MyEventsScreen({
           {event.seriesId || event.recurringSeriesId ? (
             <Pressable
               onPress={() => onDeleteSeries?.(event)}
-              disabled={!onDeleteSeries || deletingSeriesId === (event.seriesId || event.recurringSeriesId)}
-              style={({ pressed }) => [styles.deleteSeriesButton, pressed && onDeleteSeries && styles.pressed, (!onDeleteSeries || deletingSeriesId === (event.seriesId || event.recurringSeriesId)) && styles.disabled]}
+              disabled={!canDeleteSeries || deletingSeriesId === (event.seriesId || event.recurringSeriesId)}
+              style={({ pressed }) => [styles.deleteSeriesButton, pressed && canDeleteSeries && styles.pressed, (!canDeleteSeries || deletingSeriesId === (event.seriesId || event.recurringSeriesId)) && styles.disabled]}
             >
               {deletingSeriesId === (event.seriesId || event.recurringSeriesId) ? (
                 <ActivityIndicator color={colors.danger} size="small" />
@@ -115,7 +119,8 @@ export default function MyEventsScreen({
         </View>
       </View>}
     </View>
-  );
+    );
+  };
 
   return (
     <FlatList
