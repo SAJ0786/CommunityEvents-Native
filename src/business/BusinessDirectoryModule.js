@@ -1,6 +1,6 @@
 import HorizontalStrip from '../components/HorizontalStrip';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import ScrollView from '../components/KeyboardAwareScrollView';
 import * as Location from 'expo-location';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -113,6 +113,7 @@ function publicBusinessRecord(business = {}, userLocation = null) {
 }
 
 function DirectoryHome({ businesses, categories, city, savedIds, loading, error, initialFilter, onInitialFilterConsumed, onCityChange, onLocationResolved, onOpenBusiness, onToggleSaved }) {
+  const { fontScale } = useWindowDimensions();
   const [query, setQuery] = useState('');
   const [categoryId, setCategoryId] = useState('all');
   const [subcategoryId, setSubcategoryId] = useState('');
@@ -233,7 +234,7 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
 
       <SectionHeading title="Quick access" subtitle="Swipe for useful ways to explore" actionLabel={categoryId === 'all' && !openOnly && !favouritesOnly && !nearbyOnly && !recentOnly ? '' : 'Clear'} onAction={clearBrowseFilters} />
       <View style={quickAccess.panel}>
-      <HorizontalStrip accessibilityLabel="Business filters" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.browseChips}>
+      <HorizontalStrip equalItems minimumItemWidth={quickAccess.tile.width * Math.max(1, fontScale)} accessibilityLabel="Business filters" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.browseChips}>
         {[
           ['view-grid-outline', 'All', colors.blueSoft, colors.blue, clearBrowseFilters, categoryId === 'all' && !openOnly && !favouritesOnly && !nearbyOnly && !recentOnly],
           ['clock-check-outline', 'Open now', colors.successSoft || colors.tealSoft, colors.tealDark, () => { setOpenOnly(true); setFavouritesOnly(false); setNearbyOnly(false); setRecentOnly(false); }, openOnly],
@@ -250,6 +251,7 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
       </View>
 
       <SectionHeading title={favouritesOnly ? 'Favourite businesses' : 'Browse businesses'} subtitle={favouritesOnly ? 'Only businesses saved to your profile' : subcategoryId ? `Filtered: ${selectedCategory?.subcategories.find(item => item.id === subcategoryId)?.label || 'Selected service'}` : 'Browse by service'} actionLabel={categoryId === 'all' && !subcategoryId && !favouritesOnly ? '' : 'Clear'} onAction={() => { setCategoryId('all'); setSubcategoryId(''); setFavouritesOnly(false); }} />
+      <View style={quickAccess.panel}>
       <HorizontalStrip accessibilityLabel="Business categories" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRail}>
         <Pressable onPress={() => { setCategoryId('all'); setSubcategoryId(''); }} style={[styles.category, categoryId === 'all' && styles.categoryActive]}>
           <Text style={[styles.categoryIcon, categoryId === 'all' && styles.categoryIconActive]}>{'\u2726'}</Text>
@@ -266,6 +268,7 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
         })}
       </HorizontalStrip>
 
+      </View>
       {selectedCategory ? (
         <View style={styles.subcategoryPanel}>
           <Text style={styles.subcategoryLabel}>SELECT SERVICE</Text>
@@ -915,12 +918,12 @@ const styles = StyleSheet.create({
   textButtonLabel: { color: colors.blue, fontSize: 12, fontWeight: '700' },
   browseChips: { gap: 9, paddingRight: spacing.lg },
   browseAccess: quickAccess.tile,
-  browseAccessActive: { borderColor: colors.blue, backgroundColor: colors.blueSoft },
+  browseAccessActive: { backgroundColor: colors.blueSoft },
   browseAccessIcon: quickAccess.icon,
   browseAccessLabel: quickAccess.label,
   browseAccessLabelActive: { color: colors.blueDark, fontWeight: '700' },
   categoryRail: { gap: spacing.sm, paddingRight: spacing.lg },
-  category: { width: 82, minHeight: 72, alignItems: 'center', justifyContent: 'center', gap: 5, padding: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: withAlpha(colors.glassBorder, 0.76) },
+  category: { width: 82, minHeight: 72, alignItems: 'center', justifyContent: 'center', gap: 5, padding: 7, borderRadius: 18, backgroundColor: 'transparent' },
   categoryActive: { borderColor: colors.blue, backgroundColor: colors.blueSoft },
   categoryIcon: { fontSize: 20 },
   categoryIconActive: { color: colors.blue },

@@ -1355,7 +1355,7 @@ function MainApp() {
         />
       <View style={styles.sectionHeadingRow}><Text style={styles.homeSectionTitle}>Quick access</Text></View>
       <View style={quickAccess.panel}>
-      <HorizontalStrip accessibilityLabel="Quick access" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickGrid}>
+      <HorizontalStrip equalItems minimumItemWidth={quickAccess.tile.width * Math.max(1, fontScale)} accessibilityLabel="Quick access" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickGrid}>
         {[
           ...(REGISTRATION_ENABLED ? [['clipboard-text-outline', registrationOnly ? 'All events' : 'Registration\nonly', colors.tealSoft, colors.tealDark, () => setRegistrationOnly(value => !value)]] : []),
           [homeViewMode === 'map' ? 'format-list-bulleted' : 'map-outline', homeViewMode === 'map' ? 'List' : 'Map', colors.blueSoft, colors.blue, () => setHomeViewMode(current => current === 'map' ? 'list' : 'map')],

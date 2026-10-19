@@ -40,9 +40,9 @@
 
 export const quickAccess = {
   panel: { padding: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.surface },
-  tile: { width: 72, minHeight: 61, alignItems: 'center', justifyContent: 'center', gap: 2, paddingVertical: 2, paddingHorizontal: 3, borderRadius: 12, backgroundColor: 'transparent' },
+  tile: { width: 65, minHeight: 68, alignItems: 'center', justifyContent: 'flex-start', gap: 5, paddingVertical: 3, paddingHorizontal: 1, borderRadius: 12, backgroundColor: 'transparent' },
   icon: { width: 31, height: 31, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  label: { color: colors.text, fontSize: 9.5, lineHeight: 11, fontWeight: '600', textAlign: 'center' },
+  label: { color: colors.text, fontSize: 11, lineHeight: 13, minHeight: 26, fontWeight: '600', textAlign: 'center' },
 };
 
 export const spacing = {

@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { AUDIENCE_TYPES } from '../utils/eventOptions';
 import { EVENT_BROWSE_PRESETS } from '../utils/eventBrowseOptions';
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, quickAccess, radius, spacing, typography } from '../theme';
 import CompactSelect from './CompactSelect';
 
 function FilterChoices({ label, options, value, onChange }) {
@@ -18,7 +18,7 @@ function FilterChoices({ label, options, value, onChange }) {
 
 export function EventPresetStrip({ filters, nearby = false, onNearbyChange, onPresetChange }) {
   return (
-    <View>
+    <View style={quickAccess.panel}>
       <HorizontalStrip horizontal showsHorizontalScrollIndicator={false}
         directionalLockEnabled alwaysBounceVertical={false} contentInsetAdjustmentBehavior="never"
         style={{ flexGrow: 0, flexShrink: 0, minHeight: 44 }}
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   label: { color: colors.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
   choiceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 4 },
   nearbyHelp: { color: colors.muted, fontSize: 12, lineHeight: 17 },
-  choice: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, paddingVertical: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.surface },
+  choice: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: 22, backgroundColor: 'transparent' },
   choiceSelected: { borderColor: colors.blue, backgroundColor: colors.blue },
   choiceText: { color: colors.muted, fontSize: typography.body.fontSize, fontWeight: '600' },
   choiceTextSelected: { color: colors.surface },
