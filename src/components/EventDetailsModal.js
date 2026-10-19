@@ -25,6 +25,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import NativeShare from 'react-native-share';
+import { registrationUnavailable, registrationStatusLabel } from '../registration/registrationStatus';
+import { responseAnswer } from '../registration/responsePresentation';
 import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import { formatEventDate, formatEventTime } from '../utils/formatters';
 import { buildEventShareMessage } from '../utils/eventShare';
@@ -248,6 +250,8 @@ export default function EventDetailsModal({
   // createdByUserId, so the old owner can contact the new owner while the new
   // owner sees the same action disabled.
   const canConnectHost = Boolean(!isGuest && user?.uid && (!hostUid || hostUid !== user.uid));
+  const unavailableRegistration = registrationUnavailable(event);
+  const showManagementActions = !event.registrationOnly || Boolean(registrationDetail?.canManage && !unavailableRegistration);
   const isSeriesEvent = Boolean(event.isSeries || event.isRecurring || event.seriesId || event.recurringSeriesId);
 
   const shareTextOnly = async () => {
@@ -432,16 +436,16 @@ export default function EventDetailsModal({
                 {registrationLoading && <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}><ActivityIndicator color={colors.tealDark} /><Text style={styles.notes}>Loading registration details…</Text></View>}
                 {onRetryRegistration && <ActionButton icon="reload" label="Retry registration details" onPress={onRetryRegistration} />}
                 <View style={styles.actionGrid}>
-                  {registrationDetail && <ActionButton icon="clipboard-edit-outline" label={registrationDetail.ownRegistration?.status === 'registered' ? 'Edit registrations' : 'Register for event'} onPress={onRegister} disabled={!registrationDetail.canRegister && !registrationDetail.canEditRegistration} />}
+                  {registrationDetail && !unavailableRegistration && <ActionButton icon="clipboard-edit-outline" label={registrationDetail.ownRegistration?.status === 'registered' ? 'Edit registrations' : 'Register for event'} onPress={onRegister} disabled={!registrationDetail.canRegister && !registrationDetail.canEditRegistration} />}
                   {onEditRegistrationForm && <ActionButton icon="form-select" label="Edit Registration form" onPress={onEditRegistrationForm} />}
                   {onRegistrationResponses && <ActionButton icon="clipboard-list-outline" label="Registration responses" onPress={onRegistrationResponses} />}
                   {onApproveRegistration && <ActionButton icon="check-decagram-outline" label="Review event" onPress={onApproveRegistration} />}
-                  {onCancelRegistration && <ActionButton icon="clipboard-remove-outline" label="Delete my registration" variant="danger" onPress={onCancelRegistration} />}
+                  {onCancelRegistration && <ActionButton icon="clipboard-remove-outline" label={unavailableRegistration ? "Delete my registration data" : "Delete my registration"} variant="danger" onPress={onCancelRegistration} />}
                   {onToggleVisibility ? <ActionButton icon={event.hidden ? 'eye-outline' : 'eye-off-outline'} label={event.hidden ? 'Make Visible' : 'Hide Event'} onPress={() => onToggleVisibility(event)} /> : null}
                   {onTransfer ? <ActionButton icon="account-switch-outline" label="Transfer" variant="primary" onPress={() => onTransfer(event)} /> : null}
                   {onRemoveLiveStale ? <ActionButton icon="broadcast-off" label="Remove Live Stale" variant="danger" onPress={() => onRemoveLiveStale(event)} /> : null}
-                  <ActionButton icon="share-variant-outline" label="Share" variant="share" onPress={() => setShareOpen(true)} />
-                  <ActionButton icon="map-marker-path" label="Directions" variant="primary" onPress={openDirections} disabled={isGuest || !fullAddress || (event.registrationOnly && !event.registrationPrivate)} />
+                  {!unavailableRegistration && <ActionButton icon="share-variant-outline" label="Share" variant="share" onPress={() => setShareOpen(true)} />}
+                  {!unavailableRegistration && <ActionButton icon="map-marker-path" label="Directions" variant="primary" onPress={openDirections} disabled={isGuest || !fullAddress || (event.registrationOnly && !event.registrationPrivate)} />}
                   <ActionButton icon="email-outline" label="Contact Host" disabled={!canConnectHost} onPress={() => { setHostMessageStatus(''); setHostMessageOpen(true); }} />
                   {!isGuest && event.isLive && hasPlayableLiveUrl && event.liveAppVisibility !== 'private' && !(canManageStream && onManageStream) ? <ActionButton iconNode={<FontAwesome name="youtube-play" size={22} color={colors.danger} />} label="Watch on YouTube" variant="danger" onPress={openLiveVideo} /> : null}
                   {canManageStream && onManageStream ? (
@@ -453,18 +457,20 @@ export default function EventDetailsModal({
                       onPress={!event.registrationOnly && event.isLive && hasPlayableLiveUrl ? openLiveVideo : () => onManageStream(event)}
                     />
                   ) : null}
-                  <ActionButton icon={reminder ? 'bell-check-outline' : 'alarm'} label={reminder ? 'Reminder Set' : 'Reminder'} onPress={() => { setReminderError(''); setReminderOpen(true); }} disabled={isGuest || (event.registrationOnly && (!event.startTime || event.status !== 'approved'))} />
-                  <ActionButton icon="calendar-sync-outline" label="Sync Calendar" variant="primary" onPress={addToCalendar} disabled={isGuest || (event.registrationOnly && event.status !== 'approved')} />
+                  {!unavailableRegistration && <ActionButton icon={reminder ? 'bell-check-outline' : 'alarm'} label={reminder ? 'Reminder Set' : 'Reminder'} onPress={() => { setReminderError(''); setReminderOpen(true); }} disabled={isGuest || (event.registrationOnly && (!event.startTime || event.status !== 'approved'))} />}
+                  {!unavailableRegistration && <ActionButton icon="calendar-sync-outline" label="Sync Calendar" variant="primary" onPress={addToCalendar} disabled={isGuest || (event.registrationOnly && event.status !== 'approved')} />}
                   {onNiazArrangement ? <ActionButton icon="bowl-mix-outline" label="Niaz Arrangement" variant="share" disabled={isGuest || !canArrangeNiaz} onPress={() => onNiazArrangement(event)} /> : null}
-                  <ActionButton icon="pencil-outline" label="Edit" disabled={!onEdit} onPress={() => onEdit?.(event)} />
-                  {isSeriesEvent ? <ActionButton icon="folder-edit-outline" label="Edit Series" disabled={!onEditSeries} onPress={() => onEditSeries?.(event)} /> : null}
-                  <ActionButton icon="content-copy" label="Copy" disabled={!onCopy} onPress={() => onCopy?.(event)} />
-                  <ActionButton icon="trash-can-outline" label="Delete" variant="danger" disabled={!onDelete} onPress={() => onDelete?.(event)} />
-                  {isSeriesEvent ? <ActionButton icon="delete-sweep-outline" label="Delete Series" variant="danger" disabled={!onDeleteSeries} onPress={() => onDeleteSeries?.(event)} /> : null}
+                  {showManagementActions && <ActionButton icon="pencil-outline" label="Edit" disabled={!onEdit} onPress={() => onEdit?.(event)} />}
+                  {isSeriesEvent && showManagementActions ? <ActionButton icon="folder-edit-outline" label="Edit Series" disabled={!onEditSeries} onPress={() => onEditSeries?.(event)} /> : null}
+                  {showManagementActions && <ActionButton icon="content-copy" label="Copy" disabled={!onCopy} onPress={() => onCopy?.(event)} />}
+                  {showManagementActions && <ActionButton icon="trash-can-outline" label="Delete" variant="danger" disabled={!onDelete} onPress={() => onDelete?.(event)} />}
+                  {isSeriesEvent && showManagementActions ? <ActionButton icon="delete-sweep-outline" label="Delete Series" variant="danger" disabled={!onDeleteSeries} onPress={() => onDeleteSeries?.(event)} /> : null}
                 </View>
 
+                {unavailableRegistration && <View style={styles.detailsPanel}><Text style={styles.date}>{registrationStatusLabel(event)}</Text><Text style={styles.notes}>This event is no longer taking place. Your registration is kept here for reference; no places are reserved.</Text></View>}
+                {unavailableRegistration && registrationDetail?.ownRegistration && <View style={styles.detailsPanel}><Text style={styles.detailValue}>Registration history</Text>{(registrationDetail.ownRegistration.fields || []).map(field => <View key={field.id} style={styles.detailRow}><View style={{flex:1}}><Text style={styles.notes}>{field.label}</Text><Text selectable style={styles.detailValue}>{responseAnswer(registrationDetail.ownRegistration.answers?.[field.id])}</Text></View></View>)}</View>}
                 <Text style={styles.date}>{formatEventDate(event.eventDate)}</Text>
-                {event.registrationOnly && !event.startTime ? <Text style={styles.notes}>Start time not supplied. Calendar entry is date-only; timed reminders are unavailable.</Text> : null}
+                {event.registrationOnly && !unavailableRegistration && !event.startTime ? <Text style={styles.notes}>Start time not supplied. Calendar entry is date-only; timed reminders are unavailable.</Text> : null}
                 {registrationNotice ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{registrationNotice}</Text> : null}
                 {registrationDetail?.registrationNeedsReview ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>The registration form changed. Review your answers and agree to the current terms again.</Text> : null}
 

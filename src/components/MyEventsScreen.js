@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import EventCard from './EventCard';
+import { registrationUnavailable } from '../registration/registrationStatus';
 import { colors, radius, shadow, spacing, typography } from '../theme';
 import MemberPageHeader from './MemberPageHeader';
 
@@ -34,8 +35,11 @@ export default function MyEventsScreen({
 }) {
   const [selection,setSelection] = useState(null);
   const organising = events.filter(event => !event.registrationOnly || event.ownerUid === userUid);
-  const registrations = events.filter(event => event.registrationOnly && event.isRegistered);
-  const selected = selection && selection.uid === userUid ? selection.view : organising.length || !registrations.length ? 'organising' : 'attending';
+  const registrations = events.filter(event => event.registrationOnly && event.isRegistered && !registrationUnavailable(event));
+  const history = events.filter(event => event.registrationOnly && event.isRegistered && registrationUnavailable(event));
+  const [historySelection, setHistorySelection] = useState(null);
+  const historyOpen = historySelection === userUid;
+  const selected = selection && selection.uid === userUid ? selection.view : organising.length || !(registrations.length || history.length) ? 'organising' : 'attending';
   const visibleEvents = selected === 'organising' ? organising : registrations;
   const renderEvent = ({ item: event }) => (
     <View style={styles.itemWrap}>
@@ -69,9 +73,8 @@ export default function MyEventsScreen({
         </Pressable>
       </View>}
       <View style={event.hidden ? styles.hiddenCard : undefined}>
-        <EventCard event={event} onPress={() => onPressEvent?.(event)} />
+        <EventCard event={event} registrationActionLabel={event.registrationOnly && event.isRegistered ? registrationUnavailable(event) ? 'Registration history' : 'View my registration' : undefined} onPress={() => onPressEvent?.(event)} />
       </View>
-      {event.registrationOnly && event.isRegistered ? <Pressable onPress={() => onPressEvent?.(event)} style={styles.editButton}><Text style={styles.editText}>{event.status === 'cancelled' ? 'View registration history' : 'View or edit my registration'}</Text></Pressable> : null}
       {(!event.registrationOnly || selected === 'organising' && (event.canManage ?? (event.ownerUid === userUid))) && <View style={styles.metaRow}>
         <View style={styles.actionRow}>
           <Pressable disabled={event.registrationOnly && event.status === 'cancelled'} onPress={() => onEdit?.(event)} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}>
@@ -141,7 +144,13 @@ export default function MyEventsScreen({
           ) : null}
         </View>
       )}
-      ListFooterComponent={error ? <Text style={styles.error}>{error}</Text> : null}
+      ListFooterComponent={<View>
+        {selected === 'attending' && history.length > 0 && <View style={styles.historySection}>
+          <Pressable accessibilityRole="button" accessibilityState={{expanded:historyOpen}} onPress={() => setHistorySelection(historyOpen ? null : userUid)} style={styles.historyToggle}><Text style={styles.historyTitle}>Registration history ({history.length}) {historyOpen ? '▴' : '▾'}</Text><Text style={styles.historyHelp}>Deleted and cancelled events · no places reserved</Text></Pressable>
+          {historyOpen && history.map(event => <View key={event.id} style={styles.historyItem}>{renderEvent({item:event})}</View>)}
+        </View>}
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+      </View>}
       initialNumToRender={4}
       maxToRenderPerBatch={4}
       updateCellsBatchingPeriod={40}
@@ -198,6 +207,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: spacing.sm,
   },
+  historySection: { marginTop: spacing.lg, gap: spacing.sm },
+  historyToggle: { minHeight: 52, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  historyTitle: { color: colors.navy, ...typography.body, fontWeight: '700' },
+  historyHelp: { color: colors.muted, ...typography.label, marginTop: 4 },
+  historyItem: { marginTop: spacing.sm },
   headerContent: { marginBottom: spacing.md },
   separator: { height: spacing.md },
   itemWrap: {

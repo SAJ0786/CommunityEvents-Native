@@ -496,6 +496,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const schedule = (await scheduleModel).registrationSchedule({ ...event, timeZone: event.timeZone });
       const live = liveProjection(event);
       const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), ...schedule, ...live, id: event.id, ownerUid: event.ownerUid, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
+      result.event.deleted = Boolean(event.deletedAt);
       result.event.submittedByName = await submitterName(tx,event);
       result.canApprove = Boolean(caller && !event.deletedAt && !event.reviewDecision && (event.status === 'pending' || pending) && approves(caller, event));
       result.canRegister = event.status === 'approved' && localMinute(now(), event.timeZone) < (event.closes || `${event.date}T00:00`);
@@ -569,7 +570,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         const schedule = (await scheduleModel).registrationSchedule(event);
         const row = { ...(await model).publicEvent({ ...event, address: privateSnap.data()?.address || '' }), ...schedule,
           id: event.id, city: event.city, timeZone: event.timeZone, ownerUid: event.ownerUid, submittedByName: await submitterName(tx,event,submitterNames),
-          status: event.status, revision: event.revision, formVersion: event.formVersion,
+          status: event.status, deleted: Boolean(event.deletedAt), revision: event.revision, formVersion: event.formVersion,
           allowCancellation: event.allowCancellation === true, registrationOnly: true,
           canManage: manager, canApprove, isRegistered: registered,
           canRegister: event.status === 'approved' && localMinute(now(), event.timeZone) < (event.closes || `${event.date}T00:00`),

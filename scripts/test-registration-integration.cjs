@@ -270,6 +270,7 @@ test('My Events preserves attendee history without exposing host edit/delete con
     react,
     'react-native': { ActivityIndicator: 'ActivityIndicator', FlatList: 'FlatList', Pressable: 'Pressable', Text: 'Text', View: 'View', StyleSheet: { create: value => value } },
     './EventCard': { __esModule: true, default: 'EventCard' },
+    '../registration/registrationStatus': { registrationUnavailable:event => Boolean(event.registrationOnly && (event.deleted || event.deletedAt || event.status === 'cancelled')) },
     './MemberPageHeader': { __esModule: true, default: 'MemberPageHeader' },
     '../theme': require('./theme-fixture.cjs'),
   };
@@ -285,11 +286,28 @@ test('My Events preserves attendee history without exposing host edit/delete con
   const list = exports.default({});
   const attendeeCard = list.props.renderItem({ item: { id: 'event', registrationOnly: true, isRegistered: true, status: 'cancelled', canManage: false } });
   const attendee = JSON.stringify(attendeeCard);
-  assert.match(attendee, /View registration history/);
+  assert.match(attendee, /Registration history/);
   assert.doesNotMatch(attendee, /Registration responses|"children":\["Edit"\]|"children":\["Delete"\]/);
   const hosted = JSON.stringify(list.props.renderItem({ item: { id: 'event', registrationOnly: true, status: 'pending', canManage: true } }));
   assert.match(hosted, /Edit Registration form/);
   assert.match(hosted, /Registration responses/);
+  const events = [{id:'active',registrationOnly:true,isRegistered:true,status:'approved'}, {id:'deleted',registrationOnly:true,isRegistered:true,status:'cancelled',deleted:true}];
+  const activeList = exports.default({events,userUid:'viewer'});
+  assert.deepEqual(Array.from(activeList.props.data,event=>event.id),['active']);
+  assert.match(JSON.stringify(activeList.props.ListFooterComponent),/Registration history/);
+});
+
+test('registered attendees get collapsed poster thumbnails and account changes discard the private image', async () => {
+  const slots=[],effects=[],auth={currentUser:{uid:'member'}};let index=0,calls=0;
+  const react={createElement:(type,props,...children)=>({type,props:{...props,children}}),useState:value=>{const i=index++;if(!(i in slots))slots[i]=typeof value==='function'?value():value;return[slots[i],next=>{slots[i]=typeof next==='function'?next(slots[i]):next;}];},useEffect:(fn,deps)=>{const i=index++;const old=slots[i];if(!old||deps.some((value,j)=>value!==old.deps[j])){old?.cleanup?.();const item={deps};slots[i]=item;effects.push(()=>item.cleanup=fn());}}};
+  const mocks={react,'react-native':{ActivityIndicator:'ActivityIndicator',AppState:{currentState:'active',addEventListener:()=>({remove(){}})},Image:'Image',Modal:'Modal',Pressable:'Pressable',Text:'Text',View:'View',useWindowDimensions:()=>({width:393,fontScale:1}),StyleSheet:{create:v=>v}},'@expo/vector-icons/MaterialCommunityIcons':'Icon','../firebase/firebase':{auth},'../registration/registrationStatus':load(path.join(root,'src/registration/registrationStatus.js')),'../theme':require('./theme-fixture.cjs'),'../utils/formatters':{formatEventTime:()=>''},'../services/events':{getEventPoster:()=>'',getEventSuburb:()=>''},'../services/images':{getImmediatePosterSource:()=>'',resolvePosterSource:async()=>''},'../registration/firebaseRegistration':{REGISTRATION_ENABLED:true,firebaseRegistration:()=>({poster:async()=>{calls++;return{mime:'image/png',base64:'registered-poster'};}})},'../../assets/logo.png':'fallback-logo'};
+  const exports={};const code=babel.transformSync(fs.readFileSync(path.join(root,'src/components/EventCard.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
+  vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
+  let event={id:'event',eventDate:'2026-12-01',registrationOnly:true,status:'approved',hasPoster:true,isRegistered:true,revision:1};
+  const render=()=>{index=0;const tree=exports.default({event});while(effects.length)effects.shift()();return tree;};
+  render();await new Promise(setImmediate);let tree=render();assert.equal(calls,1);assert.equal(flatten(tree).find(node=>node.type==='Image').props.source.uri,'data:image/png;base64,registered-poster');
+  auth.currentUser={uid:'another-member'};event={...event,isRegistered:false};tree=render();assert.equal(flatten(tree).find(node=>node.type==='Image').props.source,'fallback-logo');await new Promise(setImmediate);assert.equal(calls,1,'An unrelated member cannot request the collapsed private poster');
+  event={...event,isRegistered:true,status:'cancelled',deleted:true};tree=render();await new Promise(setImmediate);assert.equal(calls,1,'Unavailable events do not fetch private posters');assert.equal(flatten(tree).find(node=>node.type==='Image').props.source,'fallback-logo');
 });
 
 function stagedDetail() {

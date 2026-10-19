@@ -157,10 +157,11 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
     onEdit={detail.canManage && detail.event.status !== 'cancelled' ? () => onEdit(detail.card) : undefined}
     onCopy={detail.canManage && ['admin', 'superAdmin'].includes(profile?.role) ? () => operation('copy') : undefined}
     onDelete={detail.canManage ? () => onDelete(detail.card) : undefined}
-    onCancelRegistration={detail.canCancel ? () => Alert.alert('Delete your registration?', 'Delete your submitted answers and release your places. Access to the private venue and poster will be removed.', [
+    onCancelRegistration={detail.canCancel ? () => Alert.alert(detail.event.status === 'cancelled' ? 'Delete your registration data?' : 'Delete your registration?', detail.event.status === 'cancelled' ? 'Permanently delete your saved registration answers for this unavailable event. This will remove it from your registration history.' : 'Delete your submitted answers and release your places. Access to the private venue and poster will be removed.', [
       { text: 'Keep registration', style: 'cancel' }, { text: 'Delete registration', style: 'destructive', onPress: async () => {
         try {
           await firebaseRegistration({ enabled: REGISTRATION_ENABLED }).cancel(detail.event.id, detail.ownRegistration.revision);
+          onChanged?.();
           setDetail(null); setRefresh(value => value + 1);
         } catch (err) { Alert.alert('Could not delete registration', err.message); }
       } },

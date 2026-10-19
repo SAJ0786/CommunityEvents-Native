@@ -40,7 +40,7 @@ function testVisibleActionContract() {
   assert.match(details, /overlayRoot:\s*\{[\s\S]*?alignItems:\s*'center',[\s\S]*?justifyContent:\s*'center'/);
   assert.match(details, /label="Contact Host" disabled=\{!canConnectHost\}/);
   assert.match(details, /const canConnectHost = Boolean\(!isGuest && user\?\.uid && \(!hostUid \|\| hostUid !== user\.uid\)\)/);
-  assert.match(details, /isSeriesEvent \? <ActionButton[^>]+label="Edit Series" disabled=\{!onEditSeries\}/);
+  assert.match(details, /isSeriesEvent && showManagementActions \? <ActionButton[^>]+label="Edit Series" disabled=\{!onEditSeries\}/);
   assert.match(details, /label="Edit" disabled=\{!onEdit\}/);
   assert.match(details, /label="Copy" disabled=\{!onCopy\}/);
   assert.match(details, /label="Delete" variant="danger" disabled=\{!onDelete\}/);

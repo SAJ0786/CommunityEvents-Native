@@ -648,6 +648,8 @@ test('event deletion is manager-only, soft, revisioned and cannot be reversed by
   }
   const attending = await f.handlers.listRegistrationEvents(f.request('member', { scope: 'attending' }));
   assert.equal(attending.events.length, 1);
+  assert.equal(attending.events[0].deleted, true);
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('member', { eventId: event.eventId }))).event.deleted, true);
   assert.equal((await f.handlers.getRegistrationEvent(f.request('member', { eventId: event.eventId }))).event.status, 'cancelled');
   assert.deepEqual(await f.handlers.deleteRegistrationEvent(f.request('host', { eventId: event.eventId, expectedRevision: 1, confirmation: 'DELETE EVENT' })), deleted);
 });

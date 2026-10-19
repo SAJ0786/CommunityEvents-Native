@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, AppState, Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { auth } from '../firebase/firebase';
+import { registrationStatusLabel } from '../registration/registrationStatus';
 import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import { formatEventTime } from '../utils/formatters';
 import { getEventPoster, getEventSuburb } from '../services/events';
@@ -35,10 +37,13 @@ function organiserBadge(event) {
     : { label: 'Centre', backgroundColor: colors.amberSoft, color: colors.warningText };
 }
 
-export default function EventCard({ event, onPress, onToggleSaved, isSaved, saving }) {
+export default function EventCard({ event, onPress, onToggleSaved, isSaved, saving, registrationActionLabel }) {
   const { width, fontScale } = useWindowDimensions();
   const compact = width / Math.max(fontScale, 1) < 390;
   const [poster, setPoster] = useState(getEventPoster(event) || getImmediatePosterSource(event));
+  const viewerUid = auth.currentUser?.uid || '';
+  const [posterAccount, setPosterAccount] = useState('');
+  const visiblePoster = event.registrationOnly && (posterAccount !== viewerUid || event.status === 'cancelled' || (!event.isRegistered && !event.canManage)) ? '' : poster;
   const [posterOpen, setPosterOpen] = useState(false);
   const [posterError, setPosterError] = useState('');
   const [posterRefresh, setPosterRefresh] = useState(0);
@@ -66,8 +71,8 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
     setPosterError('');
     if (event.registrationOnly) {
       setPoster('');
-      if (event.hasPoster && foreground && posterOpen) firebaseRegistration({ enabled: REGISTRATION_ENABLED }).poster(event.id)
-        .then(result => { if (alive) setPoster(`data:${result.mime};base64,${result.base64}`); })
+      if (event.hasPoster && event.status !== 'cancelled' && foreground && viewerUid && (event.isRegistered || event.canManage || posterOpen)) firebaseRegistration({ enabled: REGISTRATION_ENABLED }).poster(event.id)
+        .then(result => { if (alive && auth.currentUser?.uid === viewerUid && ['image/jpeg', 'image/png', 'image/webp'].includes(result.mime)) { setPosterAccount(viewerUid); setPoster(`data:${result.mime};base64,${result.base64}`); } })
         .catch(() => { if (alive) setPosterError('Poster unavailable. Open event to retry.'); });
       return () => { alive = false; };
     }
@@ -81,7 +86,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
     return () => {
       alive = false;
     };
-  }, [event.id, event.revision, event.hasPoster, event.imageUrl, event.posterUrl, event.imagePath, foreground, posterRefresh, event.registrationOnly && posterOpen]);
+  }, [event.id, event.revision, event.status, event.hasPoster, event.imageUrl, event.posterUrl, event.imagePath, foreground, posterRefresh, viewerUid, event.isRegistered, event.canManage, event.registrationOnly && !event.isRegistered && !event.canManage && posterOpen]);
 
   return (
     <>
@@ -100,9 +105,9 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
         style={[styles.posterFrame, compact && styles.posterFrameCompact]}
       >
         <Image
-          source={poster ? { uri: poster } : fallbackLogo}
+          source={visiblePoster ? { uri: visiblePoster } : fallbackLogo}
           style={styles.poster}
-          resizeMode={poster ? 'cover' : 'contain'}
+          resizeMode={visiblePoster ? 'cover' : 'contain'}
         />
         {chip.day ? (
           <View style={styles.dateChip}>
@@ -119,7 +124,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
 
       <View style={styles.content}>
         {event.registrationOnly && event.canManage && (event.status === 'pending' || event.hasPendingChanges || event.reviewDecision) ? <View style={{ backgroundColor: colors.amberSoft, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, alignSelf: 'flex-start' }}><Text style={{ color: colors.danger, ...typography.label }}>{event.reviewDecision === 'rejected' ? 'Unapproved' : event.reviewDecision === 'changes-requested' ? 'Changes requested' : 'Needs approval'}</Text></View> : null}
-        {event.registrationOnly && event.status === 'cancelled' ? <Text style={styles.metaText}>Event no longer available</Text> : null}
+        {event.registrationOnly && registrationStatusLabel(event) ? <Text style={styles.unavailableText}>{registrationStatusLabel(event)}</Text> : null}
         {posterError ? <Text accessibilityRole="alert" style={styles.metaText}>{posterError}</Text> : null}
         <View style={styles.titlePanel}>
           <Text maxFontSizeMultiplier={1.06} style={[styles.title, compact && styles.titleCompact]} numberOfLines={2}>{title}</Text>
@@ -140,6 +145,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
             <Text maxFontSizeMultiplier={1.02} numberOfLines={1} style={[styles.typeText, { color: organiser.color }]}>{organiser.label}</Text>
           </View>
         </View>
+        {registrationActionLabel ? <View style={styles.registrationCaption}><MaterialCommunityIcons color={colors.blue} name="clipboard-text-outline" size={14}/><Text style={styles.registrationCaptionText}>{registrationActionLabel}</Text></View> : null}
         <MaterialCommunityIcons color={colors.blue} name="chevron-right" size={22} style={styles.disclosureIcon} />
         {onToggleSaved ? (
           <Pressable
@@ -166,7 +172,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
 
     <Modal transparent visible={posterOpen} animationType="fade" onRequestClose={() => setPosterOpen(false)}>
       <Pressable accessibilityLabel="Close full-screen event poster" onPress={() => setPosterOpen(false)} style={styles.posterModal}>
-        {poster ? <Image source={{ uri: poster }} style={styles.posterFullscreen} resizeMode="contain" /> : posterError ? <><Text accessibilityRole="alert" style={{ color: colors.onPrimary }}>{posterError}</Text><Pressable onPress={event => { event.stopPropagation?.(); setPosterRefresh(value => value + 1); }}><Text style={{ color: colors.onPrimary }}>Retry poster</Text></Pressable></> : <ActivityIndicator color={colors.onPrimary} />}
+        {visiblePoster ? <Image source={{ uri: visiblePoster }} style={styles.posterFullscreen} resizeMode="contain" /> : posterError ? <><Text accessibilityRole="alert" style={{ color: colors.onPrimary }}>{posterError}</Text><Pressable onPress={event => { event.stopPropagation?.(); setPosterRefresh(value => value + 1); }}><Text style={{ color: colors.onPrimary }}>Retry poster</Text></Pressable></> : <ActivityIndicator color={colors.onPrimary} />}
         <Text maxFontSizeMultiplier={1.1} style={styles.posterCloseHint}>Tap anywhere to close</Text>
       </Pressable>
     </Modal>
@@ -191,6 +197,9 @@ const styles = StyleSheet.create({
   title: { color: colors.navy, fontSize: typography.body.fontSize, lineHeight: 17, fontWeight: '700', letterSpacing: -0.15 },
   titleCompact: { fontSize: 12, lineHeight: 16 },
   metaRow: { minWidth: 0, flexDirection: 'row', alignItems: 'center', paddingRight: 25, gap: 3, overflow: 'hidden' },
+  unavailableText: { color: colors.danger, fontSize: 10, lineHeight: 14, fontWeight: '700', marginBottom: 4 },
+  registrationCaption: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, paddingRight: 24 },
+  registrationCaptionText: { color: colors.blue, fontSize: 10, lineHeight: 14, fontWeight: '600', flexShrink: 1 },
   metaText: { flexShrink: 0, color: colors.muted, fontSize: 9.5, lineHeight: 13, fontWeight: '600' },
   locationText: { flex: 1, minWidth: 0 },
   metaDot: { color: colors.borderStrong, fontSize: 10, lineHeight: 13, marginHorizontal: 1 },
