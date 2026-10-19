@@ -90,3 +90,15 @@ test('registration conversation delivery uses its explicit event collection even
  h.records.set('hostMessageThreads/t',{eventCollection:'registrationEvents',hostUid:'host',senderUid:'customer',participantUids:['host','customer'],eventId:'same'});h.records.set('hostMessageThreads/t/messages/m',{kind:'text',senderUid:'customer',text:'private'});
  await h.functions.matrixHostMessage({id:'same-message',params:{threadId:'t',messageId:'m'},data:h.snap('hostMessageThreads/t/messages/m')});await h.flush();assert.equal(h.pushes.length,1);assert.equal(h.pushes[0].data.recipientUid,'host');assert.equal(h.mails.length,0);
 });
+
+test('organiser and superadmins receive booking alerts in the first worker tick, independent of UID ordering',async()=>{
+ const h=harness();for(let i=0;i<180;i++)h.user('a'+String(i).padStart(3,'0'));
+ h.user('z-organiser');h.user('z-superadmin',{role:'superAdmin'});
+ h.records.set('registrationEvents/e',{ownerUid:'z-organiser',city:'sydney',title:'Workshop'});
+ h.records.set('registrationEvents/e/registrations/a000',{revision:1,status:'registered'});
+ await h.functions.matrixRegistrationBooking({id:'fast-booking',params:{eventId:'e',uid:'a000'},data:{before:{data:()=>undefined},after:h.snap('registrationEvents/e/registrations/a000')}});
+ await h.functions.deliverNotificationMatrix();
+ assert.deepEqual(h.mails.map(m=>m.to).sort(),['z-organiser@example.test','z-superadmin@example.test']);
+ assert.equal([...h.records.entries()].filter(([p,v])=>p.startsWith('userNotifications/')&&v.type==='registration.booking').length,2);
+ await h.flush();assert.equal(h.mails.length,2,'direct and role matches remain deduplicated');
+});

@@ -198,14 +198,23 @@ function register(deps = {}) {
     if (process.env.NOTIFICATION_MATRIX_ENABLED !== 'true') return;
     const campaigns = await db.collection('notificationCampaigns').where('state', '==', 'pending').limit(8).get();
     for (const campaign of campaigns.docs) {
-      const job = campaign.data(); if (job.notBefore && job.notBefore > Date.now()) continue; let query = db.collection('users').orderBy('__name__').limit(50); if (job.cursor) query = query.startAfter(job.cursor);
-      const page = await query.get();
-      for (const doc of page.docs) {
-        const user = doc.data(); if (!await matches(user, doc.id, job)) continue;
+      const job = campaign.data(); if (job.notBefore && job.notBefore > Date.now()) continue;
+      const enqueue = async doc => {
+        const user = doc.data(); if (!await matches(user, doc.id, job)) return;
         for (const channel of job.channels) if (channelAllowed(user, job, channel)) await create(db.collection('notificationDeliveries').doc(hash(`${campaign.id}:${doc.id}:${channel}`)), {
           campaignId: campaign.id, uid: doc.id, channel, state: 'pending', createdAt: timestamp(),
         });
+      };
+      // Direct recipients must not wait behind every unrelated user page.
+      if (job.audience === 'ids' || job.includeUids) {
+        for (const uid of [...new Set(job.uids || [])].filter(uid => typeof uid === 'string' && uid && !uid.includes('/'))) await enqueue(await db.collection('users').doc(uid).get());
+        if (job.audience === 'ids') { await campaign.ref.update({state:'queued'}); continue; }
       }
+      let query = db.collection('users');
+      if (job.audience === 'superadmins') query = query.where('role', '==', 'superAdmin');
+      query = query.orderBy('__name__').limit(50); if (job.cursor) query = query.startAfter(job.cursor);
+      const page = await query.get();
+      for (const doc of page.docs) await enqueue(doc);
       await campaign.ref.update({ cursor: page.docs.at(-1)?.id || job.cursor, state: page.size < 50 ? 'queued' : 'pending' });
     }
     const config = Object.fromEntries(secrets.map(secret => [secret.name, secret.value()]));

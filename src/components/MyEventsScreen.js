@@ -15,6 +15,7 @@ function EmptyState({ title, text }) {
 
 export default function MyEventsScreen({
   events = [],
+  userUid,
   loading = false,
   error = '',
   onPressEvent,
@@ -66,7 +67,7 @@ export default function MyEventsScreen({
         <EventCard event={event} onPress={() => onPressEvent?.(event)} />
       </View>
       {event.registrationOnly && event.isRegistered ? <Pressable onPress={() => onPressEvent?.(event)} style={styles.editButton}><Text style={styles.editText}>{event.status === 'cancelled' ? 'View registration history' : 'View or edit my registration'}</Text></Pressable> : null}
-      {(!event.registrationOnly || event.canManage) && <View style={styles.metaRow}>
+      {(!event.registrationOnly || (event.canManage ?? (event.ownerUid === userUid))) && <View style={styles.metaRow}>
         <View style={styles.actionRow}>
           <Pressable disabled={event.registrationOnly && event.status === 'cancelled'} onPress={() => onEdit?.(event)} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}>
             <Text style={styles.editText}>Edit</Text>

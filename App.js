@@ -1287,9 +1287,9 @@ function MainApp() {
   pushNavigationRef.current = handleHeaderNavigate;
   useEffect(() => {
     if (!currentUser?.uid || currentUser.isAnonymous) return undefined;
-    return listenForBusinessPushOpens(currentUser.uid, (screen, eventId) => {
+    return listenForBusinessPushOpens(currentUser.uid, (screen, eventId, action) => {
       if (screen === 'registration' && REGISTRATION_ENABLED) {
-        setRegistrationTarget({ eventId, uid: currentUser.uid, nonce: Date.now() });
+        setRegistrationTarget({ eventId, action: action || 'entry', uid: currentUser.uid, nonce: Date.now() });
         setAppModule('events'); setActiveTab('registration');
       } else pushNavigationRef.current(screen);
     }, error => {
@@ -1299,7 +1299,7 @@ function MainApp() {
 
   const openBellNotification = row => {
     if (row.recipientUid !== currentUser?.uid) return;
-    if (row.module === 'registration' && REGISTRATION_ENABLED) { setRegistrationTarget({ eventId: row.eventId, uid: currentUser.uid, nonce: Date.now() }); setAppModule('events'); setActiveTab('registration'); }
+    if (row.module === 'registration' && REGISTRATION_ENABLED) { setRegistrationTarget({ eventId: row.eventId, action: row.type === 'registration.booking' ? 'responses' : 'entry', uid: currentUser.uid, nonce: Date.now() }); setAppModule('events'); setActiveTab('registration'); }
     else handleHeaderNavigate(row.module === 'events' ? row.threadId ? 'host-inbox' : row.type === 'event.favourite_reminder' ? 'favourites' : 'home' : row.threadId ? 'business-inbox' : 'business-notifications');
   };
 
@@ -1530,6 +1530,7 @@ function MainApp() {
         />
       ) : activeTab === 'my_events' ? (
         <MyEventsScreen
+          userUid={currentUser?.uid}
           events={[...new Map([...myEvents, ...hostRegistrationEvents, ...attendingRegistrationEvents].map(event => [event.id, event])).values()].sort(compareEventsByDateTime)}
           loading={myEventsLoading}
           error={myEventsError || registrationError}
