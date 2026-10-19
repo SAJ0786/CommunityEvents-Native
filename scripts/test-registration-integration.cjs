@@ -283,14 +283,18 @@ test('My Events preserves attendee history without exposing host edit/delete con
     if (!(name in mocks)) throw new Error(`Unexpected My Events dependency ${name}`);
     return mocks[name];
   } });
-  const list = exports.default({});
+  let opened;
+  const list = exports.default({onPressEvent:event=>{opened=event;}});
   const attendeeCard = list.props.renderItem({ item: { id: 'event', registrationOnly: true, isRegistered: true, status: 'cancelled', canManage: false } });
   const attendee = JSON.stringify(attendeeCard);
   assert.match(attendee, /Registration history/);
   assert.doesNotMatch(attendee, /Registration responses|"children":\["Edit"\]|"children":\["Delete"\]/);
-  const hosted = JSON.stringify(list.props.renderItem({ item: { id: 'event', registrationOnly: true, status: 'pending', canManage: true } }));
-  assert.match(hosted, /Edit Registration form/);
-  assert.match(hosted, /Registration responses/);
+  const hostedTree = list.props.renderItem({ item: { id: 'event', registrationOnly: true, status: 'pending', canManage: true } });
+  const hosted = JSON.stringify(hostedTree);
+  assert.doesNotMatch(hosted, /Edit Registration form|Registration responses|"children":\["Edit"\]/);
+  const findCard=node=>node?.type==='EventCard'?node:(node?.props?.children||[]).flatMap(child=>Array.isArray(child)?child:[child]).map(findCard).find(Boolean);
+  findCard(hostedTree).props.onPress();
+  assert.equal(opened.id,'event','Organiser shortcut opens the card; actions stay inside it');
   const events = [{id:'active',registrationOnly:true,isRegistered:true,status:'approved'}, {id:'deleted',registrationOnly:true,isRegistered:true,status:'cancelled',deleted:true}];
   const activeList = exports.default({events,userUid:'viewer'});
   assert.deepEqual(Array.from(activeList.props.data,event=>event.id),['active']);
@@ -479,6 +483,9 @@ function componentFixture(file, mocks, props) {
   }).code;
   vm.runInNewContext(code, { exports, require: name => {
     if (name === 'react') return react;
+    if (name === './EventDetailsModal') return {__esModule:true,default:'Details'};
+    if (name === '../registration/eventFeed') return feed;
+    if (name === '../registration/registrationStatus') return load(path.join(root,'src/registration/registrationStatus.js'));
     if (!(name in mocks)) throw Error(`Unexpected dependency: ${name}`);
     return mocks[name];
   } });
@@ -689,6 +696,17 @@ function recurrenceScreenFixture(transport, extra = {}) {
   }, { enabled: true, user: { uid: 'host' }, city: 'sydney', initialCreate: true, transport, ...extra });
 }
 
+test('cancelled notification and stale entry links open the read-only event card without a form',async()=>{
+ const detail={event:{id:'cancelled',title:'Cancelled event',date:'2026-12-01',status:'cancelled',deleted:true},form:{version:1,fields:[]},ownRegistration:{status:'registered',revision:1,places:1,fields:[],answers:{}},canCancel:true,canRegister:false,canEditRegistration:false};
+ for(const initialAction of ['history','entry','confirmation']){const fixture=recurrenceScreenFixture({load:async()=>detail},{initialCreate:false,initialEventId:'cancelled',initialAction,user:{uid:'attendee'}});fixture.render();await new Promise(setImmediate);const tree=fixture.render();assert.equal(tree.type,'Details');assert.equal(tree.props.event.status,'cancelled');assert.equal(tree.props.event.deleted,true);assert.equal(tree.props.onRegister,undefined);assert.equal(tree.props.onEdit,undefined);assert.equal(typeof tree.props.onCancelRegistration,'function');assert.doesNotMatch(JSON.stringify(tree),/Retry same submission/);}
+});
+
+test('cancellation while a registration form is open clears retries and returns to the event card',async()=>{
+ const active={event:{id:'event',title:'Event',date:'2026-12-01',status:'approved',capacity:20},form:{version:1,fields:[]},canRegister:true};const ended={...active,event:{...active.event,status:'cancelled'},canRegister:false,canEditRegistration:false,canCancel:true,ownRegistration:{status:'registered',revision:1}};let loads=0,submits=0;
+ const fixture=recurrenceScreenFixture({load:async()=>++loads===1?active:ended,submit:async()=>{submits++;throw Error('Event cancelled');}},{initialCreate:false,initialEventId:'event',initialAction:'entry',user:{uid:'attendee'}});
+ fixture.render();await new Promise(setImmediate);const button=flatten(fixture.render()).find(node=>node.type==='Action'&&node.props.children.join('')==='Submit registration');assert.ok(button);button.props.onPress();await new Promise(setImmediate);const tree=fixture.render();assert.equal(submits,1);assert.equal(tree.type,'Details');assert.equal(tree.props.onRegister,undefined);assert.match(tree.props.registrationNotice,/read-only/);assert.doesNotMatch(JSON.stringify(tree),/Retry same submission/);
+});
+
 test('native series review selects all pending dates and requires review before batch approval',async()=>{
  const rows=[{eventId:'one',date:'2026-12-01',revision:1},{eventId:'two',date:'2026-12-08',revision:2}],sent=[];
  const api={load:async(id,_,review)=>review?{reviewOccurrences:rows}:{event:{id,date:rows.find(row=>row.eventId===id).date,revision:rows.find(row=>row.eventId===id).revision,title:'Submitted'},form:{purpose:'Purpose',fields:[]},privateDetails:{address:'Private venue',hasPoster:false},canApprove:true},approveSeries:async data=>sent.push(data)};
@@ -872,6 +890,7 @@ test('edit and copy never recreate a series from immutable provenance', async ()
 });
 test('host screen edits pending draft but self-registration stays on published form and revision', async () => {
   const detail = stagedDetail();
+  detail.canRegister = true;
   const saved = [], submitted = [];
   const transport = {
     load: async () => detail,

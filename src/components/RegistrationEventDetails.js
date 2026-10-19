@@ -162,6 +162,7 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
         try {
           await firebaseRegistration({ enabled: REGISTRATION_ENABLED }).cancel(detail.event.id, detail.ownRegistration.revision);
           onChanged?.();
+          if (detail.event.status === 'cancelled') { onClose?.(); return; }
           setDetail(null); setRefresh(value => value + 1);
         } catch (err) { Alert.alert('Could not delete registration', err.message); }
       } },

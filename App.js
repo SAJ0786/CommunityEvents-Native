@@ -1289,8 +1289,8 @@ function MainApp() {
     if (!currentUser?.uid || currentUser.isAnonymous) return undefined;
     return listenForBusinessPushOpens(currentUser.uid, (screen, eventId, action) => {
       if (screen === 'registration' && REGISTRATION_ENABLED) {
-        setRegistrationTarget({ eventId, action: action || 'entry', uid: currentUser.uid, nonce: Date.now() });
-        setAppModule('events'); setActiveTab('registration');
+        setRegistrationTarget(null); setSelectedEvent({ id: eventId, registrationOnly: true });
+        setAppModule('events'); setActiveTab('home');
       } else pushNavigationRef.current(screen);
     }, error => {
       recordNonFatalError(error, { feature: 'notifications', operation: 'open_business_push' });
@@ -1299,7 +1299,7 @@ function MainApp() {
 
   const openBellNotification = row => {
     if (row.recipientUid !== currentUser?.uid) return;
-    if (row.module === 'registration' && REGISTRATION_ENABLED) { setRegistrationTarget({ eventId: row.eventId, action: row.type === 'registration.booking' ? 'responses' : 'entry', uid: currentUser.uid, nonce: Date.now() }); setAppModule('events'); setActiveTab('registration'); }
+    if (row.module === 'registration' && REGISTRATION_ENABLED) { setRegistrationTarget(null); setSelectedEvent({ id: row.eventId, registrationOnly: true }); setAppModule('events'); setActiveTab('home'); }
     else handleHeaderNavigate(row.module === 'events' ? row.threadId ? 'host-inbox' : row.type === 'event.favourite_reminder' ? 'favourites' : 'home' : row.threadId ? 'business-inbox' : 'business-notifications');
   };
 

@@ -169,6 +169,12 @@ async function testNativeRegistration() {
   opened({ data: { ...data, notificationId: 'other', recipientUid: 'different-user' } });
   assert.equal(routes.length, 1);
   stopOpen();
+  const registrationRoutes=[];
+  const stopRegistration=exports.listenForBusinessPushOpens(uid,(...args)=>registrationRoutes.push(args),()=>{}, {registrationEnabled:true});
+  opened({data:{module:'registration',recipientUid:uid,eventId:'event',notificationId:'cancelled-event',type:'registration.changed'}});
+  opened({data:{module:'registration',recipientUid:uid,eventId:'event',notificationId:'new-booking',type:'registration.booking'}});
+  assert.deepEqual(registrationRoutes.map(row=>row.slice(0,3)),[['registration','event','history'],['registration','event','history']]);
+  stopRegistration();
   await exports.unregisterDevicePushNotifications(uid);
   assert.equal(deleted, 1);
   assert.ok(!profile.fcmTokens['fcm-iphone']);

@@ -75,7 +75,7 @@ export default function MyEventsScreen({
       <View style={event.hidden ? styles.hiddenCard : undefined}>
         <EventCard event={event} registrationActionLabel={event.registrationOnly && event.isRegistered ? registrationUnavailable(event) ? 'Registration history' : 'View my registration' : undefined} onPress={() => onPressEvent?.(event)} />
       </View>
-      {(!event.registrationOnly || selected === 'organising' && (event.canManage ?? (event.ownerUid === userUid))) && <View style={styles.metaRow}>
+      {!event.registrationOnly && <View style={styles.metaRow}>
         <View style={styles.actionRow}>
           <Pressable disabled={event.registrationOnly && event.status === 'cancelled'} onPress={() => onEdit?.(event)} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}>
             <Text style={styles.editText}>Edit</Text>
@@ -85,7 +85,6 @@ export default function MyEventsScreen({
               <Text style={styles.seriesText}>Edit Entire Series</Text>
             </Pressable>
           ) : null}
-          {event.registrationOnly && <>{event.status !== 'cancelled' && <Pressable onPress={() => onOpenRegistration?.(event, 'form')} style={styles.editButton}><Text style={styles.editText}>Edit Registration form</Text></Pressable>}<Pressable onPress={() => onOpenRegistration?.(event, 'responses')} style={styles.editButton}><Text style={styles.editText}>Registration responses</Text></Pressable></>}
           <Pressable disabled={!onCopy} onPress={() => onCopy?.(event)} style={({ pressed }) => [styles.copyButton, !onCopy && styles.disabled, pressed && onCopy && styles.pressed]}>
             <Text style={styles.copyText}>Copy</Text>
           </Pressable>

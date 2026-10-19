@@ -3,6 +3,9 @@ import { ActivityIndicator, Alert, AppState, Pressable, Text, View } from 'react
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 import MemberPageHeader from './MemberPageHeader';
 import NativeBackButton from './NativeBackButton';
+import EventDetailsModal from './EventDetailsModal';
+import { registrationEventCard } from '../registration/eventFeed';
+import { registrationEntryAllowed, registrationEventEnded } from '../registration/registrationStatus';
 import RegistrationEditor from '../registration/RegistrationEditor';
 import { Action, Answer, Input, RegistrationIdentity, styles } from '../registration/RegistrationControls';
 import { firebaseRegistration } from '../registration/firebaseRegistration';
@@ -49,10 +52,13 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     const [result, responseResult] = await Promise.all([api.load(eventId,action === 'entry'), action === 'responses' ? api.responses(eventId) : Promise.resolve(null)]);
     if (!valid()) return;
     currentId.current = eventId; setDetail(result);
+    if (registrationEventEnded(result) && action !== 'responses') { submission.current=null; setStage('history'); return; }
     if (action === 'entry') {
       if (!requireMember()) return;
+      if (!registrationEntryAllowed(result)) { submission.current=null; setStage('history'); return; }
       setAnswers(answersForReview(result)); setPlaces(String(result.ownRegistration?.status === 'registered' ? result.ownRegistration.places : 1)); setStage('entry');
       setSelectedOccurrences(result.occurrences?.length ? [result.event.id] : []); submission.current=null;
+    } else if (action === 'history') { submission.current=null; setStage('history');
     } else if (action === 'editor' || action === 'form' || action === 'copy') {
       const options = {};
       if (!valid()) return;
@@ -76,6 +82,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       const eventTypes = [...new Set([...EVENT_TYPES, ...(options.eventTypes || [])])];
       const fresh = isNew ? null : await api.load(detail.event.id);
       if (!valid()) return;
+      if (fresh && registrationEventEnded(fresh)) { setDetail(fresh); setStage('history'); return; }
       if (isNew) { createKey.current = newReference(); currentId.current = null; setDetail(null); }
       else setDetail(fresh);
       setTypes(eventTypes); setDraft(isNew ? { ...createDraft(), title: '', eventType: eventTypes[0], customEventType: '' } : eventDraftFromDetail(fresh, eventTypes));
@@ -160,11 +167,14 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     run(async valid => {
       const fresh = await api.load(detail.event.id,true);
       if (!valid()) return;
-      setDetail(fresh); setAnswers(answersForReview(fresh)); setPlaces(String(fresh.ownRegistration?.status === 'registered' ? fresh.ownRegistration.places : 1)); submission.current = null; setStage('entry');
+      setDetail(fresh);
+      if (!registrationEntryAllowed(fresh)) { submission.current=null; setStage('history'); return; }
+      setAnswers(answersForReview(fresh)); setPlaces(String(fresh.ownRegistration?.status === 'registered' ? fresh.ownRegistration.places : 1)); submission.current = null; setStage('entry');
       setSelectedOccurrences(fresh.occurrences?.length ? [fresh.event.id] : []);
     });
   };
   const submit = () => {
+    if (!registrationEntryAllowed(detail)) { submission.current=null; setStage('history'); return; }
     const errors = validateAnswers(detail.form.fields, answers, places, detail.occurrences?.length ? 5 : detail.event.capacity);
     if (Object.keys(errors).length) { setNotice(Object.entries(errors).map(([id, error]) => `${detail.form.fields.find(field => field.id === id)?.label || 'Places'}: ${error}`).join('\n')); return; }
     if (!submission.current) {
@@ -174,11 +184,17 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     }
     run(async valid => {
       const request=submission.current;
-      const result=request.occurrences ? await api.submitOccurrences(request) : await api.submit(request);
+      let result;
+      try { result=request.occurrences ? await api.submitOccurrences(request) : await api.submit(request); }
+      catch (error) {
+        let latest; try { latest=await api.load(detail.event.id); } catch (_) { /* Keep an ambiguous request intact while offline. */ }
+        if (valid() && registrationEventEnded(latest)) { setDetail(latest); submission.current=null; setAnswers({}); setStage('history'); setNotice('This event was cancelled or deleted. Your saved registration is read-only.'); return; }
+        throw error;
+      }
       const fresh = await api.load(request.occurrences?.[0]?.eventId || detail.event.id);
       if (!valid()) return;
-      setDetail(fresh); submission.current = null; setAnswers({}); setStage('confirmation');
-      if(request.occurrences) setNotice(`Registration confirmed for ${result.registrations.length} selected occurrences. Each booking is available in My Events → My registrations.`);
+      setDetail(fresh); submission.current = null; setAnswers({}); setStage(registrationEventEnded(fresh) ? 'history' : 'confirmation');
+      if(request.occurrences && !registrationEventEnded(fresh)) setNotice(`Registration confirmed for ${result.registrations.length} selected occurrences. Each booking is available in My Events → My registrations.`);
     });
   };
   const responsePage = (next = null) => run(async valid => {
@@ -201,6 +217,15 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
   ]);
   if (!enabled) return <View style={styles.panel}><NativeBackButton onPress={onBack} accessibilityLabel="Back to events" /><Text style={styles.text}>Registration is not enabled for this release.</Text></View>;
   if (obscured) return <View style={styles.panel}><Text style={styles.muted}>Private event details hidden while the app is inactive.</Text></View>;
+  if (stage === 'history' && detail) return <EventDetailsModal visible event={{...registrationEventCard(detail.event),registrationPrivate:Boolean(detail.privateDetails),address:detail.privateDetails ? {...detail.privateDetails.venue,fullAddress:detail.privateDetails.address,suburb:detail.event.suburb} : {suburb:detail.event.suburb}}}
+    onClose={onBack} user={user} profile={profile} isGuest={!member} registrationDetail={detail} registrationNotice={notice}
+    onRegister={registrationEntryAllowed(detail) ? startEntry : undefined}
+    onEdit={detail.canManage && !registrationEventEnded(detail) ? () => edit(false) : undefined}
+    onEditRegistrationForm={detail.canManage && !registrationEventEnded(detail) ? () => edit(false) : undefined}
+    onRegistrationResponses={detail.canManage ? () => responsePage() : undefined}
+    onCancelRegistration={detail.canCancel ? () => Alert.alert(registrationEventEnded(detail) ? 'Delete my registration data?' : 'Delete my registration?', registrationEventEnded(detail) ? 'Permanently delete your saved answers and remove this booking from your registration history?' : 'Delete your saved answers, release your places and remove private venue and poster access?', [
+      {text:'Keep data',style:'cancel'}, {text:'Delete data',style:'destructive',onPress:()=>run(async valid=>{await api.cancel(detail.event.id,detail.ownRegistration.revision);if(valid())(onMyEvents||onBack)?.();})},
+    ]) : undefined}/>;
   return <KeyboardAwareScrollView contentContainerStyle={styles.content}>
     <MemberPageHeader title={stage === 'responses' ? 'Registration responses' : stage === 'editor' ? detail ? 'Edit event and registration form' : 'Create registration event' : 'Event registration'} subtitle={cityLabel(city)} icon="clipboard-text-outline" tone="teal" onBack={onBack} backDisabled={busy} backAccessibilityLabel="Back to events" />
     {busy && <ActivityIndicator color={colors.tealDark} />}
