@@ -161,6 +161,7 @@ function detailsFixture(detail, isGuest = false) {
     './MemberPageHeader': { __esModule: true, default: 'MemberPageHeader' },
     '../registration/firebaseRegistration': { firebaseRegistration: () => api, REGISTRATION_ENABLED: true },
     '../registration/eventFeed': feed,
+    '../registration/SeriesApproval': {__esModule:true,default:'SeriesApproval'},
   };
   const exports = {};
   const code = babel.transformSync(fs.readFileSync(path.join(root, 'src/components/RegistrationEventDetails.js'), 'utf8'), {
@@ -660,6 +661,8 @@ function recurrenceScreenFixture(transport, extra = {}) {
     '../registration/RegistrationEditor': { __esModule: true, default: 'Editor' },
     '../registration/RegistrationControls': { Action: 'Action', Answer: 'Answer', Input: 'Input', styles: {} },
     '../registration/firebaseRegistration': {}, '../registration/registrationClient': contract,
+    '../registration/OccurrencePicker': { __esModule:true,default:'OccurrencePicker' },
+    '../registration/occurrenceSelection': load(path.join(root,'src/registration/occurrenceSelection.js')),
     '../registration/responsePresentation': load(path.join(root, 'src/registration/responsePresentation.js')),
     '../services/registrationExport': { exportRegistrationWorkbook: async () => {} },
     '../registration/registrationViewModel': view, '../registration/prototypeModel': load(path.join(root, 'src/registration/prototypeModel.js')),
@@ -667,6 +670,41 @@ function recurrenceScreenFixture(transport, extra = {}) {
     '../utils/cities': { cityLabel: value => value }, '../theme': require('./theme-fixture.cjs'),
   }, { enabled: true, user: { uid: 'host' }, city: 'sydney', initialCreate: true, transport, ...extra });
 }
+
+test('native series review selects all pending dates and requires review before batch approval',async()=>{
+ const rows=[{eventId:'one',date:'2026-12-01',revision:1},{eventId:'two',date:'2026-12-08',revision:2}],sent=[];
+ const api={load:async(id,_,review)=>review?{reviewOccurrences:rows}:{event:{id,date:rows.find(row=>row.eventId===id).date,revision:rows.find(row=>row.eventId===id).revision,title:'Submitted'},form:{purpose:'Purpose',fields:[]},privateDetails:{address:'Private venue',hasPoster:false},canApprove:true},approveSeries:async data=>sent.push(data)};
+ const fixture=componentFixture('src/registration/SeriesApproval.js',{'react-native':{Image:'Image',Pressable:'Pressable',Text:'Text',View:'View'},'./RegistrationControls':{Action:'Action',RegistrationIdentity:'Identity',styles:{}}},{api,event:{id:'one'}});
+ const action=label=>flatten(fixture.render()).find(node=>node.type==='Action'&&node.props.children.join('')===label);
+ action('Review series occurrences for approval').props.onPress();await new Promise(setImmediate);
+ flatten(fixture.render()).find(node=>node.props.accessibilityLabel==='Select all awaiting approval').props.onPress();
+ action('Review selected occurrences (2)').props.onPress();await new Promise(setImmediate);
+ assert.equal(action('Approve selected occurrences (2)').props.disabled,true);
+ flatten(fixture.render()).find(node=>node.props.accessibilityLabel?.startsWith('I have reviewed')).props.onPress();
+ action('Approve selected occurrences (2)').props.onPress();await new Promise(setImmediate);
+ assert.equal(sent.length,1);assert.equal(JSON.stringify(sent[0].occurrences),JSON.stringify(rows.map(row=>({eventId:row.eventId,expectedRevision:row.revision}))));
+});
+
+test('native occurrence selection submits chosen dates together and keeps exact request on retry',async()=>{
+ const detail={event:{id:'one',title:'Series',date:'2026-12-01',capacity:8,status:'approved'},form:{version:1,fields:[],purpose:'Shared form'},canRegister:true,
+ occurrences:[{eventId:'one',date:'2026-12-01',formVersion:1,availablePlaces:8,selectable:true},{eventId:'two',date:'2026-12-08',formVersion:1,availablePlaces:8,selectable:true}]};
+ const sent=[];const transport={load:async()=>detail,submitOccurrences:async data=>{sent.push(JSON.stringify(data));if(sent.length===1)throw Error('Unconfirmed response');return {registrations:data.occurrences};}};
+ const fixture=recurrenceScreenFixture(transport,{initialCreate:false,initialEventId:'one',initialAction:'entry'});
+ fixture.render();await new Promise(setImmediate);
+ flatten(fixture.render()).find(node=>node.type==='OccurrencePicker').props.onChange(['two']);
+ flatten(fixture.render()).find(node=>node.type==='Action'&&node.props.children.includes('Submit registration')).props.onPress();await new Promise(setImmediate);
+ flatten(fixture.render()).find(node=>node.type==='Action'&&node.props.children.includes('Retry same submission')).props.onPress();await new Promise(setImmediate);
+ assert.equal(sent.length,2);assert.equal(sent[0],sent[1]);assert.deepEqual(JSON.parse(sent[0]).occurrences.map(row=>row.eventId),['two']);
+ assert.match(JSON.stringify(fixture.render()),/Registration confirmed/);
+});
+test('native occurrence picker Select all skips blocked dates and honours the requested places',()=>{
+ const props={detail:{occurrences:[{eventId:'one',date:'2026-12-01',selectable:true,availablePlaces:5},{eventId:'two',date:'2026-12-08',selectable:true,availablePlaces:1},{eventId:'closed',date:'2026-12-15',selectable:false,availablePlaces:5,reason:'Registration closed'}]},places:'2',selected:[],onChange:value=>{props.selected=value;}};
+ const fixture=componentFixture('src/registration/OccurrencePicker.js',{'react-native':{Pressable:'Pressable',View:'View',Text:'Text'},'./RegistrationControls':{styles:{}},'./occurrenceSelection':load(path.join(root,'src/registration/occurrenceSelection.js'))},props);
+ const all=()=>flatten(fixture.render()).find(node=>node.props.accessibilityLabel==='Select all available occurrences');
+ all().props.onPress();assert.equal(JSON.stringify(props.selected),'["one"]');assert.equal(all().props.accessibilityState.checked,true);
+ assert.equal(flatten(fixture.render()).find(node=>node.props.accessibilityLabel?.includes('2026-12-08')).props.disabled,true);
+ all().props.onPress();assert.equal(props.selected.length,0);
+});
 async function screenEditor(fixture) {
   fixture.render(); await new Promise(setImmediate);
   return flatten(fixture.render()).find(node => node.type === 'Editor');
@@ -829,6 +867,8 @@ test('host screen edits pending draft but self-registration stays on published f
     '../registration/RegistrationEditor': { __esModule: true, default: 'Editor' },
     '../registration/RegistrationControls': { Action: 'Action', Answer: 'Answer', Input: 'Input', styles: {} },
     '../registration/firebaseRegistration': {}, '../registration/registrationClient': contract,
+    '../registration/OccurrencePicker': { __esModule:true,default:'OccurrencePicker' },
+    '../registration/occurrenceSelection': load(path.join(root,'src/registration/occurrenceSelection.js')),
     '../registration/responsePresentation': load(path.join(root, 'src/registration/responsePresentation.js')),
     '../services/registrationExport': { exportRegistrationWorkbook: async () => {} },
     '../registration/registrationViewModel': view, '../registration/prototypeModel': load(path.join(root, 'src/registration/prototypeModel.js')),

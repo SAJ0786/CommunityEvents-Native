@@ -8,6 +8,7 @@ import { colors } from '../theme';
 import { Action, Input, RegistrationIdentity, styles } from '../registration/RegistrationControls';
 import SafeAreaView from './ModalSafeArea';
 import { registrationEventCard } from '../registration/eventFeed';
+import SeriesApproval from '../registration/SeriesApproval';
 
 export default function RegistrationEventDetails({ event, user, profile, isGuest, onClose, onOperation, onRequireSignIn, onEdit, onDelete, onManageStream, initialReview = false, onChanged }) {
   const [detail, setDetail] = useState(null);
@@ -138,6 +139,7 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
         <Action disabled={approving} onPress={() => setRefresh(value => value + 1)}>Reload submitted changes</Action>
         {detail.canApprove && <View style={styles.group}>
           <Action primary disabled={!complete || approving} onPress={approve}>{approving ? 'Please wait…' : 'Approve event and form'}</Action>
+          {detail.event.seriesId && <SeriesApproval event={detail.event} api={firebaseRegistration({enabled:REGISTRATION_ENABLED})} disabled={approving} onApproved={()=>{onChanged?.();setDetail(null);setReviewing(false);setRefresh(value=>value+1);}}/>}
           <Input label="Feedback for organiser" value={feedback} onChangeText={setFeedback} multiline maxLength={2000} />
           <View style={styles.actions}><Action style={styles.actionInRow} disabled={approving} onPress={() => decide('changes-requested')}>Suggest changes</Action><Action style={styles.actionInRow} disabled={approving} onPress={() => decide('rejected')}>Reject</Action></View>
         </View>}

@@ -8,7 +8,7 @@ export function createRegistrationClient(call, { enabled = false } = {}) {
   }
   return Object.freeze({
     list: ({ scope = 'public', city, cursor = null } = {}) => invoke('listRegistrationEvents', { scope, ...(city ? { city } : {}), cursor }),
-    load: eventId => invoke('getRegistrationEvent', { eventId }),
+    load: (eventId, includeOccurrences = false, includeSeriesReview = false) => invoke('getRegistrationEvent', { eventId, ...(includeOccurrences ? { includeOccurrences:true } : {}), ...(includeSeriesReview ? {includeSeriesReview:true} : {}) }),
     createSeries: ({ city, createKey, draft, recurrence, occurrences }) => {
       const { poster, ...details } = draft;
       return invoke('createRegistrationSeries', { city, createKey, draft: details, recurrence, occurrences });
@@ -18,8 +18,10 @@ export function createRegistrationClient(call, { enabled = false } = {}) {
       return invoke('saveRegistrationEvent', { ...(eventId ? { eventId, expectedRevision } : { createKey }), city, draft: details });
     },
     approve: (eventId, expectedRevision) => invoke('approveRegistrationEvent', { eventId, expectedRevision }),
+    approveSeries: request => invoke('approveRegistrationSeries', request),
     review: (eventId, expectedRevision, decision, feedback) => invoke('reviewRegistrationEvent', { eventId, expectedRevision, decision, feedback }),
     submit: submission => invoke('submitEventRegistration', submission),
+    submitOccurrences: submission => invoke('submitRegistrationOccurrences', submission),
     cancel: (eventId, expectedRevision) => invoke('cancelEventRegistration', { eventId, expectedRevision }),
     cancelEvent: (eventId, expectedRevision, confirmation) => invoke('cancelRegistrationEvent', { eventId, expectedRevision, confirmation }),
     deleteEvent: (eventId, expectedRevision) => invoke('deleteRegistrationEvent', { eventId, expectedRevision, confirmation: 'DELETE EVENT' }),

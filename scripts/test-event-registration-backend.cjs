@@ -28,7 +28,7 @@ function fixture() {
     // Serial execution models transaction retries: each concurrent request sees committed capacity.
     const promise = queue.then(async () => {
       const writes = []; let writing = false;
-      const result = await fn({ get: async ref => { assert.equal(writing, false, 'all reads must precede writes'); return snap(ref); },
+      const result = await fn({ get: async ref => { assert.equal(writing, false, 'all reads must precede writes'); return ref.path ? snap(ref) : ref.get(); },
         set: (ref, data, options) => { writing = true; writes.push(() => records.set(ref.path, options?.merge ? { ...records.get(ref.path), ...structuredClone(data) } : structuredClone(data))); },
         update: (ref, data) => { writing = true; writes.push(() => records.set(ref.path, { ...records.get(ref.path), ...structuredClone(data) })); },
         delete: ref => { writing = true; writes.push(() => records.delete(ref.path)); },
@@ -59,6 +59,68 @@ function seriesRequest(f, changes = {}) {
     ], ...changes,
   };
 }
+
+test('series review lists only pending dates for superadmins and approves selected dates atomically',async()=>{
+ const f=fixture(),series=await f.handlers.createRegistrationSeries(f.request('host',seriesRequest(f))),first=series.events[0].eventId;
+ const review=await f.handlers.getRegistrationEvent(f.request('super',{eventId:first,includeSeriesReview:true}));assert.equal(review.reviewOccurrences.length,2);
+ const owner=await f.handlers.getRegistrationEvent(f.request('host',{eventId:first,includeSeriesReview:true}));assert.equal(owner.reviewOccurrences,undefined);
+ const data={eventId:first,requestId:'approve-series',occurrences:review.reviewOccurrences.map(row=>({eventId:row.eventId,expectedRevision:row.revision}))};
+ await assert.rejects(f.handlers.approveRegistrationSeries(f.request('admin',data)),{code:'permission-denied'});
+ const result=await f.handlers.approveRegistrationSeries(f.request('super',data));assert.equal(result.events.length,2);
+ assert.deepEqual(await f.handlers.approveRegistrationSeries(f.request('super',data)),result);
+ for(const row of series.events)assert.equal(f.records.get(`registrationEvents/${row.eventId}`).status,'approved');
+ assert.equal((await f.handlers.getRegistrationEvent(f.request('super',{eventId:first,includeSeriesReview:true}))).reviewOccurrences.length,0);
+});
+test('stale or unrelated series approval rolls back every selected occurrence',async()=>{
+ for(const mismatch of ['revision','series']){
+ const f=fixture(),series=await f.handlers.createRegistrationSeries(f.request('host',seriesRequest(f))),[first,second]=series.events.map(row=>row.eventId);
+ if(mismatch==='series')f.records.get(`registrationEvents/${second}`).seriesId='different';
+ const data={eventId:first,requestId:'approve-stale',occurrences:[{eventId:first,expectedRevision:1},{eventId:second,expectedRevision:mismatch==='revision'?0:1}]};
+ await assert.rejects(f.handlers.approveRegistrationSeries(f.request('super',data)));
+ assert.equal(f.records.get(`registrationEvents/${first}`).status,'pending');assert.equal(f.records.get(`registrationEvents/${second}`).status,'pending');
+ }
+});
+
+test('series attendee selection is atomic, retry-safe and keeps separate bookings/capacities', async()=>{
+ const f=fixture(),series=await f.handlers.createRegistrationSeries(f.request('host',seriesRequest(f)));
+ for(const event of series.events)await f.approve(event);
+ const root=series.events[0].eventId;
+ const detail=await f.handlers.getRegistrationEvent(f.request('member',{eventId:root,includeOccurrences:true}));
+ assert.equal(detail.occurrences.length,2);assert.ok(detail.occurrences.every(row=>row.selectable));
+ assert.equal(JSON.stringify(detail.occurrences).includes(f.draft.address),false);
+ const data={eventId:root,requestId:'batch-one',places:2,answers:{name:'Synthetic',consent:true},occurrences:detail.occurrences.map(row=>({eventId:row.eventId,formVersion:row.formVersion,expectedRevision:0}))};
+ const result=await f.handlers.submitRegistrationOccurrences(f.request('member',data));
+ assert.equal(result.registrations.length,2);
+ assert.deepEqual(await f.handlers.submitRegistrationOccurrences(f.request('member',data)),result);
+ for(const event of series.events){assert.equal(f.records.get(`registrationEvents/${event.eventId}`).reservedPlaces,2);assert.equal(f.records.get(`registrationEvents/${event.eventId}/registrations/member`).revision,1);}
+ const after=await f.handlers.getRegistrationEvent(f.request('member',{eventId:root,includeOccurrences:true}));
+ assert.equal(after.occurrences.find(row=>row.eventId!==root).reason,'Already registered');
+ await assert.rejects(f.handlers.submitRegistrationOccurrences(f.request('member',{...data,places:1})),{code:'already-exists'});
+});
+test('a full, closed, changed-form or unrelated occurrence prevents all selected writes',async()=>{
+ for(const failure of ['full','closed','form','unrelated']){
+ const f=fixture(),series=await f.handlers.createRegistrationSeries(f.request('host',seriesRequest(f)));
+ for(const event of series.events)await f.approve(event);
+ const [first,second]=series.events.map(row=>row.eventId),row=f.records.get(`registrationEvents/${second}`);
+ if(failure==='full')row.reservedPlaces=row.capacity;
+ if(failure==='closed')row.closes='2026-10-01T00:00';
+ if(failure==='unrelated')row.seriesId='different-series';
+ if(failure==='form')f.records.get(`registrationForms/${second}`).fields[0].label='Changed question';
+ const data={eventId:first,requestId:'batch-fail',places:2,answers:{name:'Synthetic',consent:true},occurrences:[first,second].map(eventId=>({eventId,formVersion:1,expectedRevision:0}))};
+ await assert.rejects(f.handlers.submitRegistrationOccurrences(f.request('member',data)));
+ assert.equal(f.records.has(`registrationEvents/${first}/registrations/member`),false,failure);
+ assert.equal(f.records.get(`registrationEvents/${first}`).reservedPlaces,0,failure);
+ }
+});
+test('occurrence selector hides unapproved/deleted dates and does not disclose other attendees',async()=>{
+ const f=fixture(),series=await f.handlers.createRegistrationSeries(f.request('host',seriesRequest(f)));
+ await f.approve(series.events[0]);
+ const first=series.events[0].eventId;
+ const detail=await f.handlers.getRegistrationEvent(f.request('member',{eventId:first,includeOccurrences:true}));
+ assert.equal(detail.occurrences.length,1);
+ await assert.rejects(f.handlers.submitRegistrationOccurrences(f.request(null,{eventId:first,requestId:'guest',occurrences:[{eventId:first}]})),{code:'unauthenticated'});
+ await assert.rejects(f.handlers.submitRegistrationOccurrences(f.request('member',{eventId:first,requestId:'dupe',occurrences:[{eventId:first},{eventId:first}]})),{code:'invalid-argument'});
+});
 
 test('series creation is atomic, authenticated, retry-safe and separate from public discovery until individual approval', async () => {
   const f = fixture(); const data = seriesRequest(f);

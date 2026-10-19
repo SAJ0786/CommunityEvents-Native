@@ -7,6 +7,8 @@ import RegistrationEditor from '../registration/RegistrationEditor';
 import { Action, Answer, Input, RegistrationIdentity, styles } from '../registration/RegistrationControls';
 import { firebaseRegistration } from '../registration/firebaseRegistration';
 import { createSubmission } from '../registration/registrationClient';
+import OccurrencePicker from '../registration/OccurrencePicker';
+import {occurrenceSubmission} from '../registration/occurrenceSelection';
 import { answersForReview, eventDraftFromDetail, mergeRegistrationPage } from '../registration/registrationViewModel';
 import { createDraft, validateAnswers, registrationFieldGroups } from '../registration/prototypeModel';
 import { EVENT_TYPES } from '../utils/eventOptions';
@@ -24,6 +26,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
   const [expandedResponse, setExpandedResponse] = useState(null);
   const [responses, setResponses] = useState([]); const [responseCursor, setResponseCursor] = useState(null);
   const [answers, setAnswers] = useState({}); const [places, setPlaces] = useState('1');
+  const [selectedOccurrences,setSelectedOccurrences] = useState([]);
   const [pendingPoster, setPendingPoster] = useState(null);
   const [notice, setNotice] = useState(''); const [busy, setBusy] = useState(false); const [obscured, setObscured] = useState(false);
   const busyRef = useRef(false); const epoch = useRef(0); const currentId = useRef(null);
@@ -43,12 +46,13 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
   const requireMember = () => { if (member) return true; onRequireSignIn?.('Sign in to register for or organise an event.'); return false; };
   const open = (eventId, action = 'entry') => run(async valid => {
     setDetail(null); setAnswers({}); setResponses([]);
-    const [result, responseResult] = await Promise.all([api.load(eventId), action === 'responses' ? api.responses(eventId) : Promise.resolve(null)]);
+    const [result, responseResult] = await Promise.all([api.load(eventId,action === 'entry'), action === 'responses' ? api.responses(eventId) : Promise.resolve(null)]);
     if (!valid()) return;
     currentId.current = eventId; setDetail(result);
     if (action === 'entry') {
       if (!requireMember()) return;
       setAnswers(answersForReview(result)); setPlaces(String(result.ownRegistration?.status === 'registered' ? result.ownRegistration.places : 1)); setStage('entry');
+      setSelectedOccurrences(result.occurrences?.length ? [result.event.id] : []); submission.current=null;
     } else if (action === 'editor' || action === 'form' || action === 'copy') {
       const options = {};
       if (!valid()) return;
@@ -154,20 +158,27 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
   const startEntry = () => {
     if (!requireMember()) return;
     run(async valid => {
-      const fresh = await api.load(detail.event.id);
+      const fresh = await api.load(detail.event.id,true);
       if (!valid()) return;
       setDetail(fresh); setAnswers(answersForReview(fresh)); setPlaces(String(fresh.ownRegistration?.status === 'registered' ? fresh.ownRegistration.places : 1)); submission.current = null; setStage('entry');
+      setSelectedOccurrences(fresh.occurrences?.length ? [fresh.event.id] : []);
     });
   };
   const submit = () => {
-    const errors = validateAnswers(detail.form.fields, answers, places, detail.event.capacity);
+    const errors = validateAnswers(detail.form.fields, answers, places, detail.occurrences?.length ? 5 : detail.event.capacity);
     if (Object.keys(errors).length) { setNotice(Object.entries(errors).map(([id, error]) => `${detail.form.fields.find(field => field.id === id)?.label || 'Places'}: ${error}`).join('\n')); return; }
-    if (!submission.current) submission.current = createSubmission(detail.event.id, detail.form.version, detail.ownRegistration, answers, places, newReference());
+    if (!submission.current) {
+      try { submission.current = detail.occurrences?.length ? occurrenceSubmission(detail,selectedOccurrences,answers,places,newReference())
+        : createSubmission(detail.event.id, detail.form.version, detail.ownRegistration, answers, places, newReference()); }
+      catch(error) {setNotice(error.message);return;}
+    }
     run(async valid => {
-      await api.submit(submission.current);
-      const fresh = await api.load(detail.event.id);
+      const request=submission.current;
+      const result=request.occurrences ? await api.submitOccurrences(request) : await api.submit(request);
+      const fresh = await api.load(request.occurrences?.[0]?.eventId || detail.event.id);
       if (!valid()) return;
       setDetail(fresh); submission.current = null; setAnswers({}); setStage('confirmation');
+      if(request.occurrences) setNotice(`Registration confirmed for ${result.registrations.length} selected occurrences. Each booking is available in My Events → My registrations.`);
     });
   };
   const responsePage = (next = null) => run(async valid => {
@@ -208,9 +219,13 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       <RegistrationIdentity event={detail.event} places={detail.ownRegistration?.status === 'registered' ? detail.ownRegistration.places : 0}/>
       {detail.ownRegistration && detail.ownRegistration.formVersion !== detail.form.version && <Text style={styles.error}>The organiser changed the form. Review every question and agree to the current terms again.</Text>}
       <Text style={styles.text}>{detail.form.purpose}</Text><Text style={styles.muted}>{detail.retention?.notice}</Text>
+      <View pointerEvents={submission.current ? 'none' : 'auto'} accessibilityElementsHidden={false}>
+      {detail.occurrences?.length > 0 && <OccurrencePicker detail={detail} places={places} selected={selectedOccurrences} onChange={setSelectedOccurrences} disabled={busy || Boolean(submission.current)}/>}
       <Input label="Number of places (maximum 5)" value={places} keyboardType="number-pad" onChangeText={value => { submission.current = null; setPlaces(value); }} />
       {registrationFieldGroups(detail.form.fields, places).map(group => <View key={group.id} style={styles.insetPanel}><Text style={styles.title}>{group.label}</Text>{group.fields.map(field => <View key={field.id}><Answer field={{...field,label:field.originalLabel || field.label}} value={answers[field.id]} onChange={value => { submission.current = null; setAnswers(current => ({ ...current, [field.id]: value })); }} />{field.description ? <Text style={styles.muted}>{field.description}</Text> : null}</View>)}</View>)}
-      <Action primary onPress={submit}>Submit registration</Action>
+      </View>
+      {submission.current && !busy && <><Text style={styles.muted}>The last request is unconfirmed. Retry the same submission, or reload before editing.</Text><Action onPress={()=>open(detail.event.id,'entry')}>Reload registration</Action></>}
+      <Action primary disabled={busy} onPress={submit}>{submission.current ? 'Retry same submission' : 'Submit registration'}</Action>
     </View>}
     {detail && ['confirmation', 'host-confirmation'].includes(stage) && <View style={styles.panel}>
       <Text style={styles.title}>{stage === 'confirmation' ? 'Registration confirmed' : 'Event and form saved'}</Text>

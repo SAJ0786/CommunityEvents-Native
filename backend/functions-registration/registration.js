@@ -256,7 +256,9 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     });
   }
   async function approveRegistrationEvent(request) {
-    return db.runTransaction(async tx => {
+    return db.runTransaction(tx => approveInTransaction(request,tx));
+  }
+  async function approveInTransaction(request,tx) {
       const caller = await actor(request, tx); const event = await readEvent(request.data?.eventId, tx);
       if (!approves(caller, event)) fail('permission-denied', 'Only a super admin can approve an event.');
       if (event.deletedAt || event.reviewDecision || (event.status !== 'pending' && !(event.status === 'approved' && event.hasPendingChanges))) fail('failed-precondition', 'Only a pending event or submitted changes can be approved.');
@@ -295,6 +297,31 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       if (localMinute(now(), event.timeZone) >= (event.closes || `${event.date}T00:00`)) fail('failed-precondition', 'The registration closing time has passed.');
       tx.update(eventRef(event.id), { status: 'approved', approvedBy: caller.uid, approvedAt: now().toISOString() });
       return { eventId: event.id, status: 'approved' };
+  }
+  async function approveRegistrationSeries(request) {
+    gate();const selected=request.data?.occurrences;
+    if(!Array.isArray(selected)||!selected.length||selected.length>100||new Set(selected.map(row=>row?.eventId)).size!==selected.length)fail('invalid-argument','Choose between 1 and 100 different occurrences.');
+    const baseId=id(request.data.eventId),requestId=id(request.data.requestId);
+    return db.runTransaction(async tx=>{
+      const caller=await actor(request,tx);
+      if(!approves(caller))fail('permission-denied','Only a super admin can approve a series.');
+      const receiptRef=eventRef(baseId).collection('seriesApprovalOperations').doc(createHash('sha256').update(JSON.stringify([caller.uid,requestId])).digest('hex'));
+      const hash=createHash('sha256').update(JSON.stringify(request.data)).digest('hex'),receipt=await tx.get(receiptRef);
+      if(receipt.exists){if(receipt.data().hash!==hash)fail('already-exists','This approval reference was already used.');return receipt.data().result;}
+      const base=await readEvent(baseId,tx);if(!base.seriesId||base.deletedAt)fail('failed-precondition','Reload a series event before approving.');
+      const writes=[],cache=new Map();let bytes=0;
+      const stage=(method,args)=>{bytes+=Buffer.byteLength(JSON.stringify(args[1]||{}));writes.push(()=>tx[method](...args));};
+      const staged={get:ref=>{if(!cache.has(ref.path))cache.set(ref.path,tx.get(ref));return cache.get(ref.path);},
+        set:(...args)=>stage('set',args),update:(...args)=>stage('update',args),delete:(...args)=>stage('delete',args)};
+      const events=[];
+      for(const row of selected){
+        const event=await readEvent(row?.eventId,staged);
+        if(event.seriesId!==base.seriesId||event.ownerUid!==base.ownerUid)fail('invalid-argument','Choose occurrences from the same series.');
+        try{events.push(await approveInTransaction({...request,data:{eventId:event.id,expectedRevision:row.expectedRevision}},staged));}
+        catch(error){throw new HttpsError(error.code||'internal',`${event.date}: ${error.message}`);}
+      }
+      if(writes.length>450||bytes>8*1024*1024)fail('resource-exhausted','These submitted changes are too large to approve together. Select fewer occurrences.');
+      const result={events};writes.forEach(write=>write());tx.set(receiptRef,{uid:caller.uid,hash,result,createdAt:now().toISOString()});return result;
     });
   }
   async function reviewRegistrationEvent(request) {
@@ -312,9 +339,11 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     });
   }
   async function submitEventRegistration(request) {
+    return db.runTransaction(tx => submitInTransaction(request, tx));
+  }
+  async function submitInTransaction(request, tx) {
     const eventId = id(request.data?.eventId); const requestId = id(request.data?.requestId);
     const hash = createHash('sha256').update(JSON.stringify({ answers: request.data.answers, places: request.data.places, formVersion: request.data.formVersion, expectedRevision: request.data.expectedRevision })).digest('hex');
-    return db.runTransaction(async tx => {
       const caller = await actor(request, tx); const event = await readEvent(eventId, tx);
       const operationId = createHash('sha256').update(JSON.stringify([caller.uid, requestId])).digest('hex');
       const receiptRef = eventRef(eventId).collection('operations').doc(operationId);
@@ -349,6 +378,44 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       tx.set(db.collection('registrationMemberEvents').doc(caller.uid).collection('events').doc(eventId), { eventId });
       tx.update(eventRef(eventId), { reservedPlaces, registrationCount: event.registrationCount + (previous?.status === 'registered' ? 0 : 1) });
       tx.set(receiptRef, { uid: caller.uid, hash, result, createdAt: now().toISOString() });
+      return result;
+  }
+  async function submitRegistrationOccurrences(request) {
+    gate();
+    const selected = request.data?.occurrences;
+    if (!Array.isArray(selected) || !selected.length || selected.length > 100
+      || new Set(selected.map(row => row?.eventId)).size !== selected.length) fail('invalid-argument', 'Choose between 1 and 100 different occurrences.');
+    const baseId = id(request.data.eventId), requestId = id(request.data.requestId);
+    if (Buffer.byteLength(JSON.stringify(request.data)) > 100000) fail('invalid-argument', 'This registration is too large.');
+    return db.runTransaction(async tx => {
+      const caller = await actor(request, tx);
+      const receiptRef = eventRef(baseId).collection('seriesOperations').doc(createHash('sha256').update(JSON.stringify([caller.uid,requestId])).digest('hex'));
+      const hash = createHash('sha256').update(JSON.stringify(request.data)).digest('hex');
+      const receipt = await tx.get(receiptRef);
+      if (receipt.exists) { if (receipt.data().hash !== hash) fail('already-exists','This submission reference was already used.'); return receipt.data().result; }
+      const base = await readEvent(baseId,tx);
+      if (!base.seriesId || base.deletedAt || base.status !== 'approved') fail('failed-precondition','Reload an approved series occurrence.');
+      const baseForm = (await tx.get(formRef(baseId))).data();
+      const signature = form => JSON.stringify([form?.purpose,form?.fields]);
+      // Buffer writes so every occurrence is validated/read before Firestore writes.
+      const writes = [], cache = new Map();
+      const staged = { get: ref => { if (!cache.has(ref.path)) cache.set(ref.path,tx.get(ref)); return cache.get(ref.path); },
+        set: (...args) => writes.push(() => tx.set(...args)), update: (...args) => writes.push(() => tx.update(...args)) };
+      const registrations = [];
+      for (const row of selected) {
+        const event = await readEvent(row?.eventId,staged);
+        if (event.seriesId !== base.seriesId || event.ownerUid !== base.ownerUid || event.deletedAt) fail('invalid-argument','Choose occurrences from the same event series.');
+        const form = (await staged.get(formRef(event.id))).data();
+        if (signature(form) !== signature(baseForm)) fail('failed-precondition',`${event.date}: this occurrence has a different form. Register for it separately.`);
+        if (event.id !== baseId && (await staged.get(bookingRef(event.id,caller.uid))).data()?.status === 'registered') fail('failed-precondition','Manage existing registrations separately.');
+        try {
+          registrations.push(await submitInTransaction({ ...request,data:{ eventId:event.id,requestId,formVersion:row.formVersion,
+            expectedRevision:row.expectedRevision,places:request.data.places,answers:request.data.answers } },staged));
+        } catch (error) { throw new HttpsError(error.code || 'internal',`${event.date}: ${error.message}`); }
+      }
+      const result = { registrations };
+      writes.forEach(write => write());
+      tx.set(receiptRef,{ uid:caller.uid,hash,result,createdAt:now().toISOString() });
       return result;
     });
   }
@@ -436,6 +503,27 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       result.registrationNeedsReview = Boolean(registered && own.formVersion !== event.formVersion);
       result.canCancel = Boolean(registered && (event.status === 'cancelled' || (event.allowCancellation && localMinute(now(), event.timeZone).slice(0, 10) < event.date)));
       result.retention = RETENTION;
+      if(request.data?.includeSeriesReview === true && event.seriesId && caller && approves(caller,event)){
+        const snapshot=await tx.get(db.collection('registrationEvents').where('seriesId','==',event.seriesId).limit(100));
+        result.reviewOccurrences=snapshot.docs.map(doc=>({...doc.data(),id:doc.id})).filter(row=>row.ownerUid===event.ownerUid&&!row.deletedAt&&!row.reviewDecision&&(row.status==='pending'||(row.status==='approved'&&row.hasPendingChanges)))
+          .map(row=>({eventId:row.id,title:row.title,date:row.date,startTime:row.startTime||'',revision:row.revision,status:row.status,hasPendingChanges:Boolean(row.hasPendingChanges)}))
+          .sort((a,b)=>`${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`));
+      }
+      if (request.data?.includeOccurrences === true && event.seriesId && event.status === 'approved' && !event.deletedAt) {
+        const snapshot = await tx.get(db.collection('registrationEvents').where('seriesId','==',event.seriesId).limit(100));
+        const rows = snapshot.docs.map(doc => ({ ...doc.data(),id:doc.id })).filter(row => row.status === 'approved' && !row.deletedAt && row.ownerUid === event.ownerUid);
+        result.occurrences = await Promise.all(rows.map(async row => {
+          const [booking,otherForm] = await Promise.all([caller ? tx.get(bookingRef(row.id,caller.uid)) : Promise.resolve(null),tx.get(formRef(row.id))]);
+          const registered = booking?.data()?.status === 'registered';
+          const open = localMinute(now(),row.timeZone) < (row.closes || `${row.date}T00:00`);
+          const sameForm = JSON.stringify([form.data()?.purpose,form.data()?.fields]) === JSON.stringify([otherForm.data()?.purpose,otherForm.data()?.fields]);
+          return { eventId:row.id,date:row.date,startTime:row.startTime || '',timeZone:row.timeZone,formVersion:otherForm.data()?.version,
+            availablePlaces:Math.max(0,row.capacity-row.reservedPlaces + (registered && row.id === event.id ? booking.data().places : 0)),registered,registrationRevision:booking?.data()?.revision || 0,
+            selectable:row.id === event.id ? Boolean(result.canRegister || result.canEditRegistration) : Boolean(open && !registered && sameForm && row.capacity>row.reservedPlaces),
+            reason:!sameForm ? 'Different form — register separately' : registered && row.id !== event.id ? 'Already registered' : !open ? 'Registration closed' : row.capacity<=row.reservedPlaces ? 'Full' : '' };
+        }));
+        result.occurrences.sort((a,b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`));
+      }
       if (manager && event.reviewDecision) result.reviewFeedback = { decision: event.reviewDecision, message: event.reviewFeedback };
       const { normalisePrivateVenue } = await venueModel;
       const privateProjection = data => ({ address: data?.address || '', venue: normalisePrivateVenue(data?.venue), hasPoster: Boolean(data?.posterPath),
@@ -687,6 +775,6 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const snapshot = await query.get();
     return { templates: snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })), nextCursor: snapshot.docs.length === 50 ? snapshot.docs.at(-1).id : null };
   }
-  return { createRegistrationSeries, saveRegistrationEvent, approveRegistrationEvent, reviewRegistrationEvent, submitEventRegistration, cancelEventRegistration, cancelRegistrationEvent, deleteRegistrationEvent, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
+  return { createRegistrationSeries, saveRegistrationEvent, approveRegistrationEvent, approveRegistrationSeries, reviewRegistrationEvent, submitEventRegistration, submitRegistrationOccurrences, cancelEventRegistration, cancelRegistrationEvent, deleteRegistrationEvent, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
 }
 module.exports = { createRegistrationHandlers, localMinute, active, manages, approves };
