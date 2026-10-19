@@ -9,6 +9,7 @@ export default function MemberPageHeader({
   tone,
   onBack,
   backAccessibilityLabel,
+  backDisabled,
   children,
   footer,
   style,
@@ -24,6 +25,7 @@ export default function MemberPageHeader({
       tone={tone}
       onBack={onBack}
       backAccessibilityLabel={backAccessibilityLabel}
+      backDisabled={backDisabled}
       footer={footer}
       style={style}
     >

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Pressable, Text, View } from 'react-native';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 import MemberPageHeader from './MemberPageHeader';
+import NativeBackButton from './NativeBackButton';
 import RegistrationEditor from '../registration/RegistrationEditor';
 import { Action, Answer, Input, styles } from '../registration/RegistrationControls';
 import { firebaseRegistration } from '../registration/firebaseRegistration';
@@ -187,11 +188,10 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       if (valid()) { setPendingPoster(null); setDetail(fresh); setNotice(fresh.event.hasPendingChanges ? 'Poster change submitted for review. The published poster remains unchanged until approval.' : 'Private poster updated.'); }
     }) },
   ]);
-  if (!enabled) return <View style={styles.panel}><Text style={styles.text}>Registration is not enabled for this release.</Text><Action onPress={onBack}>Back</Action></View>;
+  if (!enabled) return <View style={styles.panel}><NativeBackButton onPress={onBack} accessibilityLabel="Back to events" /><Text style={styles.text}>Registration is not enabled for this release.</Text></View>;
   if (obscured) return <View style={styles.panel}><Text style={styles.muted}>Private event details hidden while the app is inactive.</Text></View>;
   return <KeyboardAwareScrollView contentContainerStyle={styles.content}>
-    <MemberPageHeader title={stage === 'responses' ? 'Registration responses' : stage === 'editor' ? 'Edit event and registration form' : 'Event registration'} subtitle={cityLabel(city)} icon="clipboard-text-outline" tone="teal" />
-    <View style={styles.row}><Action disabled={busy} onPress={onBack}>Back to events</Action></View>
+    <MemberPageHeader title={stage === 'responses' ? 'Registration responses' : stage === 'editor' ? 'Edit event and registration form' : 'Event registration'} subtitle={cityLabel(city)} icon="clipboard-text-outline" tone="teal" onBack={onBack} backDisabled={busy} backAccessibilityLabel="Back to events" />
     {busy && <ActivityIndicator color={colors.tealDark} />}
     {detail?.reviewFeedback && <Text style={styles.error}>{detail.reviewFeedback.message} Edit and save to resubmit for approval.</Text>}
     {notice ? <Text accessibilityRole="alert" style={styles.error}>{notice}</Text> : null}
@@ -210,14 +210,14 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       <Text style={styles.text}>{detail.form.purpose}</Text><Text style={styles.muted}>{detail.retention?.notice}</Text>
       <Input label="Number of places (maximum 5)" value={places} keyboardType="number-pad" onChangeText={value => { submission.current = null; setPlaces(value); }} />
       {registrationFieldGroups(detail.form.fields, places).map(group => <View key={group.id} style={styles.panel}><Text style={styles.title}>{group.label}</Text>{group.fields.map(field => <View key={field.id}><Answer field={{...field,label:field.originalLabel || field.label}} value={answers[field.id]} onChange={value => { submission.current = null; setAnswers(current => ({ ...current, [field.id]: value })); }} />{field.description ? <Text style={styles.muted}>{field.description}</Text> : null}</View>)}</View>)}
-      <Action primary onPress={submit}>Submit registration</Action><Action onPress={onBack}>Back to events</Action>
+      <Action primary onPress={submit}>Submit registration</Action>
     </View>}
     {detail && ['confirmation', 'host-confirmation'].includes(stage) && <View style={styles.panel}>
       <Text style={styles.title}>{stage === 'confirmation' ? 'Registration confirmed' : 'Event and form saved'}</Text>
       <Text style={styles.text}>{detail.event.title}</Text>
       {stage === 'host-confirmation' && (seriesSummary || detail.event.seriesId) && <Text style={styles.title}>{seriesSummary?.count || detail.event.occurrenceCount} independent occurrences — separate bookings, capacities, closing dates and approvals. Editing here changes only this occurrence.</Text>}
       <Text style={styles.muted}>{stage === 'confirmation' ? `${detail.ownRegistration?.places || 0} places reserved.` : detail.event.hasPendingChanges ? 'Changes await super administrator approval. The published event and form remain unchanged.' : detail.event.status === 'pending' ? 'Awaiting super administrator approval. Your event appears in My Events until approved.' : 'Changes saved.'}</Text>
-      <Action primary onPress={onBack}>Back to events</Action><Action onPress={() => stage === 'confirmation' ? startEntry() : edit()}>{stage === 'confirmation' ? 'Edit registration' : 'Edit event or form'}</Action>
+      <Action onPress={() => stage === 'confirmation' ? startEntry() : edit()}>{stage === 'confirmation' ? 'Edit registration' : 'Edit event or form'}</Action>
       {stage === 'host-confirmation' && seriesSummary && <Action primary onPress={onMyEvents || onBack}>Return to My Events</Action>}
       {pendingPoster && <Action onPress={() => posterChange(false)}>Retry selected poster upload</Action>}
     </View>}
@@ -242,7 +242,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
           {row.answersDeletedAt ? <Text style={styles.muted}>Answers deleted.</Text> : <Action onPress={() => deleteAnswers(row)}>Permanently delete answers only</Action>}
         </View>}
       </View>)}
-      {responseCursor && <Action onPress={() => responsePage(responseCursor)}>Load more responses</Action>}<Action onPress={onBack}>Back to events</Action>
+      {responseCursor && <Action onPress={() => responsePage(responseCursor)}>Load more responses</Action>}
     </View>}
     </View>
   </KeyboardAwareScrollView>;

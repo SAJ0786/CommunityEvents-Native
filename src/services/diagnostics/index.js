@@ -95,6 +95,7 @@ export function recordNonFatalError(error, context = {}) {
     ? new Error(safeError.message || 'Application error')
     : new Error(safeError?.message || String(error || 'Application error'));
   report.name = safeError.name || 'ApplicationError';
+  if (typeof safeError.stack === 'string') report.stack = safeError.stack;
   nativeReporter()?.setAttributes(stringAttributes({ ...currentContext, ...safeContext }));
   nativeReporter()?.recordError(report);
   recordDiagnosticRegistryError(safeError, safeContext);

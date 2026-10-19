@@ -6,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import CreateEventForm from '../components/CreateEventForm';
 import NativeDateTimeField from '../components/NativeDateTimeField';
 import { Action, IconAction, Input, styles } from './RegistrationControls';
-import { FIELD_TYPES, FORM_TEMPLATES, TERMS_LIMIT, closingDateError, consentLast, makeField, moveField, publicNotesError, publicSuburbError, templateFields, validateDraft } from './prototypeModel';
+import { FIELD_TYPES, FORM_TEMPLATES, TERMS_LIMIT, closingDateError, consentLast, makeField, moveField, publicNotesError, publicSuburbError, templateFields, validateDraft, registrationFieldGroups } from './prototypeModel';
 import { normalisePrivateVenue } from './privateVenue';
 import { normalEventFromRegistrationDraft, registrationDraftFromNormalEvent, registrationOccurrenceDefaults, validateRegistrationOccurrences } from './registrationViewModel';
 import { registrationOccurrencePreview } from './registrationRecurrence';
@@ -95,7 +95,7 @@ export default function RegistrationEditor({
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
     {step === 'event' && <View>
       <CreateEventForm registrationMode registrationTitle={draft.title} onRegistrationTitleChange={value => update('title', value)} defaultCity={city} defaultHostName={defaultHostName} defaultHostPhone={defaultHostPhone}
-        registrationPosterControl={<EventPosterPicker uri={draft.poster?.uri} hasPoster={hasPoster} privatePoster onChoose={selectPoster} onRemove={draft.poster ? () => update('poster', null) : onRemovePoster} disabled={busy} />}
+        registrationPosterControl={<EventPosterPicker uri={draft.poster?.uri} hasPoster={hasPoster} privatePoster showChooseButton={false} onChoose={selectPoster} onRemove={draft.poster ? () => update('poster', null) : onRemovePoster} disabled={busy} />}
         initialEvent={normalEventFromRegistrationDraft(draft, eventId)} allowUnchangedSubmit submitting={busy}
         title="Event details" subtitle="Registration event — private venue and poster" submitLabel="Continue to registration settings"
         onSubmit={acceptEvent} onCancel={onCancel} />

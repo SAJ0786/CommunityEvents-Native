@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as Notifications from 'expo-notifications';
 import { colors, radius, shadow, spacing, typography } from '../theme';
+import { recordNonFatalError } from '../services/diagnostics';
 
 const azaanRecording = require('../../assets/sounds/azan_mashad.mp3');
 
@@ -16,8 +17,11 @@ function formatTime(value) {
 }
 
 export default function AzaanPlaybackController({ onOpenHijriCalendar }) {
-  const player = useAudioPlayer(azaanRecording, { updateInterval: 250 });
-  const status = useAudioPlayerStatus(player);
+  // Native audio creation can fail on a device. It must never happen during
+  // login/home rendering or take the entire application to its error boundary.
+  const playerRef = useRef(null);
+  const statusSubscription = useRef(null);
+  const [status, setStatus] = useState({});
   const [visible, setVisible] = useState(false);
   const handledNotificationId = useRef('');
 
@@ -30,6 +34,11 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar }) {
     onOpenHijriCalendar?.();
     setVisible(true);
     try {
+      if (!playerRef.current) {
+        playerRef.current = createAudioPlayer(azaanRecording, { updateInterval: 250 });
+        statusSubscription.current = playerRef.current.addListener('playbackStatusUpdate', setStatus);
+      }
+      const player = playerRef.current;
       await setAudioModeAsync({
         playsInSilentMode: false,
         shouldPlayInBackground: false,
@@ -37,18 +46,27 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar }) {
       });
       await player.seekTo(0);
       player.play();
-    } catch {
+    } catch (error) {
+      recordNonFatalError(error, { feature: 'notifications', operation: 'open_azaan_player' });
+      handledNotificationId.current = '';
       setVisible(false);
     }
-  }, [onOpenHijriCalendar, player]);
+  }, [onOpenHijriCalendar]);
 
   const stopPlayback = useCallback(async () => {
     try {
-      player.pause();
-      await player.seekTo(0);
+      playerRef.current?.pause();
+      await playerRef.current?.seekTo(0);
     } catch {}
     setVisible(false);
-  }, [player]);
+  }, []);
+
+  useEffect(() => () => {
+    try { statusSubscription.current?.remove(); } catch { /* already released */ }
+    try { playerRef.current?.remove(); } catch { /* native teardown must not crash navigation */ }
+    statusSubscription.current = null;
+    playerRef.current = null;
+  }, []);
 
   useEffect(() => {
     let mounted = true;

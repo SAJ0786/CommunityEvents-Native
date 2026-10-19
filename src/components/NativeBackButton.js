@@ -4,14 +4,16 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors } from '../theme';
 
 /** One consistent, platform-native back affordance for every in-app screen. */
-export default function NativeBackButton({ onPress, accessibilityLabel = 'Back', style, color = colors.navy }) {
+export default function NativeBackButton({ onPress, accessibilityLabel = 'Back', style, color = colors.navy, disabled = false }) {
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       hitSlop={8}
       onPress={onPress}
-      style={({ pressed }) => [styles.button, style, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.button, style, (pressed || disabled) && styles.pressed]}
     >
       <MaterialCommunityIcons
         color={color}

@@ -479,7 +479,7 @@ function normalFormFixture(initialEvent, registrationMode) {
     './EventPosterPicker': 'EventPosterPicker',
     './EventDateTimePicker': 'EventDateTimePicker',
     './KeyboardAwareScrollView': 'ScrollView',
-    './MemberPageHeader': 'MemberPageHeader',
+    './NativeBackButton': 'NativeBackButton', './MemberPageHeader': 'MemberPageHeader',
     './AddressAutocomplete': 'AddressAutocomplete',
     './CompactSelect': 'CompactSelect',
     '../theme': require('./theme-fixture.cjs'),
@@ -528,6 +528,7 @@ test('actual shared form isolates registration date-only/overnight and private p
 });
 test('editor renders the actual shared form in registration mode and keeps dedicated registration/poster controls', async () => {
   const detail = stagedDetail();
+  detail.pendingChanges.form.fields[0].perParticipant = true;
   const fixture = componentFixture('src/registration/RegistrationEditor.js', {
     'react-native': { Image: 'Image', Switch: 'Switch', Text: 'Text', View: 'View' },
     'expo-image-picker': {},
@@ -550,8 +551,15 @@ test('editor renders the actual shared form in registration mode and keeps dedic
   assert.match(JSON.stringify(settings), /Registration settings/);
   assert.equal(form.props.registrationPosterControl.type, 'EventPosterPicker');
   assert.equal(form.props.registrationPosterControl.props.privatePoster, true);
+  assert.equal(form.props.registrationPosterControl.props.showChooseButton, false, 'tappable poster panel is the only upload action');
   assert.equal(form.props.registrationPosterControl.props.hasPoster, true);
   assert.match(JSON.stringify(settings), /Capacity \(places\)/);
+  flatten(settings).find(node => node.type === 'Action' && node.props.children.flat(Infinity).join('') === 'Choose registration form').props.onPress();
+  flatten(fixture.render()).find(node => node.type === 'Action' && node.props.children.flat(Infinity).join('') === 'Continue current form').props.onPress();
+  const participantPreview = JSON.stringify(fixture.render());
+  assert.match(participantPreview, /Participant 1/);
+  assert.match(participantPreview, /Participant 2/);
+  assert.doesNotMatch(participantPreview, /Participant 3/);
 });
 
 function recurrenceEditorDependencies() {
@@ -646,7 +654,7 @@ test('mounted recurrence editor calculates seasonal prayer starts and preserves 
 function recurrenceScreenFixture(transport, extra = {}) {
   return componentFixture('src/components/RegistrationScreen.js', {
     'react-native': { ActivityIndicator: 'ActivityIndicator', Alert: { alert() {} }, AppState: { addEventListener: () => ({ remove() {} }) }, Pressable: 'Pressable', Share: {}, Text: 'Text', View: 'View' },
-    './KeyboardAwareScrollView': 'ScrollView', './MemberPageHeader': 'MemberPageHeader',
+    './KeyboardAwareScrollView': 'ScrollView', './NativeBackButton': 'NativeBackButton', './MemberPageHeader': 'MemberPageHeader',
     '../registration/RegistrationEditor': { __esModule: true, default: 'Editor' },
     '../registration/RegistrationControls': { Action: 'Action', Answer: 'Answer', Input: 'Input', styles: {} },
     '../registration/firebaseRegistration': {}, '../registration/registrationClient': contract,
@@ -815,7 +823,7 @@ test('host screen edits pending draft but self-registration stays on published f
   };
   const mocks = {
     'react-native': { ActivityIndicator: 'ActivityIndicator', Alert: { alert() {} }, AppState: { addEventListener: () => ({ remove() {} }) }, Pressable: 'Pressable', Share: {}, Text: 'Text', View: 'View' },
-    './KeyboardAwareScrollView': 'ScrollView', './MemberPageHeader': 'MemberPageHeader',
+    './KeyboardAwareScrollView': 'ScrollView', './NativeBackButton': 'NativeBackButton', './MemberPageHeader': 'MemberPageHeader',
     '../registration/RegistrationEditor': { __esModule: true, default: 'Editor' },
     '../registration/RegistrationControls': { Action: 'Action', Answer: 'Answer', Input: 'Input', styles: {} },
     '../registration/firebaseRegistration': {}, '../registration/registrationClient': contract,

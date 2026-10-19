@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const parser = require('@babel/parser');
+require('./verify-ui-bindings.cjs').verify();
 
 const projectRoot = path.resolve(__dirname, '..');
 const files = ['App.js'];

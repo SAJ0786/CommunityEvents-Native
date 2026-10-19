@@ -121,8 +121,7 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
     ];
     return <Modal onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}><KeyboardAwareScrollView contentContainerStyle={styles.content}>
-        <MemberPageHeader title="Review submitted changes" subtitle={detail.pendingChanges ? 'Published event remains live until approval' : 'Unpublished event and registration form'} icon="clipboard-check-outline" tone="teal" />
-        <Action disabled={approving} onPress={onClose}>Back to events</Action>
+        <MemberPageHeader title="Review submitted changes" subtitle={detail.pendingChanges ? 'Published event remains live until approval' : 'Unpublished event and registration form'} icon="clipboard-check-outline" tone="teal" onBack={onClose} backDisabled={approving} backAccessibilityLabel="Back to events" />
         {detail.pendingChanges && <Text style={styles.text}>Submitted {detail.pendingChanges.submittedAt || ''} by {detail.pendingChanges.submittedBy || 'organiser'}</Text>}
         {values.filter(([, value]) => value !== undefined && value !== '').map(([label, value]) => <View key={label} style={styles.panel}><Text style={styles.label}>{label}</Text><Text selectable style={styles.text}>{String(value)}</Text></View>)}
         <Text style={styles.label}>Private poster</Text>

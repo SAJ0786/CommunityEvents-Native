@@ -18,6 +18,7 @@ export default function PageHeader({
   tone = 'teal',
   onBack,
   backAccessibilityLabel = 'Back',
+  backDisabled = false,
   children,
   footer,
   style,
@@ -28,7 +29,7 @@ export default function PageHeader({
       <View style={[styles.glowLarge, { backgroundColor: palette.glow }]} />
       <View style={[styles.glowSmall, { backgroundColor: palette.glowSoft }]} />
       <View style={styles.row}>
-        {onBack ? <NativeBackButton onPress={onBack} accessibilityLabel={backAccessibilityLabel} /> : null}
+        {onBack ? <NativeBackButton onPress={onBack} accessibilityLabel={backAccessibilityLabel} disabled={backDisabled} /> : null}
         <View style={[styles.iconChip, { backgroundColor: palette.chipBg, borderColor: palette.chipBorder }]}>
           <MaterialCommunityIcons name={icon} color={palette.icon} size={22} />
         </View>

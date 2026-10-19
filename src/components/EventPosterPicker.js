@@ -4,7 +4,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, radius, spacing, typography } from '../theme';
 
 // Shared by ordinary and registration events; storage/access policy stays with callers.
-export default function EventPosterPicker({ uri, hasPoster = false, onChoose, onRemove, error, disabled = false, privatePoster = false }) {
+export default function EventPosterPicker({ uri, hasPoster = false, onChoose, onRemove, error, disabled = false, privatePoster = false, showChooseButton = true }) {
   const selected = Boolean(uri || hasPoster);
   return <View style={styles.group}>
     <Pressable accessibilityRole="button" accessibilityLabel="Choose event poster" disabled={disabled} onPress={onChoose} style={styles.dropZone}>
@@ -15,7 +15,7 @@ export default function EventPosterPicker({ uri, hasPoster = false, onChoose, on
       </View>}
     </Pressable>
     <View style={styles.actions}>
-      <Pressable accessibilityRole="button" disabled={disabled} onPress={onChoose} style={styles.choose}><Text style={styles.chooseText}>{selected ? 'Choose another photo' : 'Upload your event poster'}</Text></Pressable>
+      {showChooseButton && <Pressable accessibilityRole="button" disabled={disabled} onPress={onChoose} style={styles.choose}><Text style={styles.chooseText}>{selected ? 'Choose another photo' : 'Upload your event poster'}</Text></Pressable>}
       {selected && onRemove && <Pressable accessibilityRole="button" disabled={disabled} onPress={onRemove} style={styles.remove}><Text style={styles.removeText}>Remove poster</Text></Pressable>}
     </View>
     {privatePoster && <Text style={styles.helper}>Visible only to registered attendees, the organiser and authorised admins. JPEG, PNG or WebP, up to 5 MB.</Text>}
