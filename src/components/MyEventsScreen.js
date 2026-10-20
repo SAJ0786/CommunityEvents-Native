@@ -4,6 +4,7 @@ import EventCard from './EventCard';
 import { registrationUnavailable } from '../registration/registrationStatus';
 import { colors, radius, shadow, spacing, typography } from '../theme';
 import MemberPageHeader from './MemberPageHeader';
+import SegmentedControl from './SegmentedControl';
 
 function EmptyState({ title, text }) {
   return (
@@ -34,12 +35,15 @@ export default function MyEventsScreen({
   onOpenRegistration,
 }) {
   const [selection,setSelection] = useState(null);
-  const organising = events.filter(event => !event.registrationOnly || event.ownerUid === userUid);
+  const [typeSelection, setTypeSelection] = useState(null);
+  const registrationOnly = Boolean(typeSelection && typeSelection.uid === userUid && typeSelection.registrationOnly);
+  const allOrganising = events.filter(event => !event.registrationOnly || event.ownerUid === userUid);
+  const organising = allOrganising.filter(event => !registrationOnly || event.registrationOnly);
   const registrations = events.filter(event => event.registrationOnly && event.isRegistered && !registrationUnavailable(event));
   const history = events.filter(event => event.registrationOnly && event.isRegistered && registrationUnavailable(event));
   const [historySelection, setHistorySelection] = useState(null);
   const historyOpen = historySelection === userUid;
-  const selected = selection && selection.uid === userUid ? selection.view : organising.length || !(registrations.length || history.length) ? 'organising' : 'attending';
+  const selected = selection && selection.uid === userUid ? selection.view : allOrganising.length || !(registrations.length || history.length) ? 'organising' : 'attending';
   const visibleEvents = selected === 'organising' ? organising : registrations;
   const renderEvent = ({ item: event }) => {
     const canDeleteSeries = Boolean(onDeleteSeries && userUid && (
@@ -132,6 +136,10 @@ export default function MyEventsScreen({
       ListHeaderComponent={(
         <View style={styles.headerContent}>
           <MemberPageHeader title="My Events" subtitle="Events you created and your registrations. Manage your events or open a booking to review it." icon="calendar-check-outline" tone="teal" />
+          <View style={styles.typeFilter}><SegmentedControl label="My Events event type" value={registrationOnly ? 'registration' : 'all'} onChange={value => setTypeSelection({uid:userUid,registrationOnly:value === 'registration'})} options={[
+            {value:'all',label:'All events',icon:'calendar-month-outline'},
+            {value:'registration',label:'Registration only',icon:'clipboard-text-outline'},
+          ]}/></View>
           <View style={styles.listTabs} accessibilityRole="tablist">{[['organising',`Events I organise (${organising.length})`],['attending',`My registrations (${registrations.length})`]].map(([view,label]) => <Pressable key={view} accessibilityRole="tab" accessibilityState={{selected:selected === view}} onPress={() => setSelection({uid:userUid,view})} style={[styles.listTab,selected === view && styles.listTabSelected]}><Text style={[styles.listTabText,selected === view && styles.listTabTextSelected]}>{label}</Text></Pressable>)}</View>
           <Text style={styles.visibilityText}>{selected === 'organising' ? 'Events you submitted. Manage your events and attendee responses.' : 'Events you booked places for. Open a card to manage your registration.'}</Text>
           {loading ? (
@@ -140,8 +148,8 @@ export default function MyEventsScreen({
               <Text style={styles.loadingText}>Loading your events...</Text>
             </View>
           ) : null}
-          {!loading && visibleEvents.length === 0 ? <EmptyState title={selected === 'organising' ? 'No submitted events' : 'No registrations yet'} text={selected === 'organising' ? 'Events you create appear here.' : 'Your event bookings appear here.'} /> : null}
-          {!loading && visibleEvents.length === 0 && selected === 'organising' ? (
+          {!loading && visibleEvents.length === 0 ? <EmptyState title={selected === 'organising' ? registrationOnly ? 'No registration-only events' : 'No submitted events' : 'No registrations yet'} text={selected === 'organising' ? registrationOnly ? 'Registration-only events you create appear here. Choose All events to see your other events.' : 'Events you create appear here.' : 'Your event bookings appear here.'} /> : null}
+          {!loading && allOrganising.length === 0 && selected === 'organising' ? (
             <Pressable onPress={onAddEvent} style={({ pressed }) => [styles.addEventButton, pressed && styles.pressed]}>
               <Text style={styles.addEventText}>+ Add Your First Event</Text>
             </Pressable>
@@ -166,6 +174,7 @@ export default function MyEventsScreen({
 }
 
 const styles = StyleSheet.create({
+  typeFilter: { marginVertical: spacing.md },
   listTabs: { flexDirection:'row', gap:spacing.sm, padding:spacing.xs, borderRadius:radius.lg, borderWidth:1, borderColor:colors.border, backgroundColor:colors.surface },
   listTab: { flex:1, minWidth:0, minHeight:48, padding:spacing.sm, borderRadius:radius.md, justifyContent:'center' },
   listTabSelected: { backgroundColor:colors.blueSoft },

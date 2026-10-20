@@ -274,6 +274,7 @@ test('My Events preserves attendee history without exposing host edit/delete con
     './EventCard': { __esModule: true, default: 'EventCard' },
     '../registration/registrationStatus': { registrationUnavailable:event => Boolean(event.registrationOnly && (event.deleted || event.deletedAt || event.status === 'cancelled')) },
     './MemberPageHeader': { __esModule: true, default: 'MemberPageHeader' },
+    './SegmentedControl': { __esModule: true, default: 'SegmentedControl' },
     '../theme': require('./theme-fixture.cjs'),
   };
   const exports = {};
@@ -301,6 +302,30 @@ test('My Events preserves attendee history without exposing host edit/delete con
   const activeList = exports.default({events,userUid:'viewer'});
   assert.deepEqual(Array.from(activeList.props.data,event=>event.id),['active']);
   assert.match(JSON.stringify(activeList.props.ListFooterComponent),/Registration history/);
+});
+
+test('My Events type filter preserves list choice, bookings and history and resets for another account', () => {
+  const state = []; let index = 0;
+  const react = { useState: initial => { const slot = index++; if (!(slot in state)) state[slot] = initial; return [state[slot], value => { state[slot] = value; }]; }, createElement: (type, props, ...children) => ({type, props:{...props, children}}) };
+  const mocks = {react, 'react-native':{ActivityIndicator:'ActivityIndicator',FlatList:'FlatList',Pressable:'Pressable',Text:'Text',View:'View',StyleSheet:{create:value=>value}},
+    './EventCard':{__esModule:true,default:'EventCard'}, './MemberPageHeader':{__esModule:true,default:'MemberPageHeader'}, './SegmentedControl':{__esModule:true,default:'SegmentedControl'},
+    '../registration/registrationStatus':{registrationUnavailable:event=>Boolean(event.deletedAt)}, '../theme':require('./theme-fixture.cjs')};
+  const exports = {};
+  const code = babel.transformSync(fs.readFileSync(path.join(root,'src/components/MyEventsScreen.js'),'utf8'), {configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
+  vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
+  const events = [{id:'normal'}, {id:'hosted',ownerUid:'a',registrationOnly:true,isRegistered:true}, {id:'booking',ownerUid:'other',registrationOnly:true,isRegistered:true}, {id:'history',ownerUid:'other',registrationOnly:true,isRegistered:true,deletedAt:'2026-10-01'}];
+  const render = (uid='a', rows=events) => {index=0;return exports.default({userUid:uid,events:rows});};
+  const ids = list => Array.from(list.props.data,event=>event.id);
+  const filter = list => flatten(list.props.ListHeaderComponent).find(node=>node.type==='SegmentedControl');
+  let list=render();assert.deepEqual(ids(list),['normal','hosted']);
+  filter(list).props.onChange('registration');list=render();assert.deepEqual(ids(list),['hosted']);
+  assert.match(JSON.stringify(list.props.ListHeaderComponent),/Events I organise \(1\)/);
+  flatten(list.props.ListHeaderComponent).find(node=>node.props.accessibilityRole==='tab' && JSON.stringify(node).includes('My registrations')).props.onPress();
+  list=render();assert.deepEqual(ids(list),['hosted','booking']);assert.match(JSON.stringify(list.props.ListFooterComponent),/Registration history/);
+  filter(list).props.onChange('all');list=render();assert.deepEqual(ids(list),['hosted','booking']);
+  filter(list).props.onChange('registration');list=render('b',[{id:'b-normal'}]);assert.deepEqual(ids(list),['b-normal']);assert.equal(filter(list).props.value,'all');
+  // With only ordinary submissions, filtering must keep the organiser view and offer a way back.
+  filter(list).props.onChange('registration');list=render('b',[{id:'b-normal'}]);assert.deepEqual(ids(list),[]);assert.match(JSON.stringify(list.props.ListHeaderComponent),/Choose All events/);
 });
 
 test('registered attendees get collapsed poster thumbnails and account changes discard the private image', async () => {
