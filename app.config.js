@@ -56,7 +56,7 @@ export default ({ config }) => ({
   extra: {
     ...(config.extra || {}),
     // Opt in only for a reviewed test/release environment with deployed prerequisites.
-    // Only dedicated registration tester profiles opt in before device acceptance.
+      // Store builds and dedicated registration tester profiles explicitly opt in.
     eventRegistrationEnabled: process.env.EVENT_REGISTRATION_CLIENT_ENABLED === 'true',
     cityManagementEnabled: process.env.CITY_MANAGEMENT_CLIENT_ENABLED === 'true',
     promotionAudienceEnabled: process.env.PROMOTION_AUDIENCE_CLIENT_ENABLED === 'true',

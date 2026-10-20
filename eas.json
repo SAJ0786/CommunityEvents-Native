@@ -85,7 +85,10 @@
       },
       "env": {
         "APP_RELEASE_MODE": "production",
-        "APP_CHECK_PROVIDER": "production"
+        "APP_CHECK_PROVIDER": "production",
+        "EVENT_REGISTRATION_CLIENT_ENABLED": "true",
+        "CITY_MANAGEMENT_CLIENT_ENABLED": "false",
+        "PROMOTION_AUDIENCE_CLIENT_ENABLED": "false"
       }
     },
     "play-internal": {

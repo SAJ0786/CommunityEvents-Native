@@ -92,10 +92,14 @@ for (const profile of [registrationTestflight, registrationApk]) {
     throw new Error('Registration tester profiles must enable only registration, without identity or token overrides.');
   }
 }
-if (production?.env?.EVENT_REGISTRATION_CLIENT_ENABLED === 'true' ||
-    apk?.env?.EVENT_REGISTRATION_CLIENT_ENABLED === 'true' ||
+if (production?.env?.EVENT_REGISTRATION_CLIENT_ENABLED !== 'true' ||
+    production?.env?.CITY_MANAGEMENT_CLIENT_ENABLED !== 'false' ||
+    production?.env?.PROMOTION_AUDIENCE_CLIENT_ENABLED !== 'false') {
+  throw new Error('Store builds must include the released registration module while retaining unrelated feature gates.');
+}
+if (apk?.env?.EVENT_REGISTRATION_CLIENT_ENABLED === 'true' ||
     preview?.env?.EVENT_REGISTRATION_CLIENT_ENABLED === 'true') {
-  throw new Error('Registration must remain opt-in only in dedicated tester profiles.');
+  throw new Error('Debug APK and preview registration testing must use the dedicated registration profile.');
 }
 if (apk?.environment !== 'preview' ||
     apk?.distribution !== 'internal' ||
