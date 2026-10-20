@@ -6,6 +6,7 @@
     weekday: 'short',
     day: 'numeric',
     month: 'short',
+    year: 'numeric',
   });
 }
 

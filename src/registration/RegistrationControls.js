@@ -5,7 +5,7 @@ import { colors, radius, spacing, typography, shadow } from '../theme';
 
 export function RegistrationIdentity({ event, places }) {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(event.date || '') ? new Date(`${event.date}T12:00:00Z`) : null;
-  const dateText = date ? new Intl.DateTimeFormat('en-AU', { day:'numeric', month:'long', year:'numeric', timeZone:'UTC' }).format(date) : event.date;
+  const dateText = date ? new Intl.DateTimeFormat('en-AU', { weekday:'short', day:'numeric', month:'short', year:'numeric', timeZone:'UTC' }).format(date) : event.date;
   return <View style={styles.identity}>
     <View style={styles.identityHeading}><View style={styles.identityIcon}><MaterialCommunityIcons name="clipboard-text-outline" size={28} color={colors.blueDark}/></View><View style={styles.identityCopy}><Text style={styles.eyebrow}>Registration only event</Text><Text style={styles.title}>{event.title}</Text>{event.eventType ? <Text style={styles.muted}>{event.eventType}</Text> : null}</View></View>
     <View style={styles.metadata}>{[['calendar-outline',dateText],['clock-outline',event.startTime || 'Time to be confirmed'],['map-marker-outline',event.suburb]].filter(([,text]) => text).map(([icon,text]) => <View key={icon} style={styles.metadataRow}><MaterialCommunityIcons name={icon} size={18} color={colors.blueDark}/><Text style={styles.text}>{text}</Text></View>)}</View>

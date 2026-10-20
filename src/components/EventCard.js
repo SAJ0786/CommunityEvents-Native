@@ -4,7 +4,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { auth } from '../firebase/firebase';
 import { registrationStatusLabel } from '../registration/registrationStatus';
 import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
-import { formatEventTime } from '../utils/formatters';
+import { formatEventDate, formatEventTime } from '../utils/formatters';
 import { getEventPoster, getEventSuburb } from '../services/events';
 import { getImmediatePosterSource, resolvePosterSource } from '../services/images';
 import { firebaseRegistration, REGISTRATION_ENABLED } from '../registration/firebaseRegistration';
@@ -129,6 +129,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
         <View style={styles.titlePanel}>
           <Text maxFontSizeMultiplier={1.06} style={[styles.title, compact && styles.titleCompact]} numberOfLines={2}>{title}</Text>
         </View>
+        <View style={styles.metaRow}><MaterialCommunityIcons color={colors.blue} name="calendar-outline" size={13}/><Text style={styles.metaText}>{formatEventDate(event.eventDate)}</Text></View>
         <View style={styles.metaRow}>
           <MaterialCommunityIcons color={colors.blue} name="clock-outline" size={13} />
           <Text maxFontSizeMultiplier={1.03} numberOfLines={1} style={styles.metaText}>{displayTime || 'TBC'}</Text>

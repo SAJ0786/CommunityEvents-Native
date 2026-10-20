@@ -413,7 +413,7 @@ export default function EventDetailsModal({
               <View style={styles.dragHandle} />
               <View style={styles.headerRow}>
                 <View style={styles.headerCopy}>
-                  <Text maxFontSizeMultiplier={1.05} style={styles.headerTitle}>Event details</Text>
+                  <Text maxFontSizeMultiplier={1.05} style={styles.headerTitle}>{event.registrationOnly ? 'Registration Only - Event details' : 'Event details'}</Text>
                   <Text maxFontSizeMultiplier={1.05} style={styles.headerHint}>Swipe down to close</Text>
                 </View>
                 <Pressable accessibilityLabel="Close event details" onPress={animateClose} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
