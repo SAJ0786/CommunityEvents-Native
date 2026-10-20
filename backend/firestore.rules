@@ -1,3 +1,4 @@
+// Community Connect web release candidate. Deploy only after release acceptance.
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -105,6 +106,15 @@ service cloud.firestore {
 
     // Private Business Directory submissions. These documents contain owner,
     // declaration, exact-address and moderation data and are never public.
+    // Candidate: tolerate older profiles without status fields, but honour
+    // explicit inactive, archived and banned states independently of the UI.
+    function isActiveDirectoryMember() {
+      return isRegistered()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc().data.get('isActive', true) == true
+        && userDoc().data.get('active', true) == true
+        && !(userDoc().data.get('accountStatus', 'active') in ['archived', 'banned', 'deleted']);
+    }
     function isBusinessOwner(data) {
       return isRegistered() && data.ownerId == request.auth.uid;
     }
@@ -165,7 +175,7 @@ service cloud.firestore {
       allow read: if isBusinessOwner(resource.data)
                     || isAdmin();
 
-      allow create: if isRegistered()
+      allow create: if isActiveDirectoryMember()
                       && request.resource.data.ownerId == request.auth.uid
                       && validBusinessCreate(request.resource.data)
                       && request.resource.data.status == 'pending'
@@ -185,8 +195,8 @@ service cloud.firestore {
                           && request.resource.data.ownerId == request.auth.uid
                           && ownerBusinessFieldsOnly()
                           && request.resource.data.status == 'pending'
-                          && request.resource.data.tier == resource.data.tier
-                          && request.resource.data.foundingMember == resource.data.foundingMember
+                          && !request.resource.data.diff(resource.data).affectedKeys()
+                            .hasAny(['tier', 'foundingMember'])
                           && request.resource.data.referrerReview.status == 'pending'
                           && request.resource.data.referrerReview.checkedBy == ''
                           && request.resource.data.abnVerified == false);
@@ -199,13 +209,26 @@ service cloud.firestore {
     // Sanitised projection used by the public directory. It deliberately omits
     // owner identity, private contact routing, exact home addresses, ABN number,
     // declarations and moderation fields.
+    // Check the authoritative private record before and after an atomic write.
+    // A forged public city cannot grant authority over another city's business.
+    function cityAdminOwnsProjectionScope(businessId, projection) {
+      return isCityAdminForBusiness(
+          get(/databases/$(database)/documents/businesses/$(businessId)).data,
+          getAfter(/databases/$(database)/documents/businesses/$(businessId)).data)
+        && businessCity(projection) == adminCity();
+    }
     match /publicBusinesses/{businessId} {
       allow read: if true;
-      allow create, update: if isAdmin();
-      allow delete: if isAdmin()
-                    || (isRegistered()
-                        && get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId
-                          == request.auth.uid);
+      allow create: if isActiveDirectoryMember()
+        && (isSuperAdmin() || cityAdminOwnsProjectionScope(businessId, request.resource.data));
+      allow update: if isActiveDirectoryMember()
+        && (isSuperAdmin()
+          || (cityAdminOwnsProjectionScope(businessId, request.resource.data)
+            && businessCity(resource.data) == adminCity()));
+      allow delete: if isActiveDirectoryMember()
+        && (isSuperAdmin()
+          || cityAdminOwnsProjectionScope(businessId, resource.data)
+          || get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid);
     }
 
     // Aggregate interaction counters are written only by the trusted callable
@@ -247,8 +270,7 @@ service cloud.firestore {
     }
 
     function validPromotion(data) {
-      return (!('requestedAudience' in data) || data.requestedAudience in ['local', 'australia'])
-        && data.title is string
+      return data.title is string
         && data.title.size() >= 3
         && data.briefText is string
         && data.briefText.size() >= 10
@@ -263,7 +285,7 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'title', 'briefText', 'discountText', 'fullDetails',
         'startDate', 'endDate', 'imageUrl', 'imagePath', 'status',
-        'hidden', 'rejectionReason', 'lastSubmittedBy', 'updatedAt', 'submittedAt', 'requestedAudience'
+        'hidden', 'rejectionReason', 'lastSubmittedBy', 'updatedAt', 'submittedAt'
       ]);
     }
 
@@ -407,10 +429,9 @@ service cloud.firestore {
     // ── Settings ───────────────────────────────────────────────────────────────
     match /settings/{docId} {
       allow read:  if docId == 'cityCatalogue' || signedIn();
-      // Public configuration, updated only by a reviewed server-side operation.
-      allow write: if docId != 'cityCatalogue' && (isSuperAdmin()
+      allow write: if isSuperAdmin()
                      || (isAdmin()
-                         && !(docId in ['hijriCalendar', 'hijriObservances', 'azaanRecording'])));
+                         && !(docId in ['hijriCalendar', 'hijriObservances', 'azaanRecording']));
     }
 
     // ── Calendar subscriptions ─────────────────────────────────────────────────
@@ -470,13 +491,27 @@ service cloud.firestore {
     }
 
     function isHostThreadParticipant(data) {
-      return isRegistered()
+      return isActiveDirectoryMember()
         && request.auth.uid in data.participantUids;
+    }
+    function hostThreadMatchesEvent(data) {
+      let registration = data.get('eventCollection', 'events') == 'registrationEvents';
+      let event = registration
+        ? get(/databases/$(database)/documents/registrationEvents/$(data.eventId)).data
+        : get(/databases/$(database)/documents/events/$(data.eventId)).data;
+      let host = event.get('createdByUserId', '') != '' ? event.createdByUserId
+        : event.get('ownerUid', '') != '' ? event.ownerUid
+        : event.get('createdByUid', '') != '' ? event.createdByUid : event.get('userId', '');
+      return data.get('eventCollection', 'events') in ['events', 'registrationEvents']
+        && data.hostUid == host && event.get('hidden', false) == false
+        && (!registration || (event.get('status', '') == 'approved' && event.get('deletedAt', null) == null))
+        && !(event.get('status', 'active') in ['inactive', 'archived', 'deleted', 'cancelled']);
     }
 
     match /hostMessageThreads/{threadId} {
       allow read: if isHostThreadParticipant(resource.data);
-      allow create: if isRegistered()
+      allow create: if isActiveDirectoryMember()
+        && hostThreadMatchesEvent(request.resource.data)
         && request.resource.data.type == 'host'
         && request.resource.data.participantUids is list
         && request.resource.data.participantUids.size() == 2
@@ -486,7 +521,7 @@ service cloud.firestore {
         && request.resource.data.senderUid == request.auth.uid;
       allow update: if isHostThreadParticipant(resource.data)
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'type', 'eventId', 'hostUid', 'senderUid', 'participantUids'
+          'type', 'eventId', 'eventCollection', 'hostUid', 'senderUid', 'participantUids'
         ]);
       allow delete: if false;
 
@@ -496,7 +531,10 @@ service cloud.firestore {
         );
         allow create: if isHostThreadParticipant(
           getAfter(/databases/$(database)/documents/hostMessageThreads/$(threadId)).data
-        ) && request.resource.data.senderUid == request.auth.uid;
+        ) && request.resource.data.senderUid == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 2000;
         allow update, delete: if false;
       }
     }
@@ -522,7 +560,10 @@ service cloud.firestore {
     }
 
     function businessThreadAdminModerationOnly() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+      let business = get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data;
+      return isActiveDirectoryMember()
+        && (isSuperAdmin() || isCityAdminForBusiness(business, business))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'adminBlocked', 'adminBlockedReason', 'adminBlockedBy',
         'adminBlockedAt', 'updatedAt'
       ]);
@@ -672,13 +713,6 @@ service cloud.firestore {
     match /ai_reports/{reportId} {
       allow create: if signedIn();
       allow read, update, delete: if isAdmin();
-    }
-
-    // Public, non-sensitive store-release metadata. Operators publish via Admin SDK.
-    // Do not enable until the corresponding version is publicly available in store.
-    match /appReleases/{platform} {
-      allow get: if platform in ['ios', 'android'];
-      allow list, write: if false;
     }
 
     // ── Edit OTPs — Cloud Function only ──────────────────────────────────────
