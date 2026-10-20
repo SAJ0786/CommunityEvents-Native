@@ -8,9 +8,9 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
 // Execute the actual shared hook with a deterministic animation clock. Native
 // touch dispatch/layout must still be checked on an iOS and Android device.
-function harness() {
+function harness({deferStops=false}={}) {
   let index = 0;
-  const slots = [], effects = [], animations = [], calls = [];
+  const slots = [], effects = [], animations = [], calls = [], stops=[];
   const react = {
     useRef(value) { const i = index++; return slots[i] ||= { current: value }; },
     useMemo(fn) { return fn(); },
@@ -25,7 +25,7 @@ function harness() {
   class Value {
     constructor(value) { this.value = value; }
     setValue(value) { this.value = value; }
-    stopAnimation() { this.pending?.finish(false); }
+    stopAnimation(callback) { this.pending?.finish(false); if(callback){const value=this.value;if(deferStops)stops.push(()=>callback(value));else callback(value);} }
   }
   function animation(type, value, config) {
     const entry = { type, config, finished: false, start(callback) { this.callback = callback; value.pending = this; animations.push(this); },
@@ -53,7 +53,7 @@ function harness() {
     if (id === 'react-native') return native;
     throw new Error(id);
   } });
-  return { animations, calls,
+  return { animations, calls, stops,
     render(visible = true, openingFraction = 1) {
       index = 0;
       const result = exports.default({ visible, openingFraction, onClose: () => calls.push('close') });
@@ -79,6 +79,7 @@ assert.equal(pan.onMoveShouldSetPanResponderCapture(null, { dy: 5, dx: 1 }), tru
 assert.equal(pan.onMoveShouldSetPanResponderCapture(null, { dy: 1, dx: 0 }), false, 'a tap on Close must not become a drag');
 assert.equal(pan.onMoveShouldSetPanResponderCapture(null, { dy: 5, dx: 20 }), false, 'horizontal motion remains available to children');
 assert.equal(pan.onMoveShouldSetPanResponderCapture(null, { dy: -30, dx: 0 }), false, 'upward drags must not dismiss');
+h.animations[0].finish();
 pan.onPanResponderGrant();
 assert.equal(h.animations[0].finished, true, 'drag must stop the opening spring');
 pan.onPanResponderMove(null, { dy: 20 });
@@ -121,7 +122,7 @@ interrupted.unmount();
 
 for (const name of ['AccountMenuSheet', 'EventDetailsModal', 'NotificationsDrawer']) {
   const source = read(`src/components/${name}.js`);
-  assert.match(source, /useMenuDrawerMotion\(\{ visible, onClose(?:, openingFraction:0\.72)? \}\)/);
+  assert.match(source, /useMenuDrawerMotion\(\{ visible, onClose(?:, openingFraction:0\.(?:72|78))? \}\)/);
   assert.match(source, /DrawerDragZone/);
   assert.match(source, /panHandlers=\{panHandlers\}/);
   assert.doesNotMatch(source, /PanResponder.create|Animated.spring|Animated.timing/);
@@ -165,3 +166,32 @@ quickMenu.onSheetLayout({nativeEvent:{layout:{height:420}}});
 firstOpen.render(false, 0.72);
 quickMenu = firstOpen.render(true, 0.72);
 assert.equal(quickMenu.translateY.value,420,'subsequent openings use measured sheet height');
+
+const interruptedDrag=harness();
+const moving=interruptedDrag.render();
+moving.translateY.setValue(35);
+moving.panHandlers.onPanResponderGrant();
+moving.panHandlers.onPanResponderMove(null,{dy:20});
+assert.equal(moving.translateY.value,55,'grabbing an opening/snap-back animation must retain its current position');
+moving.panHandlers.onPanResponderRelease(null,{dy:20,vy:0});
+moving.onSheetLayout({nativeEvent:{layout:{height:620}}});
+moving.requestClose();
+assert.equal(interruptedDrag.animations.at(-1).config.toValue,620,'close travels only the measured sheet height');
+assert.match(read('src/components/EventDetailsModal.js'),/onLayout=\{onSheetLayout\}/);
+assert.match(read('src/components/EventDetailsModal.js'),/<NativeScrollView[\s\S]*?<\/NativeScrollView>/,'read-only event body uses a native scroll view without keyboard measurement work');
+console.log('PASS event sheet measured travel and interrupted-drag continuity.');
+
+const delayed=harness({deferStops:true});
+const delayedDrawer=delayed.render();
+delayedDrawer.translateY.setValue(35);
+delayedDrawer.panHandlers.onPanResponderGrant();
+delayedDrawer.panHandlers.onPanResponderMove(null,{dy:20});
+delayed.stops.shift()();
+assert.equal(delayedDrawer.translateY.value,55,'moves received before native stop acknowledgement are preserved');
+delayedDrawer.panHandlers.onPanResponderRelease(null,{dy:20,vy:0});
+delayedDrawer.panHandlers.onPanResponderGrant();
+delayedDrawer.panHandlers.onPanResponderRelease(null,{dy:10,vy:0});
+delayedDrawer.translateY.setValue(12);
+delayed.stops.shift()();
+assert.equal(delayedDrawer.translateY.value,12,'a late native acknowledgement cannot jump a released sheet');
+console.log('PASS delayed native stop acknowledgements and late-callback isolation.');

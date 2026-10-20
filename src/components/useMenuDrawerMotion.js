@@ -12,6 +12,7 @@ export default function useMenuDrawerMotion({ visible, onClose, openingFraction 
   const closingRef = useRef(false);
   const afterCloseRef = useRef(null);
   const generation = useRef(0);
+  const drag = useRef({ active:false, generation:0, origin:null, distance:0 });
   closeRef.current = onClose;
 
   useEffect(() => {
@@ -19,6 +20,7 @@ export default function useMenuDrawerMotion({ visible, onClose, openingFraction 
     translateY.stopAnimation();
     closingRef.current = false;
     afterCloseRef.current = null;
+    drag.current.active = false;
     if (visible) {
       translateY.setValue(sheetHeight.current || screenHeight * openingFraction);
       Animated.spring(translateY, {
@@ -41,11 +43,12 @@ export default function useMenuDrawerMotion({ visible, onClose, openingFraction 
   const requestClose = useCallback(afterClose => {
     if (closingRef.current) return;
     closingRef.current = true;
+    drag.current.active = false;
     afterCloseRef.current = typeof afterClose === 'function' ? afterClose : null;
     const current = generation.current;
     translateY.stopAnimation();
     Animated.timing(translateY, {
-      toValue: Math.max(700, screenHeight), duration: 245,
+      toValue: sheetHeight.current || screenHeight, duration: 245,
       easing: Easing.out(Easing.cubic), useNativeDriver: true,
     }).start(({ finished }) => {
       if (!finished || generation.current !== current) return;
@@ -75,10 +78,21 @@ export default function useMenuDrawerMotion({ visible, onClose, openingFraction 
     // event. No capture at touch-down: close buttons and other taps still work.
     onMoveShouldSetPanResponderCapture: shouldCaptureDrag,
     onMoveShouldSetPanResponder: shouldCaptureDrag,
-    onPanResponderGrant: () => translateY.stopAnimation(),
-    onPanResponderMove: (_, gesture) => { if (!closingRef.current) translateY.setValue(Math.max(0, gesture.dy)); },
-    onPanResponderRelease: (_, gesture) => releaseDrag(gesture),
-    onPanResponderTerminate: restoreSheet,
+    onPanResponderGrant: () => {
+      const token=++drag.current.generation;
+      drag.current.active=true; drag.current.origin=null; drag.current.distance=0;
+      translateY.stopAnimation(value=>{
+        if (!drag.current.active || token!==drag.current.generation || closingRef.current) return;
+        drag.current.origin=value;
+        translateY.setValue(Math.max(0,value+drag.current.distance));
+      });
+    },
+    onPanResponderMove: (_, gesture) => {
+      drag.current.distance=gesture.dy;
+      if (!closingRef.current && drag.current.active && drag.current.origin!==null) translateY.setValue(Math.max(0,drag.current.origin+gesture.dy));
+    },
+    onPanResponderRelease: (_, gesture) => { drag.current.active=false; releaseDrag(gesture); },
+    onPanResponderTerminate: () => { drag.current.active=false; restoreSheet(); },
     onPanResponderTerminationRequest: () => false,
   }), [releaseDrag, restoreSheet, shouldCaptureDrag, translateY]);
 

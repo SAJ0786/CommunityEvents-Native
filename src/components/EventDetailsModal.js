@@ -11,6 +11,7 @@ import {
   Platform,
   Pressable,
   Share,
+  ScrollView as NativeScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -170,7 +171,7 @@ export default function EventDetailsModal({
   onApproveRegistration,
   onCancelRegistration,
 }) {
-  const { translateY, requestClose: animateClose, panHandlers } = useMenuDrawerMotion({ visible, onClose });
+  const { translateY, requestClose: animateClose, panHandlers, onSheetLayout } = useMenuDrawerMotion({ visible, onClose, openingFraction:0.78 });
   const [posterUri, setPosterUri] = useState('');
   const [posterOpen, setPosterOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -405,10 +406,10 @@ export default function EventDetailsModal({
   };
 
   return (
-    <Modal transparent visible={visible} animationType="none" onRequestClose={animateClose} statusBarTranslucent>
+    <Modal transparent visible={visible} animationType="none" hardwareAccelerated onRequestClose={animateClose} statusBarTranslucent>
         <SafeAreaView accessibilityViewIsModal={true} style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={animateClose} />
-          <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+          <Animated.View onLayout={onSheetLayout} style={[styles.sheet, { transform: [{ translateY }] }]}>
             <DrawerDragZone panHandlers={panHandlers} style={styles.sheetHeader}>
               <View style={styles.dragHandle} />
               <View style={styles.headerRow}>
@@ -422,7 +423,7 @@ export default function EventDetailsModal({
               </View>
             </DrawerDragZone>
 
-            <ScrollView
+            <NativeScrollView
               bounces={false}
               contentContainerStyle={styles.content}
               directionalLockEnabled
@@ -506,7 +507,7 @@ export default function EventDetailsModal({
               <Text style={styles.privacyNote}>
                 {isGuest ? 'Public view shows suburb-level location only. ' : ''}Verify event details with the host.
               </Text>
-            </ScrollView>
+            </NativeScrollView>
           </Animated.View>
 
           {shareOpen ? <View style={styles.inlineOverlayLayer}>
