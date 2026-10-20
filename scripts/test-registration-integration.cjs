@@ -126,7 +126,7 @@ test('unified native discovery and operations replace the separate registration 
   assert.match(source('src/registration/RegistrationEditor.js'), /registrationPosterControl=\{<EventPosterPicker/);
 });
 
-function detailsFixture(detail, isGuest = false) {
+function detailsFixture(detail, isGuest = false, options = {}) {
   const state = [], effectDeps = [], cleanups = [], effects = [], listeners = [], calls = [], alerts = [];
   let stateIndex = 0, effectIndex = 0;
   const react = {
@@ -150,6 +150,7 @@ function detailsFixture(detail, isGuest = false) {
     approve: async (...args) => { calls.push(['approve', ...args]); },
     cancel: async (...args) => { calls.push(['cancel', ...args]); },
   };
+  if(options.lightweight) api.card=async id=>{calls.push(['card',id]);const {form,pendingChanges,...card}=detail;return card;};
   const mocks = {
     react,
     'react-native': { ActivityIndicator: 'ActivityIndicator', Image: 'Image', Modal: 'Modal', Pressable: 'Pressable', Text: 'Text', View: 'View',
@@ -173,7 +174,7 @@ function detailsFixture(detail, isGuest = false) {
     if (!(name in mocks)) throw new Error(`Unexpected component dependency ${name}`);
     return mocks[name];
   } });
-  const props = { event: { id: 'event' }, user: { uid: isGuest ? 'guest' : 'member' }, profile: { role: detail.canApprove ? 'superAdmin' : 'user' }, isGuest,
+  const props = { event: { id: 'event',...(options.poster ? {registrationPoster:options.poster} : {}) }, user: { uid: isGuest ? 'guest' : 'member' }, profile: { role: detail.canApprove ? 'superAdmin' : 'user' }, isGuest,
     onClose: () => calls.push(['close']), onRequireSignIn: () => calls.push(['sign-in']),
     onOperation: (event, action) => calls.push(['operation', event.id, action]),
     onEdit: event => calls.push(['edit', event.id]), onDelete: event => calls.push(['delete', event.id]),
@@ -294,7 +295,7 @@ test('My Events preserves attendee history without exposing host edit/delete con
   const hosted = JSON.stringify(hostedTree);
   assert.doesNotMatch(hosted, /Edit Registration form|Registration responses|"children":\["Edit"\]/);
   const findCard=node=>node?.type==='EventCard'?node:(node?.props?.children||[]).flatMap(child=>Array.isArray(child)?child:[child]).map(findCard).find(Boolean);
-  findCard(hostedTree).props.onPress();
+  findCard(hostedTree).props.onPress(findCard(hostedTree).props.event);
   assert.equal(opened.id,'event','Organiser shortcut opens the card; actions stay inside it');
   const events = [{id:'active',registrationOnly:true,isRegistered:true,status:'approved'}, {id:'deleted',registrationOnly:true,isRegistered:true,status:'cancelled',deleted:true}];
   const activeList = exports.default({events,userUid:'viewer'});
@@ -984,4 +985,16 @@ test('registration feed publishes first-page cards before the next page finishes
   assert.equal(published[0][0].id, 'first');
   release({ events:[{id:'second',status:'approved'}], nextCursor:null });
   assert.equal((await pending).length, 2);
+});
+
+
+test('normal registration opening uses lightweight card data and reuses only a currently authorised matching poster',async()=>{
+ const detail={event:{id:'event',revision:3,status:'approved',title:'Fast card'},form:{fields:[{id:'private'}]},canManage:true,privateDetails:{address:'Private venue',hasPoster:true}};
+ for(const [uid,revision,expected] of [['member',3,0],['other',3,1],['member',2,1]]){
+  const f=detailsFixture(detail,false,{lightweight:true,poster:{uid,revision,uri:'data:image/png;base64,LIST_POSTER'}});
+  f.render();await new Promise(setImmediate);const tree=f.render();
+  assert.equal(f.calls.filter(c=>c[0]==='card').length,1);assert.equal(f.calls.filter(c=>c[0]==='load').length,0);assert.equal(tree.props.registrationDetail.form,undefined);
+  assert.equal(f.calls.filter(c=>c[0]==='poster').length,expected);
+  if(expected===0)assert.equal(tree.props.event.imageUrl,'data:image/png;base64,LIST_POSTER');
+ }
 });

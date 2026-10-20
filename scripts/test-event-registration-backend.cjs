@@ -7,7 +7,7 @@ const { createNotificationTransport } = require('../backend/functions-registrati
 const { createAccountCleanup } = require('../backend/functions-registration/accountCleanup');
 class HttpsError extends Error { constructor(code, message) { super(message); this.code = code; } }
 function fixture() {
-  const records = new Map(); let sequence = 0; let queue = Promise.resolve();
+  const records = new Map(); const reads=[]; let sequence = 0; let queue = Promise.resolve();
   const files = new Map(); let onDownload; let onDelete; let onSave;
   let clock = Date.parse('2026-11-01T00:00:00Z');
   const bucket = { file: path => ({
@@ -28,7 +28,7 @@ function fixture() {
     // Serial execution models transaction retries: each concurrent request sees committed capacity.
     const promise = queue.then(async () => {
       const writes = []; let writing = false;
-      const result = await fn({ get: async ref => { assert.equal(writing, false, 'all reads must precede writes'); return ref.path ? snap(ref) : ref.get(); },
+      const result = await fn({ get: async ref => { reads.push(ref.path); assert.equal(writing, false, 'all reads must precede writes'); return ref.path ? snap(ref) : ref.get(); },
         set: (ref, data, options) => { writing = true; writes.push(() => records.set(ref.path, options?.merge ? { ...records.get(ref.path), ...structuredClone(data) } : structuredClone(data))); },
         update: (ref, data) => { writing = true; writes.push(() => records.set(ref.path, { ...records.get(ref.path), ...structuredClone(data) })); },
         delete: ref => { writing = true; writes.push(() => records.delete(ref.path)); },
@@ -45,7 +45,7 @@ function fixture() {
   const create = () => handlers.saveRegistrationEvent(request('host', { city: 'sydney', createKey: 'create-one', draft }));
   const approve = event => handlers.approveRegistrationEvent(request('super', { eventId: event.eventId, expectedRevision: event.revision }));
   const submit = (event, uid = 'member', overrides = {}) => handlers.submitEventRegistration(request(uid, { eventId: event.eventId, formVersion: 1, expectedRevision: 0, requestId: 'request-1', places: 2, answers: { name: 'Synthetic', consent: true }, ...overrides }));
-  return { records, files, now: () => new Date(clock), onDownload: callback => { onDownload = callback; }, onDelete: callback => { onDelete = callback; }, onSave: callback => { onSave = callback; }, advance: ms => { clock += ms; }, sweep, handlers, request, draft, create, approve, submit, db };
+  return { records, reads, files, now: () => new Date(clock), onDownload: callback => { onDownload = callback; }, onDelete: callback => { onDelete = callback; }, onSave: callback => { onSave = callback; }, advance: ms => { clock += ms; }, sweep, handlers, request, draft, create, approve, submit, db };
 }
 
 function seriesRequest(f, changes = {}) {
@@ -1063,4 +1063,22 @@ test('submitter name comes from the authenticated creator and older events resol
  const stored=f.records.get('registrationEvents/'+event.eventId);delete stored.submittedByName;
  const listed=await f.handlers.listRegistrationEvents(f.request(null,{scope:'public',city:'sydney'}));assert.equal(listed.events[0].submittedByName,'Actual Creator');assert.equal(JSON.stringify(listed).includes('test@example.com'),false);
  const detail=await f.handlers.getRegistrationEvent(f.request('member',{eventId:event.eventId}));assert.equal(detail.event.submittedByName,'Actual Creator');
+});
+
+
+test('lightweight cards skip forms and staged drafts, omit answers and preserve current privacy checks',async()=>{
+ const f=fixture(),created=await f.create();await f.approve(created);await f.submit(created);
+ await f.handlers.saveRegistrationEvent(f.request('host',{eventId:created.eventId,expectedRevision:1,city:'sydney',draft:{...f.draft,title:'Staged title'}}));
+ f.reads.length=0;
+ const host=await f.handlers.getRegistrationEvent(f.request('host',{eventId:created.eventId,cardOnly:true,includeOccurrences:true,includeSeriesReview:true}));
+ assert.equal(host.canManage,true);assert.equal(host.event.hasPendingChanges,true);assert.ok(host.privateDetails);
+ assert.ok(!f.reads.some(path=>/registrationForms|registrationPendingChanges/.test(path)),'card opening does not read form or staged drafts');
+ assert.equal(host.form,undefined);assert.equal(host.pendingChanges,undefined);assert.equal(host.occurrences,undefined);
+ const attendee=await f.handlers.getRegistrationEvent(f.request('member',{eventId:created.eventId,cardOnly:true}));
+ assert.equal(attendee.ownRegistration.places,2);assert.equal(attendee.ownRegistration.answers,undefined);assert.equal(attendee.ownRegistration.fields,undefined);assert.ok(attendee.privateDetails);
+ const stranger=await f.handlers.getRegistrationEvent(f.request('other',{eventId:created.eventId,cardOnly:true}));assert.equal(stranger.privateDetails,undefined);assert.equal(stranger.ownRegistration,null);
+ const full=await f.handlers.getRegistrationEvent(f.request('member',{eventId:created.eventId}));assert.ok(full.form);assert.equal(full.ownRegistration.answers.name,'Synthetic');
+ const event=f.records.get(`registrationEvents/${created.eventId}`);event.status='cancelled';event.deletedAt='now';
+ const history=await f.handlers.getRegistrationEvent(f.request('member',{eventId:created.eventId,cardOnly:true}));assert.equal(history.event.deleted,true);assert.equal(history.privateDetails,undefined);assert.equal(history.canRegister,false);assert.equal(history.canEditRegistration,false);
+ await assert.rejects(f.handlers.getRegistrationEvent(f.request('other',{eventId:created.eventId,cardOnly:true})),{code:'not-found'});
 });

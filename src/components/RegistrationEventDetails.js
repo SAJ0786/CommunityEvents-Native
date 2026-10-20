@@ -34,7 +34,7 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
     if (!event || !foreground) return undefined;
     const api = firebaseRegistration({ enabled: REGISTRATION_ENABLED });
     (async () => {
-      let result = await api.load(event.id);
+      let result = await (reviewing ? api.load(event.id) : (api.card || api.load)(event.id));
       // Draw text/actions as soon as authorised details arrive, before image transfer.
       if (active) setDetail({ ...result, reviewLoaded: false, card: {
         ...registrationEventCard(result.event),
@@ -57,8 +57,9 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
       }
       if (!reviewing && result.privateDetails?.hasPoster) {
         try {
-          const image = await api.poster(event.id);
-          poster = `data:${image.mime};base64,${image.base64}`;
+          const offered=event.registrationPoster;
+          if (refresh === 0 && offered?.uid === user?.uid && offered.revision === result.event.revision) poster=offered.uri;
+          else { const image = await api.poster(event.id); poster = `data:${image.mime};base64,${image.base64}`; }
         } catch (err) {
           result = await api.load(event.id);
           if (active) setPosterError(err.message || 'Private poster unavailable. Reopen the event to retry.');
@@ -151,6 +152,7 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
     registrationNotice={detail.reviewFeedback ? `Review: ${detail.reviewFeedback.decision === 'rejected' ? 'Rejected' : 'Changes requested'} — ${detail.reviewFeedback.message}. Edit and save to resubmit.` : detail.canManage && detail.event.hasPendingChanges ? <Text style={styles.text}>Submitted changes await approval. The published event and form remain live and unchanged. <Text accessibilityRole="button" onPress={() => setReviewing(true)}>Review submitted changes</Text>{posterError ? `\n${posterError}` : ''}</Text> : posterError}
     canManageStream={!isGuest && detail.canManage && detail.event.status === 'approved' && Boolean(onManageStream)}
     onManageStream={detail.canManage && detail.event.status === 'approved' ? onManageStream : undefined}
+    onViewRegistrationHistory={() => operation('history')}
     onRegister={() => operation('entry')}
     onEditRegistrationForm={detail.canManage && detail.event.status !== 'cancelled' ? () => operation('form') : undefined}
     onRegistrationResponses={detail.canManage ? () => operation('responses') : undefined}

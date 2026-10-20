@@ -487,10 +487,30 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     return db.runTransaction(async tx => {
       const [caller, event] = await Promise.all([request.auth && request.auth.token?.firebase?.sign_in_provider !== 'anonymous' ? actor(request, tx) : Promise.resolve(null), readEvent(request.data?.eventId, tx)]);
       const manager = caller && manages(caller, event);
-      const [ownSnap, form, details] = await Promise.all([caller ? tx.get(bookingRef(event.id, caller.uid)) : Promise.resolve(null), tx.get(formRef(event.id)), tx.get(privateRef(event.id))]);
+      const cardOnly = request.data?.cardOnly === true;
+      const [ownSnap, form, details] = await Promise.all([caller ? tx.get(bookingRef(event.id, caller.uid)) : Promise.resolve(null), cardOnly ? Promise.resolve(null) : tx.get(formRef(event.id)), tx.get(privateRef(event.id))]);
       const own = ownSnap?.exists ? ownSnap.data() : null;
       const registered = own?.status === 'registered';
       if (event.status !== 'approved' && !manager && !registered) fail('not-found', 'Event not available.');
+      if (cardOnly) {
+        const time = localMinute(now(), event.timeZone);
+        const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }),
+          ...(await scheduleModel).registrationSchedule(event), ...liveProjection(event), id:event.id, ownerUid:event.ownerUid,
+          status:event.status, city:event.city, timeZone:event.timeZone, revision:event.revision, formVersion:event.formVersion,
+          deleted:Boolean(event.deletedAt), submittedByName:await submitterName(tx,event),
+          ...(manager ? {registrationCount:event.registrationCount,hasPendingChanges:Boolean(event.hasPendingChanges)} : {}) },
+          canManage:Boolean(manager), canApprove:Boolean(caller && !event.deletedAt && !event.reviewDecision && (event.status === 'pending' || event.hasPendingChanges) && approves(caller,event)),
+          canRegister:event.status === 'approved' && time < (event.closes || `${event.date}T00:00`),
+          canEditRegistration:Boolean(registered && event.status === 'approved' && time.slice(0,10) < event.date),
+          canCancel:Boolean(registered && (event.status === 'cancelled' || (event.allowCancellation && time.slice(0,10) < event.date))),
+          ownRegistration:own ? {status:own.status,revision:own.revision,places:own.places,formVersion:own.formVersion} : null };
+        if (manager && event.reviewDecision) result.reviewFeedback = {decision:event.reviewDecision,message:event.reviewFeedback};
+        if (manager || (registered && event.status !== 'cancelled')) {
+          const data=details.data();
+          result.privateDetails={address:data?.address || '',venue:(await venueModel).normalisePrivateVenue(data?.venue),hasPoster:Boolean(data?.posterPath),hostPhone:data?.hostPhone || '',hostContactOptional:data?.hostContactOptional || ''};
+        }
+        return result;
+      }
       const pending = manager && event.hasPendingChanges && event.status === 'approved' && !event.deletedAt ? (await tx.get(pendingRef(event.id))).data() : null;
       if (manager && event.hasPendingChanges && event.status === 'approved' && !event.deletedAt && !pending) fail('failed-precondition', 'The submitted changes are unavailable. Contact an administrator before editing.');
       const schedule = (await scheduleModel).registrationSchedule({ ...event, timeZone: event.timeZone });

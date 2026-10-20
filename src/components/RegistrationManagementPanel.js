@@ -39,7 +39,7 @@ export default function RegistrationManagementPanel({ user, profile, review = fa
     {error ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{error}</Text> : null}
     <Pressable onPress={() => setRefresh(value => value + 1)}><Text style={{ color: colors.tealDark }}>Refresh registration events</Text></Pressable>
     {!busy && !error && events.length === 0 && <Text>{review ? 'No events pending approval.' : 'No registration events in this city.'}</Text>}
-    {events.map(event => <EventCard key={event.id} event={event} onPress={() => setSelected(event)} />)}
+    {events.map(event => <EventCard key={event.id} event={event} onPress={setSelected} />)}
     <RegistrationEventDetails event={selected} user={user} profile={profile} isGuest={false} onChanged={() => setRefresh(value => value + 1)} onClose={close}
       onManageStream={event => { setSelected(null); setStreamEvent(event); }}
       onOperation={onOperation} onEdit={event => onOperation(event, 'editor')}

@@ -1529,7 +1529,7 @@ function MainApp() {
               event={item}
               isSaved={savedEventIds.includes(item.id)}
               saving={savingEventId === item.id}
-              onPress={() => setSelectedEvent(item)}
+              onPress={setSelectedEvent}
               onToggleSaved={isGuest ? undefined : () => handleToggleSaved(item)}
             />
           )}

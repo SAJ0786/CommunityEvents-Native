@@ -77,7 +77,7 @@ export default function MyEventsScreen({
         </Pressable>
       </View>}
       <View style={event.hidden ? styles.hiddenCard : undefined}>
-        <EventCard event={event} registrationActionLabel={event.registrationOnly && event.isRegistered ? registrationUnavailable(event) ? 'Registration history' : 'View my registration' : undefined} onPress={() => onPressEvent?.(event)} />
+        <EventCard event={event} registrationActionLabel={event.registrationOnly && event.isRegistered ? registrationUnavailable(event) ? 'Registration history' : 'View my registration' : undefined} onPress={onPressEvent} />
       </View>
       {!event.registrationOnly && <View style={styles.metaRow}>
         <View style={styles.actionRow}>

@@ -176,7 +176,7 @@ export default function CalendarScreen({
       event={event}
       isSaved={savedIds.includes(event.id)}
       saving={savingEventId === event.id}
-      onPress={() => onOpenEvent(event)}
+      onPress={onOpenEvent}
       onToggleSaved={isGuest ? undefined : () => onToggleSaved(event)}
     />
   );

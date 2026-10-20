@@ -93,7 +93,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`View details for ${title}`}
-      onPress={onPress}
+      onPress={() => onPress?.(event.registrationOnly && visiblePoster ? {...event,registrationPoster:{uid:viewerUid,revision:event.revision,uri:visiblePoster}} : event)}
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
       <Pressable

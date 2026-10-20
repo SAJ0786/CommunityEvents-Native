@@ -58,7 +58,7 @@ export default function FavouritesScreen({
           <EventCard
             event={event}
             isSaved
-            onPress={() => onPressEvent?.(event)}
+            onPress={onPressEvent}
             onToggleSaved={() => onToggleSaved?.(event)}
             saving={savingEventId === event.id}
           />
