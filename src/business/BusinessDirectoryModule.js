@@ -316,7 +316,7 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
               </View>
               <View style={styles.rowCopy}>
                 <View style={styles.rowTitleLine}>
-                  <Text numberOfLines={1} style={styles.rowTitle}>{business.name}</Text>
+                  <Text style={styles.rowTitle}>{business.name}</Text>
                   {business.tier === 'featured' ? <Text style={styles.featuredStar}>{'\u2605'}</Text> : null}
                 </View>
                 <Text numberOfLines={1} style={styles.rowMeta}>{(business.categories || [business.category]).filter(Boolean).join(', ')} · {business.suburb}</Text>
@@ -940,8 +940,8 @@ const styles = StyleSheet.create({
   rowCategoryIcon: { fontSize: 27 },
   rowLogoText: { color: colors.onPrimary, fontSize: 18, fontWeight: '700' },
   rowCopy: { flex: 1, minWidth: 0 },
-  rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  rowTitle: { flexShrink: 1, color: colors.navy, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
+  rowTitleLine: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
+  rowTitle: { flex: 1, minWidth: 0, color: colors.navy, fontSize: typography.cardTitle.fontSize, fontWeight: '700' },
   featuredStar: { color: colors.warningText, fontSize: typography.body.fontSize },
   rowMeta: { marginTop: 3, color: colors.muted, fontSize: 10.5, fontWeight: '500' },
   rowStatusLine: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
