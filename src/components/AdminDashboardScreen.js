@@ -2459,7 +2459,7 @@ export default function AdminDashboardScreen({
         </View>
       ) : panel === 'events' ? (
         <View style={styles.section}>
-          {eventCollection === 'events' && <AdminPageHeader title="Events" subtitle="Admin event management" icon="calendar-outline" onBack={() => setPanel('overview')} />}
+          <AdminPageHeader title="Events" subtitle="Admin event management" icon="calendar-outline" onBack={() => setPanel('overview')} />
           <SegmentedControl label="Event management" value={eventCollection} onChange={setEventCollection} options={[
             { value: 'events', label: 'Events', icon: 'calendar-outline' },
             { value: 'registration', label: 'Registration only events', icon: 'clipboard-text-outline' },
