@@ -50,6 +50,7 @@ import {
   saveMonthOverride,
 } from '../services/settings';
 import { uploadCommunityMessageImage } from '../services/images';
+import { getAzaanRecordingSettings, MAX_AUDIO_BYTES, uploadAzaanRecording } from '../services/azaanRecording';
 import {
   DEFAULT_HIJRI_OBSERVANCES,
   getHijriObservances,
@@ -437,6 +438,7 @@ export default function AdminDashboardScreen({
   onCopyEvent,
   onEditSeries,
   onOpenRegistration,
+  onPlayAzaan,
 }) {
   const adminScrollRef = useRef(null);
   const [panel, setPanel] = useState('overview');
@@ -463,6 +465,10 @@ export default function AdminDashboardScreen({
   const [youtubeBusy, setYouTubeBusy] = useState(false);
   const [thumbnailBusy, setThumbnailBusy] = useState(false);
   const [thumbnailResult, setThumbnailResult] = useState('');
+  const [azaanRecording, setAzaanRecording] = useState(null);
+  const [azaanRecordingLoading, setAzaanRecordingLoading] = useState(false);
+  const [azaanRecordingBusy, setAzaanRecordingBusy] = useState(false);
+  const [azaanRecordingResult, setAzaanRecordingResult] = useState('');
   const [editingHijriObsId, setEditingHijriObsId] = useState(null);
   const [hijriObsSelection, setHijriObsSelection] = useState('');
   const [hijriObsForm, setHijriObsForm] = useState(blankHijriObservanceForm);
@@ -1053,6 +1059,62 @@ export default function AdminDashboardScreen({
     });
     return () => subscription.remove();
   }, [panel]);
+
+  useEffect(() => {
+    if (panel !== 'tools' || profile?.role !== 'superAdmin') return;
+    let active = true;
+    setAzaanRecordingLoading(true);
+    getAzaanRecordingSettings()
+      .then(value => { if (active) setAzaanRecording(value); })
+      .catch(() => { if (active) setAzaanRecording(null); })
+      .finally(() => { if (active) setAzaanRecordingLoading(false); });
+    return () => { active = false; };
+  }, [panel, profile?.role]);
+
+  const chooseAzaanRecording = async () => {
+    if (profile?.role !== 'superAdmin' || azaanRecordingBusy) return;
+    setAzaanRecordingResult('');
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({
+        type: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/x-m4a'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (picked.canceled) return;
+      const asset = picked.assets?.[0];
+      if (!asset?.uri) throw new Error('No audio file was selected.');
+      if (Number(asset.size || 0) > MAX_AUDIO_BYTES) throw new Error('The Azan recording must be smaller than 20 MB.');
+
+      Alert.alert(
+        azaanRecording ? 'Replace current Azan?' : 'Activate this Azan?',
+        `${asset.name || 'Selected audio'} will be used when users tap an Azan notification or press Play Azan. The bundled notification sound will not change.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: azaanRecording ? 'Replace' : 'Activate', onPress: async () => {
+            setAzaanRecordingBusy(true);
+            try {
+              const next = await uploadAzaanRecording({
+                uri: asset.uri,
+                fileName: asset.name,
+                mimeType: asset.mimeType || 'audio/mpeg',
+                size: asset.size,
+                userId: user?.uid,
+                userName: profile?.fullName || user?.displayName || user?.email,
+              });
+              setAzaanRecording(next);
+              setAzaanRecordingResult('Uploaded Azan is now active for manual and notification-tap playback.');
+            } catch (error) {
+              setAzaanRecordingResult(error?.message || 'Could not upload the Azan recording.');
+            } finally {
+              setAzaanRecordingBusy(false);
+            }
+          } },
+        ],
+      );
+    } catch (error) {
+      setAzaanRecordingResult(error?.message || 'Could not select the Azan recording.');
+    }
+  };
 
   const selectedRepairEvent = useMemo(
     () => repairEvents.find(event => event.id === repairSelectedId) || null,
@@ -3221,6 +3283,41 @@ export default function AdminDashboardScreen({
                 </Text>
               </View>
             ) : null}
+          </View> : null}
+
+          {panel === 'tools' ? <View style={styles.actionCard}>
+            <View style={styles.cardTop}>
+              <View style={styles.listTextWrap}>
+                <Text style={styles.cardTitle}>Azan playback recording</Text>
+                <Text style={styles.cardDescription}>The bundled clip remains the automatic notification sound. This uploaded recording plays only when a user taps the notification or presses Play Azan.</Text>
+              </View>
+              <View style={[styles.dashboardActionIcon, { backgroundColor: colors.tealSoft }]}>
+                <MaterialCommunityIcons name="volume-high" color={colors.tealDark} size={21} />
+              </View>
+            </View>
+
+            {profile?.role !== 'superAdmin' ? (
+              <Text style={styles.listMeta}>Only Super Admins can replace the national Azan recording.</Text>
+            ) : azaanRecordingLoading ? (
+              <View style={styles.rowWrap}><ActivityIndicator color={colors.tealDark} /><Text style={styles.listMeta}>Loading current recording...</Text></View>
+            ) : (
+              <>
+                <View style={styles.noticeBox}>
+                  <Text style={styles.noticeText}>{azaanRecording?.fileName || 'Bundled Azan currently used as fallback'}</Text>
+                  {azaanRecording?.updatedAtClient ? <Text style={styles.listSubtle}>Updated {new Date(azaanRecording.updatedAtClient).toLocaleString('en-AU')}{azaanRecording.updatedByName ? ` by ${azaanRecording.updatedByName}` : ''}</Text> : null}
+                </View>
+                <View style={styles.rowWrap}>
+                  <Pressable accessibilityRole="button" onPress={chooseAzaanRecording} disabled={azaanRecordingBusy} style={[styles.primaryButton, styles.rowButton, azaanRecordingBusy && styles.disabledButton]}>
+                    <Text style={styles.primaryButtonText}>{azaanRecordingBusy ? 'Uploading...' : azaanRecording ? 'Replace Azan recording' : 'Upload Azan recording'}</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" onPress={onPlayAzaan} disabled={azaanRecordingBusy} style={[styles.secondaryButton, styles.rowButton, azaanRecordingBusy && styles.disabledButton]}>
+                    <Text style={styles.secondaryButtonText}>Preview active Azan</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+            <Text style={styles.helper}>MP3, WAV or M4A; maximum 20 MB. Previously downloaded audio remains available offline, and the app falls back to the bundled clip if the current upload cannot be loaded.</Text>
+            {azaanRecordingResult ? <Text style={styles.listMeta}>{azaanRecordingResult}</Text> : null}
           </View> : null}
 
           {panel === 'tools' ? <View style={styles.actionCard}>

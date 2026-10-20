@@ -36,5 +36,19 @@ service firebase.storage {
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
     }
+
+    // The automatic notification sound remains bundled in each app build.
+    // Super Admins may replace only the longer recording used after a user
+    // deliberately taps an Azaan alert or presses Play Azan in the app.
+    match /azaan-recordings/{userId}/{fileName} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.auth.token.firebase.sign_in_provider != 'anonymous'
+                   && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'superAdmin'
+                   && request.resource.size < 20 * 1024 * 1024
+                   && request.resource.contentType.matches('audio/.*');
+      allow delete: if false;
+    }
   }
 }

@@ -228,6 +228,13 @@ async function main() {
   assert.doesNotMatch(read('src/components/AzaanPlaybackController.js'), /position: 'absolute'/);
   assert.match(read('src/components/AzaanPlaybackController.js'), /playsInSilentMode: true/);
   assert.match(read('src/components/HijriCalendarScreen.js'), /accessibilityLabel="Play Azaan"/);
+  assert.match(read('src/components/AzaanPlaybackController.js'), /getActiveAzaanRecording/);
+  assert.match(read('src/services/azaanRecording.js'), /azaan-recordings\/\$\{userId\}/);
+  assert.match(read('src/services/azaanRecording.js'), /bundled-fallback/);
+  assert.match(read('src/components/AdminDashboardScreen.js'), /Replace Azan recording/);
+  assert.match(read('backend/storage.rules'), /match \/azaan-recordings\/\{userId\}\/\{fileName\}/);
+  assert.match(read('backend/storage.rules'), /data\.role == 'superAdmin'/);
+  assert.match(read('backend/firestore.rules'), /'azaanRecording'/);
   console.log('PASS messaging: atomic host/business replies, owner routing, validation, surfaced errors, first/repeated feedback; notification clearing; drawer/keyboard contracts; iOS PCM sound');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -4,8 +4,7 @@ import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as Notifications from 'expo-notifications';
 import { colors, radius, shadow, spacing, typography } from '../theme';
 import { recordNonFatalError } from '../services/diagnostics';
-
-const azaanRecording = require('../../assets/sounds/azan_mashad.mp3');
+import { getActiveAzaanRecording } from '../services/azaanRecording';
 
 function isAzaanNotification(response) {
   return response?.notification?.request?.content?.data?.kind === 'azaan-alarm';
@@ -21,6 +20,7 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar, manualPla
   // login/home rendering or take the entire application to its error boundary.
   const playerRef = useRef(null);
   const statusSubscription = useRef(null);
+  const playerSourceKey = useRef('');
   const [status, setStatus] = useState({});
   const [visible, setVisible] = useState(false);
   const handledNotificationId = useRef('');
@@ -29,9 +29,13 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar, manualPla
     if (openCalendar) onOpenHijriCalendar?.();
     setVisible(true);
     try {
-      if (!playerRef.current) {
-        playerRef.current = createAudioPlayer(azaanRecording, { updateInterval: 250 });
+      const recording = await getActiveAzaanRecording();
+      if (!playerRef.current || playerSourceKey.current !== recording.key) {
+        try { statusSubscription.current?.remove(); } catch { /* already released */ }
+        try { playerRef.current?.remove(); } catch { /* replace stale recording */ }
+        playerRef.current = createAudioPlayer(recording.source, { updateInterval: 250 });
         statusSubscription.current = playerRef.current.addListener('playbackStatusUpdate', setStatus);
+        playerSourceKey.current = recording.key;
       }
       const player = playerRef.current;
       await setAudioModeAsync({
@@ -77,6 +81,7 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar, manualPla
     try { playerRef.current?.remove(); } catch { /* native teardown must not crash navigation */ }
     statusSubscription.current = null;
     playerRef.current = null;
+    playerSourceKey.current = '';
   }, []);
 
   useEffect(() => {

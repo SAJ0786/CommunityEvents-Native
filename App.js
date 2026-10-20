@@ -1591,6 +1591,7 @@ function MainApp() {
           onCopyEvent={handleCopyMyEvent}
           onEditSeries={handleEditSeries}
           onOpenRegistration={(event, action) => { setRegistrationTarget({ eventId: event.id, action, nonce: Date.now() }); setActiveTab('registration'); }}
+          onPlayAzaan={() => setAzaanManualPlayRequest(value => value + 1)}
         />
       ) : activeTab === 'streams' ? (
         <StreamedVideosScreen
