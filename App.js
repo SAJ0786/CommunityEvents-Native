@@ -261,6 +261,7 @@ function MainApp() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [streamEvent, setStreamEvent] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
+  const [hostInboxThreadId, setHostInboxThreadId] = useState('');
   const [registrationTarget, setRegistrationTarget] = useState(null);
   const [registrationOnly, setRegistrationOnly] = useState(false);
   const [registrationEvents, setRegistrationEvents] = useState([]);
@@ -1228,19 +1229,21 @@ function MainApp() {
   }, [appModule, businessListingOpen, editingEvent]);
 
   const handleHeaderNavigate = useCallback(nextTab => {
-    if (isGuest && ['notifications', 'business-notifications'].includes(nextTab)) {
+    const resolvedTab = nextTab === 'host-inbox' ? 'inbox' : nextTab;
+    if (resolvedTab === 'inbox') setHostInboxThreadId('');
+    if (isGuest && ['notifications', 'business-notifications'].includes(resolvedTab)) {
       requestSignIn();
       return;
     }
-    if (nextTab === 'login') {
+    if (resolvedTab === 'login') {
       requestSignIn();
       return;
     }
-    if (nextTab === 'share-app') {
+    if (resolvedTab === 'share-app') {
       Share.share(buildAppShareContent()).catch(() => {});
       return;
     }
-    if (nextTab === 'business-favourites') {
+    if (resolvedTab === 'business-favourites') {
       setSelectedBusinessId('');
       setAppModule('directory');
       setDirectoryFilter({ favouritesOnly: true, label: 'Favourite Businesses', nonce: Date.now() });
@@ -1256,16 +1259,16 @@ function MainApp() {
       'business-contact': 'contact',
       'business-notifications': 'notifications',
     };
-    if (businessRoutes[nextTab]) {
+    if (businessRoutes[resolvedTab]) {
       setSelectedBusinessId('');
       setAppModule('directory');
-      setDirectoryTab(businessRoutes[nextTab]);
+      setDirectoryTab(businessRoutes[resolvedTab]);
       return;
     }
     const navigate = () => {
       setAppModule('events');
       setSelectedBusinessId('');
-      requestTabChange(nextTab);
+      requestTabChange(resolvedTab);
     };
     if (appModule === 'directory' && businessListingOpen) {
       Alert.alert(
@@ -1281,24 +1284,32 @@ function MainApp() {
     navigate();
   }, [appModule, businessListingOpen, isGuest, requestSignIn, requestTabChange]);
 
+  const openHostInbox = useCallback(threadId => {
+    handleHeaderNavigate('inbox');
+    setHostInboxThreadId(String(threadId || ''));
+  }, [handleHeaderNavigate]);
+
   const pushNavigationRef = useRef(handleHeaderNavigate);
   pushNavigationRef.current = handleHeaderNavigate;
   useEffect(() => {
     if (!currentUser?.uid || currentUser.isAnonymous) return undefined;
-    return listenForBusinessPushOpens(currentUser.uid, (screen, eventId, action) => {
+    return listenForBusinessPushOpens(currentUser.uid, (screen, eventId, action, threadId) => {
       if (screen === 'registration' && REGISTRATION_ENABLED) {
         setRegistrationTarget(null); setSelectedEvent({ id: eventId, registrationOnly: true });
         setAppModule('events'); setActiveTab('home');
+      } else if (screen === 'inbox') {
+        openHostInbox(threadId);
       } else pushNavigationRef.current(screen);
     }, error => {
       recordNonFatalError(error, { feature: 'notifications', operation: 'open_business_push' });
     }, { registrationEnabled: REGISTRATION_ENABLED });
-  }, [currentUser?.uid, currentUser?.isAnonymous]);
+  }, [currentUser?.uid, currentUser?.isAnonymous, openHostInbox]);
 
   const openBellNotification = row => {
     if (row.recipientUid !== currentUser?.uid) return;
     if (row.module === 'registration' && REGISTRATION_ENABLED) { setRegistrationTarget(null); setSelectedEvent({ id: row.eventId, registrationOnly: true }); setAppModule('events'); setActiveTab('home'); }
-    else handleHeaderNavigate(row.module === 'events' ? row.threadId ? 'host-inbox' : row.type === 'event.favourite_reminder' ? 'favourites' : 'home' : row.threadId ? 'business-inbox' : 'business-notifications');
+    else if (row.module === 'events' && row.threadId) openHostInbox(row.threadId);
+    else handleHeaderNavigate(row.module === 'events' ? row.type === 'event.favourite_reminder' ? 'favourites' : 'home' : row.threadId ? 'business-inbox' : 'business-notifications');
   };
 
   const openEventsProfile = useCallback(() => {
@@ -1586,10 +1597,11 @@ function MainApp() {
         />
       ) : activeTab === 'inbox' ? (
         <InboxScreen
-          key={currentUser?.uid || 'guest'}
+          key={`${currentUser?.uid || 'guest'}-${hostInboxThreadId}`}
           user={currentUser}
           profile={profile}
-          onBack={() => setActiveTab('home')}
+          initialThreadId={hostInboxThreadId}
+          onBack={() => { setHostInboxThreadId(''); setActiveTab('home'); }}
         />
       ) : activeTab === 'notifications' ? (
         <BusinessNotificationsScreen onOpenNotification={openBellNotification}

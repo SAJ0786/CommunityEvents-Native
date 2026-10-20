@@ -169,6 +169,11 @@ async function testNativeRegistration() {
   opened({ data: { ...data, notificationId: 'other', recipientUid: 'different-user' } });
   assert.equal(routes.length, 1);
   stopOpen();
+  const eventRoutes = [];
+  const stopEventOpen = exports.listenForBusinessPushOpens(uid, (...args) => eventRoutes.push(args));
+  opened({ data: { module: 'events', recipientUid: uid, notificationId: 'host-message', threadId: 'host-thread' } });
+  assert.deepEqual(eventRoutes.map(row => row.slice(0, 4)), [['inbox', null, 'history', 'host-thread']]);
+  stopEventOpen();
   const registrationRoutes=[];
   const stopRegistration=exports.listenForBusinessPushOpens(uid,(...args)=>registrationRoutes.push(args),()=>{}, {registrationEnabled:true});
   opened({data:{module:'registration',recipientUid:uid,eventId:'event',notificationId:'cancelled-event',type:'registration.changed'}});

@@ -35,9 +35,9 @@ const formatDateTime = value => {
   });
 };
 
-export default function InboxScreen({ user, profile, onBack }) {
+export default function InboxScreen({ user, profile, initialThreadId = '', onBack }) {
   const [threads, setThreads] = useState([]);
-  const [selectedId, setSelectedId] = useState('');
+  const [selectedId, setSelectedId] = useState(initialThreadId);
   const [messages, setMessages] = useState([]);
   const [reply, setReply] = useState('');
   const [status, setStatus] = useState('');
@@ -56,6 +56,10 @@ export default function InboxScreen({ user, profile, onBack }) {
       setLoadError(error?.message || 'Could not load host messages.');
     });
   }, [user?.uid]);
+
+  useEffect(() => {
+    setSelectedId(String(initialThreadId || ''));
+  }, [initialThreadId]);
 
   const selected = useMemo(
     () => threads.find(thread => thread.id === selectedId) || null,

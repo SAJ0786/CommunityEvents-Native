@@ -114,7 +114,7 @@ export function listenForBusinessPushOpens(uid, onOpen, onError = () => {}, { re
     const key = data.notificationId;
     if (key && seen.has(key)) return;
     if (key) seen.add(key);
-    onOpen(registration ? 'registration' : data.module === 'events' ? data.threadId ? 'host-inbox' : 'notifications' : data.threadId ? 'business-inbox' : 'business-notifications', registration ? data.eventId : null, 'history');
+    onOpen(registration ? 'registration' : data.module === 'events' ? data.threadId ? 'inbox' : 'notifications' : data.threadId ? 'business-inbox' : 'business-notifications', registration ? data.eventId : null, 'history', data.threadId || '');
   };
   const messaging = getMessaging();
   const foreground = onMessage(messaging, async message => {
