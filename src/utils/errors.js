@@ -21,9 +21,18 @@ const FIREBASE_MESSAGES = {
   'unavailable': 'The service is temporarily unavailable. Check your connection and try again.',
 };
 
+const CALLABLE_TOKEN_TASK_ERROR = /(?:java\.util\.concurrent\.)?ExecutionException:.*underlying tasks? failed/i;
+
+export function isCallableTokenTaskError(error) {
+  return CALLABLE_TOKEN_TASK_ERROR.test(String(error?.message || error || ''));
+}
+
 export function friendlyError(error, fallback = 'Something went wrong. Please try again.') {
   if (error?.code && FIREBASE_MESSAGES[error.code]) return FIREBASE_MESSAGES[error.code];
   const message = String(error?.message || '').replace(/^Firebase:\s*/i, '').trim();
+  if (isCallableTokenTaskError(error)) {
+    return 'Your secure session could not be refreshed. Check your internet connection, then sign out and sign in again.';
+  }
   if (!message || /^FirebaseError/i.test(message)) return fallback;
   return message;
 }

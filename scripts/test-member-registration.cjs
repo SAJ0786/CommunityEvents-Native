@@ -48,6 +48,29 @@ async function main() {
   assert.equal(helper.memberJoinedMillis({ createdAt: 'invalid', registeredAt: { _seconds: 100 } }), 100000);
   assert.equal(helper.memberJoinedLabel({}), 'Date unavailable');
 
+  const errors = load('src/utils/errors.js');
+  const tokenTaskError = new Error('java.util.concurrent.ExecutionException: 1 out of 2 underlying tasks failed');
+  assert.equal(errors.isCallableTokenTaskError(tokenTaskError), true);
+  assert.equal(errors.isCallableTokenTaskError(new Error('permission denied')), false);
+  assert.match(errors.friendlyError(tokenTaskError), /secure session/i);
+  let callableAttempts = 0; let authRefreshes = 0; let appCheckRefreshes = 0; const diagnosticOperations = [];
+  const registrationTransport = load('src/registration/firebaseRegistration.js', {
+    '@react-native-firebase/functions': { httpsCallable: () => async () => {
+      callableAttempts++;
+      if (callableAttempts === 1) throw tokenTaskError;
+      return { data: { recovered: true } };
+    } },
+    '../firebase/firebase': { auth: { currentUser: { getIdToken: async force => { assert.equal(force, true); authRefreshes++; } } }, functions: {} },
+    '../firebase/appCheck': { requestFirebaseAppCheckToken: async force => { assert.equal(force, true); appCheckRefreshes++; } },
+    '../services/diagnostics': { recordNonFatalError: (_error, context) => diagnosticOperations.push(context.operation) },
+    '../utils/errors': errors,
+    './registrationClient': { createRegistrationClient: call => ({ recover: () => call('listRegistrationEvents', {}) }) },
+    'expo-constants': { __esModule: true, default: { expoConfig: { extra: { eventRegistrationEnabled: true } } } },
+  });
+  assert.deepEqual(await registrationTransport.firebaseRegistration({ enabled: true }).recover(), { data: { recovered: true } });
+  assert.equal(callableAttempts, 2); assert.equal(authRefreshes, 1); assert.equal(appCheckRefreshes, 1);
+  assert.ok(diagnosticOperations.includes('callable_token_tasks'));
+
   for (const bad of [{ ...details, fullName: '' }, { ...details, fullName: 'x' }, { ...details, email: 'bad' }, { ...details, email: 'x'.repeat(260) + '@a.co' }, { ...details, termsAccepted: false }, { ...details, legalVersion: 'outdated' }]) {
     const b = backend(); await assert.rejects(b.complete(request(bad))); assert.equal(b.writes.length, 0);
   }
@@ -99,6 +122,6 @@ async function main() {
   const rules = read('backend/firestore.rules');
   assert.match(rules, /'registeredAt', 'profileCompletedAt', 'legalAcceptedAt'/);
   assert.ok(read('src/config/legal.js').includes(LEGAL_VERSION));
-  console.log('PASS: member gate, validation/consent, UI interactions, server authorization, profile preservation, trusted phone/date, retry-safe trigger, newest-first sorting and shared date formats. No live calls.');
+  console.log('PASS: member gate, validation/consent, callable token error handling, UI interactions, server authorization, profile preservation, trusted phone/date, retry-safe trigger, newest-first sorting and shared date formats. No live calls.');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

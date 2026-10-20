@@ -19,6 +19,7 @@ import { cityLabel } from '../utils/cities';
 import { colors } from '../theme';
 import { responseName, responseAnswer } from '../registration/responsePresentation';
 import { exportRegistrationWorkbook } from '../services/registrationExport';
+import { friendlyError } from '../utils/errors';
 
 const newReference = () => `r-${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 export default function RegistrationScreen({ enabled = false, user, profile, city, initialCreate = false, initialEventId = null, initialAction = 'entry', onBack, onMyEvents, onRequireSignIn, transport }) {
@@ -43,7 +44,9 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
     if (!enabled || busyRef.current) return;
     const token = epoch.current; busyRef.current = true; setBusy(true); setNotice('');
     try { await work(() => token === epoch.current); }
-    catch (error) { if (token === epoch.current) setNotice(error?.message || 'Could not complete the request. Reload and try again.'); }
+    catch (error) {
+      if (token === epoch.current) setNotice(friendlyError(error, 'Could not complete the request. Reload and try again.'));
+    }
     finally { if (token === epoch.current) { busyRef.current = false; setBusy(false); } }
   }
   const requireMember = () => { if (member) return true; onRequireSignIn?.('Sign in to register for or organise an event.'); return false; };
@@ -65,7 +68,9 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       const eventTypes = [...new Set([...EVENT_TYPES, ...(options.eventTypes || [])])];
       setTypes(eventTypes); setDraft(eventDraftFromDetail(result, eventTypes)); setStage('editor');
       if (action === 'copy') { createKey.current = newReference(); currentId.current = null; setDetail(null); }
-      loadTemplates(valid).catch(error => { if (valid()) setNotice(error.message || 'Saved templates could not be loaded. Built-in templates are available.'); });
+      loadTemplates(valid).catch(error => {
+        if (valid()) setNotice(friendlyError(error, 'Saved templates could not be loaded. Built-in templates are available.'));
+      });
     } else if (action === 'responses') {
       const page = responseResult;
       if (valid()) { setResponses(page.registrations); setResponseCursor(page.nextCursor); setStage('responses'); }
@@ -87,7 +92,9 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       else setDetail(fresh);
       setTypes(eventTypes); setDraft(isNew ? { ...createDraft(), title: '', eventType: eventTypes[0], customEventType: '' } : eventDraftFromDetail(fresh, eventTypes));
       setStage('editor'); setPendingPoster(null);
-      loadTemplates(valid).catch(error => { if (valid()) setNotice(error.message || 'Saved templates could not be loaded. Built-in templates are available.'); });
+      loadTemplates(valid).catch(error => {
+        if (valid()) setNotice(friendlyError(error, 'Saved templates could not be loaded. Built-in templates are available.'));
+      });
     });
   };
   useEffect(() => {

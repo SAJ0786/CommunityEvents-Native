@@ -79,7 +79,7 @@ import { EVENT_TYPE_GROUPS } from './src/utils/eventOptions';
 import { canArrangeEventNiaz, matchesEventPeriod } from './src/utils/eventBrowseOptions';
 import { DEFAULT_CITY, cityLabel, getEventMetroArea, normalizeCity } from './src/utils/cities';
 import { colors, quickAccess, radius, shadow, spacing, typography, withAlpha } from './src/theme';
-import { friendlyError } from './src/utils/errors';
+import { friendlyError, isCallableTokenTaskError } from './src/utils/errors';
 import { LEGAL_DOCUMENT_VERSION } from './src/config/legal';
 import { buildAppShareContent } from './src/utils/storeLinks';
 import { recordAuthenticationFailure } from './src/services/diagnostics/authFailures';
@@ -581,7 +581,10 @@ function MainApp() {
       // Device reminders are independent of drawing the event list.
       const rows = [...new Map([...publicRows, ...ownRows, ...attendingRows].map(event => [event.id, event])).values()];
       Promise.allSettled(rows.map(event => getEventReminder(event.id, event)));
-    }).catch(err => { if (active) setRegistrationError(friendlyError(err, 'Could not load registration events.')); });
+    }).catch(err => {
+      if (!isCallableTokenTaskError(err)) recordNonFatalError(err, { feature: 'registration', operation: 'load_registration_events', current_screen: 'Home' });
+      if (active) setRegistrationError(friendlyError(err, 'Could not load registration events.'));
+    });
     const timer = setInterval(() => { if (active) setRegistrationRefresh(value => value + 1); }, AUTO_EVENT_REFRESH_MS);
     return () => { active = false; clearInterval(timer); };
   }, [currentUser?.uid, currentUser?.isAnonymous, profile?.role, selectedCity, registrationRefresh, cityCatalogueVersion]);
