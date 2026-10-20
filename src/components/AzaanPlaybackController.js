@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as Notifications from 'expo-notifications';
 import { colors, radius, shadow, spacing, typography } from '../theme';
@@ -16,7 +16,7 @@ function formatTime(value) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-export default function AzaanPlaybackController({ onOpenHijriCalendar }) {
+export default function AzaanPlaybackController({ onOpenHijriCalendar, manualPlayRequest = 0 }) {
   // Native audio creation can fail on a device. It must never happen during
   // login/home rendering or take the entire application to its error boundary.
   const playerRef = useRef(null);
@@ -25,13 +25,8 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar }) {
   const [visible, setVisible] = useState(false);
   const handledNotificationId = useRef('');
 
-  const playFromNotification = useCallback(async response => {
-    if (!isAzaanNotification(response)) return;
-    const identifier = response.notification.request.identifier || '';
-    if (identifier && handledNotificationId.current === identifier) return;
-    handledNotificationId.current = identifier;
-
-    onOpenHijriCalendar?.();
+  const playRecording = useCallback(async ({ openCalendar = false, operation = 'play_azaan' } = {}) => {
+    if (openCalendar) onOpenHijriCalendar?.();
     setVisible(true);
     try {
       if (!playerRef.current) {
@@ -40,18 +35,34 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar }) {
       }
       const player = playerRef.current;
       await setAudioModeAsync({
-        playsInSilentMode: false,
+        // Manual playback and a deliberate notification tap should be audible
+        // even when the iPhone silent switch is on. Background notification
+        // delivery still follows the operating system's alert-sound policy.
+        playsInSilentMode: true,
         shouldPlayInBackground: false,
         interruptionMode: 'duckOthers',
       });
       await player.seekTo(0);
       player.play();
+      return true;
     } catch (error) {
-      recordNonFatalError(error, { feature: 'notifications', operation: 'open_azaan_player' });
-      handledNotificationId.current = '';
+      recordNonFatalError(error, { feature: 'notifications', operation });
       setVisible(false);
+      if (operation === 'manual_azaan_player') {
+        Alert.alert('Play Azan', 'The Azan recording could not be played. Check your media volume and try again.');
+      }
+      return false;
     }
   }, [onOpenHijriCalendar]);
+
+  const playFromNotification = useCallback(async response => {
+    if (!isAzaanNotification(response)) return;
+    const identifier = response.notification.request.identifier || '';
+    if (identifier && handledNotificationId.current === identifier) return;
+    handledNotificationId.current = identifier;
+    const played = await playRecording({ openCalendar: true, operation: 'open_azaan_player' });
+    if (!played) handledNotificationId.current = '';
+  }, [playRecording]);
 
   const stopPlayback = useCallback(async () => {
     try {
@@ -87,6 +98,11 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar }) {
       subscription.remove();
     };
   }, [playFromNotification]);
+
+  useEffect(() => {
+    if (!manualPlayRequest) return;
+    playRecording({ operation: 'manual_azaan_player' });
+  }, [manualPlayRequest, playRecording]);
 
   useEffect(() => {
     if (status.didJustFinish) setVisible(false);

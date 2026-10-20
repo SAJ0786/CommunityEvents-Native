@@ -96,7 +96,7 @@ function getNextObservance(observances, overrides) {
   return candidates[0] || null;
 }
 
-export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
+export default function HijriCalendarScreen({ profile, selectedCity, onBack, onPlayAzaan }) {
   const cityCatalogueVersion = useCityCatalogueVersion();
   const { width, fontScale } = useWindowDimensions();
   const compactLayout = width / Math.max(fontScale, 1) < 360;
@@ -349,6 +349,15 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
                     <Text style={styles.azaanTitle}>Azaan Alarm</Text>
                     <Text style={styles.azaanHelp}>Optional on this phone. All alarms are off by default.</Text>
                   </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Play Azaan"
+                    onPress={onPlayAzaan}
+                    style={({ pressed }) => [styles.azaanPlayButton, pressed && styles.pressed]}
+                  >
+                    <MaterialCommunityIcons name="play" color={colors.surface} size={17} />
+                    <Text style={styles.azaanPlayText}>Play Azan</Text>
+                  </Pressable>
                 </View>
                 {[
                   ['fajr', 'Fajr'],
@@ -363,7 +372,7 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack }) {
                     {azaanAlarmBusy === key ? <ActivityIndicator color={colors.tealDark} size="small" /> : <Switch accessibilityLabel={`${label} Azaan alarm`} value={azaanAlarmKeys.includes(key)} onValueChange={() => toggleAzaanAlarm(key)} trackColor={{ false: colors.border, true: colors.teal }} />}
                   </View>
                 ))}
-                <Text style={styles.azaanPrivacy}>The selected Azaan recording is bundled in the app. It starts automatically when the alarm arrives while the app is open; when the app is backgrounded, the phone plays the configured notification sound and platform restrictions may require tapping the notification for full in-app playback. Android may require Alarms &amp; reminders permission; these alarms are separate from Profile prayer-time reminders.</Text>
+                <Text style={styles.azaanPrivacy}>Tap Play Azan to listen at any time. The selected recording is bundled in the app. When the app is backgrounded, the phone plays the configured notification sound and platform restrictions may require tapping the notification for full in-app playback. Android may require Alarms &amp; reminders permission; these alarms are separate from Profile prayer-time reminders.</Text>
               </View>
             </View>
           ) : null}
@@ -601,6 +610,8 @@ const styles = StyleSheet.create({
   azaanHeadingCopy: { flex: 1, minWidth: 0 },
   azaanTitle: { color: colors.navy, fontSize: typography.cardTitle.fontSize, fontWeight: '500' },
   azaanHelp: { marginTop: 2, color: colors.muted, fontSize: 10, lineHeight: 14, fontWeight: '400' },
+  azaanPlayButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 11, borderRadius: 19, backgroundColor: colors.tealDark },
+  azaanPlayText: { color: colors.surface, fontSize: 11, fontWeight: '700' },
   azaanRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.successSoft },
   azaanRowCopy: { flex: 1, minWidth: 0 },
   azaanRowLabel: { color: colors.navy, fontSize: 12, fontWeight: '400' },

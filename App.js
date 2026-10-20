@@ -262,6 +262,7 @@ function MainApp() {
   const [streamEvent, setStreamEvent] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
   const [hostInboxThreadId, setHostInboxThreadId] = useState('');
+  const [azaanManualPlayRequest, setAzaanManualPlayRequest] = useState(0);
   const [registrationTarget, setRegistrationTarget] = useState(null);
   const [registrationOnly, setRegistrationOnly] = useState(false);
   const [registrationEvents, setRegistrationEvents] = useState([]);
@@ -1576,6 +1577,7 @@ function MainApp() {
       ) : activeTab === 'hijri-calendar' ? (
         <HijriCalendarScreen
           onBack={() => setActiveTab('home')}
+          onPlayAzaan={() => setAzaanManualPlayRequest(value => value + 1)}
           profile={profile}
           selectedCity={selectedCity}
         />
@@ -1766,6 +1768,7 @@ function MainApp() {
           }}
         /> : null}
         <AzaanPlaybackController
+          manualPlayRequest={azaanManualPlayRequest}
           onOpenHijriCalendar={() => {
             setAppModule('events');
             setActiveTab('hijri-calendar');

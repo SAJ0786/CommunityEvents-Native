@@ -225,7 +225,9 @@ async function main() {
   assert.equal(format, 1, 'iOS notification sound must be PCM');
   assert.ok(dataSize / byteRate > 0 && dataSize / byteRate < 30);
   assert.match(read('src/services/reminders.js'), /azan_mashad.wav/);
-  assert.doesNotMatch(read('src/components/AzaanPlaybackController.js'), /position: 'absolute'|playsInSilentMode: true/);
+  assert.doesNotMatch(read('src/components/AzaanPlaybackController.js'), /position: 'absolute'/);
+  assert.match(read('src/components/AzaanPlaybackController.js'), /playsInSilentMode: true/);
+  assert.match(read('src/components/HijriCalendarScreen.js'), /accessibilityLabel="Play Azaan"/);
   console.log('PASS messaging: atomic host/business replies, owner routing, validation, surfaced errors, first/repeated feedback; notification clearing; drawer/keyboard contracts; iOS PCM sound');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
