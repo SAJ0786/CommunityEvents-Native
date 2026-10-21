@@ -121,3 +121,17 @@ test('registration deletion targets attendees and reviewers on first tick, bypas
  campaign[1].state='pending';campaign[1].cursor='z-old-user-cursor';delete campaign[1].registrationAdminsQueued;delete campaign[1].registrationCursor;
  await h.functions.deliverNotificationMatrix();assert.equal(h.mails.length,3);assert.equal(h.pushes.length,3);
 });
+
+test('hiding a pending event never resubmits approval notices, while creation and real edits still do',async()=>{
+ const h=harness();h.user('sa',{role:'superAdmin'});
+ const initial={ownerUid:'host',status:'pending',city:'sydney',title:'Event',revision:1,hidden:false};
+ h.records.set('registrationEvents/e',initial);
+ await h.functions.matrixRegistrationWritten(h.event('registrationEvents/e','created'));await h.flush();
+ const created=h.mails.length;assert.ok(created>0);
+ h.records.set('registrationEvents/e',{...initial,hidden:true,revision:2});
+ const hidden=h.event('registrationEvents/e','hidden');hidden.data.before={exists:true,data:()=>initial};
+ await h.functions.matrixRegistrationWritten(hidden);await h.flush();assert.equal(h.mails.length,created);
+ const before=h.records.get('registrationEvents/e');h.records.set('registrationEvents/e',{...before,title:'Edited',revision:3});
+ const edited=h.event('registrationEvents/e','edited');edited.data.before={exists:true,data:()=>before};
+ await h.functions.matrixRegistrationWritten(edited);await h.flush();assert.ok(h.mails.length>created);
+});

@@ -1128,6 +1128,12 @@ function MainApp() {
     setVisibilityBusyId(event.id);
     setMyEventsError('');
     try {
+      if (event.registrationOnly) {
+        const result = await firebaseRegistration({enabled:REGISTRATION_ENABLED}).setVisibility(event.id,event.revision,hidden);
+        setHostRegistrationEvents(rows => rows.map(row => row.id === event.id ? {...row,hidden,revision:result.revision} : row));
+        setRegistrationRefresh(value => value + 1);
+        return;
+      }
       await setEventVisibility(event.id, hidden);
       setMyEvents(current => current.map(item => (
         item.id === event.id ? { ...item, hidden } : item

@@ -78,7 +78,7 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
     return () => { active = false; };
   }, [event?.id, event?.revision, user?.uid, foreground, refresh, reviewing]);
   if (!event) return null;
-  if (!detail) return <EventDetailsModal event={{ ...registrationEventCard(event), imageUrl: '', hostPhone: '', hostContactOptional: '', registrationPrivate: false }} visible user={user} profile={profile} isGuest={isGuest} onClose={onClose}
+  if (!detail) return <EventDetailsModal event={{ ...registrationEventCard(error ? {id:event.id,title:'Event unavailable'} : event), imageUrl: '', hostPhone: '', hostContactOptional: '', registrationPrivate: false }} visible user={user} profile={profile} isGuest={isGuest} onClose={onClose}
     registrationDetail={{}} registrationLoading={!error} registrationNotice={error}
     onRetryRegistration={error ? () => setRefresh(value => value + 1) : undefined} />;
   const operation = action => {

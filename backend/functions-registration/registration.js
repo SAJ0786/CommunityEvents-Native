@@ -88,6 +88,24 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     try { return { ...draft, ...eventMetadata(raw) }; }
     catch (error) { fail('invalid-argument', error.message); }
   }
+  const requireVisible = (caller, event) => {
+    if (event.hidden === true && !(caller && manages(caller, event))) fail('not-found', 'The organiser has chosen to hide this event. It is currently unavailable.');
+  };
+  async function setRegistrationEventVisibility(request) {
+    if (typeof request.data?.hidden !== 'boolean') fail('invalid-argument', 'Choose event visibility.');
+    return db.runTransaction(async tx => {
+      const caller = await actor(request, tx);
+      const event = await readEvent(request.data?.eventId, tx);
+      if (!manages(caller, event)) fail('permission-denied', 'Only the organiser or authorised admins may change visibility.');
+      if (event.deletedAt || event.status === 'cancelled') fail('failed-precondition', 'A cancelled or deleted event cannot be made visible.');
+      if (request.data.expectedRevision !== event.revision) fail('aborted', 'The event has changed. Reload before changing visibility.');
+      const hidden = request.data.hidden;
+      if (Boolean(event.hidden) === hidden) return {eventId:event.id,hidden,revision:event.revision};
+      const revision = event.revision + 1;
+      tx.update(eventRef(event.id), {hidden,revision,visibilityChangedAt:now().toISOString(),visibilityChangedBy:caller.uid});
+      return {eventId:event.id,hidden,revision};
+    });
+  }
   const checkOpen = event => {
     if (event.status !== 'approved' || localMinute(now(), event.timeZone) >= (event.closes || `${event.date}T00:00`)) fail('failed-precondition', 'Registration is closed or this event is not approved.');
   };
@@ -231,7 +249,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const formVersion = formChanged ? revision : previousForm.version;
       const status = current?.status || 'pending';
       const publicData = { ...(await model).publicEvent({ ...editingEvent, ...draft }), ...schedule, city, timeZone, ownerUid: current?.ownerUid || caller.uid, submittedByName: current ? await submitterName(tx,current) : displayName(caller.profile.fullName), revision,
-        formVersion, status, reservedPlaces: current?.reservedPlaces || 0, registrationCount: current?.registrationCount || 0,
+        formVersion, status, hidden: current?.hidden === true, reservedPlaces: current?.reservedPlaces || 0, registrationCount: current?.registrationCount || 0,
         createdAt: current?.createdAt || now().toISOString(), updatedAt: now().toISOString(), allowCancellation: draft.allowCancellation, creationFingerprint: current?.creationFingerprint || fingerprint };
       if (current?.approvedAt) { publicData.approvedAt = current.approvedAt; publicData.approvedBy = current.approvedBy; }
       for (const key of ['isLive', 'liveUrl', 'liveWatchUrl', 'liveAppVisibility', 'liveSource', 'liveStartedAt', 'liveVideoRecordId', 'liveEndedAt', 'liveRoomCode', 'liveStartedBy']) {
@@ -345,6 +363,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const eventId = id(request.data?.eventId); const requestId = id(request.data?.requestId);
     const hash = createHash('sha256').update(JSON.stringify({ answers: request.data.answers, places: request.data.places, formVersion: request.data.formVersion, expectedRevision: request.data.expectedRevision })).digest('hex');
       const caller = await actor(request, tx); const event = await readEvent(eventId, tx);
+      requireVisible(caller,event);
       const operationId = createHash('sha256').update(JSON.stringify([caller.uid, requestId])).digest('hex');
       const receiptRef = eventRef(eventId).collection('operations').doc(operationId);
       const receipt = await tx.get(receiptRef);
@@ -394,6 +413,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const receipt = await tx.get(receiptRef);
       if (receipt.exists) { if (receipt.data().hash !== hash) fail('already-exists','This submission reference was already used.'); return receipt.data().result; }
       const base = await readEvent(baseId,tx);
+      requireVisible(caller,base);
       if (!base.seriesId || base.deletedAt || base.status !== 'approved') fail('failed-precondition','Reload an approved series occurrence.');
       const baseForm = (await tx.get(formRef(baseId))).data();
       const signature = form => JSON.stringify([form?.purpose,form?.fields]);
@@ -487,6 +507,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     return db.runTransaction(async tx => {
       const [caller, event] = await Promise.all([request.auth && request.auth.token?.firebase?.sign_in_provider !== 'anonymous' ? actor(request, tx) : Promise.resolve(null), readEvent(request.data?.eventId, tx)]);
       const manager = caller && manages(caller, event);
+      requireVisible(caller,event);
       const cardOnly = request.data?.cardOnly === true;
       const [ownSnap, form, details] = await Promise.all([caller ? tx.get(bookingRef(event.id, caller.uid)) : Promise.resolve(null), cardOnly ? Promise.resolve(null) : tx.get(formRef(event.id)), tx.get(privateRef(event.id))]);
       const own = ownSnap?.exists ? ownSnap.data() : null;
@@ -497,7 +518,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }),
           ...(await scheduleModel).registrationSchedule(event), ...liveProjection(event), id:event.id, ownerUid:event.ownerUid,
           status:event.status, city:event.city, timeZone:event.timeZone, revision:event.revision, formVersion:event.formVersion,
-          deleted:Boolean(event.deletedAt), submittedByName:await submitterName(tx,event),
+          hidden:event.hidden === true, deleted:Boolean(event.deletedAt), submittedByName:await submitterName(tx,event),
           ...(manager ? {registrationCount:event.registrationCount,hasPendingChanges:Boolean(event.hasPendingChanges)} : {}) },
           canManage:Boolean(manager), canApprove:Boolean(caller && !event.deletedAt && !event.reviewDecision && (event.status === 'pending' || event.hasPendingChanges) && approves(caller,event)),
           canRegister:event.status === 'approved' && time < (event.closes || `${event.date}T00:00`),
@@ -516,6 +537,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const schedule = (await scheduleModel).registrationSchedule({ ...event, timeZone: event.timeZone });
       const live = liveProjection(event);
       const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), ...schedule, ...live, id: event.id, ownerUid: event.ownerUid, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
+      result.event.hidden = event.hidden === true;
       result.event.deleted = Boolean(event.deletedAt);
       result.event.submittedByName = await submitterName(tx,event);
       result.canApprove = Boolean(caller && !event.deletedAt && !event.reviewDecision && (event.status === 'pending' || pending) && approves(caller, event));
@@ -532,7 +554,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       }
       if (request.data?.includeOccurrences === true && event.seriesId && event.status === 'approved' && !event.deletedAt) {
         const snapshot = await tx.get(db.collection('registrationEvents').where('seriesId','==',event.seriesId).limit(100));
-        const rows = snapshot.docs.map(doc => ({ ...doc.data(),id:doc.id })).filter(row => row.status === 'approved' && !row.deletedAt && row.ownerUid === event.ownerUid);
+        const rows = snapshot.docs.map(doc => ({ ...doc.data(),id:doc.id })).filter(row => row.status === 'approved' && !row.deletedAt && (row.hidden !== true || (caller && manages(caller,row))) && row.ownerUid === event.ownerUid);
         result.occurrences = await Promise.all(rows.map(async row => {
           const [booking,otherForm] = await Promise.all([caller ? tx.get(bookingRef(row.id,caller.uid)) : Promise.resolve(null),tx.get(formRef(row.id))]);
           const registered = booking?.data()?.status === 'registered';
@@ -579,8 +601,9 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         if (!snapshot.exists) return null;
         const event = { ...snapshot.data(), id: snapshot.id };
         if ((event.deletedAt && scope !== 'attending') || (city && event.city !== city) || (scope === 'mine' && event.ownerUid !== caller.uid)) return null;
-        if (scope === 'public' && (event.status !== 'approved' || event.date < localMinute(now(), event.timeZone).slice(0, 10))) return null;
+        if (scope === 'public' && (event.hidden === true || event.status !== 'approved' || event.date < localMinute(now(), event.timeZone).slice(0, 10))) return null;
         const manager = Boolean(caller && manages(caller, event));
+        if (event.hidden === true && !manager) return null;
         const canApprove = Boolean(manager && !event.reviewDecision && (event.status === 'pending' || event.hasPendingChanges) && approves(caller, event));
         if (scope === 'review' && !canApprove) return null;
         const [privateSnap, ownSnap] = await Promise.all([
@@ -601,7 +624,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         const row = { ...(await model).publicEvent({ ...event, address: privateSnap.data()?.address || '' }), ...schedule,
           ...publicMapPoint,
           id: event.id, city: event.city, timeZone: event.timeZone, ownerUid: event.ownerUid, submittedByName: await submitterName(tx,event,submitterNames),
-          status: event.status, deleted: Boolean(event.deletedAt), revision: event.revision, formVersion: event.formVersion,
+          status: event.status, hidden: event.hidden === true, deleted: Boolean(event.deletedAt), revision: event.revision, formVersion: event.formVersion,
           allowCancellation: event.allowCancellation === true, registrationOnly: true,
           canManage: manager, canApprove, isRegistered: registered,
           canRegister: event.status === 'approved' && localMinute(now(), event.timeZone) < (event.closes || `${event.date}T00:00`),
@@ -738,6 +761,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     return db.runTransaction(async tx => {
       const [caller, event] = await Promise.all([actor(request, tx), readEvent(request.data?.eventId, tx)]);
       const manager = manages(caller, event);
+      requireVisible(caller,event);
       if (staged && (!manager || event.status !== 'approved' || !event.hasPendingChanges)) fail('permission-denied', 'Only managers can review a pending poster.');
       if (!manager) {
         const own = await tx.get(bookingRef(event.id, caller.uid));
@@ -766,6 +790,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const eventId = id(request.data?.eventId);
     await db.runTransaction(async tx => {
       const caller = await actor(request, tx); const event = await readEvent(eventId, tx);
+      requireVisible(caller,event);
       const previous = await tx.get(privateRef(eventId));
       const pending = (await tx.get(pendingRef(eventId))).data();
       const form = (await tx.get(formRef(eventId))).data();
@@ -807,6 +832,6 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const snapshot = await query.get();
     return { templates: snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })), nextCursor: snapshot.docs.length === 50 ? snapshot.docs.at(-1).id : null };
   }
-  return { createRegistrationSeries, saveRegistrationEvent, approveRegistrationEvent, approveRegistrationSeries, reviewRegistrationEvent, submitEventRegistration, submitRegistrationOccurrences, cancelEventRegistration, cancelRegistrationEvent, deleteRegistrationEvent, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
+  return { setRegistrationEventVisibility, createRegistrationSeries, saveRegistrationEvent, approveRegistrationEvent, approveRegistrationSeries, reviewRegistrationEvent, submitEventRegistration, submitRegistrationOccurrences, cancelEventRegistration, cancelRegistrationEvent, deleteRegistrationEvent, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
 }
 module.exports = { createRegistrationHandlers, localMinute, active, manages, approves };

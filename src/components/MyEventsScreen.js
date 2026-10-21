@@ -59,9 +59,9 @@ export default function MyEventsScreen({
           </Text>
         </View>
       ) : null}
-      {!event.registrationOnly && <View style={styles.visibilityRow}>
+      {(!event.registrationOnly || (selected === 'organising' && event.ownerUid === userUid && !registrationUnavailable(event))) && <View style={styles.visibilityRow}>
         <Text style={[styles.visibilityText, event.hidden ? styles.hiddenText : styles.visibleText]}>
-          {event.hidden ? 'Hidden from home screen' : 'Visible on home screen'}
+          {event.registrationOnly ? event.hidden ? 'Hidden · organiser and admins only' : 'Visible to participants' : event.hidden ? 'Hidden from home screen' : 'Visible on home screen'}
         </Text>
         <Pressable
           disabled={visibilityBusyId === event.id}

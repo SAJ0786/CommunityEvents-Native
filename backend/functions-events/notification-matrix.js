@@ -127,7 +127,7 @@ function register(deps = {}) {
     const before = event.data.before.data() || {}, after = event.data.after.data(); if (!after) return;
     const common = { module: 'registration', eventId: event.params.eventId, city: eventCity(after) };
     const pending = after.status === 'pending' || after.hasPendingChanges;
-    if (pending && (!event.data.before.exists || before.revision !== after.revision) && !after.reviewDecision) await queue(`${event.id}:submit`, {
+    if (pending && (!event.data.before.exists || Boolean(before.hidden) === Boolean(after.hidden)) && (!event.data.before.exists || before.revision !== after.revision) && !after.reviewDecision) await queue(`${event.id}:submit`, {
       ...common, type: 'registration.submitted', title: 'Registration event awaiting approval', body: `${title(after)} was submitted for approval.`, channels: ['email', 'push'] });
     if (before.status !== 'approved' && after.status === 'approved' || before.hasPendingChanges && !after.hasPendingChanges && after.status === 'approved') await queue(`${event.id}:approved`, {
       ...common, type: 'registration.approved', title: 'Registration event approved', body: `${title(after)} has been approved.`, audience: 'interested', uids: [after.ownerUid], channels: ['email'] });

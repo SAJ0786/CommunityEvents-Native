@@ -25,6 +25,10 @@ test('client stays off by default and discovery uses the callable allowlist', as
   await contract.createRegistrationClient(call, { enabled: true }).list({ city: 'sydney', scope: 'review', cursor: 'next' });
   assert.equal(calls[0].name, 'listRegistrationEvents');
   assert.equal(calls[0].data.cursor, 'next');
+  await contract.createRegistrationClient(call,{enabled:true}).setVisibility('event',4,true);
+  assert.equal(calls[1].name,'setRegistrationEventVisibility');
+  assert.equal(JSON.stringify(calls[1].data),JSON.stringify({eventId:'event',expectedRevision:4,hidden:true}));
+
 });
 test('editing requires authorised private detail; custom type and cancellation setting survive', () => {
   assert.throws(() => view.eventDraftFromDetail({ canManage: false }, []), /manage/);
@@ -302,6 +306,14 @@ test('My Events preserves attendee history without exposing host edit/delete con
   const activeList = exports.default({events,userUid:'viewer'});
   assert.deepEqual(Array.from(activeList.props.data,event=>event.id),['active']);
   assert.match(JSON.stringify(activeList.props.ListFooterComponent),/Registration history/);
+  const own={id:'own',ownerUid:'viewer',registrationOnly:true,status:'approved',revision:3};
+  let toggled;
+  const ownerList=exports.default({events:[own],userUid:'viewer',onToggleVisibility:event=>{toggled=event;}});
+  const ownerCard=ownerList.props.renderItem({item:own});
+  const toggle=flatten(ownerCard).find(node=>node.type==='Pressable' && JSON.stringify(node).includes('Hide Event'));
+  assert.ok(toggle);toggle.props.onPress();assert.equal(toggled.id,'own');
+  assert.doesNotMatch(JSON.stringify(activeList.props.renderItem({item:own})),/Hide Event|Make Visible/);
+
 });
 
 test('My Events type filter preserves list choice, bookings and history and resets for another account', () => {
@@ -1022,4 +1034,15 @@ test('normal registration opening uses lightweight card data and reuses only a c
   assert.equal(f.calls.filter(c=>c[0]==='poster').length,expected);
   if(expected===0)assert.equal(tree.props.event.imageUrl,'data:image/png;base64,LIST_POSTER');
  }
+});
+
+test('hidden notification links show the organiser explanation without stale event content',async()=>{
+ const f=detailsFixture({event:{id:'event',title:'Private event title'}});
+ f.api.card=async()=>{throw Error('The organiser has chosen to hide this event. It is currently unavailable.');};
+ f.api.load=f.api.card;
+ f.render();await new Promise(setImmediate);const tree=f.render();
+ assert.equal(tree.props.registrationNotice,'The organiser has chosen to hide this event. It is currently unavailable.');
+ assert.equal(tree.props.registrationLoading,false);
+ assert.equal(tree.props.event.title,'Event unavailable');
+ assert.equal(tree.props.event.registrationPrivate,false);
 });
