@@ -1081,13 +1081,43 @@ test('native dashboard opens the transfer selector from the card action and subm
  '../registration/firebaseRegistration':{REGISTRATION_ENABLED:true,firebaseRegistration:()=>({transfer:async(...args)=>calls.push(args)})},'../registration/eventFeed':{},'../services/events':{},'../utils/adminUserSearch':load(path.join(root,'src/utils/adminUserSearch.js')),'../utils/cities':{DEFAULT_CITY:'sydney'},'../theme':require('./theme-fixture.cjs')};
  const exports={};const code=babel.transformSync(fs.readFileSync(path.join(root,'src/components/RegistrationManagementPanel.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
  vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
- const render=()=>{cursor=0;return exports.default({user:{uid:'super'},profile:{role:'superAdmin'},users:[{id:'new-owner',fullName:'New Organiser',email:'organiser@example.com',phone:'+61 496 504 950'}],onLoadUsers:()=>calls.push(['loadUsers'])});};
+ const render=(extra={})=>{cursor=0;return exports.default({user:{uid:'super'},profile:{role:'superAdmin'},users:[{id:'new-owner',fullName:'Syed Asim Raza',phone:'+61 496 504 950'}],onLoadUsers:()=>calls.push(['loadUsers']),...extra});};
  let nodes=flatten(render());nodes.find(node=>node.type==='EventCard').props.onPress(event);
  nodes=flatten(render());const details=nodes.find(node=>node.type==='RegistrationDetails');assert.equal(details.props.event.id,'event');
  details.props.onTransfer({...event,revision:7});nodes=flatten(render());assert.equal(nodes.find(node=>node.type==='RegistrationDetails').props.event,null);
- const input=nodes.find(node=>node.type==='TextInput');assert.ok(input);input.props.onChangeText('0496 504 950');
- nodes=flatten(render());const member=nodes.find(node=>node.type==='Pressable'&&flatten(node).some(child=>child.type==='Text'&&child.props.children[0]==='New Organiser'));assert.ok(member);member.props.onPress();
+ const input=nodes.find(node=>node.type==='TextInput');assert.ok(input);input.props.onChangeText('Asim  Raza');
+ const findMember=tree=>tree.find(node=>node.type==='Pressable'&&flatten(node).some(child=>child.type==='Text'&&child.props.children[0]==='Syed Asim Raza'));
+ assert.equal(findMember(flatten(render({usersLoading:true}))),undefined,'stale candidates are hidden while refreshing');
+ assert.equal(findMember(flatten(render({usersError:'Offline'}))),undefined,'failed refresh must not offer stale candidates');
+ nodes=flatten(render());assert.ok(findMember(nodes),'phone-only member matches partial name with repeated spaces');
+ input.props.onChangeText('0496 504 950');
+ nodes=flatten(render());const member=findMember(nodes);assert.ok(member);assert.ok(flatten(member).some(child=>child.type==='Text'&&child.props.children[0]==='+61 496 504 950'),'phone is visible below name');member.props.onPress();
  await alerts[0][2][1].onPress();assert.equal(JSON.stringify(calls.at(-1)),JSON.stringify(['event',7,'new-owner']));
+});
+
+test('native transfer labels prioritise names and phones while email stays searchable',()=>{
+ const {transferMemberName,transferMemberContact,userMatchesSearch}=load(path.join(root,'src/utils/adminUserSearch.js'));
+ const member={fullName:'Syed Asim Raza',phone:'0496 504 950',email:'member@example.com'};
+ assert.equal(transferMemberName(member),'Syed Asim Raza');
+ assert.equal(transferMemberContact(member),'0496 504 950');
+ assert.ok(userMatchesSearch(member,'asim raza'));
+ assert.ok(userMatchesSearch(member,'+61 496 504 950'));
+ assert.ok(userMatchesSearch(member,'member@example.com'));
+ assert.equal(transferMemberContact({email:'member@example.com'}),'member@example.com');
+ assert.equal(transferMemberContact({mobileNumber:'0400 123 456'}),'0400 123 456');
+});
+
+test('native member refresh uses the server and propagates offline failure without cache fallback',async()=>{
+ const calls=[],exports={};let offline=false;
+ const snapshot={docs:[{id:'phone-member',data:()=>({fullName:'Syed Asim Raza',phone:'0400 123 456',isActive:true})}]};
+ const firestore={collection:()=> 'users',getDocs:async()=>{calls.push('default');return snapshot;},getDocsFromServer:async()=>{calls.push('server');if(offline)throw new Error('Offline');return snapshot;}};
+ const mocks={'@react-native-firebase/firestore':firestore,'@react-native-firebase/functions':{},'@react-native-firebase/auth':{},'../firebase/firebase':{db:{}}};
+ const code=babel.transformSync(fs.readFileSync(path.join(root,'src/services/users.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
+ vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
+ assert.equal((await exports.listUsers({includeHidden:true,serverOnly:true}))[0].fullName,'Syed Asim Raza');
+ await exports.listUsers({includeHidden:true});
+ offline=true;await assert.rejects(exports.listUsers({includeHidden:true,serverOnly:true}),/Offline/);
+ assert.deepEqual(calls,['server','default','server']);
 });
 test('native admin panel renders hidden non-owned events as delete-only entries',async()=>{
  let index=0;const calls=[],alerts=[];

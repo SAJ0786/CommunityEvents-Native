@@ -5,8 +5,18 @@ export function normalisePhone(value) {
   return digits;
 }
 
+const searchText = value => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+export function transferMemberName(user) {
+  return user.fullName || user.displayName || user.name || transferMemberContact(user) || 'Member';
+}
+
+export function transferMemberContact(user) {
+  return user.phone || user.phoneNumber || user.mobile || user.mobileNumber || user.email || '';
+}
+
 export function userMatchesSearch(userRecord, queryText) {
-  const textQuery = String(queryText || '').trim().toLowerCase();
+  const textQuery = searchText(queryText);
   if (!textQuery) return true;
 
   const textFields = [
@@ -15,7 +25,7 @@ export function userMatchesSearch(userRecord, queryText) {
     userRecord.name,
     userRecord.email,
   ];
-  if (textFields.some(value => String(value || '').toLowerCase().includes(textQuery))) return true;
+  if (textFields.some(value => searchText(value).includes(textQuery))) return true;
 
   const phoneQuery = normalisePhone(textQuery);
   if (!phoneQuery) return false;

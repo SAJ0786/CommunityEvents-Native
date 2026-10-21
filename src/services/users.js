@@ -1,4 +1,4 @@
-import { arrayRemove, arrayUnion, collection, deleteField, doc, getDoc, getDocFromCache, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from '@react-native-firebase/firestore';
+import { arrayRemove, arrayUnion, collection, deleteField, doc, getDoc, getDocFromCache, getDocs, getDocsFromServer, query, serverTimestamp, setDoc, updateDoc, where } from '@react-native-firebase/firestore';
 import { httpsCallable } from '@react-native-firebase/functions';
 import { signOut } from '@react-native-firebase/auth';
 import { auth, db, functions } from '../firebase/firebase';
@@ -163,8 +163,8 @@ function isOldMigratedProfile(user = {}) {
   return !!user.migratedToUid && !(user.isActive !== false && hasPhone(user));
 }
 
-export async function listUsers({ includeHidden = false } = {}) {
-  const snapshot = await getDocs(collection(db, 'users'));
+export async function listUsers({ includeHidden = false, serverOnly = false } = {}) {
+  const snapshot = await (serverOnly ? getDocsFromServer : getDocs)(collection(db, 'users'));
   const users = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
   return includeHidden
     ? users

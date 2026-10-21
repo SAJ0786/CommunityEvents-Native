@@ -9,9 +9,9 @@ import { registrationEventFeed } from '../registration/eventFeed';
 import { compareEventsByDateTime } from '../services/events';
 import { DEFAULT_CITY } from '../utils/cities';
 import { colors, spacing, typography } from '../theme';
-import { userMatchesSearch } from '../utils/adminUserSearch';
+import { userMatchesSearch, transferMemberName, transferMemberContact } from '../utils/adminUserSearch';
 
-export default function RegistrationManagementPanel({ user, profile, review = false, onOperation, users = [], onLoadUsers, usersLoading = false }) {
+export default function RegistrationManagementPanel({ user, profile, review = false, onOperation, users = [], onLoadUsers, usersLoading = false, usersError = '' }) {
   const [city, setCity] = useState(profile?.adminCity || profile?.defaultCity || DEFAULT_CITY);
   const [events, setEvents] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -37,9 +37,9 @@ export default function RegistrationManagementPanel({ user, profile, review = fa
   const openTransfer = event => {
     setSelected(null); setTransfer(event); setTransferQuery(''); setError(''); onLoadUsers?.();
   };
-  const candidates=users.filter(row=>row.id!==transfer?.ownerUid && row.isActive!==false && !row.migratedToUid && !row.bannedAt && !row.archivedAt && !row.accountDeletedAt && !['inactive','banned','deleted','archived','suspended'].includes(row.accountStatus))
+  const candidates=(usersLoading || usersError ? [] : users).filter(row=>row.id!==transfer?.ownerUid && row.isActive!==false && !row.migratedToUid && !row.bannedAt && !row.archivedAt && !row.accountDeletedAt && !['inactive','banned','deleted','archived','suspended'].includes(row.accountStatus))
     .filter(row=>transferQuery.trim().length>=2 && userMatchesSearch(row,transferQuery)).slice(0,8);
-  const confirmTransfer = target => Alert.alert('Transfer event ownership?', `Transfer to ${target.fullName || target.displayName || target.email || 'this member'}? They will be able to manage this event and its registration responses. Other series occurrences are unchanged.`, [{text:'Cancel',style:'cancel'},{text:'Transfer',onPress:async()=>{
+  const confirmTransfer = target => Alert.alert('Transfer event ownership?', `Transfer to ${transferMemberName(target)}? They will be able to manage this event and its registration responses. Other series occurrences are unchanged.`, [{text:'Cancel',style:'cancel'},{text:'Transfer',onPress:async()=>{
     if(busy)return;setBusy(true);setError('');
     try{await firebaseRegistration({enabled:true}).transfer(transfer.id,transfer.revision,target.id);setTransfer(null);setTransferQuery('');setSelected(null);setRefresh(value=>value+1);}
     catch(err){setError(err.message || 'Transfer failed. Reload events and try again.');}finally{setBusy(false);}
@@ -51,7 +51,19 @@ export default function RegistrationManagementPanel({ user, profile, review = fa
       catch(err){setError(err.message || 'Could not delete event.');}finally{setBusy(false);}
     }},
   ]);
-  const transferForm = transfer && <View style={{padding:spacing.md,gap:spacing.sm,backgroundColor:colors.surface}} accessibilityLabel="Transfer registration event ownership"><Text style={{...typography.sectionTitle,color:colors.navy}}>Transfer {transfer.title}</Text><Text>The new organiser can manage this event and its responses. Only this occurrence is transferred.</Text><TextInput accessibilityLabel="Search new organiser" placeholder="Search member name, email or phone" value={transferQuery} onChangeText={setTransferQuery} editable={!busy} style={{padding:spacing.md,borderWidth:1,borderColor:colors.border,borderRadius:12,color:colors.navy}}/>{usersLoading && <ActivityIndicator/>}{candidates.map(target=><Pressable key={target.id} accessibilityRole="button" disabled={busy} onPress={()=>confirmTransfer(target)} style={{padding:spacing.sm}}><Text style={{color:colors.tealDark}}>{target.fullName || target.displayName || target.email || target.id}{target.email && target.fullName ? ` · ${target.email}` : ''}</Text></Pressable>)}{!usersLoading && transferQuery.trim().length>=2 && !candidates.length && <Text>No active members match this search.</Text>}<Pressable accessibilityRole="button" disabled={busy} onPress={()=>setTransfer(null)}><Text style={{color:colors.tealDark}}>Cancel transfer</Text></Pressable></View>;
+  const transferForm = transfer && <View style={{padding:spacing.md,gap:spacing.sm,backgroundColor:colors.surface}} accessibilityLabel="Transfer registration event ownership">
+    <Text style={{...typography.sectionTitle,color:colors.navy}}>Transfer {transfer.title}</Text>
+    <Text>The new organiser can manage this event and its responses. Only this occurrence is transferred.</Text>
+    <TextInput accessibilityLabel="Search new organiser" placeholder="Search by name, phone number or email" autoCapitalize="none" autoCorrect={false} value={transferQuery} onChangeText={setTransferQuery} editable={!busy} style={{padding:spacing.md,borderWidth:1,borderColor:colors.border,borderRadius:12,color:colors.navy}}/>
+    {usersLoading && <ActivityIndicator/>}
+    {usersError ? <Text accessibilityRole="alert" style={{color:colors.danger}}>Could not refresh members. Close and reopen transfer to try again.</Text> : null}
+    {candidates.map(target=><Pressable key={target.id} accessibilityRole="button" disabled={busy} onPress={()=>confirmTransfer(target)} style={{padding:spacing.sm,gap:spacing.xs}}>
+      <Text style={{color:colors.navy,fontWeight:'600'}}>{transferMemberName(target)}</Text>
+      <Text style={{color:colors.muted}}>{transferMemberContact(target)}</Text>
+    </Pressable>)}
+    {!usersLoading && !usersError && transferQuery.trim().length>=2 && !candidates.length && <Text>No active members match this search.</Text>}
+    <Pressable accessibilityRole="button" disabled={busy} onPress={()=>setTransfer(null)}><Text style={{color:colors.tealDark}}>Cancel transfer</Text></Pressable>
+  </View>;
   return <View style={{ gap: spacing.sm, marginVertical: spacing.md }}>
     <CitySelector selectedCity={city} onChange={value => { setEvents([]); setTransfer(null); setTransferQuery(''); setCity(value); }} disabled={profile?.role !== 'superAdmin'} />
     <Text style={{ color: colors.navy, ...typography.sectionTitle }}>Registration only events</Text>

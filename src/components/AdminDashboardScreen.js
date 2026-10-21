@@ -1,7 +1,7 @@
 import HorizontalStrip from './HorizontalStrip';
 import SegmentedControl from './SegmentedControl';
 import BusinessApprovalPanel from '../business/BusinessApprovalPanel';
-import { userMatchesSearch, normalisePhone } from '../utils/adminUserSearch';
+import { userMatchesSearch, normalisePhone, transferMemberName, transferMemberContact } from '../utils/adminUserSearch';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -740,18 +740,18 @@ export default function AdminDashboardScreen({
 
   const transferCandidates = useMemo(() => {
     const queryText = transferQuery.trim().toLowerCase();
-    if (queryText.length < 2) return [];
+    if (queryText.length < 2 || usersLoading || usersError) return [];
     return scopedUsers
       .filter(item => item.id !== (transferEvent?.createdByUserId || transferEvent?.ownerUid))
       .filter(item => userMatchesSearch(item, queryText))
       .slice(0, 8);
-  }, [scopedUsers, transferEvent?.createdByUserId, transferEvent?.ownerUid, transferQuery]);
+  }, [scopedUsers, transferEvent?.createdByUserId, transferEvent?.ownerUid, transferQuery, usersLoading, usersError]);
 
   const openTransfer = event => {
     setTransferEvent(current => current?.id === event.id ? null : event);
     setTransferQuery('');
     setTransferUser(null);
-    if (!usersLoaded && !usersLoading) loadUsers();
+    loadUsers({ serverOnly: true });
   };
   const openUserEvents = userRecord => {
     setAdminOwnerFilterUid(userRecord.id);
@@ -941,11 +941,11 @@ export default function AdminDashboardScreen({
     }
   };
 
-  const loadUsers = async () => {
+  const loadUsers = async ({ serverOnly = false } = {}) => {
     setUsersLoading(true);
     setUsersError('');
     try {
-      const nextUsers = await listUsers({ includeHidden: true });
+      const nextUsers = await listUsers({ includeHidden: true, serverOnly });
       setUsersList(nextUsers);
       setUsersLoaded(true);
     } catch (error) {
@@ -2464,7 +2464,7 @@ export default function AdminDashboardScreen({
             { value: 'events', label: 'Events', icon: 'calendar-outline' },
             { value: 'registration', label: 'Registration only events', icon: 'clipboard-text-outline' },
           ]} />
-          {eventCollection === 'registration' ? <RegistrationManagementPanel user={user} profile={profile} onOperation={onOpenRegistration} users={scopedUsers} onLoadUsers={loadUsers} usersLoading={usersLoading} /> : <>
+          {eventCollection === 'registration' ? <RegistrationManagementPanel user={user} profile={profile} onOperation={onOpenRegistration} users={scopedUsers} onLoadUsers={() => loadUsers({ serverOnly: true })} usersLoading={usersLoading} usersError={usersError} /> : <>
 
           <View style={styles.statisticsCard}>
             <View style={styles.statisticsHead}>
@@ -2751,7 +2751,7 @@ export default function AdminDashboardScreen({
                           autoCorrect={false}
                           value={transferQuery}
                           onChangeText={value => { setTransferQuery(value); setTransferUser(null); }}
-                          placeholder="Search user name, email or phone"
+                          placeholder="Search by name, phone number or email"
                           placeholderTextColor={colors.muted}
                           style={styles.input}
                         />
@@ -2761,10 +2761,11 @@ export default function AdminDashboardScreen({
                             <Text style={styles.inlineTransferMeta}>Loading users…</Text>
                           </View>
                         ) : null}
-                        {!usersLoading && transferQuery.trim().length < 2 ? (
+                        {usersError ? <Text accessibilityRole="alert" style={[styles.noticeText, styles.noticeTextError]}>Could not refresh members. Close and reopen transfer to try again.</Text> : null}
+                        {!usersLoading && !usersError && transferQuery.trim().length < 2 ? (
                           <Text style={styles.inlineTransferHint}>Enter at least two characters to search.</Text>
                         ) : null}
-                        {!usersLoading && transferQuery.trim().length >= 2 && transferCandidates.length === 0 ? (
+                        {!usersLoading && !usersError && transferQuery.trim().length >= 2 && transferCandidates.length === 0 ? (
                           <Text style={styles.inlineTransferHint}>No matching users found.</Text>
                         ) : null}
                         {transferCandidates.length ? (
@@ -2778,8 +2779,8 @@ export default function AdminDashboardScreen({
                                   style={[styles.transferResult, selected && styles.transferResultSelected]}
                                 >
                                   <View style={styles.listTextWrap}>
-                                    <Text style={[styles.transferResultName, selected && styles.transferResultTextSelected]}>{item.fullName || item.displayName || item.email || 'Unnamed user'}</Text>
-                                    <Text style={[styles.transferResultMeta, selected && styles.transferResultTextSelected]}>{item.email || item.phone || item.phoneNumber || cityLabel(normalizeCity(item.defaultCity || DEFAULT_CITY))}</Text>
+                                    <Text style={[styles.transferResultName, selected && styles.transferResultTextSelected]}>{transferMemberName(item)}</Text>
+                                    <Text style={[styles.transferResultMeta, selected && styles.transferResultTextSelected]}>{transferMemberContact(item)}</Text>
                                   </View>
                                   {selected ? <Text style={styles.transferResultCheck}>✓</Text> : null}
                                 </Pressable>
