@@ -48,7 +48,7 @@ export default function RegistrationManagementPanel({ user, profile, review = fa
     }},
   ]);
   return <View style={{ gap: spacing.sm, marginVertical: spacing.md }}>
-    <CitySelector selectedCity={city} onChange={value => { setEvents([]); setCity(value); }} disabled={profile?.role !== 'superAdmin'} />
+    <CitySelector selectedCity={city} onChange={value => { setEvents([]); setTransfer(null); setTransferQuery(''); setCity(value); }} disabled={profile?.role !== 'superAdmin'} />
     <Text style={{ color: colors.navy, ...typography.sectionTitle }}>Registration only events</Text>
     {busy && <ActivityIndicator />}
     {error ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{error}</Text> : null}
