@@ -7,6 +7,7 @@ import {
   AppState,
   FlatList,
   Image,
+  Linking,
   Alert,
   Platform,
   Pressable,
@@ -46,6 +47,7 @@ import AddEventChoice from './src/components/AddEventChoice';
 import RegistrationPrototypeScreen from './src/components/RegistrationPrototypeScreen';
 import RegistrationScreen from './src/components/RegistrationScreen';
 import { REGISTRATION_ENABLED, firebaseRegistration } from './src/registration/firebaseRegistration';
+import { parseEventShareLink } from './src/utils/eventLinks';
 import { registrationEventFeed } from './src/registration/eventFeed';
 import RegistrationEventDetails from './src/components/RegistrationEventDetails';
 import CalendarScreen from './src/components/CalendarScreen';
@@ -1295,6 +1297,32 @@ function MainApp() {
     handleHeaderNavigate('inbox');
     setHostInboxThreadId(String(threadId || ''));
   }, [handleHeaderNavigate]);
+
+  useEffect(() => {
+    if (!currentUser?.uid) return undefined;
+    let active = true;
+    const open = async value => {
+      const target=parseEventShareLink(value); if(!target)return;
+      try {
+        if(target.registrationOnly) {
+          if(!REGISTRATION_ENABLED)throw Error('Please update the app to open this registration event.');
+          if(!active)return;
+          setRegistrationTarget(null);setSelectedEvent(target);
+        } else {
+          const rows=await getPublicEvents();
+          let event=rows.find(row=>row.id===target.id);
+          if(!event && !currentUser.isAnonymous)event=(await getUserEventSubmissions(currentUser.uid)).find(row=>row.id===target.id);
+          if(!active)return;
+          if(!event || (event.hidden && event.createdByUserId!==currentUser.uid))throw Error('This event is currently unavailable.');
+          setSelectedEvent(event);
+        }
+        setAppModule('events');setActiveTab('home');
+      } catch(error) {if(active)Alert.alert('Event unavailable',error.message || 'This event could not be opened.');}
+    };
+    Linking.getInitialURL().then(value=>{if(active && value)open(value);}).catch(()=>{});
+    const listener=Linking.addEventListener('url',event=>open(event.url));
+    return()=>{active=false;listener.remove();};
+  },[currentUser?.uid,currentUser?.isAnonymous]);
 
   const pushNavigationRef = useRef(handleHeaderNavigate);
   pushNavigationRef.current = handleHeaderNavigate;

@@ -17,12 +17,15 @@ function active(profile) {
   return profile && profile.isActive !== false && !profile.bannedAt && !profile.archivedAt && !profile.accountDeletedAt
     && !['inactive', 'banned', 'deleted', 'archived', 'suspended'].includes(profile.accountStatus);
 }
-function manages(actor, event) {
+function moderates(actor, event) {
   return actor.uid === event.ownerUid || actor.profile.role === 'superAdmin'
     || (actor.profile.role === 'admin' && Boolean(actor.profile.adminCity || actor.profile.defaultCity) && (actor.profile.adminCity || actor.profile.defaultCity) === event.city);
 }
+function manages(actor,event) {
+  return actor.uid === event.ownerUid || (event.hidden !== true && moderates(actor,event));
+}
 function approves(actor, event) {
-  return actor.profile.role === 'superAdmin';
+  return actor.profile.role === 'superAdmin' && (!event?.hidden || event.ownerUid === actor.uid);
 }
 function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Date(), enabled = () => false }) {
   const displayName = value => typeof value === 'string' ? value.trim().slice(0,160) : '';
@@ -96,7 +99,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     return db.runTransaction(async tx => {
       const caller = await actor(request, tx);
       const event = await readEvent(request.data?.eventId, tx);
-      if (!manages(caller, event)) fail('permission-denied', 'Only the organiser or authorised admins may change visibility.');
+      if (caller.uid !== event.ownerUid) fail('permission-denied', 'Only the organiser may change event visibility.');
       if (event.deletedAt || event.status === 'cancelled') fail('failed-precondition', 'A cancelled or deleted event cannot be made visible.');
       if (request.data.expectedRevision !== event.revision) fail('aborted', 'The event has changed. Reload before changing visibility.');
       const hidden = request.data.hidden;
@@ -442,6 +445,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
   async function cancelEventRegistration(request) {
     return db.runTransaction(async tx => {
       const caller = await actor(request, tx); const event = await readEvent(request.data?.eventId, tx);
+      requireVisible(caller,event);
       const ref = bookingRef(event.id, caller.uid); const snapshot = await tx.get(ref); const booking = snapshot.data();
       if (!booking || booking.status === 'cancelled') return { status: 'cancelled' };
       if (event.status !== 'cancelled' && (!event.allowCancellation || localMinute(now(), event.timeZone).slice(0, 10) >= event.date)) fail('failed-precondition', 'Cancellation is not available. Contact the organiser.');
@@ -479,7 +483,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     if (request.data?.confirmation !== 'DELETE EVENT') fail('invalid-argument', 'Confirm that you want to delete this event.');
     return db.runTransaction(async tx => {
       const caller = await actor(request, tx); const event = await readEvent(request.data?.eventId, tx);
-      if (!manages(caller, event)) fail('permission-denied', 'You cannot delete this event.');
+      if (!moderates(caller, event)) fail('permission-denied', 'You cannot delete this event.');
       if (event.deletedAt) return { eventId: event.id, revision: event.revision, status: 'cancelled', deleted: true };
       if (request.data.expectedRevision !== event.revision) fail('aborted', 'Reload the event before deleting it.');
       const pending = (await tx.get(pendingRef(event.id))).data();
@@ -548,7 +552,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       result.retention = RETENTION;
       if(request.data?.includeSeriesReview === true && event.seriesId && caller && approves(caller,event)){
         const snapshot=await tx.get(db.collection('registrationEvents').where('seriesId','==',event.seriesId).limit(100));
-        result.reviewOccurrences=snapshot.docs.map(doc=>({...doc.data(),id:doc.id})).filter(row=>row.ownerUid===event.ownerUid&&!row.deletedAt&&!row.reviewDecision&&(row.status==='pending'||(row.status==='approved'&&row.hasPendingChanges)))
+        result.reviewOccurrences=snapshot.docs.map(doc=>({...doc.data(),id:doc.id})).filter(row=>row.ownerUid===event.ownerUid&&(!row.hidden||row.ownerUid===caller.uid)&&!row.deletedAt&&!row.reviewDecision&&(row.status==='pending'||(row.status==='approved'&&row.hasPendingChanges)))
           .map(row=>({eventId:row.id,title:row.title,date:row.date,startTime:row.startTime||'',revision:row.revision,status:row.status,hasPendingChanges:Boolean(row.hasPendingChanges)}))
           .sort((a,b)=>`${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`));
       }
@@ -603,7 +607,10 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
         if ((event.deletedAt && scope !== 'attending') || (city && event.city !== city) || (scope === 'mine' && event.ownerUid !== caller.uid)) return null;
         if (scope === 'public' && (event.hidden === true || event.status !== 'approved' || event.date < localMinute(now(), event.timeZone).slice(0, 10))) return null;
         const manager = Boolean(caller && manages(caller, event));
-        if (event.hidden === true && !manager) return null;
+        if (event.hidden === true && !manager) {
+          if (scope !== 'management' || !moderates(caller,event)) return null;
+          return {id:event.id,title:event.title,date:event.date,city:event.city,ownerUid:event.ownerUid,revision:event.revision,status:event.status,hidden:true,registrationOnly:true,moderationOnly:true,canDelete:true,canManage:false,canApprove:false};
+        }
         const canApprove = Boolean(manager && !event.reviewDecision && (event.status === 'pending' || event.hasPendingChanges) && approves(caller, event));
         if (scope === 'review' && !canApprove) return null;
         const [privateSnap, ownSnap] = await Promise.all([

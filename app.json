@@ -36,7 +36,11 @@
         ],
         "NSCameraUsageDescription": "Allow Community Connect Australia to use your camera when you choose to live stream an event.",
         "NSMicrophoneUsageDescription": "Allow Community Connect Australia to use your microphone when you choose to live stream an event."
-      }
+      },
+      "associatedDomains": [
+        "applinks:communityconnect.siza.info",
+        "applinks:communityevents.siza.info"
+      ]
     },
     "android": {
       "package": "info.siza.communityevents.app",
@@ -53,6 +57,28 @@
         "RECORD_AUDIO",
         "MODIFY_AUDIO_SETTINGS",
         "SCHEDULE_EXACT_ALARM"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "communityconnect.siza.info",
+              "path": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "communityevents.siza.info",
+              "path": "/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "extra": {

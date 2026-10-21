@@ -1046,3 +1046,30 @@ test('hidden notification links show the organiser explanation without stale eve
  assert.equal(tree.props.event.title,'Event unavailable');
  assert.equal(tree.props.event.registrationPrivate,false);
 });
+
+test('individual share text includes public event-card links; bulk share stays separate',()=>{
+ const share=load(path.join(root,'src/utils/eventShare.js'));
+ const event={id:'one',eventType:'Workshop',registrationOnly:true,address:{fullAddress:'SECRET ADDRESS',suburb:'Parramatta'},hostPhone:'SECRET PHONE'};
+ const text=share.buildEventShareMessage(event,{isGuest:false,user:{uid:'owner'},profile:{role:'superAdmin'}});
+ assert.match(text,/https:\/\/communityconnect.siza.info\/\?registration=one/);
+ assert.doesNotMatch(text,/SECRET ADDRESS|SECRET PHONE/);
+ assert.match(share.buildEventShareMessage({...event,registrationOnly:false}),/\?event=one/);
+ const bulk=fs.readFileSync(path.join(root,'src/components/BulkShareScreen.js'),'utf8');
+ assert.doesNotMatch(bulk,/eventShareLink|buildEventShareMessage/);
+});
+
+test('native admin panel renders hidden non-owned events as delete-only entries',async()=>{
+ let index=0;const calls=[],alerts=[];
+ const row={id:'hidden',title:'Hidden event',date:'2099-12-01',revision:4,hidden:true,moderationOnly:true};
+ const react={useState:value=>[index++===1?[row]:value,()=>{}],useEffect:()=>{},createElement:(type,props,...children)=>({type,props:{...props,children}})};
+ const mocks={react,'react-native':{ActivityIndicator:'ActivityIndicator',Alert:{alert:(...args)=>alerts.push(args)},Pressable:'Pressable',Text:'Text',View:'View'},
+ './EventCard':{__esModule:true,default:'EventCard'},'./RegistrationEventDetails':{__esModule:true,default:'RegistrationDetails'},'./NativeLiveStreamModal':{__esModule:true,default:'StreamModal'},'./CitySelector':{__esModule:true,default:'CitySelector'},
+ '../registration/firebaseRegistration':{REGISTRATION_ENABLED:true,firebaseRegistration:()=>({deleteEvent:async(...args)=>calls.push(args)})},'../registration/eventFeed':{},'../services/events':{},'../utils/cities':{DEFAULT_CITY:'sydney'},'../theme':require('./theme-fixture.cjs')};
+ const exports={};const code=babel.transformSync(fs.readFileSync(path.join(root,'src/components/RegistrationManagementPanel.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
+ vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
+ const tree=exports.default({user:{uid:'admin'},profile:{role:'superAdmin'}}),nodes=flatten(tree);
+ assert.equal(nodes.filter(node=>node.type==='EventCard').length,0);
+ assert.equal(nodes.find(node=>node.type==='RegistrationDetails').props.event,null);
+ const button=nodes.find(node=>node.type==='Pressable'&&JSON.stringify(node).includes('Delete event'));assert.ok(button);button.props.onPress();
+ await alerts[0][2][1].onPress();assert.equal(JSON.stringify(calls),JSON.stringify([['hidden',4]]));
+});

@@ -1,3 +1,4 @@
+import { eventShareLink } from './eventLinks';
 import { STORE_SHARE_LINES } from './storeLinks';
 
 function isAdminRole(role) {
@@ -30,6 +31,7 @@ function eventDateLabel(value) {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
+      year: 'numeric',
     });
   } catch {
     return String(value || '');
@@ -55,7 +57,7 @@ function suburbLabel(event = {}) {
 }
 
 export function buildEventShareMessage(event = {}, { isGuest = true, user = null, profile = null } = {}) {
-  const sharePrivacy = getSharePrivacy(profile, event, user?.uid, isGuest);
+  const sharePrivacy = event.registrationOnly ? {showFullAddress:false,showPhone:false} : getSharePrivacy(profile, event, user?.uid, isGuest);
   const location = sharePrivacy.showFullAddress ? (fullAddressLabel(event) || suburbLabel(event)) : suburbLabel(event);
   const locationLabel = sharePrivacy.showFullAddress ? '*Location:*' : '*Suburb:*';
   const displayType = event.eventSubject?.trim()
@@ -78,6 +80,7 @@ export function buildEventShareMessage(event = {}, { isGuest = true, user = null
     normalizeAudience(event.audienceType || event.audience) ? `👥 ${normalizeAudience(event.audienceType || event.audience)}` : '',
     event.notes?.trim() ? `📝 *Notes:* ${event.notes.trim()}` : '',
     '',
+    eventShareLink(event) ? `🔗 View event${event.registrationOnly ? ' & register' : ''}: ${eventShareLink(event)}` : '',
     ...STORE_SHARE_LINES,
     '',
     '_Shared via Community Events Australia_',

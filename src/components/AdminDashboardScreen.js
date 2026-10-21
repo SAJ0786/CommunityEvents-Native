@@ -2646,6 +2646,7 @@ export default function AdminDashboardScreen({
           ) : displayedAdminEvents.length ? (
             <View style={styles.cardList}>
               {displayedAdminEvents.map(event => {
+                if (event.hidden && event.createdByUserId !== user?.uid) return <View key={event.id} style={styles.actionCard}><Text style={styles.cardTitle}>{event.eventSubject || event.eventType || 'Event'}</Text><Text>Hidden by organiser · {event.eventDate}</Text><Text>Only the organiser can open or restore this event.</Text><Pressable accessibilityRole="button" disabled={adminDeletingId === event.id} onPress={() => confirmDeleteAdminEvent(event)} style={styles.ghostButtonDanger}><Text style={styles.ghostButtonDangerText}>Delete event</Text></Pressable></View>;
                 const series = Boolean(event.isSeries || event.seriesId || event.recurringSeriesId);
                 const recurring = Boolean(event.isRecurring || event.recurringSeriesId);
                 return (

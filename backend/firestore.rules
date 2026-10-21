@@ -87,6 +87,9 @@ service cloud.firestore {
                                && request.resource.data.createdByUserId == request.auth.uid;
       allow update:         if isRegistered()
                                && (resource.data.createdByUserId == request.auth.uid
+                                   || (resource.data.get('hidden', false) == false
+                                       && request.resource.data.get('hidden', false) == false))
+                               && (resource.data.createdByUserId == request.auth.uid
                                    || isSuperAdmin()
                                    || (isCityAdminForEvent(resource.data)
                                        && eventCity(request.resource.data) == adminCity()));

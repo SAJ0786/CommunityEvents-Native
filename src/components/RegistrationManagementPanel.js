@@ -32,6 +32,13 @@ export default function RegistrationManagementPanel({ user, profile, review = fa
   }, [city, review, profile?.role, user?.uid, refresh]);
   if (!REGISTRATION_ENABLED || (review && profile?.role !== 'superAdmin')) return null;
   const close = () => setSelected(null);
+  const deleteHidden = event => Alert.alert('Delete hidden event?', 'Existing places will be released and registration history retained.', [
+    {text:'Keep event',style:'cancel'}, {text:'Delete event',style:'destructive',onPress:async()=>{
+      if(busy)return;setBusy(true);setError('');
+      try {await firebaseRegistration({enabled:true}).deleteEvent(event.id,event.revision);setRefresh(value=>value+1);}
+      catch(err){setError(err.message || 'Could not delete event.');}finally{setBusy(false);}
+    }},
+  ]);
   return <View style={{ gap: spacing.sm, marginVertical: spacing.md }}>
     <CitySelector selectedCity={city} onChange={value => { setEvents([]); setCity(value); }} disabled={profile?.role !== 'superAdmin'} />
     <Text style={{ color: colors.navy, ...typography.sectionTitle }}>Registration only events</Text>
@@ -39,7 +46,7 @@ export default function RegistrationManagementPanel({ user, profile, review = fa
     {error ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{error}</Text> : null}
     <Pressable onPress={() => setRefresh(value => value + 1)}><Text style={{ color: colors.tealDark }}>Refresh registration events</Text></Pressable>
     {!busy && !error && events.length === 0 && <Text>{review ? 'No events pending approval.' : 'No registration events in this city.'}</Text>}
-    {events.map(event => <EventCard key={event.id} event={event} onPress={setSelected} />)}
+    {events.map(event => event.moderationOnly ? <View key={event.id} style={{gap:spacing.sm,padding:spacing.md,backgroundColor:colors.surface}}><Text>{event.title}</Text><Text>Hidden by organiser · {event.date}</Text><Text>Only the organiser can open or restore this event.</Text><Pressable accessibilityRole="button" disabled={busy} onPress={()=>deleteHidden(event)}><Text style={{color:colors.danger}}>Delete event</Text></Pressable></View> : <EventCard key={event.id} event={event} onPress={setSelected} />)}
     <RegistrationEventDetails event={selected} user={user} profile={profile} isGuest={false} onChanged={() => setRefresh(value => value + 1)} onClose={close}
       onManageStream={event => { setSelected(null); setStreamEvent(event); }}
       onOperation={onOperation} onEdit={event => onOperation(event, 'editor')}

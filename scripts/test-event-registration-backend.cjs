@@ -1091,18 +1091,18 @@ test('hidden registrations disappear for guests and attendees, but retain bookin
  assert.equal(changed.hidden,true);assert.equal(changed.revision,2);
  assert.deepEqual(f.records.get(`registrationEvents/${event.eventId}/registrations/member`),booking);
  assert.equal(f.records.get(`registrationEvents/${event.eventId}`).reservedPlaces,2);
- for(const uid of [null,'member','other','wrongadmin']) {
+ for(const uid of [null,'member','other','wrongadmin','admin','super']) {
   for(const cardOnly of [false,true])await assert.rejects(f.handlers.getRegistrationEvent(f.request(uid,{eventId:event.eventId,cardOnly})),{code:'not-found',message:'The organiser has chosen to hide this event. It is currently unavailable.'});
  }
  assert.equal((await f.handlers.listRegistrationEvents(f.request(null,{scope:'public',city:'sydney'}))).events.length,0);
  assert.equal((await f.handlers.listRegistrationEvents(f.request('member',{scope:'attending'}))).events.length,0);
- for(const uid of ['host','admin','super'])assert.equal((await f.handlers.getRegistrationEvent(f.request(uid,{eventId:event.eventId}))).event.hidden,true);
+ for(const uid of ['host'])assert.equal((await f.handlers.getRegistrationEvent(f.request(uid,{eventId:event.eventId}))).event.hidden,true);
  assert.equal((await f.handlers.listRegistrationEvents(f.request('host',{scope:'mine'}))).events[0].hidden,true);
  assert.equal((await f.handlers.listRegistrationEvents(f.request('admin',{scope:'management',city:'sydney'}))).events[0].hidden,true);
  await assert.rejects(f.submit(event,'member',{expectedRevision:1,requestId:'edit-hidden'}),{code:'not-found'});
  await assert.rejects(f.submit(event,'other'),{code:'not-found'});
  await assert.rejects(f.handlers.getRegistrationPoster(f.request('member',{eventId:event.eventId})),{code:'not-found'});
- await f.handlers.setRegistrationEventVisibility(f.request('admin',{eventId:event.eventId,expectedRevision:2,hidden:false}));
+ await f.handlers.setRegistrationEventVisibility(f.request('host',{eventId:event.eventId,expectedRevision:2,hidden:false}));
  assert.equal((await f.handlers.getRegistrationEvent(f.request('member',{eventId:event.eventId}))).ownRegistration.status,'registered');
  assert.equal((await f.handlers.listRegistrationEvents(f.request('member',{scope:'attending'}))).events.length,1);
  assert.equal(f.records.get(`registrationEvents/${event.eventId}`).status,'approved');
@@ -1116,16 +1116,16 @@ test('visibility mutations require scoped management, valid state and current re
  await assert.rejects(change('host',{hidden:'true'}),{code:'invalid-argument'});
  await assert.rejects(change('host',{expectedRevision:0}),{code:'aborted'});
  await change('host');
- await assert.rejects(change('super',{hidden:false}),{code:'aborted'});
+ await assert.rejects(change('super',{hidden:false}),{code:'permission-denied'});
  await f.handlers.cancelRegistrationEvent(f.request('host',{eventId:event.eventId,expectedRevision:2,confirmation:'CANCEL EVENT'}));
  await assert.rejects(change('host',{expectedRevision:3,hidden:false}),{code:'failed-precondition'});
 });
 
-test('saving and approving edits never unhides an event',async()=>{
+test('saving hidden edits preserves privacy and prevents non-owner approval',async()=>{
  const f=fixture(),event=await f.create();await f.approve(event);
  await f.handlers.setRegistrationEventVisibility(f.request('host',{eventId:event.eventId,expectedRevision:1,hidden:true}));
  const saved=await f.handlers.saveRegistrationEvent(f.request('host',{eventId:event.eventId,city:'sydney',expectedRevision:2,draft:{...f.draft,title:'Updated while hidden'}}));
- await f.approve(saved);
+ await assert.rejects(f.approve(saved),{code:'permission-denied'});
  assert.equal(f.records.get(`registrationEvents/${event.eventId}`).hidden,true);
  assert.equal((await f.handlers.listRegistrationEvents(f.request(null,{scope:'public',city:'sydney'}))).events.length,0);
 });
@@ -1139,4 +1139,27 @@ test('hidden series occurrences cannot be discovered or submitted by attendees',
  assert.deepEqual(detail.occurrences.map(row=>row.eventId),[first]);
  await assert.rejects(f.handlers.submitRegistrationOccurrences(f.request('member',{eventId:first,requestId:'hidden-series',places:1,answers:{name:'Synthetic',consent:true},occurrences:series.events.map(row=>({eventId:row.eventId,formVersion:1,expectedRevision:0}))})));
  assert.equal(f.records.get(`registrationEvents/${first}`).reservedPlaces,0);
+});
+
+test('hidden non-owned events give admins only minimal delete entries, not restoration or responses',async()=>{
+ for(const uid of ['admin','super']){
+ const f=fixture(),event=await f.create();await f.approve(event);await f.submit(event);
+ await f.handlers.setRegistrationEventVisibility(f.request('host',{eventId:event.eventId,expectedRevision:1,hidden:true}));
+ const row=(await f.handlers.listRegistrationEvents(f.request(uid,{scope:'management',city:'sydney'}))).events[0];
+ assert.deepEqual(Object.keys(row).sort(),['id','title','date','city','ownerUid','revision','status','hidden','registrationOnly','moderationOnly','canDelete','canManage','canApprove'].sort());
+ assert.equal(row.moderationOnly,true);assert.equal(row.canManage,false);assert.equal(row.canDelete,true);
+ await assert.rejects(f.handlers.setRegistrationEventVisibility(f.request(uid,{eventId:event.eventId,expectedRevision:2,hidden:false})),{code:'permission-denied'});
+ await assert.rejects(f.handlers.listEventRegistrations(f.request(uid,{eventId:event.eventId})),{code:'permission-denied'});
+ await assert.rejects(f.handlers.saveRegistrationEvent(f.request(uid,{eventId:event.eventId,expectedRevision:2,city:'sydney',draft:f.draft})),{code:'permission-denied'});
+ await assert.rejects(f.handlers.getRegistrationPoster(f.request(uid,{eventId:event.eventId})),{code:'not-found'});
+ await assert.rejects(f.submit(event,uid),{code:'not-found'});
+ assert.equal((await f.handlers.deleteRegistrationEvent(f.request(uid,{eventId:event.eventId,expectedRevision:2,confirmation:'DELETE EVENT'}))).deleted,true);
+ }
+});
+test('admin ownership retains access to their own hidden event',async()=>{
+ const f=fixture();const event=await f.handlers.saveRegistrationEvent(f.request('super',{city:'sydney',createKey:'own-super',draft:f.draft}));
+ await f.handlers.setRegistrationEventVisibility(f.request('super',{eventId:event.eventId,expectedRevision:1,hidden:true}));
+ assert.equal((await f.handlers.getRegistrationEvent(f.request('super',{eventId:event.eventId}))).canManage,true);
+ await f.handlers.setRegistrationEventVisibility(f.request('super',{eventId:event.eventId,expectedRevision:2,hidden:false}));
+ assert.equal(f.records.get(`registrationEvents/${event.eventId}`).hidden,false);
 });

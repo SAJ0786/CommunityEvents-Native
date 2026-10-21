@@ -36,6 +36,13 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="exp+community-events-australia-native"/>
       </intent-filter>
+      <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="https" android:host="communityconnect.siza.info" android:path="/"/>
+        <data android:scheme="https" android:host="communityevents.siza.info" android:path="/"/>
+      </intent-filter>
     </activity>
     <uses-library android:name="org.apache.http.legacy" android:required="false"/>
   </application>
