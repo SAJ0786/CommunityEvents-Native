@@ -2,6 +2,7 @@ import React from 'react';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing, typography, shadow } from '../theme';
+import { registrationFieldGroups } from './prototypeModel';
 
 export function RegistrationIdentity({ event, places }) {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(event.date || '') ? new Date(`${event.date}T12:00:00Z`) : null;
@@ -21,15 +22,24 @@ export function IconAction({ icon, label, onPress, disabled }) {
 export function Input({ label, error, ...props }) {
   return <View style={styles.group}><Text style={styles.label}>{label}</Text><TextInput accessibilityLabel={label} placeholderTextColor={colors.muted} maxLength={2000} {...props} style={[styles.input, props.multiline && styles.multiline]} />{error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}</View>;
 }
-export function Answer({ field, value, onChange }) {
+export function RegistrationFields({ fields = [], answers = {}, places = 1, readOnly = false, onChange }) {
+  // Submitted fields are already expanded for each participant; never repeat them again.
+  const source = readOnly ? fields.map(field => ({...field,perParticipant:false})) : fields;
+  return <View style={styles.group}>{registrationFieldGroups(source, places).map(group => <View key={group.id} style={styles.insetPanel}>
+    <Text style={styles.title}>{group.label}</Text>
+    {group.fields.map(field => <View key={field.id}><Answer field={{...field,label:field.originalLabel || field.label}} value={answers[field.id]} readOnly={readOnly} onChange={value => onChange?.(field.id,value)}/>{field.description ? <Text style={styles.muted}>{field.description}</Text> : null}</View>)}
+  </View>)}</View>;
+}
+export function Answer({ field, value, onChange, readOnly = false }) {
+  const change = next => { if (!readOnly) onChange?.(next); };
   const label = `${field.label}${field.required ? ' *' : ''}`;
-  if (field.type === 'consent') return <View style={styles.group}><Text style={styles.text}>{field.terms}</Text><View style={styles.row}><Text style={styles.flex}>{label}</Text><Switch accessibilityLabel={label} value={value === true} onValueChange={onChange} /></View></View>;
+  if (field.type === 'consent') return <View style={styles.group}><Text style={styles.text}>{field.terms}</Text><View style={styles.row}><Text style={styles.flex}>{label}</Text><Switch accessibilityLabel={label} disabled={readOnly} value={value === true} onValueChange={change} /></View></View>;
   if (['select', 'radio', 'checkboxes'].includes(field.type)) return <View style={styles.group}><Text style={styles.label}>{label}</Text>{field.options.map(option => {
     const multiple = field.type === 'checkboxes'; const values = Array.isArray(value) ? value : [];
     const selected = multiple ? values.includes(option) : value === option;
-    return <Pressable key={option} accessibilityRole={multiple ? 'checkbox' : 'radio'} accessibilityState={{ checked: selected }} onPress={() => onChange(multiple ? selected ? values.filter(item => item !== option) : [...values, option] : option)} style={[styles.button, selected && styles.selected]}><Text style={styles.text}>{selected ? '✓ ' : ''}{option}</Text></Pressable>;
+    return <Pressable key={option} disabled={readOnly} accessibilityRole={multiple ? 'checkbox' : 'radio'} accessibilityState={{ checked: selected, disabled:readOnly }} onPress={() => change(multiple ? selected ? values.filter(item => item !== option) : [...values, option] : option)} style={[styles.button, selected && styles.selected]}><Text style={styles.text}>{selected ? '✓ ' : ''}{option}</Text></Pressable>;
   })}</View>;
-  return <Input label={label} value={typeof value === 'string' ? value : ''} multiline={field.type === 'textarea'} keyboardType={field.type === 'email' ? 'email-address' : field.type === 'phone' ? 'phone-pad' : field.type === 'number' ? 'numeric' : 'default'} autoCapitalize={field.type === 'email' ? 'none' : 'sentences'} onChangeText={onChange} />;
+  return <Input label={label} value={value == null ? '' : String(value)} editable={!readOnly} accessibilityState={{disabled:readOnly}} multiline={field.type === 'textarea'} keyboardType={field.type === 'email' ? 'email-address' : field.type === 'phone' ? 'phone-pad' : field.type === 'number' ? 'numeric' : 'default'} autoCapitalize={field.type === 'email' ? 'none' : 'sentences'} onChangeText={change} />;
 }
 export const styles = StyleSheet.create({
   reviewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },

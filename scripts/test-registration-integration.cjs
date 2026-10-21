@@ -736,7 +736,7 @@ function recurrenceScreenFixture(transport, extra = {}) {
     'react-native': { ActivityIndicator: 'ActivityIndicator', Alert: { alert() {} }, AppState: { addEventListener: () => ({ remove() {} }) }, Pressable: 'Pressable', Share: {}, Text: 'Text', View: 'View' },
     './KeyboardAwareScrollView': 'ScrollView', './NativeBackButton': 'NativeBackButton', './MemberPageHeader': 'MemberPageHeader',
     '../registration/RegistrationEditor': { __esModule: true, default: 'Editor' },
-    '../registration/RegistrationControls': { Action: 'Action', Answer: 'Answer', Input: 'Input', styles: {} },
+    '../registration/RegistrationControls': { Action: 'Action', Answer: 'Answer', RegistrationFields: 'RegistrationFields', Input: 'Input', styles: {} },
     '../registration/firebaseRegistration': {}, '../registration/registrationClient': contract,
     '../registration/OccurrencePicker': { __esModule:true,default:'OccurrencePicker' },
     '../registration/occurrenceSelection': load(path.join(root,'src/registration/occurrenceSelection.js')),
@@ -955,7 +955,7 @@ test('host screen edits pending draft but self-registration stays on published f
     'react-native': { ActivityIndicator: 'ActivityIndicator', Alert: { alert() {} }, AppState: { addEventListener: () => ({ remove() {} }) }, Pressable: 'Pressable', Share: {}, Text: 'Text', View: 'View' },
     './KeyboardAwareScrollView': 'ScrollView', './NativeBackButton': 'NativeBackButton', './MemberPageHeader': 'MemberPageHeader',
     '../registration/RegistrationEditor': { __esModule: true, default: 'Editor' },
-    '../registration/RegistrationControls': { Action: 'Action', Answer: 'Answer', Input: 'Input', styles: {} },
+    '../registration/RegistrationControls': { Action: 'Action', Answer: 'Answer', RegistrationFields: 'RegistrationFields', Input: 'Input', styles: {} },
     '../registration/firebaseRegistration': {}, '../registration/registrationClient': contract,
     '../registration/OccurrencePicker': { __esModule:true,default:'OccurrencePicker' },
     '../registration/occurrenceSelection': load(path.join(root,'src/registration/occurrenceSelection.js')),
@@ -981,8 +981,8 @@ test('host screen edits pending draft but self-registration stays on published f
   const entry = entryFixture.render();
   assert.match(JSON.stringify(entry), /Published purpose/);
   assert.doesNotMatch(JSON.stringify(entry), /Staged purpose|Staged question|Staged title/);
-  const answer = flatten(entry).find(node => node.type === 'Answer');
-  assert.equal(answer.props.field.id, 'old');
+  const answer = flatten(entry).find(node => node.type === 'RegistrationFields');
+  assert.equal(answer.props.fields[0].id, 'old');
   const submit = flatten(entry).find(node => node.type === 'Action' && JSON.stringify(node.props.children).includes('Submit registration'));
   assert.ok(submit, 'published entry provides confirmation action');
   submit.props.onPress(); await new Promise(setImmediate);
@@ -1011,7 +1011,21 @@ test('response list initially shows names and reveals answers only when expanded
   assert.doesNotMatch(JSON.stringify(tree), /internal-reference ·|Share loaded responses as CSV|Only authorised organiser/);
   assert.equal(flatten(tree).some(node => node.type === 'Text' && node.props.children.includes('Age')), false);
   names.props.onPress();
-  assert.equal(flatten(fixture.render()).some(node => node.type === 'Text' && node.props.children.includes('Age')), true);
+  const saved=flatten(fixture.render()).find(node=>node.type==='RegistrationFields');assert.ok(saved);assert.equal(saved.props.readOnly,true);assert.equal(saved.props.fields[1].label,'Age');assert.equal(saved.props.answers.age,'9');
+});
+
+test('saved native form preserves participant snapshots and consent while blocking changes',()=>{
+ const exports={},calls=[];
+ const react={createElement:(type,props,...children)=>({type,props:{...props,children}})};
+ const mocks={react,'@expo/vector-icons/MaterialCommunityIcons':{default:'Icon'},'react-native':{Pressable:'Pressable',StyleSheet:{create:value=>value},Switch:'Switch',Text:'Text',TextInput:'TextInput',View:'View'},'../theme':require('./theme-fixture.cjs'),'./prototypeModel':load(path.join(root,'src/registration/prototypeModel.js'))};
+ const code=babel.transformSync(fs.readFileSync(path.join(root,'src/registration/RegistrationControls.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
+ vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
+ const fields=[{id:'participant:1:name',participantIndex:1,perParticipant:true,originalLabel:'Name',label:'Participant 1 — Name',type:'text'},{id:'participant:2:name',participantIndex:2,perParticipant:true,originalLabel:'Name',label:'Participant 2 — Name',type:'text'},{id:'terms',type:'consent',label:'Agreement',terms:'Original terms'}];
+ const nodes=flatten(exports.RegistrationFields({fields,places:2,answers:{'participant:1:name':'First','participant:2:name':'Second',terms:true},readOnly:true}));
+ const answers=nodes.filter(node=>node.type===exports.Answer);assert.equal(answers.length,3);assert.equal(answers[2].props.value,true);assert.ok(answers.every(node=>node.props.readOnly));
+ const consent=flatten(exports.Answer({...answers[2].props,onChange:value=>calls.push(value)})).find(node=>node.type==='Switch');assert.equal(consent.props.disabled,true);assert.equal(consent.props.value,true);consent.props.onValueChange(false);
+ const choice=flatten(exports.Answer({field:{type:'radio',label:'Choice',options:['A','B']},value:'B',readOnly:true,onChange:value=>calls.push(value)})).filter(node=>node.type==='Pressable');assert.ok(choice.every(node=>node.props.disabled));choice[0].props.onPress();assert.equal(calls.length,0);
+ const input=exports.Answer({...answers[0].props});assert.equal(input.props.editable,false);assert.equal(input.props.value,'First');
 });
 
 test('poster selection preserves actual PNG, JPEG and WebP encoding instead of guessing JPEG', () => {

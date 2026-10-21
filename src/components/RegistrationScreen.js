@@ -7,17 +7,17 @@ import EventDetailsModal from './EventDetailsModal';
 import { registrationEventCard } from '../registration/eventFeed';
 import { registrationEntryAllowed, registrationEventEnded } from '../registration/registrationStatus';
 import RegistrationEditor from '../registration/RegistrationEditor';
-import { Action, Answer, Input, RegistrationIdentity, styles } from '../registration/RegistrationControls';
+import { Action, Input, RegistrationIdentity, RegistrationFields, styles } from '../registration/RegistrationControls';
 import { firebaseRegistration } from '../registration/firebaseRegistration';
 import { createSubmission } from '../registration/registrationClient';
 import OccurrencePicker from '../registration/OccurrencePicker';
 import {occurrenceSubmission} from '../registration/occurrenceSelection';
 import { answersForReview, eventDraftFromDetail, mergeRegistrationPage } from '../registration/registrationViewModel';
-import { createDraft, validateAnswers, registrationFieldGroups } from '../registration/prototypeModel';
+import { createDraft, validateAnswers } from '../registration/prototypeModel';
 import { EVENT_TYPES } from '../utils/eventOptions';
 import { cityLabel } from '../utils/cities';
 import { colors } from '../theme';
-import { responseName, responseAnswer } from '../registration/responsePresentation';
+import { responseName } from '../registration/responsePresentation';
 import { exportRegistrationWorkbook } from '../services/registrationExport';
 import { friendlyError } from '../utils/errors';
 
@@ -254,7 +254,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
       <View pointerEvents={submission.current ? 'none' : 'auto'} accessibilityElementsHidden={false}>
       {detail.occurrences?.length > 0 && <OccurrencePicker detail={detail} places={places} selected={selectedOccurrences} onChange={setSelectedOccurrences} disabled={busy || Boolean(submission.current)}/>}
       <Input label="Number of places (maximum 5)" value={places} keyboardType="number-pad" onChangeText={value => { submission.current = null; setPlaces(value); }} />
-      {registrationFieldGroups(detail.form.fields, places).map(group => <View key={group.id} style={styles.insetPanel}><Text style={styles.title}>{group.label}</Text>{group.fields.map(field => <View key={field.id}><Answer field={{...field,label:field.originalLabel || field.label}} value={answers[field.id]} onChange={value => { submission.current = null; setAnswers(current => ({ ...current, [field.id]: value })); }} />{field.description ? <Text style={styles.muted}>{field.description}</Text> : null}</View>)}</View>)}
+      <RegistrationFields fields={detail.form.fields} answers={answers} places={places} onChange={(id,value) => { submission.current = null; setAnswers(current => ({...current,[id]:value})); }}/>
       </View>
       {submission.current && !busy && <><Text style={styles.muted}>The last request is unconfirmed. Retry the same submission, or reload before editing.</Text><Action onPress={()=>open(detail.event.id,'entry')}>Reload registration</Action></>}
       <Action primary disabled={busy} onPress={submit}>{submission.current ? 'Retry same submission' : 'Submit registration'}</Action>
@@ -285,7 +285,7 @@ export default function RegistrationScreen({ enabled = false, user, profile, cit
         <Pressable accessibilityRole="button" accessibilityState={{ expanded: expandedResponse === row.registrationId }} onPress={() => setExpandedResponse(current => current === row.registrationId ? null : row.registrationId)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={styles.label}>{responseName(row)}</Text></Pressable>
         {expandedResponse === row.registrationId && <View style={styles.group}>
           <Text style={styles.muted}>{row.status} · {row.places} {row.places === 1 ? 'place' : 'places'}</Text>
-          {(row.fields || []).map(field => <View key={field.id}><Text style={styles.label}>{field.label}</Text><Text style={styles.text}>{responseAnswer(row.answers?.[field.id])}</Text></View>)}
+          {!row.answersDeletedAt && <><Text style={styles.muted}>Submitted registration · Read only</Text><RegistrationFields fields={row.fields} answers={row.answers} places={row.places} readOnly/></>}
           {row.answersDeletedAt ? <Text style={styles.muted}>Answers deleted.</Text> : <Action onPress={() => deleteAnswers(row)}>Permanently delete answers only</Action>}
         </View>}
       </View>)}

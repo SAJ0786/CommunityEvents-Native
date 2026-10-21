@@ -27,7 +27,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import NativeShare from 'react-native-share';
 import { registrationUnavailable, registrationStatusLabel } from '../registration/registrationStatus';
-import { responseAnswer } from '../registration/responsePresentation';
+import { RegistrationFields } from '../registration/RegistrationControls';
 import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 import { formatEventDate, formatEventTime } from '../utils/formatters';
 import { buildEventShareMessage } from '../utils/eventShare';
@@ -470,7 +470,7 @@ export default function EventDetailsModal({
                 </View>
 
                 {unavailableRegistration && <View style={styles.detailsPanel}><Text style={styles.date}>{registrationStatusLabel(event)}</Text><Text style={styles.notes}>This event is no longer taking place. Your registration is kept here for reference; no places are reserved.</Text></View>}
-                {unavailableRegistration && registrationDetail?.ownRegistration && <View style={styles.detailsPanel}><Text style={styles.detailValue}>Registration history</Text>{!registrationDetail.ownRegistration.fields && onViewRegistrationHistory && <ActionButton icon="clipboard-text-outline" label="View saved registration" onPress={onViewRegistrationHistory}/>}{(registrationDetail.ownRegistration.fields || []).map(field => <View key={field.id} style={styles.detailRow}><View style={{flex:1}}><Text style={styles.notes}>{field.label}</Text><Text selectable style={styles.detailValue}>{responseAnswer(registrationDetail.ownRegistration.answers?.[field.id])}</Text></View></View>)}</View>}
+                {registrationDetail?.ownRegistration && <View style={styles.detailsPanel}><Text style={styles.detailValue}>{unavailableRegistration ? 'Registration history' : 'My registration · Read only'}</Text>{!registrationDetail.ownRegistration.fields && onViewRegistrationHistory && <ActionButton icon="clipboard-text-outline" label="View saved registration" onPress={onViewRegistrationHistory}/>}{registrationDetail.ownRegistration.answersDeletedAt ? <Text style={styles.notes}>Answers deleted.</Text> : <RegistrationFields fields={registrationDetail.ownRegistration.fields} answers={registrationDetail.ownRegistration.answers} places={registrationDetail.ownRegistration.places} readOnly/>}</View>}
                 <Text style={styles.date}>{formatEventDate(event.eventDate)}</Text>
                 {event.registrationOnly && !unavailableRegistration && !event.startTime ? <Text style={styles.notes}>Start time not supplied. Calendar entry is date-only; timed reminders are unavailable.</Text> : null}
                 {registrationNotice ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{registrationNotice}</Text> : null}
