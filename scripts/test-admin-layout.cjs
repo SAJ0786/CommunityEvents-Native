@@ -102,7 +102,7 @@ async function main() {
     assert.match(source, new RegExp(`const ${handler} =`), `Hijri observance CRUD should include ${handler}`);
   }
   assert.match(source, /if \(!canManageHijriSettings\)/);
-  assert.match(read('backend/firestore.rules'), /!\(docId in \['hijriCalendar', 'hijriObservances'\]\)/);
+  assert.match(read('backend/firestore.rules'), /!\(docId in \['hijriCalendar', 'hijriObservances', 'azaanRecording'\]\)/);
   for (const file of ['src/components/AdminDashboardScreen.js', 'src/business/BusinessAdminDashboard.js', 'src/business/BusinessApprovalPanel.js', 'src/business/BusinessStatisticsScreen.js']) assert.match(read(file), /AdminPageHeader/);
   assert.match(read('src/components/AccountMenuSheet.js'), /paddingBottom: bottomInset/);
   for (const file of ['src/components/BottomNavigation.js', 'src/business/DirectoryBottomNavigation.js']) assert.match(read(file), /onNavigationLayout\?\.\(navigationRef.current\)/);

@@ -44,7 +44,7 @@ function notificationBell(values) {
 }
 
 function testNavigationAndCopy() {
-  const titles = load('src/config/moduleExperience.js');
+  const titles = load('src/config/moduleExperience.js', {'../theme':require('./theme-fixture.cjs')});
   assert.equal(titles.getModuleExperience('events').productTitle, 'Events');
   assert.equal(titles.getModuleExperience('directory').productTitle, 'Business Directory');
   assert.match(read('src/components/AppHeaderModern.js'), /\? 'Business Directory' : 'Events'/);
