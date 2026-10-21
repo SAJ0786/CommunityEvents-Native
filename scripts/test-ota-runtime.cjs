@@ -4,6 +4,10 @@ const {resolveRuntimeVersionAsync}=require(path.join(root,'node_modules/expo-upd
 const runtime=async platform=>(await resolveRuntimeVersionAsync(root,platform,{},{})).runtimeVersion;
 (async()=>{
  const baseline=await runtime('android');assert.match(baseline,/^[a-f0-9]{40}$/);
+ const generated=path.join(root,'android/.settings/ota-fingerprint-probe.tmp');
+ assert.equal(fs.existsSync(generated),false);
+ fs.mkdirSync(path.dirname(generated),{recursive:true});
+ try{fs.writeFileSync(generated,'Generated IDE state');assert.equal(await runtime('android'),baseline,'Generated IDE state must not change the runtime');}finally{fs.unlinkSync(generated);fs.rmdirSync(path.dirname(generated));}
  const js=path.join(root,'App.js'),originalJs=fs.readFileSync(js);
  try{fs.appendFileSync(js,'\n// Temporary OTA JavaScript compatibility probe.\n');assert.equal(await runtime('android'),baseline,'JavaScript-only changes must remain compatible');}finally{fs.writeFileSync(js,originalJs);}
  const native=path.join(root,'android/app/src/main/java/info/siza/communityevents/app/MainApplication.kt'),originalNative=fs.readFileSync(native);

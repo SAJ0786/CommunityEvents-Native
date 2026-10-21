@@ -1,0 +1,12 @@
+# Machine-generated IDE and compiler outputs; native source remains fingerprinted.
+**/.settings/**
+**/.classpath
+**/.project
+**/android/bin/**
+**/*-gradle-plugin/bin/**
+android/.gradle-codex/**
+android/.kotlin/**
+android/.idea/**
+android/local.properties
+# Debug signing key is excluded from the EAS archive; production uses EAS signing.
+android/app/debug.keystore
