@@ -10,7 +10,7 @@ import SafeAreaView from './ModalSafeArea';
 import { registrationEventCard } from '../registration/eventFeed';
 import SeriesApproval from '../registration/SeriesApproval';
 
-export default function RegistrationEventDetails({ event, user, profile, isGuest, onClose, onOperation, onRequireSignIn, onEdit, onDelete, onManageStream, initialReview = false, onChanged }) {
+export default function RegistrationEventDetails({ event, user, profile, isGuest, onClose, onOperation, onRequireSignIn, onEdit, onDelete, onTransfer, onManageStream, initialReview = false, onChanged }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState('');
   const [posterError, setPosterError] = useState('');
@@ -149,6 +149,7 @@ export default function RegistrationEventDetails({ event, user, profile, isGuest
   }
   return <EventDetailsModal event={detail.card} visible onClose={onClose} user={user} profile={profile} isGuest={isGuest}
     registrationDetail={detail}
+    onTransfer={detail.canTransfer && onTransfer ? () => onTransfer({...detail.card,canTransfer:true}) : undefined}
     registrationNotice={detail.reviewFeedback ? `Review: ${detail.reviewFeedback.decision === 'rejected' ? 'Rejected' : 'Changes requested'} — ${detail.reviewFeedback.message}. Edit and save to resubmit.` : detail.canManage && detail.event.hasPendingChanges ? <Text style={styles.text}>Submitted changes await approval. The published event and form remain live and unchanged. <Text accessibilityRole="button" onPress={() => setReviewing(true)}>Review submitted changes</Text>{posterError ? `\n${posterError}` : ''}</Text> : posterError}
     canManageStream={!isGuest && detail.canManage && detail.event.status === 'approved' && Boolean(onManageStream)}
     onManageStream={detail.canManage && detail.event.status === 'approved' ? onManageStream : undefined}

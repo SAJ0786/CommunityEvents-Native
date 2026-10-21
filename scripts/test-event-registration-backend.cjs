@@ -94,6 +94,10 @@ test('management feed only offers transfer to scoped admins on available visible
  const f=fixture(),event=await f.create();
  const admin=(await f.handlers.listRegistrationEvents(f.request('admin',{scope:'management',city:'sydney'}))).events;assert.equal(admin[0].canTransfer,true);
  const owner=(await f.handlers.listRegistrationEvents(f.request('host',{scope:'mine',city:'sydney'}))).events;assert.equal(owner[0].canTransfer,false);
+ for(const cardOnly of [true,false]){
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('super',{eventId:event.eventId,cardOnly}))).canTransfer,true);
+  assert.equal((await f.handlers.getRegistrationEvent(f.request('host',{eventId:event.eventId,cardOnly}))).canTransfer,false);
+ }
  f.records.get(`registrationEvents/${event.eventId}`).hidden=true;
  const hidden=(await f.handlers.listRegistrationEvents(f.request('super',{scope:'management',city:'sydney'}))).events;assert.equal(hidden[0].moderationOnly,true);assert.notEqual(hidden[0].canTransfer,true);
 });

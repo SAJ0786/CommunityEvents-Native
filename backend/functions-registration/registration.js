@@ -547,7 +547,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
           status:event.status, city:event.city, timeZone:event.timeZone, revision:event.revision, formVersion:event.formVersion,
           hidden:event.hidden === true, deleted:Boolean(event.deletedAt), submittedByName:await submitterName(tx,event),
           ...(manager ? {registrationCount:event.registrationCount,hasPendingChanges:Boolean(event.hasPendingChanges)} : {}) },
-          canManage:Boolean(manager), canApprove:Boolean(caller && !event.deletedAt && !event.reviewDecision && (event.status === 'pending' || event.hasPendingChanges) && approves(caller,event)),
+          canManage:Boolean(manager), canTransfer:canTransfer(caller,event), canApprove:Boolean(caller && !event.deletedAt && !event.reviewDecision && (event.status === 'pending' || event.hasPendingChanges) && approves(caller,event)),
           canRegister:event.status === 'approved' && time < (event.closes || `${event.date}T00:00`),
           canEditRegistration:Boolean(registered && event.status === 'approved' && time.slice(0,10) < event.date),
           canCancel:Boolean(registered && (event.status === 'cancelled' || (event.allowCancellation && time.slice(0,10) < event.date))),
@@ -565,6 +565,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const live = liveProjection(event);
       const result = { event: { ...(await model).publicEvent({ ...event, address: details.data()?.address || '' }), ...schedule, ...live, id: event.id, ownerUid: event.ownerUid, status: event.status, city: event.city, timeZone: event.timeZone, revision: event.revision, formVersion: event.formVersion, allowCancellation: event.allowCancellation === true }, form: form.data(), ownRegistration: own, canManage: Boolean(manager) };
       result.event.hidden = event.hidden === true;
+      result.canTransfer = canTransfer(caller,event);
       result.event.deleted = Boolean(event.deletedAt);
       result.event.submittedByName = await submitterName(tx,event);
       result.canApprove = Boolean(caller && !event.deletedAt && !event.reviewDecision && (event.status === 'pending' || pending) && approves(caller, event));

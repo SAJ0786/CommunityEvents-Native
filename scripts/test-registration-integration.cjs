@@ -185,6 +185,7 @@ function detailsFixture(detail, isGuest = false, options = {}) {
     onClose: () => calls.push(['close']), onRequireSignIn: () => calls.push(['sign-in']),
     onOperation: (event, action) => calls.push(['operation', event.id, action]),
     onEdit: event => calls.push(['edit', event.id]), onDelete: event => calls.push(['delete', event.id]),
+    onTransfer:options.onTransfer,
     onManageStream: event => calls.push(['stream', event.id]) };
   return {
     calls, alerts, listeners, api,
@@ -249,6 +250,15 @@ test('registered attendee edits own booking and cancellation sends latest bookin
   tree.props.onCancelRegistration();
   await fixture.alerts.at(-1)[2][1].onPress();
   assert.equal(fixture.calls.some(call => call[0] === 'cancel' && call[1] === 'event' && call[2] === 4), true);
+});
+test('opened registration card exposes Transfer only with fresh server permission and forwards the latest revision',async()=>{
+ for(const allowed of [true,false]){
+  let selected;
+  const f=detailsFixture({event:{id:'event',status:'approved',revision:7},canManage:true,canTransfer:allowed},false,{lightweight:true,onTransfer:event=>{selected=event;}});
+  f.render();await new Promise(setImmediate);const tree=f.render();
+  assert.equal(typeof tree.props.onTransfer,allowed?'function':'undefined');
+  if(allowed){tree.props.onTransfer();assert.equal(selected.id,'event');assert.equal(selected.revision,7);}
+ }
 });
 test('approved managers receive streaming controls from normal registration details', async () => {
   const fixture = detailsFixture({ event: { id: 'event', status: 'approved' }, canManage: true });
@@ -1062,6 +1072,23 @@ test('individual share text includes public event-card links; bulk share stays s
  assert.doesNotMatch(bulk,/eventShareLink|buildEventShareMessage/);
 });
 
+test('native dashboard opens the transfer selector from the card action and submits its current revision',async()=>{
+ let cursor=0;const state=[],calls=[],alerts=[];
+ const event={id:'event',title:'Registration event',ownerUid:'old-owner',revision:2,canTransfer:true};
+ const react={useState:initial=>{const i=cursor++;if(!(i in state))state[i]=i===1?[event]:initial;return [state[i],value=>{state[i]=typeof value==='function'?value(state[i]):value;}];},useEffect:()=>{},createElement:(type,props,...children)=>({type,props:{...props,children}})};
+ const mocks={react,'react-native':{ActivityIndicator:'ActivityIndicator',Alert:{alert:(...args)=>alerts.push(args)},Pressable:'Pressable',Text:'Text',TextInput:'TextInput',View:'View'},
+ './EventCard':{__esModule:true,default:'EventCard'},'./RegistrationEventDetails':{__esModule:true,default:'RegistrationDetails'},'./NativeLiveStreamModal':{__esModule:true,default:'StreamModal'},'./CitySelector':{__esModule:true,default:'CitySelector'},
+ '../registration/firebaseRegistration':{REGISTRATION_ENABLED:true,firebaseRegistration:()=>({transfer:async(...args)=>calls.push(args)})},'../registration/eventFeed':{},'../services/events':{},'../utils/cities':{DEFAULT_CITY:'sydney'},'../theme':require('./theme-fixture.cjs')};
+ const exports={};const code=babel.transformSync(fs.readFileSync(path.join(root,'src/components/RegistrationManagementPanel.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
+ vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
+ const render=()=>{cursor=0;return exports.default({user:{uid:'super'},profile:{role:'superAdmin'},users:[{id:'new-owner',fullName:'New Organiser'}],onLoadUsers:()=>calls.push(['loadUsers'])});};
+ let nodes=flatten(render());nodes.find(node=>node.type==='EventCard').props.onPress(event);
+ nodes=flatten(render());const details=nodes.find(node=>node.type==='RegistrationDetails');assert.equal(details.props.event.id,'event');
+ details.props.onTransfer({...event,revision:7});nodes=flatten(render());assert.equal(nodes.find(node=>node.type==='RegistrationDetails').props.event,null);
+ const input=nodes.find(node=>node.type==='TextInput');assert.ok(input);input.props.onChangeText('New');
+ nodes=flatten(render());const member=nodes.find(node=>node.type==='Pressable'&&flatten(node).some(child=>child.type==='Text'&&child.props.children[0]==='New Organiser'));assert.ok(member);member.props.onPress();
+ await alerts[0][2][1].onPress();assert.equal(JSON.stringify(calls.at(-1)),JSON.stringify(['event',7,'new-owner']));
+});
 test('native admin panel renders hidden non-owned events as delete-only entries',async()=>{
  let index=0;const calls=[],alerts=[];
  const row={id:'hidden',title:'Hidden event',date:'2099-12-01',revision:4,hidden:true,moderationOnly:true};
