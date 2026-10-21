@@ -1,5 +1,11 @@
 # Community Connect native OTA updates
 
+## Current release restriction — 22 October 2026
+
+The user reports the iOS store update is approved, while the Android update is still under review. They authorised sending the current fixes without a separate device testing stage, for iOS only. Do not publish an Android OTA for these changes until the user confirms Android approval or explicitly changes this restriction.
+
+iOS production OTA published on 22 October 2026 (Australia/Sydney): group `13547882-0e6d-4bee-8bb1-6e67ca321329`, update `01a1608c-bf09-7c4e-bae1-16614b4fd31c`, source `0244486efaa5087d4bcc8448c3158430ee0af3ea`, runtime `b1f045e738e61629962eb354595e34e2c39b75e6` (matches iOS 2.1.1 build 16). Fixes share-footer branding and adds administrator registration-event ownership transfer. Only iOS was included; no Android OTA or new native binary was published. No on-device receipt/application is claimed. The user can open online, allow download, fully close and reopen to apply.
+
 ## Configuration
 
 Expo SDK 54 uses expo-updates ~29.0.20. EAS project b05d73eb-a069-4503-be44-ceb149f4a4fe serves updates over HTTPS. Store production builds use the production channel; preview, registration-testflight and play-internal profiles use preview. Channels are separate and do not change the store identity.
