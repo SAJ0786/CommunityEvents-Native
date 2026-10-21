@@ -11,7 +11,8 @@
       "env": {
         "APP_RELEASE_MODE": "tester",
         "APP_CHECK_PROVIDER": "debug"
-      }
+      },
+      "channel": "development"
     },
     "apk": {
       "environment": "preview",
@@ -23,7 +24,8 @@
       "env": {
         "APP_RELEASE_MODE": "tester",
         "APP_CHECK_PROVIDER": "debug"
-      }
+      },
+      "channel": "preview"
     },
     "preview": {
       "environment": "preview",
@@ -31,7 +33,8 @@
       "env": {
         "APP_RELEASE_MODE": "tester",
         "APP_CHECK_PROVIDER": "debug"
-      }
+      },
+      "channel": "preview"
     },
     "ios-simulator": {
       "environment": "preview",
@@ -43,7 +46,8 @@
       "env": {
         "APP_RELEASE_MODE": "tester",
         "APP_CHECK_PROVIDER": "debug"
-      }
+      },
+      "channel": "preview"
     },
     "ios-personal-testflight": {
       "environment": "preview",
@@ -57,7 +61,8 @@
         "APP_CHECK_PROVIDER": "production",
         "IOS_BUNDLE_IDENTIFIER": "info.siza.communityconnect.personaltest",
         "IOS_GOOGLE_SERVICES_FILE": "./GoogleService-Info.personal-test.plist"
-      }
+      },
+      "channel": "preview"
     },
     "registration-testflight": {
       "extends": "production",
@@ -67,7 +72,8 @@
         "EVENT_REGISTRATION_CLIENT_ENABLED": "true",
         "CITY_MANAGEMENT_CLIENT_ENABLED": "false",
         "PROMOTION_AUDIENCE_CLIENT_ENABLED": "false"
-      }
+      },
+      "channel": "preview"
     },
     "registration-apk": {
       "extends": "apk",
@@ -75,7 +81,8 @@
         "EVENT_REGISTRATION_CLIENT_ENABLED": "true",
         "CITY_MANAGEMENT_CLIENT_ENABLED": "false",
         "PROMOTION_AUDIENCE_CLIENT_ENABLED": "false"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "environment": "production",
@@ -89,14 +96,16 @@
         "EVENT_REGISTRATION_CLIENT_ENABLED": "true",
         "CITY_MANAGEMENT_CLIENT_ENABLED": "false",
         "PROMOTION_AUDIENCE_CLIENT_ENABLED": "false"
-      }
+      },
+      "channel": "production"
     },
     "play-internal": {
       "extends": "registration-testflight",
       "distribution": "store",
       "android": {
         "buildType": "app-bundle"
-      }
+      },
+      "channel": "preview"
     }
   },
   "submit": {

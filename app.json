@@ -150,6 +150,15 @@
           "microphonePermission": "Allow Community Connect Australia to use your microphone when you choose to live stream an event."
         }
       ]
-    ]
+    ],
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "enabled": true,
+      "url": "https://u.expo.dev/b05d73eb-a069-4503-be44-ceb149f4a4fe",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

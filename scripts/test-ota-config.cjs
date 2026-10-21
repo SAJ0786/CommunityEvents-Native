@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..'),read=name=>fs.readFileSync(path.join(root,name),'utf8');
+const app=JSON.parse(read('app.json')).expo,eas=JSON.parse(read('eas.json')),pkg=JSON.parse(read('package.json'));
+assert.equal(pkg.dependencies['expo-updates'],'~29.0.20');
+assert.equal(app.runtimeVersion.policy,'fingerprint');
+assert.equal(app.updates.enabled,true);assert.equal(app.updates.url,'https://u.expo.dev/b05d73eb-a069-4503-be44-ceb149f4a4fe');
+assert.equal(app.updates.checkAutomatically,'ON_LOAD');assert.equal(app.updates.fallbackToCacheTimeout,0);
+assert.notEqual(app.updates.disableAntiBrickingMeasures,true);
+assert.equal(eas.build.production.channel,'production');
+for(const name of ['preview','registration-testflight','play-internal','registration-apk'])assert.equal(eas.build[name].channel,'preview');
+const manifest=read('android/app/src/main/AndroidManifest.xml');
+assert.match(manifest,/android:name="expo.modules.updates.ENABLED" android:value="true"/);
+assert.match(manifest,/android:name="expo.modules.updates.EXPO_UPDATE_URL"\s+android:value="https:\/\/u.expo.dev\/b05d73eb-a069-4503-be44-ceb149f4a4fe"/);
+assert.match(manifest,/android:name="expo.modules.updates.EXPO_RUNTIME_VERSION" android:value="@string\/expo_runtime_version"/);
+assert.match(read('android/app/src/main/res/values/strings.xml'),/<string name="expo_runtime_version">file:fingerprint<\/string>/);
+assert.equal(pkg.main,'node_modules/expo/AppEntry.js');
+assert.match(read('android/app/src/main/java/info/siza/communityevents/app/MainApplication.kt'),/ReactNativeHostWrapper/);
+console.log('PASS OTA configuration: SDK-compatible package, native enabled, fingerprint runtime, isolated channels, non-blocking launch and recovery defaults.');

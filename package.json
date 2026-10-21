@@ -19,7 +19,8 @@
     "check:release": "node scripts/verify-release.js",
     "testlab:robo-script": "node scripts/generate-robo-script.js",
     "postinstall": "patch-package",
-    "test:notification-matrix": "node --test scripts/test-notification-matrix.cjs"
+    "test:notification-matrix": "node --test scripts/test-notification-matrix.cjs",
+    "test:ota": "node scripts/test-ota-config.cjs && node scripts/test-ota-runtime.cjs"
   },
   "dependencies": {
     "@api.video/react-native-livestream": "^2.0.2",
@@ -54,6 +55,7 @@
     "expo-notifications": "~0.32.17",
     "expo-screen-orientation": "~9.0.9",
     "expo-status-bar": "~3.0.9",
+    "expo-updates": "~29.0.20",
     "firebase": "^12.0.0",
     "patch-package": "^8.0.1",
     "promise": "^8.3.0",
