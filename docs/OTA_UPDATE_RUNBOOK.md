@@ -6,6 +6,14 @@ The user reports the iOS store update is approved, while the Android update is s
 
 iOS production OTA published on 22 October 2026 (Australia/Sydney): group `13547882-0e6d-4bee-8bb1-6e67ca321329`, update `01a1608c-bf09-7c4e-bae1-16614b4fd31c`, source `0244486efaa5087d4bcc8448c3158430ee0af3ea`, runtime `b1f045e738e61629962eb354595e34e2c39b75e6` (matches iOS 2.1.1 build 16). Fixes share-footer branding and adds administrator registration-event ownership transfer. Only iOS was included; no Android OTA or new native binary was published. No on-device receipt/application is claimed. The user can open online, allow download, fully close and reopen to apply.
 
+## Follow-up iOS OTA — native card action and member autocomplete
+
+On 22 October 2026 (Australia/Sydney), published iOS-only production group `89826346-b867-4a74-9308-78b81a99b0ed`, update `01a1609d-70ab-79a5-9cfd-2d63df88532e`, source `3cf1299e2ad718b63c409b7efeddcca30985f449`. Runtime remains `b1f045e738e61629962eb354595e34e2c39b75e6`, matching build 16. This supersedes the earlier iOS update for matching installations. Android OTA remains on hold.
+
+The first update exposed transfer beneath the native dashboard list card but did not wire the existing Transfer action inside opened registration details. The follow-up connects that action using fresh server permission and revision, closes details into the selected card's transfer panel, and places the selector beside that card. getRegistrationEvent was deployed to expose the server capability in both lightweight and full detail responses. No actual event ownership was changed during verification.
+
+Transfer member lookup uses one name/phone/email autocomplete field, with matching records shown below to select. Australian 04/+61 formatting is normalised. Web normal-event and registration-event transfer dropdowns were replaced with a shared picker showing up to eight suggestions; native normal/registration transfer search uses the same matching helper. Web commit `71188c3b127f4b0bb2ea39b7b6a7c616fef3af7d` deployed to Hosting and live assets were verified. Checks passed: 120 native registration/backend cases, 145-file binding gate, admin layout, 307 web cases and production build. New mounted tests cover opened-card transfer, current revision and formatted-phone selection. Physical-device receipt/application is not claimed.
+
 ## Configuration
 
 Expo SDK 54 uses expo-updates ~29.0.20. EAS project b05d73eb-a069-4503-be44-ceb149f4a4fe serves updates over HTTPS. Store production builds use the production channel; preview, registration-testflight and play-internal profiles use preview. Channels are separate and do not change the store identity.
