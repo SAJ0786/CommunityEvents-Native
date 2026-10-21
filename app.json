@@ -67,7 +67,8 @@
             "compileSdkVersion": 36,
             "targetSdkVersion": 36,
             "enableMinifyInReleaseBuilds": true,
-            "enableShrinkResourcesInReleaseBuilds": true
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-keep @interface expo.modules.kotlin.records.Field { *; }\n-keep class expo.modules.notifications.** { *; }"
           },
           "ios": {
             "deploymentTarget": "15.1",

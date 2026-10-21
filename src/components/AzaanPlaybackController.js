@@ -24,12 +24,18 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar, manualPla
   const [status, setStatus] = useState({});
   const [visible, setVisible] = useState(false);
   const handledNotificationId = useRef('');
+  const handledManualRequest = useRef(0);
+  const playbackGeneration = useRef(0);
+  const openCalendarRef = useRef(onOpenHijriCalendar);
+  openCalendarRef.current = onOpenHijriCalendar;
 
   const playRecording = useCallback(async ({ openCalendar = false, operation = 'play_azaan' } = {}) => {
-    if (openCalendar) onOpenHijriCalendar?.();
+    const generation = ++playbackGeneration.current;
+    if (openCalendar) openCalendarRef.current?.();
     setVisible(true);
     try {
       const recording = await getActiveAzaanRecording();
+      if (generation !== playbackGeneration.current) return false;
       if (!playerRef.current || playerSourceKey.current !== recording.key) {
         try { statusSubscription.current?.remove(); } catch { /* already released */ }
         try { playerRef.current?.remove(); } catch { /* replace stale recording */ }
@@ -46,18 +52,21 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar, manualPla
         shouldPlayInBackground: false,
         interruptionMode: 'duckOthers',
       });
+      if (generation !== playbackGeneration.current) return false;
       await player.seekTo(0);
+      if (generation !== playbackGeneration.current) return false;
       player.play();
       return true;
     } catch (error) {
+      if (generation !== playbackGeneration.current) return false;
       recordNonFatalError(error, { feature: 'notifications', operation });
       setVisible(false);
       if (operation === 'manual_azaan_player') {
-        Alert.alert('Play Azan', 'The Azan recording could not be played. Check your media volume and try again.');
+        Alert.alert('Play Azan', 'The Azan player could not start. Please try again. If this continues, contact support.');
       }
       return false;
     }
-  }, [onOpenHijriCalendar]);
+  }, []);
 
   const playFromNotification = useCallback(async response => {
     if (!isAzaanNotification(response)) return;
@@ -69,14 +78,16 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar, manualPla
   }, [playRecording]);
 
   const stopPlayback = useCallback(async () => {
+    playbackGeneration.current += 1;
+    setVisible(false);
     try {
       playerRef.current?.pause();
       await playerRef.current?.seekTo(0);
     } catch {}
-    setVisible(false);
   }, []);
 
   useEffect(() => () => {
+    playbackGeneration.current += 1;
     try { statusSubscription.current?.remove(); } catch { /* already released */ }
     try { playerRef.current?.remove(); } catch { /* native teardown must not crash navigation */ }
     statusSubscription.current = null;
@@ -105,7 +116,9 @@ export default function AzaanPlaybackController({ onOpenHijriCalendar, manualPla
   }, [playFromNotification]);
 
   useEffect(() => {
-    if (!manualPlayRequest) return;
+    if (!manualPlayRequest || handledManualRequest.current === manualPlayRequest) return;
+    // Consume even a failed request. Only another explicit Play tap may retry.
+    handledManualRequest.current = manualPlayRequest;
     playRecording({ operation: 'manual_azaan_player' });
   }, [manualPlayRequest, playRecording]);
 

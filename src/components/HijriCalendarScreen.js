@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   AppState,
   Alert,
+  Platform,
   Pressable,
   StyleSheet,
   Switch,
@@ -165,11 +166,12 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack, onP
 
   useEffect(() => {
     getAzaanAlarmSettings()
-      .then(value => value.enabledKeys?.length
-        ? refreshAzaanAlarms(getPrayerLocation(prayerCity))
-        : value)
+      .then(value => {
+        setAzaanAlarmKeys(value.enabledKeys || []);
+        return value.enabledKeys?.length ? refreshAzaanAlarms(getPrayerLocation(prayerCity)) : value;
+      })
       .then(value => setAzaanAlarmKeys(value.enabledKeys || []))
-      .catch(() => setAzaanAlarmKeys([]));
+      .catch(() => { /* A failed refresh must not display saved alarms as off. */ });
   }, [prayerCity, prayerDate, cityCatalogueVersion]);
 
   const overrides = settings.overrides || [];
@@ -232,13 +234,16 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack, onP
       const value = await setAzaanAlarm(key, enabled, getPrayerLocation(prayerCity));
       setAzaanAlarmKeys(value.enabledKeys || []);
       Alert.alert(enabled ? 'Azaan alarm on' : 'Azaan alarm off', enabled
-        ? 'This phone will play the bundled Azaan clip at the selected prayer time for the next 21 days. The alarm is stored only on this device.'
+        ? `Alarms are scheduled on this phone for the next ${Platform.OS === 'ios' ? 7 : 21} days. Open this page to refresh them. Enable alarms separately on each device. Signing out or clearing app data removes local alarms. The notification uses the bundled sound; tap it to play the full selected recording.`
         : 'The selected Azaan alarms were removed from this phone.');
     } catch (error) {
       const actions = error?.code === 'EXACT_ALARM_BLOCKED'
         ? [
           { text: 'Not now', style: 'cancel' },
           { text: 'Open settings', onPress: () => openDeviceNotificationSettings({ exactAlarm: true }) },
+        ] : error?.code === 'NOTIFICATIONS_BLOCKED' ? [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open settings', onPress: () => openDeviceNotificationSettings() },
         ] : [{ text: 'OK' }];
       Alert.alert('Azaan alarm', error?.message || 'We could not update this Azaan alarm.', actions);
     } finally {
@@ -347,7 +352,7 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack, onP
                   <View style={styles.azaanIcon}><MaterialCommunityIcons name="volume-high" color={colors.surface} size={18} /></View>
                   <View style={styles.azaanHeadingCopy}>
                     <Text style={styles.azaanTitle}>Azaan Alarm</Text>
-                    <Text style={styles.azaanHelp}>Optional on this phone. All alarms are off by default.</Text>
+                    <Text style={styles.azaanHelp}>For this phone only. Enable on each device. Signing out clears local alarms.</Text>
                   </View>
                   <Pressable
                     accessibilityRole="button"
@@ -372,7 +377,7 @@ export default function HijriCalendarScreen({ profile, selectedCity, onBack, onP
                     {azaanAlarmBusy === key ? <ActivityIndicator color={colors.tealDark} size="small" /> : <Switch accessibilityLabel={`${label} Azaan alarm`} value={azaanAlarmKeys.includes(key)} onValueChange={() => toggleAzaanAlarm(key)} trackColor={{ false: colors.border, true: colors.teal }} />}
                   </View>
                 ))}
-                <Text style={styles.azaanPrivacy}>Tap Play Azan to listen at any time. The selected recording is bundled in the app. When the app is backgrounded, the phone plays the configured notification sound and platform restrictions may require tapping the notification for full in-app playback. Android may require Alarms &amp; reminders permission; these alarms are separate from Profile prayer-time reminders.</Text>
+                <Text style={styles.azaanPrivacy}>Play Azan uses the active recording, with the bundled clip as a fallback. Alarm notifications use the bundled sound; tap the notification for full playback. Open this page regularly to refresh scheduled alarms. Android may require Alarms &amp; reminders permission; these alarms are separate from Profile prayer-time reminders.</Text>
               </View>
             </View>
           ) : null}

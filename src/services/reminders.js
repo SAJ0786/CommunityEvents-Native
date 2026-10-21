@@ -9,6 +9,7 @@ import { auth, functions } from '../firebase/firebase';
 import { getEventSuburb, getEventTitle } from './events';
 import { calculatePrayerTimes, prayerLabel, prayerDateAt, prayerTimeInstant } from './prayerTimes';
 import { registrationInstant, registrationSchedule } from '../registration/eventSchedule';
+import { recordNonFatalError } from './diagnostics';
 
 const REMINDER_STORAGE_KEY = '@community-events/event-reminders';
 const REMINDER_CHANNEL_ID = 'event-reminders';
@@ -114,10 +115,10 @@ export async function openDeviceNotificationSettings({ exactAlarm = false } = {}
 function notificationScheduleError(error) {
   const message = String(error?.message || '');
   const exactAlarm = Platform.OS === 'android'
-    && /exact|alarm|securityexception|schedule_exact_alarm/i.test(message);
+    && /exact.?alarm|schedule_exact_alarm|canScheduleExactAlarms/i.test(message);
   const nextError = new Error(exactAlarm
     ? 'Allow Alarms & reminders for Community Connect Australia, then try again.'
-    : 'We could not set this alarm. Check that notifications are allowed for Community Connect Australia, then try again.');
+    : 'The phone could not save this alarm. Please try again. If this continues, contact support.');
   nextError.code = exactAlarm ? 'EXACT_ALARM_BLOCKED' : 'REMINDER_NOT_SCHEDULED';
   return nextError;
 }
@@ -133,6 +134,7 @@ async function scheduleVerifiedNotification(request) {
     // not cancel a valid alarm as "not retained".
     return notificationId;
   } catch (error) {
+    recordNonFatalError(error, { feature: 'notifications', operation: 'schedule_local_notification' });
     throw notificationScheduleError(error);
   }
 }
@@ -225,19 +227,19 @@ async function scheduleAzaanAlarmKeys(keys, location, currentSettings) {
   const current = currentSettings || await readAzaanAlarmSettings();
   const enabledKeys = [...new Set(keys)].filter(key => AZAAN_ALARM_KEYS.includes(key));
   const scheduleLocation = location || current.location;
-  await cancelPrayerNotificationIds(current.notificationIds);
-
   if (!enabledKeys.length) {
     const cleared = { enabledKeys: [], notificationIds: [], location: scheduleLocation || null, refreshedAt: new Date().toISOString() };
     await AsyncStorage.setItem(AZAAN_ALARM_STORAGE_KEY, JSON.stringify(cleared));
+    await cancelPrayerNotificationIds(current.notificationIds);
     return cleared;
   }
   if (!calculatePrayerTimes(prayerDateAt(scheduleLocation), scheduleLocation)) {
-    await AsyncStorage.setItem(AZAAN_ALARM_STORAGE_KEY, JSON.stringify({ ...current, notificationIds: [], location: scheduleLocation, refreshedAt: null }));
     throw new Error('Choose a supported Australian city before setting Azaan alarms.');
   }
   if (!(await ensureAzaanNotificationPermission())) {
-    throw new Error('Notifications are disabled. Enable them in your phone settings to use Azaan alarms.');
+    const error = new Error('Notifications are disabled. Enable them in your phone settings to use Azaan alarms.');
+    error.code = 'NOTIFICATIONS_BLOCKED';
+    throw error;
   }
 
   const notificationIds = [];
@@ -245,50 +247,69 @@ async function scheduleAzaanAlarmKeys(keys, location, currentSettings) {
   // horizon leaves room for event reminders while still covering every prayer.
   const scheduleDays = Platform.OS === 'ios' ? 7 : 21;
   const scheduleNow = new Date();
-  for (let dayOffset = 0; dayOffset < scheduleDays; dayOffset += 1) {
-    const isoDate = prayerDateAt(scheduleLocation, scheduleNow, dayOffset);
-    const times = calculatePrayerTimes(isoDate, scheduleLocation);
-    if (!times) continue;
-    for (const key of enabledKeys) {
-      const match = String(times[key] || '').match(/^(\d{2}):(\d{2})$/);
-      if (!match) continue;
-      const triggerDate = prayerTimeInstant(isoDate, times[key], times.timeZone);
-      if (!triggerDate) continue;
-      if (triggerDate.getTime() <= Date.now()) continue;
-      const notificationId = await scheduleVerifiedNotification({
-        content: {
-          title: `${prayerLabel(key)} Azaan`,
-          body: `${scheduleLocation?.suburb || 'Your city'} · ${times[key]}`,
-          sound: AZAAN_SOUND_FILE,
-          data: { screen: 'hijri-calendar', prayer: key, kind: 'azaan-alarm' },
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: triggerDate,
-          ...(Platform.OS === 'android' ? { channelId: AZAAN_ALARM_CHANNEL_ID } : {}),
-        },
-      });
-      notificationIds.push(notificationId);
+  try {
+    for (let dayOffset = 0; dayOffset < scheduleDays; dayOffset += 1) {
+      const isoDate = prayerDateAt(scheduleLocation, scheduleNow, dayOffset);
+      const times = calculatePrayerTimes(isoDate, scheduleLocation);
+      if (!times) continue;
+      for (const key of enabledKeys) {
+        const match = String(times[key] || '').match(/^(\d{2}):(\d{2})$/);
+        if (!match) continue;
+        const triggerDate = prayerTimeInstant(isoDate, times[key], times.timeZone);
+        if (!triggerDate) continue;
+        if (triggerDate.getTime() <= Date.now()) continue;
+        const notificationId = await scheduleVerifiedNotification({
+          content: {
+            title: `${prayerLabel(key)} Azaan`,
+            body: `${scheduleLocation?.suburb || 'Your city'} · ${times[key]}`,
+            sound: AZAAN_SOUND_FILE,
+            data: { screen: 'hijri-calendar', prayer: key, kind: 'azaan-alarm' },
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: triggerDate,
+            ...(Platform.OS === 'android' ? { channelId: AZAAN_ALARM_CHANNEL_ID } : {}),
+          },
+        });
+        notificationIds.push(notificationId);
+      }
     }
-  }
 
-  const next = { enabledKeys, notificationIds, location: scheduleLocation, refreshedAt: new Date().toISOString() };
-  await AsyncStorage.setItem(AZAAN_ALARM_STORAGE_KEY, JSON.stringify(next));
+    const next = { enabledKeys, notificationIds, location: scheduleLocation, refreshedAt: new Date().toISOString() };
+    await AsyncStorage.setItem(AZAAN_ALARM_STORAGE_KEY, JSON.stringify(next));
+    await cancelPrayerNotificationIds(current.notificationIds);
+    return next;
+  } catch (error) {
+    // A partial native schedule must never leave hidden alarms or destroy the
+    // last working settings. Commit only after every replacement was saved.
+    await cancelPrayerNotificationIds(notificationIds);
+    throw error;
+  }
+}
+
+let azaanUpdate = Promise.resolve();
+function updateAzaanAlarms(action) {
+  const next = azaanUpdate.then(action, action);
+  azaanUpdate = next.catch(() => {});
   return next;
 }
 
-export async function setAzaanAlarm(prayerKey, enabled, location) {
-  const current = await readAzaanAlarmSettings();
-  const enabledKeys = enabled
-    ? [...new Set([...current.enabledKeys, prayerKey])]
-    : current.enabledKeys.filter(key => key !== prayerKey);
-  return scheduleAzaanAlarmKeys(enabledKeys, location, current);
+export function setAzaanAlarm(prayerKey, enabled, location) {
+  return updateAzaanAlarms(async () => {
+    const current = await readAzaanAlarmSettings();
+    const enabledKeys = enabled
+      ? [...new Set([...current.enabledKeys, prayerKey])]
+      : current.enabledKeys.filter(key => key !== prayerKey);
+    return scheduleAzaanAlarmKeys(enabledKeys, location, current);
+  });
 }
 
-export async function refreshAzaanAlarms(location) {
-  const current = await readAzaanAlarmSettings();
-  if (!current.enabledKeys.length) return current;
-  return scheduleAzaanAlarmKeys(current.enabledKeys, location || current.location, current);
+export function refreshAzaanAlarms(location) {
+  return updateAzaanAlarms(async () => {
+    const current = await readAzaanAlarmSettings();
+    if (!current.enabledKeys.length) return current;
+    return scheduleAzaanAlarmKeys(current.enabledKeys, location || current.location, current);
+  });
 }
 
 export async function getPrayerReminderSettings() {

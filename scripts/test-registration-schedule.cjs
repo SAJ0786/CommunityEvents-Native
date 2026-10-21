@@ -87,6 +87,7 @@ function reminderFixture(platform) {
     '../registration/eventSchedule': schedule, '../theme': require('./theme-fixture.cjs'), '../theme': require('./theme-fixture.cjs'),
     '@react-native-firebase/functions': { httpsCallable: (_f,name) => async data => ({data: name === 'scheduleRegistrationNotice' ? {triggerAt:'2026-12-01T07:00:00.000Z'} : {removed:true}}) },
     '../firebase/firebase': {auth:{currentUser:{uid:'member'}},functions:{}},
+    './diagnostics': { recordNonFatalError() {} },
   }, { Date: Clock });
   return { api, scheduled, store };
 }
