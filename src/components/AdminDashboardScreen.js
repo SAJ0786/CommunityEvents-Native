@@ -743,7 +743,7 @@ export default function AdminDashboardScreen({
     if (queryText.length < 2) return [];
     return scopedUsers
       .filter(item => item.id !== (transferEvent?.createdByUserId || transferEvent?.ownerUid))
-      .filter(item => [item.fullName, item.displayName, item.email, item.phone, item.phoneNumber].some(value => String(value || '').toLowerCase().includes(queryText)))
+      .filter(item => userMatchesSearch(item, queryText))
       .slice(0, 8);
   }, [scopedUsers, transferEvent?.createdByUserId, transferEvent?.ownerUid, transferQuery]);
 

@@ -1078,14 +1078,14 @@ test('native dashboard opens the transfer selector from the card action and subm
  const react={useState:initial=>{const i=cursor++;if(!(i in state))state[i]=i===1?[event]:initial;return [state[i],value=>{state[i]=typeof value==='function'?value(state[i]):value;}];},useEffect:()=>{},createElement:(type,props,...children)=>({type,props:{...props,children}})};
  const mocks={react,'react-native':{ActivityIndicator:'ActivityIndicator',Alert:{alert:(...args)=>alerts.push(args)},Pressable:'Pressable',Text:'Text',TextInput:'TextInput',View:'View'},
  './EventCard':{__esModule:true,default:'EventCard'},'./RegistrationEventDetails':{__esModule:true,default:'RegistrationDetails'},'./NativeLiveStreamModal':{__esModule:true,default:'StreamModal'},'./CitySelector':{__esModule:true,default:'CitySelector'},
- '../registration/firebaseRegistration':{REGISTRATION_ENABLED:true,firebaseRegistration:()=>({transfer:async(...args)=>calls.push(args)})},'../registration/eventFeed':{},'../services/events':{},'../utils/cities':{DEFAULT_CITY:'sydney'},'../theme':require('./theme-fixture.cjs')};
+ '../registration/firebaseRegistration':{REGISTRATION_ENABLED:true,firebaseRegistration:()=>({transfer:async(...args)=>calls.push(args)})},'../registration/eventFeed':{},'../services/events':{},'../utils/adminUserSearch':load(path.join(root,'src/utils/adminUserSearch.js')),'../utils/cities':{DEFAULT_CITY:'sydney'},'../theme':require('./theme-fixture.cjs')};
  const exports={};const code=babel.transformSync(fs.readFileSync(path.join(root,'src/components/RegistrationManagementPanel.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
  vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
- const render=()=>{cursor=0;return exports.default({user:{uid:'super'},profile:{role:'superAdmin'},users:[{id:'new-owner',fullName:'New Organiser'}],onLoadUsers:()=>calls.push(['loadUsers'])});};
+ const render=()=>{cursor=0;return exports.default({user:{uid:'super'},profile:{role:'superAdmin'},users:[{id:'new-owner',fullName:'New Organiser',email:'organiser@example.com',phone:'+61 496 504 950'}],onLoadUsers:()=>calls.push(['loadUsers'])});};
  let nodes=flatten(render());nodes.find(node=>node.type==='EventCard').props.onPress(event);
  nodes=flatten(render());const details=nodes.find(node=>node.type==='RegistrationDetails');assert.equal(details.props.event.id,'event');
  details.props.onTransfer({...event,revision:7});nodes=flatten(render());assert.equal(nodes.find(node=>node.type==='RegistrationDetails').props.event,null);
- const input=nodes.find(node=>node.type==='TextInput');assert.ok(input);input.props.onChangeText('New');
+ const input=nodes.find(node=>node.type==='TextInput');assert.ok(input);input.props.onChangeText('0496 504 950');
  nodes=flatten(render());const member=nodes.find(node=>node.type==='Pressable'&&flatten(node).some(child=>child.type==='Text'&&child.props.children[0]==='New Organiser'));assert.ok(member);member.props.onPress();
  await alerts[0][2][1].onPress();assert.equal(JSON.stringify(calls.at(-1)),JSON.stringify(['event',7,'new-owner']));
 });
@@ -1095,7 +1095,7 @@ test('native admin panel renders hidden non-owned events as delete-only entries'
  const react={useState:value=>[index++===1?[row]:value,()=>{}],useEffect:()=>{},createElement:(type,props,...children)=>({type,props:{...props,children}})};
  const mocks={react,'react-native':{ActivityIndicator:'ActivityIndicator',Alert:{alert:(...args)=>alerts.push(args)},Pressable:'Pressable',Text:'Text',View:'View'},
  './EventCard':{__esModule:true,default:'EventCard'},'./RegistrationEventDetails':{__esModule:true,default:'RegistrationDetails'},'./NativeLiveStreamModal':{__esModule:true,default:'StreamModal'},'./CitySelector':{__esModule:true,default:'CitySelector'},
- '../registration/firebaseRegistration':{REGISTRATION_ENABLED:true,firebaseRegistration:()=>({deleteEvent:async(...args)=>calls.push(args)})},'../registration/eventFeed':{},'../services/events':{},'../utils/cities':{DEFAULT_CITY:'sydney'},'../theme':require('./theme-fixture.cjs')};
+ '../registration/firebaseRegistration':{REGISTRATION_ENABLED:true,firebaseRegistration:()=>({deleteEvent:async(...args)=>calls.push(args)})},'../registration/eventFeed':{},'../services/events':{},'../utils/adminUserSearch':load(path.join(root,'src/utils/adminUserSearch.js')),'../utils/cities':{DEFAULT_CITY:'sydney'},'../theme':require('./theme-fixture.cjs')};
  const exports={};const code=babel.transformSync(fs.readFileSync(path.join(root,'src/components/RegistrationManagementPanel.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
  vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
  const tree=exports.default({user:{uid:'admin'},profile:{role:'superAdmin'}}),nodes=flatten(tree);

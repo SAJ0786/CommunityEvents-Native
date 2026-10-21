@@ -9,6 +9,7 @@ import { registrationEventFeed } from '../registration/eventFeed';
 import { compareEventsByDateTime } from '../services/events';
 import { DEFAULT_CITY } from '../utils/cities';
 import { colors, spacing, typography } from '../theme';
+import { userMatchesSearch } from '../utils/adminUserSearch';
 
 export default function RegistrationManagementPanel({ user, profile, review = false, onOperation, users = [], onLoadUsers, usersLoading = false }) {
   const [city, setCity] = useState(profile?.adminCity || profile?.defaultCity || DEFAULT_CITY);
@@ -37,7 +38,7 @@ export default function RegistrationManagementPanel({ user, profile, review = fa
     setSelected(null); setTransfer(event); setTransferQuery(''); setError(''); onLoadUsers?.();
   };
   const candidates=users.filter(row=>row.id!==transfer?.ownerUid && row.isActive!==false && !row.migratedToUid && !row.bannedAt && !row.archivedAt && !row.accountDeletedAt && !['inactive','banned','deleted','archived','suspended'].includes(row.accountStatus))
-    .filter(row=>transferQuery.trim().length>=2 && [row.fullName,row.displayName,row.email,row.phone,row.phoneNumber].some(value=>String(value||'').toLowerCase().includes(transferQuery.trim().toLowerCase()))).slice(0,8);
+    .filter(row=>transferQuery.trim().length>=2 && userMatchesSearch(row,transferQuery)).slice(0,8);
   const confirmTransfer = target => Alert.alert('Transfer event ownership?', `Transfer to ${target.fullName || target.displayName || target.email || 'this member'}? They will be able to manage this event and its registration responses. Other series occurrences are unchanged.`, [{text:'Cancel',style:'cancel'},{text:'Transfer',onPress:async()=>{
     if(busy)return;setBusy(true);setError('');
     try{await firebaseRegistration({enabled:true}).transfer(transfer.id,transfer.revision,target.id);setTransfer(null);setTransferQuery('');setSelected(null);setRefresh(value=>value+1);}
