@@ -4,6 +4,29 @@
 
 The user reports the iOS store update is approved, while the Android update is still under review. They authorised sending the current fixes without a separate device testing stage, for iOS only. Do not publish an Android OTA for these changes until the user confirms Android approval or explicitly changes this restriction.
 
+## Android catch-up register — pending publication
+
+User instruction, 22 October 2026: retain the iOS OTA history and deliver the same changes to Android. This records the pending work; it does not lift the existing Android review hold. Every row below is published on iOS and **not yet published to Android**.
+
+| iOS OTA group | Changes to include on Android | Android status |
+| --- | --- | --- |
+| `13547882-0e6d-4bee-8bb1-6e67ca321329` | Community Connect Australia share footer; administrator transfer of registration-event ownership | Pending — review hold |
+| `89826346-b867-4a74-9308-78b81a99b0ed` | Transfer action inside the opened registration card; member autocomplete by name, phone and email | Pending — review hold |
+| `d39e0f50-26cd-47e5-b51d-31d42368138c` | Name and phone displayed first; fresh server member lookup; formatting-tolerant matching; loading/error handling | Pending — review hold |
+| `be7fd4e3-de2c-42f0-92d8-15fc593cb48c` | One shared picker for normal and registration-only event transfers, consistent eligible-member filtering and selection controls | Pending — review hold |
+| `e51214b3-004c-4938-8ce3-3cb767f9e0ea` | Shared read-only registration form for saved registrations and organiser responses, preserving submitted questions, participant groups and consent | Pending — review hold |
+
+The native source is shared by both platforms. These changes are cumulative: publish one Android update from a reviewed source containing all five rows, rather than replaying the superseded iOS updates. Latest cumulative code baseline: `0784de41753bc9e2a1f12aed581f22f5e161feba`; later documentation-only commits do not alter app behaviour. Preserve later authorised fixes when choosing the final source.
+
+Android delivery checklist:
+
+- [ ] User confirms Android store approval or explicitly lifts the hold.
+- [ ] Confirm the intended installed Android binary and production channel. Recorded baseline is 2.1.1 (110), runtime `1ac7a2d1933a73b82d980e77f72cf46088efa61e`; verify it still matches before publication.
+- [ ] Review the final source and applicable checks; export with the production environment for Android. A changed native runtime requires a new binary, not a forced OTA.
+- [ ] Publish with an explicit Android-only platform target; do not republish iOS as part of catch-up.
+- [ ] Record the Android update/group ID, runtime, source commit, publication time and previous Android rollback target; mark all covered rows delivered only after successful publication.
+- [ ] Record device confirmation separately if received; server publication alone does not establish installation on a phone.
+
 iOS production OTA published on 22 October 2026 (Australia/Sydney): group `13547882-0e6d-4bee-8bb1-6e67ca321329`, update `01a1608c-bf09-7c4e-bae1-16614b4fd31c`, source `0244486efaa5087d4bcc8448c3158430ee0af3ea`, runtime `b1f045e738e61629962eb354595e34e2c39b75e6` (matches iOS 2.1.1 build 16). Fixes share-footer branding and adds administrator registration-event ownership transfer. Only iOS was included; no Android OTA or new native binary was published. No on-device receipt/application is claimed. The user can open online, allow download, fully close and reopen to apply.
 
 ## Follow-up iOS OTA — native card action and member autocomplete
