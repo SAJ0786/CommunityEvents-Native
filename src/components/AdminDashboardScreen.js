@@ -1,7 +1,7 @@
 import HorizontalStrip from './HorizontalStrip';
 import SegmentedControl from './SegmentedControl';
 import BusinessApprovalPanel from '../business/BusinessApprovalPanel';
-import { userMatchesSearch, normalisePhone, transferMemberName, transferMemberContact } from '../utils/adminUserSearch';
+import { userMatchesSearch, normalisePhone } from '../utils/adminUserSearch';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -94,6 +94,7 @@ import { EVENT_TYPES, EVENT_TYPE_GROUPS } from '../utils/eventOptions';
 import AdminPageHeader from './AdminPageHeader';
 import DiagnosticRegisterPanel from './DiagnosticRegisterPanel';
 import RegistrationManagementPanel from './RegistrationManagementPanel';
+import TransferMemberPicker from './TransferMemberPicker';
 
 const HIJRI_OBSERVANCE_CATEGORIES = ['Wiladat', 'Shahadat', 'Wafat', 'Eid', 'Ayyam-e-Aza', 'Amaal', 'Season', 'Event'];
 const BULK_IMPORT_TEMPLATE_URL = 'https://communityevents.siza.info/Community_Events_Import_Template.xlsx';
@@ -737,15 +738,6 @@ export default function AdminDashboardScreen({
       })
       .sort(compareEventsByDateTime);
   }, [adminEventQuery, adminEventSource, adminEventType, adminOwnerFilterUid, adminSeriesFilter, adminStatusFilter]);
-
-  const transferCandidates = useMemo(() => {
-    const queryText = transferQuery.trim().toLowerCase();
-    if (queryText.length < 2 || usersLoading || usersError) return [];
-    return scopedUsers
-      .filter(item => item.id !== (transferEvent?.createdByUserId || transferEvent?.ownerUid))
-      .filter(item => userMatchesSearch(item, queryText))
-      .slice(0, 8);
-  }, [scopedUsers, transferEvent?.createdByUserId, transferEvent?.ownerUid, transferQuery, usersLoading, usersError]);
 
   const openTransfer = event => {
     setTransferEvent(current => current?.id === event.id ? null : event);
@@ -2745,61 +2737,10 @@ export default function AdminDashboardScreen({
                     {transferEvent?.id === event.id ? (
                       <View style={styles.inlineTransferPanel}>
                         <Text style={styles.inlineTransferTitle}>Transfer Event</Text>
-                        <Text style={styles.inlineTransferMeta}>Type at least two characters, then select the new owner.</Text>
-                        <TextInput
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          value={transferQuery}
-                          onChangeText={value => { setTransferQuery(value); setTransferUser(null); }}
-                          placeholder="Search by name, phone number or email"
-                          placeholderTextColor={colors.muted}
-                          style={styles.input}
-                        />
-                        {usersLoading ? (
-                          <View style={styles.inlineTransferLoading}>
-                            <ActivityIndicator color={colors.tealDark} size="small" />
-                            <Text style={styles.inlineTransferMeta}>Loading users…</Text>
-                          </View>
-                        ) : null}
-                        {usersError ? <Text accessibilityRole="alert" style={[styles.noticeText, styles.noticeTextError]}>Could not refresh members. Close and reopen transfer to try again.</Text> : null}
-                        {!usersLoading && !usersError && transferQuery.trim().length < 2 ? (
-                          <Text style={styles.inlineTransferHint}>Enter at least two characters to search.</Text>
-                        ) : null}
-                        {!usersLoading && !usersError && transferQuery.trim().length >= 2 && transferCandidates.length === 0 ? (
-                          <Text style={styles.inlineTransferHint}>No matching users found.</Text>
-                        ) : null}
-                        {transferCandidates.length ? (
-                          <View style={styles.transferDropdown}>
-                            {transferCandidates.map(item => {
-                              const selected = transferUser?.id === item.id;
-                              return (
-                                <Pressable
-                                  key={item.id}
-                                  onPress={() => setTransferUser(item)}
-                                  style={[styles.transferResult, selected && styles.transferResultSelected]}
-                                >
-                                  <View style={styles.listTextWrap}>
-                                    <Text style={[styles.transferResultName, selected && styles.transferResultTextSelected]}>{transferMemberName(item)}</Text>
-                                    <Text style={[styles.transferResultMeta, selected && styles.transferResultTextSelected]}>{transferMemberContact(item)}</Text>
-                                  </View>
-                                  {selected ? <Text style={styles.transferResultCheck}>✓</Text> : null}
-                                </Pressable>
-                              );
-                            })}
-                          </View>
-                        ) : null}
-                        <View style={styles.rowWrap}>
-                          <Pressable
-                            disabled={!transferUser || transferBusy}
-                            onPress={confirmTransfer}
-                            style={[styles.primaryButton, styles.rowButton, (!transferUser || transferBusy) && styles.disabledButton]}
-                          >
-                            <Text style={styles.primaryButtonText}>{transferBusy ? 'Transferring…' : transferUser ? `Transfer to ${transferUser.fullName || transferUser.displayName || transferUser.email}` : 'Select a User'}</Text>
-                          </Pressable>
-                          <Pressable onPress={() => { setTransferEvent(null); setTransferUser(null); setTransferQuery(''); }} style={[styles.secondaryButton, styles.rowButton]}>
-                            <Text style={styles.secondaryButtonText}>Cancel</Text>
-                          </Pressable>
-                        </View>
+                        <TransferMemberPicker users={scopedUsers} ownerUid={transferEvent.createdByUserId || transferEvent.ownerUid}
+                          query={transferQuery} onQueryChange={setTransferQuery} selected={transferUser} onSelect={setTransferUser}
+                          loading={usersLoading} error={usersError} busy={transferBusy} onConfirm={confirmTransfer}
+                          onCancel={() => { setTransferEvent(null); setTransferUser(null); setTransferQuery(''); }} />
                       </View>
                     ) : null}
                   </View>
@@ -4170,13 +4111,6 @@ const styles = StyleSheet.create({
   inlineTransferMeta: { color: colors.muted, fontSize: typography.label.fontSize, lineHeight: 16, fontWeight: '700' },
   inlineTransferHint: { paddingVertical: spacing.sm, color: colors.muted, fontSize: typography.label.fontSize, fontStyle: 'italic', textAlign: 'center' },
   inlineTransferLoading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
-  transferDropdown: { overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
-  transferResult: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  transferResultSelected: { backgroundColor: colors.teal },
-  transferResultName: { color: colors.navy, fontSize: typography.body.fontSize, fontWeight: '700' },
-  transferResultMeta: { color: colors.muted, fontSize: 10, lineHeight: 14, fontWeight: '700' },
-  transferResultTextSelected: { color: colors.surface },
-  transferResultCheck: { color: colors.surface, fontSize: 18, fontWeight: '700' },
   actionCard: {
     padding: spacing.lg,
     borderRadius: radius.lg,

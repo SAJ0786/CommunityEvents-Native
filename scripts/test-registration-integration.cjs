@@ -1077,7 +1077,7 @@ test('native dashboard opens the transfer selector from the card action and subm
  const event={id:'event',title:'Registration event',ownerUid:'old-owner',revision:2,canTransfer:true};
  const react={useState:initial=>{const i=cursor++;if(!(i in state))state[i]=i===1?[event]:initial;return [state[i],value=>{state[i]=typeof value==='function'?value(state[i]):value;}];},useEffect:()=>{},createElement:(type,props,...children)=>({type,props:{...props,children}})};
  const mocks={react,'react-native':{ActivityIndicator:'ActivityIndicator',Alert:{alert:(...args)=>alerts.push(args)},Pressable:'Pressable',Text:'Text',TextInput:'TextInput',View:'View'},
- './EventCard':{__esModule:true,default:'EventCard'},'./RegistrationEventDetails':{__esModule:true,default:'RegistrationDetails'},'./NativeLiveStreamModal':{__esModule:true,default:'StreamModal'},'./CitySelector':{__esModule:true,default:'CitySelector'},
+ './TransferMemberPicker':{__esModule:true,default:'TransferMemberPicker'},'./EventCard':{__esModule:true,default:'EventCard'},'./RegistrationEventDetails':{__esModule:true,default:'RegistrationDetails'},'./NativeLiveStreamModal':{__esModule:true,default:'StreamModal'},'./CitySelector':{__esModule:true,default:'CitySelector'},
  '../registration/firebaseRegistration':{REGISTRATION_ENABLED:true,firebaseRegistration:()=>({transfer:async(...args)=>calls.push(args)})},'../registration/eventFeed':{},'../services/events':{},'../utils/adminUserSearch':load(path.join(root,'src/utils/adminUserSearch.js')),'../utils/cities':{DEFAULT_CITY:'sydney'},'../theme':require('./theme-fixture.cjs')};
  const exports={};const code=babel.transformSync(fs.readFileSync(path.join(root,'src/components/RegistrationManagementPanel.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
  vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
@@ -1085,14 +1085,33 @@ test('native dashboard opens the transfer selector from the card action and subm
  let nodes=flatten(render());nodes.find(node=>node.type==='EventCard').props.onPress(event);
  nodes=flatten(render());const details=nodes.find(node=>node.type==='RegistrationDetails');assert.equal(details.props.event.id,'event');
  details.props.onTransfer({...event,revision:7});nodes=flatten(render());assert.equal(nodes.find(node=>node.type==='RegistrationDetails').props.event,null);
- const input=nodes.find(node=>node.type==='TextInput');assert.ok(input);input.props.onChangeText('Asim  Raza');
- const findMember=tree=>tree.find(node=>node.type==='Pressable'&&flatten(node).some(child=>child.type==='Text'&&child.props.children[0]==='Syed Asim Raza'));
- assert.equal(findMember(flatten(render({usersLoading:true}))),undefined,'stale candidates are hidden while refreshing');
- assert.equal(findMember(flatten(render({usersError:'Offline'}))),undefined,'failed refresh must not offer stale candidates');
- nodes=flatten(render());assert.ok(findMember(nodes),'phone-only member matches partial name with repeated spaces');
- input.props.onChangeText('0496 504 950');
- nodes=flatten(render());const member=findMember(nodes);assert.ok(member);assert.ok(flatten(member).some(child=>child.type==='Text'&&child.props.children[0]==='+61 496 504 950'),'phone is visible below name');member.props.onPress();
+ let picker=nodes.find(node=>node.type==='TransferMemberPicker');assert.ok(picker);assert.equal(picker.props.ownerUid,'old-owner');
+ picker.props.onQueryChange('Asim Raza');picker.props.onSelect(picker.props.users[0]);
+ picker=flatten(render()).find(node=>node.type==='TransferMemberPicker');assert.equal(picker.props.selected.fullName,'Syed Asim Raza');
+ picker.props.onConfirm(picker.props.selected);
  await alerts[0][2][1].onPress();assert.equal(JSON.stringify(calls.at(-1)),JSON.stringify(['event',7,'new-owner']));
+});
+
+test('shared native transfer picker uses identical filtering and select-then-transfer behaviour',()=>{
+ const search=load(path.join(root,'src/utils/adminUserSearch.js'));
+ const member={id:'target',fullName:'Syed Asim Raza',phone:'+61 496 504 950'};
+ const users=[member,{...member,id:'owner'},{...member,id:'inactive',isActive:false},{...member,id:'migrated',migratedToUid:'target'},{...member,id:'banned',accountStatus:'banned'}];
+ assert.equal(JSON.stringify(search.transferMemberCandidates(users,'Asim  Raza','owner').map(row=>row.id)),JSON.stringify(['target']));
+ assert.equal(search.transferMemberCandidates([member],'Asim','target').length,0,'current organiser cannot be selected');
+ const calls=[],exports={};
+ const react={createElement:(type,props,...children)=>({type,props:{...props,children}})};
+ const mocks={react,'react-native':{ActivityIndicator:'ActivityIndicator',Pressable:'Pressable',StyleSheet:{create:value=>value,hairlineWidth:1},Text:'Text',TextInput:'TextInput',View:'View'},'../theme':require('./theme-fixture.cjs'),'../utils/adminUserSearch':search};
+ const code=babel.transformSync(fs.readFileSync(path.join(root,'src/components/TransferMemberPicker.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
+ vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
+ const props={users,ownerUid:'owner',query:'0496 504 950',onQueryChange:value=>calls.push(['query',value]),onSelect:value=>calls.push(['select',value]),onConfirm:value=>calls.push(['confirm',value]),onCancel:()=>{}};
+ const render=extra=>flatten(exports.default({...props,...extra}));
+ const row=nodes=>nodes.find(node=>node.type==='Pressable'&&flatten(node).some(child=>child.type==='Text'&&child.props.children[0]==='Syed Asim Raza'));
+ let nodes=render();assert.ok(row(nodes));assert.ok(flatten(row(nodes)).some(node=>node.type==='Text'&&node.props.children[0]===member.phone));
+ row(nodes).props.onPress();assert.equal(calls.at(-1)[0],'select');assert.equal(calls.filter(call=>call[0]==='confirm').length,0);
+ nodes=render({selected:member});const submit=nodes.find(node=>node.type==='Pressable'&&flatten(node).some(child=>child.type==='Text'&&String(child.props.children[0]).startsWith('Transfer to')));assert.equal(submit.props.disabled,false);submit.props.onPress();assert.equal(calls.at(-1)[0],'confirm');
+ assert.equal(row(render({loading:true})),undefined);assert.equal(row(render({error:'Offline'})),undefined);
+ nodes.find(node=>node.type==='TextInput').props.onChangeText('new search');assert.deepEqual(calls.at(-1),['select',null]);
+ for(const file of ['AdminDashboardScreen.js','RegistrationManagementPanel.js'])assert.match(fs.readFileSync(path.join(root,'src/components',file),'utf8'),/<TransferMemberPicker users=/);
 });
 
 test('native transfer labels prioritise names and phones while email stays searchable',()=>{
@@ -1124,7 +1143,7 @@ test('native admin panel renders hidden non-owned events as delete-only entries'
  const row={id:'hidden',title:'Hidden event',date:'2099-12-01',revision:4,hidden:true,moderationOnly:true};
  const react={useState:value=>[index++===1?[row]:value,()=>{}],useEffect:()=>{},createElement:(type,props,...children)=>({type,props:{...props,children}})};
  const mocks={react,'react-native':{ActivityIndicator:'ActivityIndicator',Alert:{alert:(...args)=>alerts.push(args)},Pressable:'Pressable',Text:'Text',View:'View'},
- './EventCard':{__esModule:true,default:'EventCard'},'./RegistrationEventDetails':{__esModule:true,default:'RegistrationDetails'},'./NativeLiveStreamModal':{__esModule:true,default:'StreamModal'},'./CitySelector':{__esModule:true,default:'CitySelector'},
+ './TransferMemberPicker':{__esModule:true,default:'TransferMemberPicker'},'./EventCard':{__esModule:true,default:'EventCard'},'./RegistrationEventDetails':{__esModule:true,default:'RegistrationDetails'},'./NativeLiveStreamModal':{__esModule:true,default:'StreamModal'},'./CitySelector':{__esModule:true,default:'CitySelector'},
  '../registration/firebaseRegistration':{REGISTRATION_ENABLED:true,firebaseRegistration:()=>({deleteEvent:async(...args)=>calls.push(args)})},'../registration/eventFeed':{},'../services/events':{},'../utils/adminUserSearch':load(path.join(root,'src/utils/adminUserSearch.js')),'../utils/cities':{DEFAULT_CITY:'sydney'},'../theme':require('./theme-fixture.cjs')};
  const exports={};const code=babel.transformSync(fs.readFileSync(path.join(root,'src/components/RegistrationManagementPanel.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
  vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
