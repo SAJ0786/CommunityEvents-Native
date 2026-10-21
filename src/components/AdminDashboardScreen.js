@@ -2464,7 +2464,7 @@ export default function AdminDashboardScreen({
             { value: 'events', label: 'Events', icon: 'calendar-outline' },
             { value: 'registration', label: 'Registration only events', icon: 'clipboard-text-outline' },
           ]} />
-          {eventCollection === 'registration' ? <RegistrationManagementPanel user={user} profile={profile} onOperation={onOpenRegistration} /> : <>
+          {eventCollection === 'registration' ? <RegistrationManagementPanel user={user} profile={profile} onOperation={onOpenRegistration} users={scopedUsers} onLoadUsers={loadUsers} usersLoading={usersLoading} /> : <>
 
           <View style={styles.statisticsCard}>
             <View style={styles.statisticsHead}>

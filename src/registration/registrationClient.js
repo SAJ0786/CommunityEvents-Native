@@ -26,6 +26,7 @@ export function createRegistrationClient(call, { enabled = false } = {}) {
     cancel: (eventId, expectedRevision) => invoke('cancelEventRegistration', { eventId, expectedRevision }),
     cancelEvent: (eventId, expectedRevision, confirmation) => invoke('cancelRegistrationEvent', { eventId, expectedRevision, confirmation }),
     deleteEvent: (eventId, expectedRevision) => invoke('deleteRegistrationEvent', { eventId, expectedRevision, confirmation: 'DELETE EVENT' }),
+    transfer: (eventId, expectedRevision, toUid) => invoke('transferRegistrationEventOwnership', {eventId, expectedRevision, toUid, confirmation: 'TRANSFER EVENT'}),
     setVisibility: (eventId, expectedRevision, hidden) => invoke('setRegistrationEventVisibility', {eventId, expectedRevision, hidden}),
     responses: (eventId, cursor = null) => invoke('listEventRegistrations', { eventId, cursor }),
     deleteAnswers: (eventId, registrationId, expectedRevision, confirmation) => invoke('deleteRegistrationAnswers', { eventId, registrationId, expectedRevision, confirmation }),

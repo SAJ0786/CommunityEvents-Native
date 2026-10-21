@@ -27,6 +27,11 @@ function manages(actor,event) {
 function approves(actor, event) {
   return actor.profile.role === 'superAdmin' && (!event?.hidden || event.ownerUid === actor.uid);
 }
+function canTransfer(actor, event) {
+  return Boolean(actor && ['admin','superAdmin'].includes(actor.profile.role) && manages(actor,event)
+    && (actor.profile.role === 'superAdmin' || (actor.profile.adminCity || actor.profile.defaultCity) === event.city)
+    && !event.deletedAt && event.status !== 'cancelled' && !event.isLive);
+}
 function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Date(), enabled = () => false }) {
   const displayName = value => typeof value === 'string' ? value.trim().slice(0,160) : '';
   async function submitterName(tx, event, cache = new Map()) {
@@ -112,6 +117,24 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
   const checkOpen = event => {
     if (event.status !== 'approved' || localMinute(now(), event.timeZone) >= (event.closes || `${event.date}T00:00`)) fail('failed-precondition', 'Registration is closed or this event is not approved.');
   };
+  async function transferRegistrationEventOwnership(request) {
+    if (request.data?.confirmation !== 'TRANSFER EVENT') fail('invalid-argument', 'Confirm the ownership transfer.');
+    return db.runTransaction(async tx => {
+      const caller = await actor(request,tx), event = await readEvent(request.data?.eventId,tx);
+      if (!canTransfer(caller,event)) fail('permission-denied', 'Only an authorised administrator can transfer an available event. Hidden events remain organiser-only. Stop any live stream before transferring.');
+      if (request.data.expectedRevision !== event.revision) fail('aborted','The event has changed. Reload before transferring.');
+      const toUid=id(request.data.toUid);
+      if (toUid === event.ownerUid) fail('invalid-argument','Choose a different organiser.');
+      const target=await tx.get(db.collection('users').doc(toUid)), profile=target.data();
+      if (!target.exists || !active(profile) || profile.migratedToUid) fail('failed-precondition','Choose an active member account.');
+      if (caller.profile.role !== 'superAdmin' && (profile.adminCity || profile.defaultCity || 'sydney') !== (caller.profile.adminCity || caller.profile.defaultCity)) fail('permission-denied','Choose a member in your city.');
+      const timestamp=now().toISOString(), revision=event.revision+1;
+      const submittedByName=await submitterName(tx,event);
+      tx.update(eventRef(event.id), {ownerUid:toUid,ownerName:displayName(profile.fullName || profile.displayName),submittedByName,revision,ownershipTransferredAt:timestamp,transferredByUid:caller.uid,updatedAt:timestamp});
+      tx.set(db.collection('registrationAudit').doc(`${event.id}-transfer-${revision}`), {eventId:event.id,action:'event.ownership_transferred',fromUid:event.ownerUid,toUid,actorUid:caller.uid,createdAt:timestamp,revision});
+      return {eventId:event.id,ownerUid:toUid,revision};
+    });
+  }
   async function createRegistrationSeries(request) {
     await actor(request);
     const city = id(request.data?.city);
@@ -633,7 +656,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
           id: event.id, city: event.city, timeZone: event.timeZone, ownerUid: event.ownerUid, submittedByName: await submitterName(tx,event,submitterNames),
           status: event.status, hidden: event.hidden === true, deleted: Boolean(event.deletedAt), revision: event.revision, formVersion: event.formVersion,
           allowCancellation: event.allowCancellation === true, registrationOnly: true,
-          canManage: manager, canApprove, isRegistered: registered,
+          canManage: manager, canApprove, canTransfer:canTransfer(caller,event), isRegistered: registered,
           canRegister: event.status === 'approved' && localMinute(now(), event.timeZone) < (event.closes || `${event.date}T00:00`),
           canEditRegistration: Boolean(registered && event.status === 'approved' && localMinute(now(), event.timeZone).slice(0, 10) < event.date),
           ...liveProjection(event),
@@ -839,6 +862,6 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
     const snapshot = await query.get();
     return { templates: snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })), nextCursor: snapshot.docs.length === 50 ? snapshot.docs.at(-1).id : null };
   }
-  return { setRegistrationEventVisibility, createRegistrationSeries, saveRegistrationEvent, approveRegistrationEvent, approveRegistrationSeries, reviewRegistrationEvent, submitEventRegistration, submitRegistrationOccurrences, cancelEventRegistration, cancelRegistrationEvent, deleteRegistrationEvent, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
+  return { transferRegistrationEventOwnership, setRegistrationEventVisibility, createRegistrationSeries, saveRegistrationEvent, approveRegistrationEvent, approveRegistrationSeries, reviewRegistrationEvent, submitEventRegistration, submitRegistrationOccurrences, cancelEventRegistration, cancelRegistrationEvent, deleteRegistrationEvent, getRegistrationEvent, listRegistrationEvents, listEventRegistrations, deleteRegistrationAnswers, putRegistrationPoster, getRegistrationPoster, removeRegistrationPoster, saveRegistrationTemplate, listRegistrationTemplates };
 }
 module.exports = { createRegistrationHandlers, localMinute, active, manages, approves };

@@ -83,6 +83,6 @@ export function buildEventShareMessage(event = {}, { isGuest = true, user = null
     eventShareLink(event) ? `🔗 View event${event.registrationOnly ? ' & register' : ''}: ${eventShareLink(event)}` : '',
     ...STORE_SHARE_LINES,
     '',
-    '_Shared via Community Events Australia_',
+    '_Shared via Community Connect Australia_',
   ].filter(Boolean).join('\n');
 }

@@ -60,6 +60,49 @@ function seriesRequest(f, changes = {}) {
   };
 }
 
+test('registration transfer preserves bookings, private content and submitter provenance and replaces owner access',async()=>{
+ const f=fixture(),event=await f.create();await f.approve(event);await f.submit(event);
+ const before=structuredClone(f.records.get(`registrationEvents/${event.eventId}`)),answers=structuredClone(f.records.get(`registrationEvents/${event.eventId}/registrations/member`)),venue=structuredClone(f.records.get(`registrationEventPrivate/${event.eventId}`));
+ const result=await f.handlers.transferRegistrationEventOwnership(f.request('admin',{eventId:event.eventId,expectedRevision:before.revision,toUid:'other',confirmation:'TRANSFER EVENT'}));
+ const after=f.records.get(`registrationEvents/${event.eventId}`);
+ assert.equal(after.ownerUid,'other');assert.equal(after.submittedByName,before.submittedByName);assert.equal(after.status,before.status);assert.equal(after.reservedPlaces,before.reservedPlaces);assert.equal(after.formVersion,before.formVersion);assert.equal(result.revision,before.revision+1);
+ assert.deepEqual(f.records.get(`registrationEvents/${event.eventId}/registrations/member`),answers);assert.deepEqual(f.records.get(`registrationEventPrivate/${event.eventId}`),venue);
+ assert.equal((await f.handlers.getRegistrationEvent(f.request('host',{eventId:event.eventId}))).canManage,false);
+ assert.equal((await f.handlers.getRegistrationEvent(f.request('other',{eventId:event.eventId}))).canManage,true);
+ await assert.rejects(f.handlers.listEventRegistrations(f.request('host',{eventId:event.eventId})),{code:'permission-denied'});
+ assert.equal((await f.handlers.listEventRegistrations(f.request('other',{eventId:event.eventId}))).registrations.length,1);
+ const audit=f.records.get(`registrationAudit/${event.eventId}-transfer-${result.revision}`);assert.equal(audit.fromUid,'host');assert.equal(audit.toUid,'other');assert.equal(audit.actorUid,'admin');
+ await assert.rejects(f.handlers.transferRegistrationEventOwnership(f.request('admin',{eventId:event.eventId,expectedRevision:before.revision,toUid:'host',confirmation:'TRANSFER EVENT'})),{code:'aborted'});
+});
+test('registration transfer rejects non-admins, wrong cities, hidden non-owners and unavailable targets/events atomically',async()=>{
+ for(const reason of ['guest','member','host','wrongadmin','hidden','inactive','migrated','wrongTargetCity','cancelled','deleted','live','confirmation','sameOwner']){
+  const f=fixture(),event=await f.create(),row=f.records.get(`registrationEvents/${event.eventId}`);let uid='admin';
+  if(['guest','member','host','wrongadmin'].includes(reason))uid=reason==='guest'?null:reason;
+  if(reason==='hidden')row.hidden=true;
+  if(reason==='inactive')f.records.get('users/other').isActive=false;
+  if(reason==='migrated')f.records.get('users/other').migratedToUid='member';
+  if(reason==='wrongTargetCity')f.records.get('users/other').adminCity='perth';
+  if(reason==='cancelled')row.status='cancelled';if(reason==='deleted')row.deletedAt='2026-11-01';if(reason==='live')row.isLive=true;
+  const before=structuredClone([...f.records]);
+  await assert.rejects(f.handlers.transferRegistrationEventOwnership(f.request(uid,{eventId:event.eventId,expectedRevision:row.revision,toUid:reason==='sameOwner'?'host':'other',confirmation:reason==='confirmation'?'':'TRANSFER EVENT'})),error=>['unauthenticated','permission-denied','failed-precondition','invalid-argument'].includes(error.code),reason);
+  assert.deepEqual([...f.records],before,reason);
+ }
+ const f=fixture(),event=await f.create();f.records.get('users/host').role='superAdmin';f.records.get(`registrationEvents/${event.eventId}`).hidden=true;
+ await f.handlers.transferRegistrationEventOwnership(f.request('host',{eventId:event.eventId,expectedRevision:1,toUid:'other',confirmation:'TRANSFER EVENT'}));assert.equal(f.records.get(`registrationEvents/${event.eventId}`).hidden,true);
+});
+test('management feed only offers transfer to scoped admins on available visible events',async()=>{
+ const f=fixture(),event=await f.create();
+ const admin=(await f.handlers.listRegistrationEvents(f.request('admin',{scope:'management',city:'sydney'}))).events;assert.equal(admin[0].canTransfer,true);
+ const owner=(await f.handlers.listRegistrationEvents(f.request('host',{scope:'mine',city:'sydney'}))).events;assert.equal(owner[0].canTransfer,false);
+ f.records.get(`registrationEvents/${event.eventId}`).hidden=true;
+ const hidden=(await f.handlers.listRegistrationEvents(f.request('super',{scope:'management',city:'sydney'}))).events;assert.equal(hidden[0].moderationOnly,true);assert.notEqual(hidden[0].canTransfer,true);
+});
+test('legacy transfer snapshots the original submitter name before changing ownership',async()=>{
+ const f=fixture(),event=await f.create();delete f.records.get(`registrationEvents/${event.eventId}`).submittedByName;
+ f.records.get('users/host').fullName='Original Submitter';f.records.get('users/other').fullName='New Organiser';
+ await f.handlers.transferRegistrationEventOwnership(f.request('admin',{eventId:event.eventId,expectedRevision:1,toUid:'other',confirmation:'TRANSFER EVENT'}));
+ assert.equal(f.records.get(`registrationEvents/${event.eventId}`).submittedByName,'Original Submitter');
+});
 test('deletion with no bookings still records a cancellation for required admin notices',async()=>{
  const f=fixture(),event=await f.create();await f.approve(event);
  const result=await f.handlers.deleteRegistrationEvent(f.request('host',{eventId:event.eventId,expectedRevision:1,confirmation:'DELETE EVENT'}));

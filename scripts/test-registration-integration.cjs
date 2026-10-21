@@ -28,6 +28,9 @@ test('client stays off by default and discovery uses the callable allowlist', as
   await contract.createRegistrationClient(call,{enabled:true}).setVisibility('event',4,true);
   assert.equal(calls[1].name,'setRegistrationEventVisibility');
   assert.equal(JSON.stringify(calls[1].data),JSON.stringify({eventId:'event',expectedRevision:4,hidden:true}));
+  await contract.createRegistrationClient(call,{enabled:true}).transfer('event',4,'new-owner');
+  assert.equal(calls[2].name,'transferRegistrationEventOwnership');
+  assert.equal(JSON.stringify(calls[2].data),JSON.stringify({eventId:'event',expectedRevision:4,toUid:'new-owner',confirmation:'TRANSFER EVENT'}));
 
 });
 test('editing requires authorised private detail; custom type and cancellation setting survive', () => {
@@ -1051,6 +1054,7 @@ test('individual share text includes public event-card links; bulk share stays s
  const share=load(path.join(root,'src/utils/eventShare.js'));
  const event={id:'one',eventType:'Workshop',registrationOnly:true,address:{fullAddress:'SECRET ADDRESS',suburb:'Parramatta'},hostPhone:'SECRET PHONE'};
  const text=share.buildEventShareMessage(event,{isGuest:false,user:{uid:'owner'},profile:{role:'superAdmin'}});
+ assert.match(text,/_Shared via Community Connect Australia_/);assert.doesNotMatch(text,/Shared via Community Events/);
  assert.match(text,/https:\/\/communityconnect.siza.info\/\?registration=one/);
  assert.doesNotMatch(text,/SECRET ADDRESS|SECRET PHONE/);
  assert.match(share.buildEventShareMessage({...event,registrationOnly:false}),/\?event=one/);
