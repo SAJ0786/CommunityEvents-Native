@@ -41,6 +41,12 @@ test('transfer never unhides or approves a private/pending listing',async()=>{
  const f=fixture();Object.assign(f.records.get('businesses/shop'),{status:'pending',hidden:true,hasPublishedVersion:true});await f.run(f.request);
  assert.equal(f.records.get('businesses/shop').status,'pending');assert.equal(f.records.get('businesses/shop').hidden,true);assert.equal(f.records.get('businessContactRoutes/shop').active,false);
 });
+
+test('self-referencing legacy migration markers allow active Super Admin actors and targets',async()=>{
+ const f=fixture();Object.assign(f.records.get('users/admin'),{role:'superAdmin',migratedToUid:'admin'});Object.assign(f.records.get('users/new'),{role:'superAdmin',migratedToUid:'new'});
+ await f.run(f.request);assert.equal(f.records.get('businesses/shop').ownerId,'new');
+ const g=fixture();g.records.get('users/admin').migratedToUid='different-account';await assert.rejects(g.run(g.request),error=>error.code==='permission-denied');assert.equal(g.writes.length,0);
+});
 test('unauthorised, stale, unavailable and same-owner transfers make no partial writes',async()=>{
  for(const change of [
    f=>{f.request.auth=null;},f=>{f.request.data.confirmation='';},f=>{f.records.get('users/admin').role='user';},

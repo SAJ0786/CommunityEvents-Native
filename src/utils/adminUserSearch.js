@@ -17,7 +17,7 @@ export function transferMemberContact(user) {
 
 export function transferMemberCandidates(users, queryText, ownerUid) {
   if (searchText(queryText).length < 2) return [];
-  return users.filter(user => user.id !== ownerUid && user.isActive !== false && user.active !== false && !user.migratedToUid &&
+  return users.filter(user => user.id !== ownerUid && user.isActive !== false && user.active !== false && (!user.migratedToUid || user.migratedToUid === user.id) &&
     !user.bannedAt && !user.archivedAt && !user.accountDeletedAt &&
     !['inactive', 'banned', 'deleted', 'archived', 'suspended'].includes(user.accountStatus))
     .filter(user => userMatchesSearch(user, queryText)).slice(0, 8);

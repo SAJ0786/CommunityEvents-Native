@@ -90,6 +90,12 @@ test('registration transfer rejects non-admins, wrong cities, hidden non-owners 
  const f=fixture(),event=await f.create();f.records.get('users/host').role='superAdmin';f.records.get(`registrationEvents/${event.eventId}`).hidden=true;
  await f.handlers.transferRegistrationEventOwnership(f.request('host',{eventId:event.eventId,expectedRevision:1,toUid:'other',confirmation:'TRANSFER EVENT'}));assert.equal(f.records.get(`registrationEvents/${event.eventId}`).hidden,true);
 });
+
+test('registration transfer accepts an active Super Admin target with a self-referencing migration marker',async()=>{
+ const f=fixture(),event=await f.create();Object.assign(f.records.get('users/other'),{role:'superAdmin',migratedToUid:'other'});
+ await f.handlers.transferRegistrationEventOwnership(f.request('admin',{eventId:event.eventId,expectedRevision:1,toUid:'other',confirmation:'TRANSFER EVENT'}));
+ assert.equal(f.records.get(`registrationEvents/${event.eventId}`).ownerUid,'other');
+});
 test('management feed only offers transfer to scoped admins on available visible events',async()=>{
  const f=fixture(),event=await f.create();
  const admin=(await f.handlers.listRegistrationEvents(f.request('admin',{scope:'management',city:'sydney'}))).events;assert.equal(admin[0].canTransfer,true);

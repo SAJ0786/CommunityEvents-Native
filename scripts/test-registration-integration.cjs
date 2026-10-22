@@ -1140,6 +1140,15 @@ test('native transfer labels prioritise names and phones while email stays searc
  assert.equal(transferMemberContact({mobileNumber:'0400 123 456'}),'0400 123 456');
 });
 
+test('transfer search includes active Iram and Sajjad self-migration profiles but excludes real migrations and current owner',()=>{
+ const {transferMemberCandidates}=load(path.join(root,'src/utils/adminUserSearch.js'));
+ const users=[{id:'iram',fullName:'Iram Rizvi',role:'superAdmin',isActive:true,migratedToUid:'iram'},{id:'sajjad',fullName:'Sajjad Zaheer',role:'superAdmin',isActive:true,migratedToUid:'sajjad'},{id:'old',fullName:'Iram Old',isActive:true,migratedToUid:'iram'}];
+ assert.equal(transferMemberCandidates(users,'Iram','another-owner')[0].id,'iram');
+ assert.equal(transferMemberCandidates(users,'Sajjad','another-owner')[0].id,'sajjad');
+ assert.equal(transferMemberCandidates(users,'Iram','iram').length,0);
+ assert.equal(transferMemberCandidates([{...users[0],isActive:false}],'Iram','other').length,0);
+});
+
 test('native member refresh uses the server and propagates offline failure without cache fallback',async()=>{
  const calls=[],exports={};let offline=false;
  const snapshot={docs:[{id:'phone-member',data:()=>({fullName:'Syed Asim Raza',phone:'0400 123 456',isActive:true})}]};

@@ -126,7 +126,7 @@ function createRegistrationHandlers({ db, bucket, HttpsError, now = () => new Da
       const toUid=id(request.data.toUid);
       if (toUid === event.ownerUid) fail('invalid-argument','Choose a different organiser.');
       const target=await tx.get(db.collection('users').doc(toUid)), profile=target.data();
-      if (!target.exists || !active(profile) || profile.migratedToUid) fail('failed-precondition','Choose an active member account.');
+      if (!target.exists || !active(profile) || (profile.migratedToUid && profile.migratedToUid !== toUid)) fail('failed-precondition','Choose an active member account.');
       if (caller.profile.role !== 'superAdmin' && (profile.adminCity || profile.defaultCity || 'sydney') !== (caller.profile.adminCity || caller.profile.defaultCity)) fail('permission-denied','Choose a member in your city.');
       const timestamp=now().toISOString(), revision=event.revision+1;
       const submittedByName=await submitterName(tx,event);
