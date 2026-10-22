@@ -25,7 +25,7 @@ const db = { collection, batch: () => { const writes = []; return { set: (ref, d
     for (const write of writes) await write(); return result;
   },
 };
-const admin = { initializeApp() {}, firestore: Object.assign(() => db, { FieldValue: { serverTimestamp: () => 'SERVER_TIME' } }),
+const admin = { initializeApp() {}, firestore: Object.assign(() => db, { FieldValue: { serverTimestamp: () => 'SERVER_TIME', increment:value=>value } }),
   messaging: () => ({ sendEachForMulticast: async payload => { pushes.push(payload); const responses = nextPushResults || payload.tokens.map(() => ({ success: true })); nextPushResults = null; return { responses }; } }),
 };
 const logger = { error() {}, warn() {}, info() {} };
@@ -91,6 +91,7 @@ async function testWorkflow() {
     './email-template': require('../backend/functions-business-workflow/email-template'),
     './support-workflow': { register: () => ({}) }, './push-delivery': { register: () => ({}) },
     './promotion-email': { register: () => ({}) },
+    './business-transfer': { register: () => ({}) },
     './cityManagement': { register: () => ({}) }, './promotionAudience': { register: () => ({}) },
   };
   vm.runInNewContext(read('backend/functions-business-workflow/index.js'), { exports, require: name => { assert.ok(name in mocks, name); return mocks[name]; }, console });
@@ -123,6 +124,14 @@ async function testWorkflow() {
   await exports.nativeBusinessProfileUpdated({ params: { userId: 'owner' }, data: { before: { data: () => ({ fullName: 'Before', defaultCity: 'sydney' }) }, after: { data: () => ({ fullName: 'After', defaultCity: 'sydney' }) } } });
   assert.equal(queuedEmails().length, 0, 'ordinary profile updates respect opted-out admins');
   console.log('PASS workflow recipients: essential approvals/rejections/closures/promotions reach owner + correct admins, exclude actor/other cities, and preserve optional opt-outs.');
+  records.set('businesses/transferred',{ownerId:'new-owner',status:'approved'});
+  records.set('publicBusinesses/transferred',{name:'Transferred business'});
+  records.set('businessContactRoutes/transferred',{ownerUid:'new-owner',active:true});
+  const enquiry=await exports.sendBusinessEnquiry({auth:{uid:'customer'},data:{businessId:'transferred',text:'New enquiry',senderName:'Customer'}});
+  assert.equal(enquiry.threadId,'transferred_customer_new-owner');
+  assert.equal(records.get('businessContactRoutes/transferred').ownerUid,'new-owner');
+  assert.deepEqual(Array.from(records.get('businessMessageThreads/'+enquiry.threadId).participantUids),['customer','new-owner']);
+  console.log('PASS enquiry routing: authoritative business and contact target read within transaction; new messages reach new owner.');
 }
 async function testNativeRegistration() {
   const babel = require('@babel/core');

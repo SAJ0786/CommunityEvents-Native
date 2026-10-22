@@ -50,6 +50,8 @@ const mocks = {
   '../utils/errors': { friendlyError: error => error.message },
   '../components/MemberPageHeader': 'MemberPageHeader',
   '../components/AdminPageHeader': 'AdminPageHeader',
+  '../components/TransferMemberPicker': 'TransferMemberPicker',
+  '../services/users': {listUsers:async()=>[]},
   './BusinessPromotionApprovalPanel': 'BusinessPromotionApprovalPanel',
 };
 const ownerCard = load('src/business/BusinessOwnerScreen.js', mocks, 'OwnerBusinessCard').OwnerBusinessCard;
@@ -110,6 +112,12 @@ function testAdminViews() {
   const active = text(adminCard({ business: business('pending'), selected: true, isManagement: true, isSuperAdmin: true, historyMatches: [] }));
   assert.match(active, /Approve & Publish/);
   assert.match(active, /CHANGES REQUIRED REASON/);
+  let transferred;
+  const transferCard=adminCard({business:business('approved'),selected:true,isManagement:true,historyMatches:[],onTransfer:value=>{transferred=value;}});
+  const transferButton=nodes(transferCard).find(node=>node.type==='Pressable' && text(node)==='Transfer ownership');
+  assert.ok(transferButton);transferButton.props.onPress();assert.equal(transferred.id,'listing');
+  const historicalCard=adminCard({business:business('archived'),selected:true,isManagement:true,historyMatches:[],onTransfer(){},transferPicker:'PRIVATE_PICKER'});
+  assert.doesNotMatch(text(historicalCard),/Transfer ownership|PRIVATE_PICKER/);
 }
 function testNavigation() {
   const source = read('src/business/BusinessDirectoryModule.js');

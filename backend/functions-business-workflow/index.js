@@ -103,6 +103,7 @@ Object.assign(exports, require('./support-workflow').register({
 Object.assign(exports, require('./push-delivery').register({ admin, db, onDocumentCreated, REGION, logger }));
 Object.assign(exports, require('./cityManagement').register({ db, onCall, HttpsError, REGION, apiKey: GOOGLE_PLACES_SERVER_API_KEY }));
 Object.assign(exports, require('./promotionAudience').register({ db, admin, onCall, HttpsError, REGION }));
+Object.assign(exports, require('./business-transfer').register({ db, admin, onCall, HttpsError, REGION }));
 Object.assign(exports, require('./promotion-email').register({ admin, db, onDocumentUpdated, onDocumentCreated, REGION, EMAIL_SECRETS, buildTransporter, sender, logger }));
 
 async function getAdminRecipients(cities, actorUid = '') {
@@ -344,27 +345,23 @@ exports.sendBusinessEnquiry = onCall(
     if (!businessId || businessId.length > 160) throw new HttpsError('invalid-argument', 'Business reference is invalid.');
     if (!text || text.length > 2000) throw new HttpsError('invalid-argument', 'Enter a message of up to 2000 characters.');
 
-    const [businessSnapshot, publicSnapshot, routeSnapshot] = await Promise.all([
-      db.collection('businesses').doc(businessId).get(),
-      db.collection('publicBusinesses').doc(businessId).get(),
-      db.collection('businessContactRoutes').doc(businessId).get(),
-    ]);
-    if (!businessSnapshot.exists || !publicSnapshot.exists) throw new HttpsError('not-found', 'This public business could not be found.');
-    const business = businessSnapshot.data() || {};
-    // The route is the published contact target and may be newer than the
-    // private business record after an ownership transfer.
-    const route = routeSnapshot.data() || {};
-    let ownerUid = clean(route.active === true ? route.ownerUid : '') || clean(business.ownerId);
-    if (!ownerUid || business.hidden === true || (business.status !== 'approved' && business.hasPublishedVersion !== true)) {
-      throw new HttpsError('failed-precondition', 'This business does not have an active in-app contact inbox.');
-    }
-    if (ownerUid === request.auth.uid) throw new HttpsError('failed-precondition', 'This business listing is already managed by you.');
-
     const senderUid = request.auth.uid;
-    const threadId = `${businessId}_${senderUid}_${ownerUid}`;
-    const threadReference = db.collection('businessMessageThreads').doc(threadId);
-    const messageReference = threadReference.collection('messages').doc();
-    const isNew = await db.runTransaction(async transaction => {
+    return db.runTransaction(async transaction => {
+      // Read routing and ownership inside the transaction so a simultaneous
+      // transfer cannot be overwritten by an enquiry using the previous owner.
+      const [businessSnapshot, publicSnapshot, routeSnapshot] = await Promise.all([
+        transaction.get(db.collection('businesses').doc(businessId)),
+        transaction.get(db.collection('publicBusinesses').doc(businessId)),
+        transaction.get(db.collection('businessContactRoutes').doc(businessId)),
+      ]);
+      if (!businessSnapshot.exists || !publicSnapshot.exists) throw new HttpsError('not-found', 'This public business could not be found.');
+      const business = businessSnapshot.data() || {}, route = routeSnapshot.data() || {};
+      const ownerUid = clean(route.active === true ? route.ownerUid : '') || clean(business.ownerId);
+      if (!ownerUid || business.hidden === true || (business.status !== 'approved' && business.hasPublishedVersion !== true)) throw new HttpsError('failed-precondition', 'This business does not have an active in-app contact inbox.');
+      if (ownerUid === senderUid) throw new HttpsError('failed-precondition', 'This business listing is already managed by you.');
+      const threadId = `${businessId}_${senderUid}_${ownerUid}`;
+      const threadReference = db.collection('businessMessageThreads').doc(threadId);
+      const messageReference = threadReference.collection('messages').doc();
       const threadSnapshot = await transaction.get(threadReference);
       const existingThread = threadSnapshot.data() || {};
       if (existingThread.adminBlocked === true || Object.values(existingThread.blockedBy || {}).some(Boolean)) {
@@ -400,9 +397,8 @@ exports.sendBusinessEnquiry = onCall(
         active: true,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
-      return !threadSnapshot.exists;
+      return { threadId, isNew: !threadSnapshot.exists };
     });
-    return { threadId, isNew };
   }
 );
 

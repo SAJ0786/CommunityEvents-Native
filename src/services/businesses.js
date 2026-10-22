@@ -519,6 +519,13 @@ export async function lookupBusinessAbnForSubmission(abnValue) {
   return result.data || {};
 }
 
+export async function transferBusinessOwnership(business, target) {
+  await requireAdminSession();
+  return (await httpsCallable(functions, 'transferBusinessOwnership')({
+    businessId:business.id,expectedOwnerId:business.ownerId,toUid:target.id,confirmation:'TRANSFER BUSINESS',
+  })).data;
+}
+
 export async function approveBusinessListing(businessId, options = {}) {
   const user = await requireAdminSession();
   if (!businessId) throw new Error('Business reference is missing.');

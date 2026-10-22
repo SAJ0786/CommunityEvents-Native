@@ -13,10 +13,13 @@ import {
   setBusinessVisibility,
   syncApprovedBusinessProjections,
   verifyBusinessAbn,
+  transferBusinessOwnership,
 } from '../services/businesses';
 import { friendlyError } from '../utils/errors';
 import { colors, radius, shadow, spacing, typography } from '../theme';
 import AdminPageHeader from '../components/AdminPageHeader';
+import TransferMemberPicker from '../components/TransferMemberPicker';
+import { listUsers } from '../services/users';
 import BusinessPromotionApprovalPanel from './BusinessPromotionApprovalPanel';
 
 const FILTERS = [
@@ -43,7 +46,7 @@ function comparisonValue(value) {
   return String(value || 'Not supplied');
 }
 
-function BusinessReviewCard({ business, compactLayout, selected, busy, isManagement, isSuperAdmin, historyMatches, onToggle, onApprove, onReject, onVisibility, onVerify, onLifecycle, onRestore }) {
+function BusinessReviewCard({ business, compactLayout, selected, busy, isManagement, isSuperAdmin, historyMatches, onToggle, onApprove, onReject, onVisibility, onVerify, onLifecycle, onRestore, onTransfer, transferPicker }) {
   const [tier, setTier] = useState(business.tier || 'free');
   const [foundingMember, setFoundingMember] = useState(Boolean(business.foundingMember || business.foundingMemberCandidate));
   const [publishWithoutAbn, setPublishWithoutAbn] = useState(false);
@@ -282,6 +285,8 @@ function BusinessReviewCard({ business, compactLayout, selected, busy, isManagem
             </Pressable>
           ) : null}
 
+          {isManagement && !isHistorical && onTransfer ? <Pressable disabled={busy} onPress={() => onTransfer(business)} style={styles.visibilityButton}><Text style={styles.visibilityText}>Transfer ownership</Text></Pressable> : null}
+          {!isHistorical && transferPicker}
           {isManagement && !isHistorical ? <View style={styles.lifecycleActions}>
             <Pressable disabled={busy} onPress={() => confirmLifecycle(false)} style={styles.archiveButton}><Text style={styles.archiveButtonText}>Archive Business</Text></Pressable>
             {isSuperAdmin ? <Pressable disabled={busy} onPress={() => confirmLifecycle(true)} style={styles.deleteRecordButton}><Text style={styles.deleteRecordText}>Mark as Deleted</Text></Pressable> : null}
@@ -308,6 +313,21 @@ export default function BusinessApprovalPanel({ mode = 'approvals', onBack, prof
   const [selectedId, setSelectedId] = useState('');
   const [busyId, setBusyId] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const [transfer, setTransfer] = useState(null), [transferQuery,setTransferQuery] = useState(''), [transferUser,setTransferUser] = useState(null);
+  const [members,setMembers] = useState([]), [membersLoading,setMembersLoading] = useState(false), [membersError,setMembersError] = useState('');
+  const openTransfer = async business => {
+    setTransfer(business);setTransferQuery('');setTransferUser(null);setMembers([]);setMembersError('');setMembersLoading(true);
+    try {const rows=await listUsers({serverOnly:true});setMembers(rows.filter(row=>profile?.role==='superAdmin' || (row.adminCity || row.defaultCity || 'sydney')===(profile?.adminCity || profile?.defaultCity || 'sydney')));}
+    catch(err){setMembersError(friendlyError(err,'Could not load members.'));}finally{setMembersLoading(false);}
+  };
+  const confirmTransfer = target => Alert.alert('Transfer business ownership?',`Transfer ${transfer.name} to ${target.fullName || target.displayName || target.name || target.phone || target.email}? Linked promotions and new enquiries will go to the new owner. Existing conversations remain with their original participants.`,[
+    {text:'Cancel',style:'cancel'},{text:'Transfer',onPress:async()=>{
+      setBusyId(transfer.id);setError('');
+      try {await transferBusinessOwnership(transfer,target);setTransfer(null);setTransferUser(null);Alert.alert('Business transferred','The new owner can manage the listing and its promotions.');}
+      catch(err){setError(friendlyError(err,'Could not transfer the business.'));}finally{setBusyId('');}
+    }},
+  ]);
+
 
   useEffect(() => {
     setQueueType('businesses');
@@ -501,6 +521,8 @@ export default function BusinessApprovalPanel({ mode = 'approvals', onBack, prof
             onVerify={verifyAbn}
             onLifecycle={changeLifecycle}
             onRestore={restore}
+            onTransfer={profile?.role === 'superAdmin' || (profile?.role === 'admin' && business.location?.city === (profile?.adminCity || profile?.defaultCity || 'sydney')) ? openTransfer : undefined}
+            transferPicker={transfer?.id===business.id ? <TransferMemberPicker searchLabel="Search new business owner" users={members} ownerUid={business.ownerId} query={transferQuery} onQueryChange={setTransferQuery} selected={transferUser} onSelect={setTransferUser} loading={membersLoading} error={membersError} busy={Boolean(busyId)} onConfirm={confirmTransfer} onCancel={()=>setTransfer(null)}/> : null}
           />
         ))}
       </View>

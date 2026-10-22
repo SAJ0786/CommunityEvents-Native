@@ -4,12 +4,12 @@ import { colors, spacing } from '../theme';
 import { transferMemberCandidates, transferMemberContact, transferMemberName } from '../utils/adminUserSearch';
 
 // Both event modules receive the same city-scoped members from the dashboard.
-export default function TransferMemberPicker({ users = [], ownerUid, query, onQueryChange, selected, onSelect, loading = false, error = '', busy = false, onConfirm, onCancel }) {
+export default function TransferMemberPicker({ users = [], ownerUid, query, onQueryChange, selected, onSelect, loading = false, error = '', busy = false, onConfirm, onCancel, searchLabel = 'Search new organiser' }) {
   const candidates = loading || error ? [] : transferMemberCandidates(users, query, ownerUid);
   const canSubmit = !loading && !error && !busy && candidates.some(user => user.id === selected?.id);
   return <View style={styles.panel}>
     <Text style={styles.hint}>Type at least two characters, then select the new owner.</Text>
-    <TextInput accessibilityLabel="Search new organiser" placeholder="Search by name, phone number or email" placeholderTextColor={colors.muted}
+    <TextInput accessibilityLabel={searchLabel} placeholder="Search by name, phone number or email" placeholderTextColor={colors.muted}
       autoCapitalize="none" autoCorrect={false} value={query} editable={!busy}
       onChangeText={value => { onQueryChange(value); onSelect(null); }} style={styles.input}/>
     {loading ? <View style={styles.loading}><ActivityIndicator color={colors.tealDark}/><Text style={styles.hint}>Loading members…</Text></View> : null}
