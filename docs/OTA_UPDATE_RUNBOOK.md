@@ -1,33 +1,47 @@
 # Community Connect native OTA updates
 
-## Current release restriction — 22 October 2026
+## Current platform release status — 22 October 2026
 
-The user reports the iOS store update is approved, while the Android update is still under review. They authorised sending the current fixes without a separate device testing stage, for iOS only. Do not publish an Android OTA for these changes until the user confirms Android approval or explicitly changes this restriction.
+The user confirmed Android approval on 22 October 2026, lifting the earlier Android review hold. Google Play was independently checked: production release 2.1.1 (110) is completed. The previously authorised Android catch-up OTA has now been published. iOS remains on its existing latest update. Earlier history sections describe the release status at that time; their Android hold statements are superseded by this current status.
 
-## Android catch-up register — pending publication
+## Android catch-up register — published
 
-User instruction, 22 October 2026: retain the iOS OTA history and deliver the same changes to Android. This records the pending work; it does not lift the existing Android review hold. Every row below is published on iOS and **not yet published to Android**.
+User instruction, 22 October 2026: retain the iOS OTA history and deliver the same changes to Android after approval. Every row below is now included in cumulative Android production group `b03ff983-d196-4c38-8a21-3498978e9cee`. Published means available from Expo for matching installations, not confirmed installed on every phone.
 
 | iOS OTA group | Changes to include on Android | Android status |
 | --- | --- | --- |
-| `13547882-0e6d-4bee-8bb1-6e67ca321329` | Community Connect Australia share footer; administrator transfer of registration-event ownership | Pending — review hold |
-| `89826346-b867-4a74-9308-78b81a99b0ed` | Transfer action inside the opened registration card; member autocomplete by name, phone and email | Pending — review hold |
-| `d39e0f50-26cd-47e5-b51d-31d42368138c` | Name and phone displayed first; fresh server member lookup; formatting-tolerant matching; loading/error handling | Pending — review hold |
-| `be7fd4e3-de2c-42f0-92d8-15fc593cb48c` | One shared picker for normal and registration-only event transfers, consistent eligible-member filtering and selection controls | Pending — review hold |
-| `e51214b3-004c-4938-8ce3-3cb767f9e0ea` | Shared read-only registration form for saved registrations and organiser responses, preserving submitted questions, participant groups and consent | Pending — review hold |
-| `cd596126-111f-4bea-8558-e2732d4a90b2` | Business Management ownership transfer using shared member search, explicit confirmation and audited server transaction | Pending — review hold |
-| `7a1bfdd9-613f-4f91-822c-b90541ed6e35` | Correct transfer eligibility for active accounts whose migration marker points to their own UID, including Iram Rizvi and Sajjad Zaheer | Pending — review hold |
+| `13547882-0e6d-4bee-8bb1-6e67ca321329` | Community Connect Australia share footer; administrator transfer of registration-event ownership | Published — 22 Oct 2026 |
+| `89826346-b867-4a74-9308-78b81a99b0ed` | Transfer action inside the opened registration card; member autocomplete by name, phone and email | Published — 22 Oct 2026 |
+| `d39e0f50-26cd-47e5-b51d-31d42368138c` | Name and phone displayed first; fresh server member lookup; formatting-tolerant matching; loading/error handling | Published — 22 Oct 2026 |
+| `be7fd4e3-de2c-42f0-92d8-15fc593cb48c` | One shared picker for normal and registration-only event transfers, consistent eligible-member filtering and selection controls | Published — 22 Oct 2026 |
+| `e51214b3-004c-4938-8ce3-3cb767f9e0ea` | Shared read-only registration form for saved registrations and organiser responses, preserving submitted questions, participant groups and consent | Published — 22 Oct 2026 |
+| `cd596126-111f-4bea-8558-e2732d4a90b2` | Business Management ownership transfer using shared member search, explicit confirmation and audited server transaction | Published — 22 Oct 2026 |
+| `7a1bfdd9-613f-4f91-822c-b90541ed6e35` | Correct transfer eligibility for active accounts whose migration marker points to their own UID, including Iram Rizvi and Sajjad Zaheer | Published — 22 Oct 2026 |
 
-The native source is shared by both platforms. These changes are cumulative: publish one Android update from a reviewed source containing all recorded rows, rather than replaying the superseded iOS updates. Latest cumulative code baseline: `1e05d752143205c15ba211e3a8ef7a72085faea3`; later documentation-only commits do not alter app behaviour. Preserve later authorised fixes when choosing the final source.
+The native source is shared by both platforms. One cumulative Android update delivered all recorded rows; the superseded iOS groups were not replayed. Cumulative code baseline: `1e05d752143205c15ba211e3a8ef7a72085faea3`. Published source `28a7e96b7d70f5c76c3e5b2bfd80325785d1b01f` includes the same code plus documentation-only history changes.
 
 Android delivery checklist:
 
-- [ ] User confirms Android store approval or explicitly lifts the hold.
-- [ ] Confirm the intended installed Android binary and production channel. Recorded baseline is 2.1.1 (110), runtime `1ac7a2d1933a73b82d980e77f72cf46088efa61e`; verify it still matches before publication.
-- [ ] Review the final source and applicable checks; export with the production environment for Android. A changed native runtime requires a new binary, not a forced OTA.
-- [ ] Publish with an explicit Android-only platform target; do not republish iOS as part of catch-up.
-- [ ] Record the Android update/group ID, runtime, source commit, publication time and previous Android rollback target; mark all covered rows delivered only after successful publication.
-- [ ] Record device confirmation separately if received; server publication alone does not establish installation on a phone.
+- [x] User confirmed Android store approval; Google Play production 2.1.1 (110) independently verified as completed.
+- [x] EAS build `f846c41f-0b96-402d-9081-12386eeb28af` is finished, production channel, runtime/fingerprint `1ac7a2d1933a73b82d980e77f72cf46088efa61e`.
+- [x] OTA configuration check passed; current production-environment runtime matched build 110 before publication; Android Hermes export succeeded. Current code retains the previously passed 131 native/backend cases and UI checks; no application code changed for catch-up.
+- [x] Published using explicit Android-only platform target. iOS was not republished.
+- [x] Android update/group/runtime/source/time/rollback target recorded below, and all seven covered rows marked published.
+- [ ] Optional device confirmation: not yet received. Server manifest delivery is verified; installation/application on an individual phone is not claimed.
+
+## Android cumulative production release — 22 October 2026
+
+- Group: `b03ff983-d196-4c38-8a21-3498978e9cee`.
+- Update: `01a16241-fd0d-7082-9a0e-eea6c3d0c4f8`.
+- Published: 22 October 2026 (Australia/Sydney); EAS timestamp `2026-10-22T06:17:34.221Z`.
+- Platform/channel: Android only, production branch/channel.
+- Runtime: `1ac7a2d1933a73b82d980e77f72cf46088efa61e`, matching approved 2.1.1 build 110.
+- Source: `28a7e96b7d70f5c76c3e5b2bfd80325785d1b01f`.
+- Previous Android target: build 110's embedded bundle. The production branch contained only the seven iOS update groups before this publication; there was no previous Android OTA group. Use an Android-specific rollback-to-embedded operation if needed, not an iOS group.
+
+The live Expo production endpoint was checked with Android runtime/platform headers and served the new Android update ID. A separate iOS request still served `01a1620a-eca3-7c29-9a9a-410d0c538989`, proving the iOS production update remained unchanged. No store binary, ownership operation, backend or web deployment was performed for this catch-up. Users on older binaries must first install Play Store 2.1.1 (110); compatible installations download OTA at launch and normally apply it on a subsequent launch.
+
+## Earlier iOS release history
 
 iOS production OTA published on 22 October 2026 (Australia/Sydney): group `13547882-0e6d-4bee-8bb1-6e67ca321329`, update `01a1608c-bf09-7c4e-bae1-16614b4fd31c`, source `0244486efaa5087d4bcc8448c3158430ee0af3ea`, runtime `b1f045e738e61629962eb354595e34e2c39b75e6` (matches iOS 2.1.1 build 16). Fixes share-footer branding and adds administrator registration-event ownership transfer. Only iOS was included; no Android OTA or new native binary was published. No on-device receipt/application is claimed. The user can open online, allow download, fully close and reopen to apply.
 
