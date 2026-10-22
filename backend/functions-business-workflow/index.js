@@ -356,7 +356,9 @@ exports.sendBusinessEnquiry = onCall(
       ]);
       if (!businessSnapshot.exists || !publicSnapshot.exists) throw new HttpsError('not-found', 'This public business could not be found.');
       const business = businessSnapshot.data() || {}, route = routeSnapshot.data() || {};
-      const ownerUid = clean(route.active === true ? route.ownerUid : '') || clean(business.ownerId);
+      // A concurrent approval from an older client may leave a stale route.
+      // Current listing ownership is authoritative; the transaction repairs routing.
+      const ownerUid = clean(business.ownerId) || clean(route.active === true ? route.ownerUid : '');
       if (!ownerUid || business.hidden === true || (business.status !== 'approved' && business.hasPublishedVersion !== true)) throw new HttpsError('failed-precondition', 'This business does not have an active in-app contact inbox.');
       if (ownerUid === senderUid) throw new HttpsError('failed-precondition', 'This business listing is already managed by you.');
       const threadId = `${businessId}_${senderUid}_${ownerUid}`;

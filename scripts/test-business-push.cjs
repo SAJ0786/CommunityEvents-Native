@@ -126,7 +126,7 @@ async function testWorkflow() {
   console.log('PASS workflow recipients: essential approvals/rejections/closures/promotions reach owner + correct admins, exclude actor/other cities, and preserve optional opt-outs.');
   records.set('businesses/transferred',{ownerId:'new-owner',status:'approved'});
   records.set('publicBusinesses/transferred',{name:'Transferred business'});
-  records.set('businessContactRoutes/transferred',{ownerUid:'new-owner',active:true});
+  records.set('businessContactRoutes/transferred',{ownerUid:'stale-owner',active:true});
   const enquiry=await exports.sendBusinessEnquiry({auth:{uid:'customer'},data:{businessId:'transferred',text:'New enquiry',senderName:'Customer'}});
   assert.equal(enquiry.threadId,'transferred_customer_new-owner');
   assert.equal(records.get('businessContactRoutes/transferred').ownerUid,'new-owner');
