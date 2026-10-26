@@ -688,6 +688,23 @@ function MainApp() {
     return counts;
   }, {}), [myEvents]);
 
+  useEffect(() => {
+    if (!currentUser?.uid || currentUser.isAnonymous) return undefined;
+    let cancelled = false;
+    const uid = currentUser.uid;
+    const subscription = AppState.addEventListener('change', state => {
+      if (state !== 'active') return;
+      const request = profileRequestRef.current;
+      getUserProfile(uid, { serverOnly: true }).then(saved => {
+        if (!cancelled && auth.currentUser?.uid === uid && profileRequestRef.current === request) {
+          setProfile(saved);
+          setProfileLoading(false);
+        }
+      }).catch(() => { /* Preserve the last confirmed profile while offline; missing-city members remain gated. */ });
+    });
+    return () => { cancelled = true; subscription.remove(); };
+  }, [currentUser?.uid, currentUser?.isAnonymous]);
+
   const handleCityChange = useCallback(city => {
     const normalizedCity = normalizeCity(city);
     setSelectedCity(normalizedCity);
