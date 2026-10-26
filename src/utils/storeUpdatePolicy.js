@@ -15,13 +15,16 @@ export function isNewerStoreVersion(installed, published) {
   }
   return false;
 }
-export function storeUpdateNotice({ release, platform, applicationId, installedVersion, now = Date.now(), snoozedUntil = 0 }) {
+export function storeUpdateNotice({ release, platform, applicationId, installedVersion, installedBuild, now = Date.now(), snoozedUntil = 0 }) {
   if (!APP_IDS[platform] || applicationId !== APP_IDS[platform] || !release || release.enabled !== true || release.storeVerified !== true) return null;
-  if (release.applicationId !== applicationId || !isNewerStoreVersion(installedVersion, release.version)) return null;
+  const sameVersion = parts(installedVersion) && parts(release.version) && parts(installedVersion).join('.') === parts(release.version).join('.');
+  const validBuild = value => /^\d{1,12}$/.test(String(value || '')) && Number.isSafeInteger(Number(value));
+  const newerBuild = sameVersion && validBuild(installedBuild) && validBuild(release.build) && Number(release.build) > Number(installedBuild);
+  if (release.applicationId !== applicationId || (!isNewerStoreVersion(installedVersion, release.version) && !newerBuild)) return null;
   const published = typeof release.publishedAt === 'string' ? Date.parse(release.publishedAt) : NaN;
   const expires = typeof release.expiresAt === 'string' ? Date.parse(release.expiresAt) : NaN;
   if (!Number.isFinite(published) || !Number.isFinite(expires) || published > now || expires <= now || expires <= published) return null;
   // Bound corrupt/local future timestamps so the notice cannot stay hidden forever.
   if (Number.isFinite(snoozedUntil) && snoozedUntil > now && snoozedUntil <= now + UPDATE_SNOOZE_MS) return null;
-  return { version: release.version, url: platform === 'ios' ? APPLE_APP_STORE_URL : GOOGLE_PLAY_URL };
+  return { version: release.version, build: release.build || '', url: platform === 'ios' ? APPLE_APP_STORE_URL : GOOGLE_PLAY_URL };
 }

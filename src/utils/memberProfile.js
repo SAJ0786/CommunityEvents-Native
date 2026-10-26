@@ -7,9 +7,10 @@ export function memberEntryState(user, profile, loading) {
   if (!user || user.isAnonymous) return 'guest';
   if (loading) return 'loading';
   if (!profile) return 'retry';
-  if (profile.isActive === false || ['banned', 'archived', 'deleted'].includes(profile.accountStatus)) return 'blocked';
+  if (profile.isActive === false || profile.active === false || ['banned', 'archived', 'deleted'].includes(profile.accountStatus)) return 'blocked';
   if (!/^\+614\d{8}$/.test(user.phoneNumber || '')) return 'verify-phone';
-  return validMemberName(profile.fullName) && validMemberEmail(profile.email) ? 'ready' : 'complete-profile';
+  if (!validMemberName(profile.fullName) || !validMemberEmail(profile.email)) return 'complete-profile';
+  return typeof profile.defaultCity === 'string' && profile.defaultCity.trim() ? 'ready' : 'choose-city';
 }
 export function memberJoinedMillis(user = {}) {
   for (const value of [user.registeredAt, user.createdAt, user.joinedAt, user.createdOn]) {

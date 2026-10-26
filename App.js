@@ -795,6 +795,7 @@ function MainApp() {
       if (auth.currentUser?.uid !== uid) return;
       profileRequestRef.current += 1;
       setProfile(saved);
+      if (saved.defaultCity) { setSelectedCity(saved.defaultCity); void AsyncStorage.setItem(CITY_STORAGE_KEY, saved.defaultCity).catch(() => {}); }
       setProfileLoading(false);
       setAppModule(preferredModule);
     } catch (err) {

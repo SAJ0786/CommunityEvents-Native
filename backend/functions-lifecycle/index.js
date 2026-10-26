@@ -12,7 +12,14 @@ const DEFAULT_CITY = 'sydney';
 
 const memberRegistration = createMemberRegistrationHandlers({
   db, auth: admin.auth(), serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(), HttpsError,
+  validateCity: async value => {
+    const model = await cityModel;
+    const snapshot = await db.collection('settings').doc('cityCatalogue').get();
+    const resolver = model.createCityResolver(snapshot.exists ? snapshot.data() : model.BUNDLED_CITY_CATALOGUE);
+    return typeof value === 'string' && value.length > 0 && resolver.enabled(value);
+  },
 });
+exports.completeMemberCity = onCall({ region: REGION }, memberRegistration.chooseCity);
 exports.completeMemberRegistration = onCall({ region: REGION }, memberRegistration.complete);
 exports.recordMemberRegistrationDate = onDocumentCreated({ region: REGION, document: 'users/{uid}', retry: true }, memberRegistration.recordCreated);
 

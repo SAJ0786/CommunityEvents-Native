@@ -1,3 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { httpsCallable } from '@react-native-firebase/functions';
+import { auth, functions } from '../firebase/firebase';
 import { Linking, Platform } from 'react-native';
 import * as Calendar from 'expo-calendar';
 import * as Clipboard from 'expo-clipboard';
@@ -6,8 +9,21 @@ import { registrationSchedule } from '../registration/eventSchedule';
 
 const APP_DOMAIN = 'https://communityevents.siza.info';
 
-export function buildFeedUrl(uid) {
-  return `${APP_DOMAIN}/cal?t=${encodeURIComponent(uid || '')}`;
+export function buildFeedUrl(secret) {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(secret || '')) throw new Error('Create your secure calendar link first.');
+  return `${APP_DOMAIN}/cal?s=${encodeURIComponent(secret)}`;
+}
+export async function getCalendarFeed(uid) {
+  if (!uid || auth.currentUser?.uid !== uid || auth.currentUser.isAnonymous) throw new Error('Sign in before syncing your calendar.');
+  const key = `@community-connect/secure-calendar/${uid}`;
+  const cached = await AsyncStorage.getItem(key);
+  if (auth.currentUser?.uid !== uid) throw new Error('Your sign-in changed.');
+  if (/^https:\/\/communityevents\.siza\.info\/cal\?s=[A-Za-z0-9_-]{43}$/.test(cached || '')) return cached;
+  const result = await httpsCallable(functions, 'createCalendarSubscription')({});
+  if (auth.currentUser?.uid !== uid) throw new Error('Your sign-in changed.');
+  const url = result.data?.url;
+  if (!/^https:\/\/communityevents\.siza\.info\/cal\?s=[A-Za-z0-9_-]{43}$/.test(url || '')) throw new Error('Your secure calendar link could not be created.');
+  await AsyncStorage.setItem(key, url);return url;
 }
 
 export function calendarInstructions() {
@@ -30,13 +46,13 @@ export function calendarInstructions() {
 }
 
 export async function copyCalendarFeed(uid) {
-  const url = buildFeedUrl(uid);
+  const url = await getCalendarFeed(uid);
   await Clipboard.setStringAsync(url);
   return url;
 }
 
 export async function openLiveCalendarSubscription(uid, alternate = false) {
-  const feedUrl = buildFeedUrl(uid);
+  const feedUrl = await getCalendarFeed(uid);
   if (Platform.OS === 'ios') {
     return Linking.openURL(`webcal://${feedUrl.replace(/^https?:\/\//, '')}`);
   }

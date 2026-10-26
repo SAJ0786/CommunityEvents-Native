@@ -1,6 +1,6 @@
 const LEGAL_VERSION = '2026-09-08-community-connect';
 
-function createMemberRegistrationHandlers({ db, auth, serverTimestamp, HttpsError }) {
+function createMemberRegistrationHandlers({ db, auth, serverTimestamp, HttpsError, validateCity = async value => ['sydney','melbourne','canberra','brisbane','adelaide','hobart','perth','rest-of-australia'].includes(value) }) {
   const fail = (code, message) => { throw new HttpsError(code, message); };
   const inactive = data => data.isActive === false || ['banned', 'archived', 'deleted'].includes(data.accountStatus);
   async function complete(request) {
@@ -20,7 +20,11 @@ function createMemberRegistrationHandlers({ db, auth, serverTimestamp, HttpsErro
       const snapshot = await transaction.get(ref);
       const existing = snapshot.data() || {};
       if (inactive(existing)) fail('permission-denied', 'This account is inactive.');
+      const defaultCity = data.defaultCity || existing.defaultCity;
+      if (!await validateCity(defaultCity)) fail('failed-precondition', 'Choose an available default city before continuing.');
+      if (existing.defaultCity && data.defaultCity && existing.defaultCity !== data.defaultCity) fail('failed-precondition', 'Change your default city from Profile.');
       const payload = {
+        defaultCity,
         fullName, email, emailLower: email, phone: account.phoneNumber, phoneVerified: true,
         privacyAccepted: true, privacyPolicyVersion: LEGAL_VERSION,
         termsAccepted: true, termsVersion: LEGAL_VERSION, legalAcceptedAt: serverTimestamp(),
@@ -42,6 +46,21 @@ function createMemberRegistrationHandlers({ db, auth, serverTimestamp, HttpsErro
       transaction.update(event.data.ref, { registeredAt: snapshot.createTime });
     });
   }
-  return { complete, recordCreated };
+  async function chooseCity(request) {
+    if (!request.auth || request.auth.token?.firebase?.sign_in_provider === 'anonymous') fail('unauthenticated', 'Sign in with your mobile number first.');
+    const defaultCity = request.data?.defaultCity;
+    if (!await validateCity(defaultCity)) fail('invalid-argument', 'Choose an available default city.');
+    const account = await auth.getUser(request.auth.uid);
+    if (account.disabled || !/^\+614\d{8}$/.test(account.phoneNumber || '')) fail('permission-denied', 'An active verified member account is required.');
+    await db.runTransaction(async tx => {
+      const ref = db.collection('users').doc(request.auth.uid), snapshot = await tx.get(ref), existing = snapshot.data() || {};
+      if (!snapshot.exists || inactive(existing)) fail('permission-denied', 'An active member profile is required.');
+      if (!existing.fullName || !existing.email) fail('failed-precondition', 'Complete your name and email first.');
+      if (existing.defaultCity && existing.defaultCity !== defaultCity) fail('failed-precondition', 'Change your default city from Profile.');
+      tx.set(ref, { defaultCity, updatedAt: serverTimestamp() }, { merge: true });
+    });
+    return { defaultCity };
+  }
+  return { complete, chooseCity, recordCreated };
 }
 module.exports = { createMemberRegistrationHandlers, LEGAL_VERSION };

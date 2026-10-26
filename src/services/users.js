@@ -1,4 +1,4 @@
-import { arrayRemove, arrayUnion, collection, deleteField, doc, getDoc, getDocFromCache, getDocs, getDocsFromServer, query, serverTimestamp, setDoc, updateDoc, where } from '@react-native-firebase/firestore';
+import { arrayRemove, arrayUnion, collection, deleteField, doc, getDoc, getDocFromCache, getDocFromServer, getDocs, getDocsFromServer, query, serverTimestamp, setDoc, updateDoc, where } from '@react-native-firebase/firestore';
 import { httpsCallable } from '@react-native-firebase/functions';
 import { signOut } from '@react-native-firebase/auth';
 import { auth, db, functions } from '../firebase/firebase';
@@ -9,9 +9,9 @@ const ROLES = {
   SUPER_ADMIN: 'superAdmin',
 };
 
-export async function getUserProfile(uid, { cacheOnly = false } = {}) {
+export async function getUserProfile(uid, { cacheOnly = false, serverOnly = false } = {}) {
   if (!uid) return null;
-  const snapshot = await (cacheOnly ? getDocFromCache : getDoc)(doc(db, 'users', uid));
+  const snapshot = await (serverOnly ? getDocFromServer : cacheOnly ? getDocFromCache : getDoc)(doc(db, 'users', uid));
   if (!snapshot.exists()) return null;
   const data = snapshot.data();
   return {
@@ -89,9 +89,10 @@ export async function ensureUserProfile(uid, defaults = {}) {
 export async function completeMemberProfile(details) {
   const user = auth.currentUser;
   if (!user || user.isAnonymous) throw new Error('Sign in with your mobile number first.');
-  await httpsCallable(functions, 'completeMemberRegistration')(details);
+  const { cityOnly, ...payload } = details;
+  await httpsCallable(functions, cityOnly ? 'completeMemberCity' : 'completeMemberRegistration')(payload);
   if (auth.currentUser?.uid !== user.uid) throw new Error('Your session changed. Please sign in again.');
-  const profile = await getUserProfile(user.uid);
+  const profile = await getUserProfile(user.uid, { serverOnly: true });
   if (!profile) throw new Error('Profile could not be confirmed. Please retry.');
   return profile;
 }

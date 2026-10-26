@@ -14,7 +14,7 @@ function load(file, mocks = {}) {
 const helper = load('src/utils/memberProfile.js');
 const { createMemberRegistrationHandlers, LEGAL_VERSION } = require('../backend/functions-lifecycle/memberRegistration');
 const user = { uid: 'member', phoneNumber: '+61400000000' };
-const details = { fullName: ' Test  Member ', email: ' MEMBER@EXAMPLE.COM ', privacyAccepted: true, termsAccepted: true, legalVersion: LEGAL_VERSION };
+const details = { fullName: ' Test  Member ', email: ' MEMBER@EXAMPLE.COM ', privacyAccepted: true, termsAccepted: true, legalVersion: LEGAL_VERSION, defaultCity: 'perth' };
 const request = data => ({ auth: { uid: user.uid, token: { firebase: { sign_in_provider: 'phone' } } }, data });
 function backend(initial = {}, account = user) {
   let record = initial;
@@ -39,7 +39,8 @@ async function main() {
   assert.equal(helper.memberEntryState(user, null, false), 'retry');
   assert.equal(helper.memberEntryState(user, {}, false), 'complete-profile');
   assert.equal(helper.memberEntryState(user, { fullName: 'Jane', email: 'bad' }, false), 'complete-profile');
-  const complete = { fullName: 'Jane Doe', email: 'jane@example.com' };
+  const complete = { fullName: 'Jane Doe', email: 'jane@example.com', defaultCity: 'perth' };
+  assert.equal(helper.memberEntryState(user, {fullName:'Jane Doe',email:'jane@example.com'}, false), 'choose-city');
   assert.equal(helper.memberEntryState(user, complete, false), 'ready');
   assert.equal(helper.memberEntryState({ uid: 'old-social' }, complete, false), 'verify-phone');
   assert.equal(helper.memberEntryState(user, { ...complete, accountStatus: 'banned' }, false), 'blocked');
@@ -101,6 +102,7 @@ async function main() {
   const Component = load('src/components/CompleteProfileScreen.js', {
     react: React, 'react-native': native, './KeyboardAwareScrollView': { __esModule: true, default: 'ScrollView' },
     '../theme': require('./theme-fixture.cjs'), '../config/legal': { LEGAL_URLS: {}, LEGAL_DOCUMENT_VERSION: LEGAL_VERSION },
+    './CitySelector': { __esModule:true,default:'CitySelector' }, '../utils/cities':{CITY_OPTIONS:[{value:'perth'}]},
     '../utils/openExternalUrl': { openExternalUrl() {} }, '../utils/memberProfile': helper,
   }).default;
   const flat = value => Array.isArray(value) ? value.flatMap(flat) : value && typeof value === 'object' ? [value, ...flat(value.children)] : [];
@@ -111,6 +113,7 @@ async function main() {
   nodes.find(n => n.props.testID === 'registration-email').props.onChangeText('JANE@example.com');
   nodes = render(); await nodes.find(n => n.props.testID === 'registration-save').props.onPress(); assert.equal(saved, null);
   nodes.find(n => n.type === 'Switch').props.onValueChange(true);
+  nodes.find(n => n.type === 'CitySelector').props.onChange('perth');
   nodes = render(); await nodes.find(n => n.props.testID === 'registration-save').props.onPress(); assert.equal(saved.email, 'jane@example.com');
   assert.equal(render('complete-profile', true).find(n => n.props.testID === 'registration-save').props.disabled, true);
   assert.equal(render('retry').some(n => n.props.testID === 'registration-save'), false);

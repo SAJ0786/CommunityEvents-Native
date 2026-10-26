@@ -65,3 +65,10 @@ test('Home integration, token styling, public read-only rule and receiving team 
   assert.equal(JSON.parse(read('eas.json')).submit.production.ios.appleTeamId, 'D36Y75H5BU');
   assert.equal(JSON.parse(read('app.json')).expo.ios.appleTeamId, 'D36Y75H5BU');
 });
+
+test('same marketing version announces a newer verified build without prompting current or newer builds', () => {
+ const same = { ...release, version:'2.1.1', build:'16' };
+ assert.ok(notice({ release:same, installedVersion:'2.1.1', installedBuild:'13' }));
+ for(const installedBuild of ['16','17','unknown',undefined]) assert.equal(notice({ release:same, installedVersion:'2.1.1', installedBuild }),null);
+ assert.equal(notice({ release:{...same,storeVerified:false}, installedVersion:'2.1.1',installedBuild:'13' }),null);
+});

@@ -1,30 +1,37 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import ScrollView from './KeyboardAwareScrollView';
+import CitySelector from './CitySelector';
+import { CITY_OPTIONS } from '../utils/cities';
 import { colors, radius, spacing, typography } from '../theme';
 import { LEGAL_URLS, LEGAL_DOCUMENT_VERSION } from '../config/legal';
 import { openExternalUrl } from '../utils/openExternalUrl';
 import { cleanMemberName, cleanMemberEmail, validMemberName, validMemberEmail } from '../utils/memberProfile';
 
 export default function CompleteProfileScreen({ user, profile, state, busy, error, onSave, onRetry, onSignOut }) {
+  const [city, setCity] = useState('');
+  const cityOnly = state === 'choose-city';
   const [name, setName] = useState(profile?.fullName || '');
   const [email, setEmail] = useState(profile?.email || '');
   const [accepted, setAccepted] = useState(false);
   const [validation, setValidation] = useState('');
-  const canComplete = state === 'complete-profile';
+  const canComplete = state === 'complete-profile' || cityOnly;
   const save = async () => {
+    if (!CITY_OPTIONS.some(option => option.value === city)) return setValidation('Choose your default city to continue.');
+    if (cityOnly) { setValidation(''); return onSave({ defaultCity: city, cityOnly: true }); }
     if (!validMemberName(name)) return setValidation('Enter your full name (2–120 characters).');
     if (!validMemberEmail(email)) return setValidation('Enter a valid email address.');
     if (!accepted) return setValidation('Please accept the Privacy Policy and Terms of Use.');
     setValidation('');
-    await onSave({ fullName: cleanMemberName(name), email: cleanMemberEmail(email), privacyAccepted: true, termsAccepted: true, legalVersion: LEGAL_DOCUMENT_VERSION });
+    await onSave({ fullName: cleanMemberName(name), email: cleanMemberEmail(email), privacyAccepted: true, termsAccepted: true, legalVersion: LEGAL_DOCUMENT_VERSION, defaultCity: city });
   };
   return <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
     <View style={styles.card}>
-      <Text accessibilityRole="header" style={styles.title}>{canComplete ? 'Complete your profile' : state === 'loading' ? 'Checking your profile…' : state === 'blocked' ? 'Account unavailable' : state === 'verify-phone' ? 'Verify your mobile number' : 'Profile could not be loaded'}</Text>
-      <Text style={styles.copy}>{canComplete ? 'Before continuing, please add your name and email. The same profile is used for Events and Business Directory.' : state === 'blocked' ? 'This account is inactive. Please contact support.' : state === 'verify-phone' ? 'Please sign out and sign in with your mobile number to verify it.' : 'Your saved details must be checked before you can continue.'}</Text>
+      <Text accessibilityRole="header" style={styles.title}>{cityOnly ? 'Choose your default city' : canComplete ? 'Complete your profile' : state === 'loading' ? 'Checking your profile…' : state === 'blocked' ? 'Account unavailable' : state === 'verify-phone' ? 'Verify your mobile number' : 'Profile could not be loaded'}</Text>
+      <Text style={styles.copy}>{cityOnly ? 'Choose and save your city before continuing. It is used for Events, Business Directory and your calendar subscription. You can change it later in Profile.' : canComplete ? 'Before continuing, please add your name, email and city. The same profile is used for Events and Business Directory.' : state === 'blocked' ? 'This account is inactive. Please contact support.' : state === 'verify-phone' ? 'Please sign out and sign in with your mobile number to verify it.' : 'Your saved details must be checked before you can continue.'}</Text>
       {state === 'loading' && <ActivityIndicator color={colors.blue} />}
-      {canComplete && <>
+      {canComplete && <View style={{ marginBottom: spacing.md }}><Text style={styles.label}>Default city *</Text><CitySelector selectedCity={city} onChange={setCity} disabled={busy} allowCurrentLocation /><Text style={styles.copy}>{city ? 'Save to confirm your selection.' : 'Please select a city. No city is selected automatically.'}</Text></View>}
+      {canComplete && !cityOnly && <>
         <Text style={styles.label}>Verified mobile number</Text><Text style={styles.copy}>{user.phoneNumber}</Text>
         <Text style={styles.label}>Full name *</Text>
         <TextInput accessibilityLabel="Full name" testID="registration-full-name" value={name} onChangeText={setName} autoComplete="name" maxLength={120} editable={!busy} style={styles.input} />

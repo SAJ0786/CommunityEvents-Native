@@ -16,13 +16,13 @@ export default function StoreUpdateNotice({ visible }) {
     const check = async () => {
       const current = ++sequence;
       const release = await readStoreRelease(Platform.OS);
-      const candidate = storeUpdateNotice({ release, platform: Platform.OS, applicationId: Application.applicationId, installedVersion: Application.nativeApplicationVersion });
+      const candidate = storeUpdateNotice({ release, platform: Platform.OS, applicationId: Application.applicationId, installedVersion: Application.nativeApplicationVersion, installedBuild: Application.nativeBuildVersion });
       let noticeToShow = candidate;
       if (candidate) {
-        let until = snoozes.current[candidate.version] || 0;
-        try { until = Math.max(until, Number(await AsyncStorage.getItem(storageKey(candidate.version))) || 0); } catch { /* session snooze still works */ }
-        until = Math.max(until, snoozes.current[candidate.version] || 0);
-        noticeToShow = storeUpdateNotice({ release, platform: Platform.OS, applicationId: Application.applicationId, installedVersion: Application.nativeApplicationVersion, snoozedUntil: until });
+        let until = snoozes.current[`${candidate.version}-${candidate.build}`] || 0;
+        try { until = Math.max(until, Number(await AsyncStorage.getItem(storageKey(`${candidate.version}-${candidate.build}`))) || 0); } catch { /* session snooze still works */ }
+        until = Math.max(until, snoozes.current[`${candidate.version}-${candidate.build}`] || 0);
+        noticeToShow = storeUpdateNotice({ release, platform: Platform.OS, applicationId: Application.applicationId, installedVersion: Application.nativeApplicationVersion, installedBuild: Application.nativeBuildVersion, snoozedUntil: until });
       }
       if (active && current === sequence) setNotice(noticeToShow);
     };
@@ -33,8 +33,8 @@ export default function StoreUpdateNotice({ visible }) {
   if (!visible || !notice) return null;
   const dismiss = () => {
     const until = Date.now() + UPDATE_SNOOZE_MS;
-    snoozes.current[notice.version] = until;
-    void AsyncStorage.setItem(storageKey(notice.version), String(until)).catch(() => {});
+    snoozes.current[`${notice.version}-${notice.build}`] = until;
+    void AsyncStorage.setItem(storageKey(`${notice.version}-${notice.build}`), String(until)).catch(() => {});
     setNotice(null);
   };
   const openStore = async () => {

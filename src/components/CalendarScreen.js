@@ -3,7 +3,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import EventCard from './EventCard';
 import { compareEventsByDateTime } from '../services/events';
-import { buildFeedUrl, calendarInstructions, copyCalendarFeed, openLiveCalendarSubscription } from '../services/calendar';
+import { getCalendarFeed, calendarInstructions, copyCalendarFeed, openLiveCalendarSubscription } from '../services/calendar';
 import { getHijriParts, HIJRI_MONTHS } from '../services/hijri';
 import { getHijriSettings } from '../services/settings';
 import { colors, radius, shadow, spacing, typography } from '../theme';
@@ -38,7 +38,9 @@ function NavButton({ direction = 'left', onPress, accessibilityLabel }) {
 function CalendarSync({ user, onBack }) {
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState('android');
-  const feedUrl = buildFeedUrl(user?.uid);
+  const [feedUrl, setFeedUrl] = useState('');
+  const [feedError, setFeedError] = useState('');
+  useEffect(() => { let active = true; getCalendarFeed(user?.uid).then(url => { if (active) setFeedUrl(url); }).catch(error => { if (active) setFeedError(error.message); });return () => { active = false; }; }, [user?.uid]);
   const instructions = calendarInstructions();
 
   const run = async action => {
@@ -67,13 +69,13 @@ function CalendarSync({ user, onBack }) {
         <Pressable onPress={() => run(() => openLiveCalendarSubscription(user?.uid, true))} style={styles.secondaryButton}>
           <Text style={styles.secondaryText}>Try alternate link</Text>
         </Pressable>
-        <Text style={styles.notice}>Calendar updates automatically within approximately one hour when events change.</Text>
+        <Text style={styles.notice}>Your calendar follows your saved default city. Changes appear when your calendar provider next refreshes; timing varies.</Text>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Your Personal Feed URL</Text>
         <Text style={styles.cardText}>Use this if Quick Sync does not work, or to add the calendar to Outlook.</Text>
-        <Text selectable style={styles.feedUrl}>{feedUrl}</Text>
+        <Text selectable style={styles.feedUrl}>{feedUrl || feedError || 'Creating your secure link…'}</Text>
         <Pressable onPress={() => run(async () => {
           await copyCalendarFeed(user?.uid);
           setCopied(true);
@@ -98,7 +100,7 @@ function CalendarSync({ user, onBack }) {
             <Text style={styles.instructionText}>{step}</Text>
           </View>
         ))}
-        <Text style={styles.notice}>Calendar entries include host name, event type, date and time, address and audience type.</Text>
+        <Text style={styles.notice}>Calendar entries include event title, date, time and suburb. Open the event in the app for authorised details. Keep your personal feed link private.</Text>
       </View>
     </ScrollView>
   );

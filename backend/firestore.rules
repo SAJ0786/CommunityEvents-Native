@@ -429,6 +429,11 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /appReleases/{platform} {
+      allow get: if platform in ['ios', 'android'];
+      allow list, write: if false;
+    }
+
     // ── Settings ───────────────────────────────────────────────────────────────
     match /settings/{docId} {
       allow read:  if docId == 'cityCatalogue' || signedIn();
