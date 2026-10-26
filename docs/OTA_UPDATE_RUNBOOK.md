@@ -146,3 +146,7 @@ Existing installed binaries without expo-updates cannot receive OTA updates. Use
 Configuration tests, real fingerprint JavaScript/native-change probes, source/release checks, existing regressions, production-environment Hermes exports and inspection of final signed packages are required. No production OTA update is published as part of initial enablement. Device testing is still required before public distribution.
 
 References: https://docs.expo.dev/eas-update/getting-started/ ; https://docs.expo.dev/bare/installing-updates/ ; https://docs.expo.dev/eas-update/runtime-versions/
+# Calendar backend follow-up — 26 October 2026
+
+Web/backend source 52c16e93df4008fc7f969d6363620f485ad0ba15 prevents revoked calendar credentials becoming valid again when a fresh subscription is created. Both calendar functions deployed and verified ACTIVE; 14 focused calendar cases pass. No OTA replacement is needed; production OTA IDs below remain current.
+

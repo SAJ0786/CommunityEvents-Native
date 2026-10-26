@@ -39,3 +39,7 @@ Completed 26 October 2026. Native application source ac3945cec21a5205e587b1cb5ff
 Additional foreground checks re-read the member profile when native/web returns to active visibility. Current UID/request guards prevent an older request overwriting a just-saved city or another account's profile. Already signed-in users with no city are gated after the new code loads; users with a saved city are not asked to choose repeatedly.
 
 The ordinary events collection still permits authenticated document reads and ordinary event image URLs remain public. Those broader privacy migrations are not represented as completed by this calendar release.
+
+## Final calendar revocation safeguard
+
+Backend source 52c16e93df4008fc7f969d6363620f485ad0ba15 adds subscription generations: creating a subscription after revocation cannot revive older secret links or historical UID links. Existing unrevoked subscriptions remain compatible. All 14 focused calendar cases pass. Both calendar functions were redeployed successfully and verified ACTIVE on 26 October; deployed source bytes match, unauthenticated callables reject requests, invalid feeds contain no events, and live Hosting assets still match. This backend-only follow-up requires no further OTA or store build.
