@@ -1,5 +1,26 @@
 # Community Connect native OTA updates
 
+## Current platform release status - 26 October 2026
+
+Both platforms now serve the required-city and secure-calendar update. This supersedes the previous current-platform section dated 22 October. Store binaries remain iOS 2.1.1 (16) and Android 2.1.1 (110). Existing calendars are retained; no bulk email/push or new binary was issued. See CITY_CALENDAR_UPDATE_2026_10_26.md for complete scope, compatibility and acceptance limits.
+
+## Deployment and OTA verification
+
+Completed 26 October 2026. Native application source ac3945cec21a5205e587b1cb5ffa2152df21ab3a; web source 06170a5b88a694f2a68f64feca82c0d4987a2ca3. Both pushed to approved origin/main and remote hashes checked.
+
+- completeMemberRegistration and completeMemberCity are ACTIVE under community-connect-web; calendarFeed and createCalendarSubscription are ACTIVE under default. Deployed profile/calendar module bytes match tested source. Unauthenticated probes reject all three callables. Invalid calendar credentials return an empty calendar with no events. No signed-in mutation or real participant test record was created.
+- Firestore rules compiled and deployed successfully. The only change from the protected prior canonical rules is the public read-only ios/android appReleases match. The web rule files are aligned to this protected baseline and current Storage rules.
+- Web Hosting deployed; live index and the App/CalendarView JavaScript assets match the tested production build exactly.
+- Verified public store metadata was created for iOS 2.1.1 (16) and Android 2.1.1 (110), with enabled/storeVerified set, fixed application IDs and a 90-day validity period. Public document reads verified. This activates the existing optional Home notice, not a forced-update policy. Revalidate or renew metadata before expiry.
+- iOS production OTA group 2a2df1fd-724f-410b-980c-c02b18ff0467, update 01a176b9-8320-7e47-96bd-6b7f82cd0143, runtime b1f045e738e61629962eb354595e34e2c39b75e6, matching build 16. Prior rollback group 7a1bfdd9-613f-4f91-822c-b90541ed6e35.
+- Android production OTA group 3be180d5-9284-41a0-a387-f648f5b0a341, update 01a176b9-8320-7969-9dbd-57d5bce3b44b, runtime 1ac7a2d1933a73b82d980e77f72cf46088efa61e, matching build 110. Prior rollback group b03ff983-d196-4c38-8a21-3498978e9cee.
+- Both production manifests were checked for the expected platform/runtime update IDs. Hermes exports and publication succeeded. Individual device download/application is not claimed. The EAS commit label includes a dirty marker due to local untracked support/environment files; tracked application source was committed before export and matched the source commit above.
+
+Additional foreground checks re-read the member profile when native/web returns to active visibility. Current UID/request guards prevent an older request overwriting a just-saved city or another account's profile. Already signed-in users with no city are gated after the new code loads; users with a saved city are not asked to choose repeatedly.
+
+The ordinary events collection still permits authenticated document reads and ordinary event image URLs remain public. Those broader privacy migrations are not represented as completed by this calendar release.
+
+
 ## Current platform release status — 22 October 2026
 
 The user confirmed Android approval on 22 October 2026, lifting the earlier Android review hold. Google Play was independently checked: production release 2.1.1 (110) is completed. The previously authorised Android catch-up OTA has now been published. iOS remains on its existing latest update. Earlier history sections describe the release status at that time; their Android hold statements are superseded by this current status.
