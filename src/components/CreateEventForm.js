@@ -19,10 +19,7 @@ import ScrollView from './KeyboardAwareScrollView';
 import { colors, radius, shadow, spacing, typography } from '../theme';
 import {
   getHijriDisplay,
-  getHijriMonthLength,
   getHijriParts,
-  hijriDisplayFromParts,
-  hijriToGregorian,
   HIJRI_MONTHS,
 } from '../services/hijri';
 import {
@@ -47,6 +44,7 @@ import {
 import { getOrganisations, normalizeOrganisationType } from '../services/organisations';
 import AddressAutocomplete from './AddressAutocomplete';
 import CompactSelect from './CompactSelect';
+import { currentHijriEventDate, resolveHijriEventDate } from '../utils/hijriEventDate';
 import { getDynamicEventOptions } from '../services/eventOptionsAdmin';
 import MemberPageHeader from './MemberPageHeader';
 
@@ -627,52 +625,17 @@ export default function CreateEventForm({
       setForm(current => ({ ...current, enteredAsHijri: false }));
       return;
     }
-    setForm(current => {
-      const parts = isIsoDate(current.eventDate)
-        ? getHijriParts(current.eventDate, hijriOverrides)
-        : getHijriParts(new Date(), hijriOverrides);
-      return {
-        ...current,
-        enteredAsHijri: true,
-        hijriDay: current.hijriDay || parts.day,
-        hijriMonth: current.hijriMonth || parts.month,
-        hijriYear: current.hijriYear || parts.year,
-      };
-    });
+    setForm(current => ({ ...current, ...currentHijriEventDate(hijriOverrides) }));
   };
 
   const updateHijriDate = changes => {
-    setForm(current => {
-      const rawDay = changes.hijriDay ?? current.hijriDay;
-      const rawMonth = changes.hijriMonth ?? current.hijriMonth;
-      const rawYear = changes.hijriYear ?? current.hijriYear;
-      const day = Number(rawDay);
-      const month = Number(rawMonth);
-      const year = Number(rawYear);
-      if (!day || !month || !year) {
-        return {
-          ...current,
-          ...changes,
-          eventDate: '',
-          hijriDate: '',
-          enteredAsHijri: true,
-        };
-      }
-      const maxDay = year && month ? getHijriMonthLength(year, month, hijriOverrides) : 30;
-      const safeDay = Math.min(Math.max(day || 1, 1), maxDay);
-      const eventDate = hijriToGregorian(safeDay, month, year, hijriOverrides) || current.eventDate;
-      return {
-        ...current,
-        ...changes,
-        hijriDay: safeDay,
-        hijriMonth: month,
-        hijriYear: year,
-        hijriDate: hijriDisplayFromParts(safeDay, month, year),
-        eventDate,
-        enteredAsHijri: true,
-      };
-    });
+    setForm(current => resolveHijriEventDate({ ...current, ...changes }, hijriOverrides));
   };
+
+  // Let a numeric field be edited before enforcing the completed date.
+  const draftHijriDate = changes => setForm(current => ({
+    ...current, ...changes, eventDate: '', hijriDate: '', enteredAsHijri: true,
+  }));
 
   const setTimeMode = mode => {
     setForm(current => ({
@@ -938,7 +901,8 @@ export default function CreateEventForm({
                     keyboardType="number-pad"
                     maxLength={2}
                     value={String(form.hijriDay || '')}
-                    onChangeText={value => updateHijriDate({ hijriDay: value.replace(/\D/g, '') })}
+                    onChangeText={value => draftHijriDate({ hijriDay: value.replace(/\D/g, '') })}
+                    onBlur={() => updateHijriDate({})}
                     placeholder="1"
                     placeholderTextColor={colors.muted}
                     style={styles.input}
@@ -950,7 +914,8 @@ export default function CreateEventForm({
                     keyboardType="number-pad"
                     maxLength={4}
                     value={String(form.hijriYear || '')}
-                    onChangeText={value => updateHijriDate({ hijriYear: value.replace(/\D/g, '') })}
+                    onChangeText={value => draftHijriDate({ hijriYear: value.replace(/\D/g, '') })}
+                    onBlur={() => updateHijriDate({})}
                     placeholder="1448"
                     placeholderTextColor={colors.muted}
                     style={styles.input}
