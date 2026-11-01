@@ -1,3 +1,11 @@
+
+## Published Hijri date OTA — 2 November 2026
+
+Source: 152954e3b620f28c2ac9a46db77b8b9dc2d65630. Production OTA for both platforms; store binaries remain iOS 2.1.1 (16) and Android 2.1.1 (110). Prefills today on selecting Hijri, converts immediately, and validates completed day/year edits on blur. Past completed dates reset to today. Tests, source checks and production runtime compatibility passed. Both live production manifests verified at 2026-11-01T19:33:24.362410+00:00. Device application is not claimed. No web or backend deployment.
+
+- ios: group 97a249f8-6dde-413f-9415-f5f22ef8293a, update 01a19895-5752-7629-b749-a60089d1304a, runtime b1f045e738e61629962eb354595e34e2c39b75e6. Rollback group 2a2df1fd-724f-410b-980c-c02b18ff0467.
+- android: group 930648c4-9712-44ab-a547-424f4348d2b6, update 01a19895-5752-744a-ad6c-ae9cff92d088, runtime 1ac7a2d1933a73b82d980e77f72cf46088efa61e. Rollback group 3be180d5-9284-41a0-a387-f648f5b0a341.
+
 # Community Connect native OTA updates
 
 ## Current platform release status - 26 October 2026
