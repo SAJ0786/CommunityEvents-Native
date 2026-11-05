@@ -142,10 +142,6 @@ android {
         }
         release {
             signingConfig signingConfigs.release
-            firebaseCrashlytics {
-                // Keep release stack traces readable after R8 obfuscation.
-                mappingFileUploadEnabled true
-            }
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
@@ -222,3 +218,8 @@ dependencies {
 
 apply plugin: 'com.google.gms.google-services'
 apply plugin: 'com.google.firebase.crashlytics'
+
+// The plugin is applied above, so its build-type extension now exists.
+android.buildTypes.release.firebaseCrashlytics {
+    mappingFileUploadEnabled true
+}

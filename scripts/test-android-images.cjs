@@ -137,6 +137,7 @@ test('release R8, resource shrinking, crash mapping and non-incrementing audit p
   assert.doesNotMatch(properties, /android.enableR8.fullMode=false/);
   assert.match(gradle, /proguard-android-optimize.txt/);
   assert.match(gradle, /mappingFileUploadEnabled true/);
+  assert.ok(gradle.indexOf("apply plugin: 'com.google.firebase.crashlytics'") < gradle.indexOf('android.buildTypes.release.firebaseCrashlytics'));
   assert.doesNotMatch(rules, /^\s*-(dontoptimize|dontobfuscate|dontshrink)\b/m);
   assert.equal(eas.build['performance-audit'].autoIncrement, false);
   assert.equal(eas.build['performance-audit'].extends, 'production');
