@@ -1,6 +1,7 @@
+import Image from '../components/OptimizedImage';
 import { BUSINESS_DAYS, formatBusinessDay } from '../utils/businessHours';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Animated, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import ScrollView from '../components/KeyboardAwareScrollView';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';

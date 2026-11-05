@@ -1,3 +1,4 @@
+import Image from './OptimizedImage';
 import HorizontalStrip from './HorizontalStrip';
 import EventPosterPicker from './EventPosterPicker';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -7,14 +8,12 @@ import EventDateTimePicker from './EventDateTimePicker';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Pressable,
   StyleSheet,
   Switch,
   Text,
   TextInput,
-  View,
-} from 'react-native';
+  View} from 'react-native';
 import ScrollView from './KeyboardAwareScrollView';
 import { colors, radius, shadow, spacing, typography } from '../theme';
 import {

@@ -86,6 +86,7 @@
     },
     "production": {
       "environment": "production",
+      "buildArtifactPaths": ["android/app/build/outputs/mapping/release/**/*"],
       "autoIncrement": true,
       "ios": {
         "image": "macos-sequoia-15.6-xcode-26.0"
@@ -98,6 +99,11 @@
         "PROMOTION_AUDIENCE_CLIENT_ENABLED": "false"
       },
       "channel": "production"
+    },
+    "performance-audit": {
+      "extends": "production",
+      "autoIncrement": false,
+      "android": { "buildType": "app-bundle" }
     },
     "play-internal": {
       "extends": "registration-testflight",

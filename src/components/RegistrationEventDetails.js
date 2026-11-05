@@ -1,5 +1,6 @@
+import Image from './OptimizedImage';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Image, Modal, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Modal, Pressable, Text, View } from 'react-native';
 import EventDetailsModal from './EventDetailsModal';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 import MemberPageHeader from './MemberPageHeader';

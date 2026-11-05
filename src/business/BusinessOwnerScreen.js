@@ -1,5 +1,6 @@
+import Image from '../components/OptimizedImage';
 import React from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BUSINESS_STATUSES, formatAbn, isHistoricalBusiness } from '../services/businesses';
 import { colors, radius, shadow, spacing, typography } from '../theme';
 import MemberPageHeader from '../components/MemberPageHeader';

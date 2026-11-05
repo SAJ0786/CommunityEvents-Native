@@ -1,14 +1,13 @@
+import Image from './OptimizedImage';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Linking,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  View,
-} from 'react-native';
+  View} from 'react-native';
 import { httpsCallable } from '@react-native-firebase/functions';
 import { functions } from '../firebase/firebase';
 import { colors, radius, shadow, spacing, typography } from '../theme';

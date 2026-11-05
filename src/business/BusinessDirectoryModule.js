@@ -1,6 +1,7 @@
+import Image from '../components/OptimizedImage';
 import HorizontalStrip from '../components/HorizontalStrip';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import ScrollView from '../components/KeyboardAwareScrollView';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import BusinessCard from './BusinessCard';
@@ -192,8 +193,7 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
     }
   };
 
-  return (
-    <ScrollView contentContainerStyle={styles.pageContent} keyboardShouldPersistTaps="handled">
+  const header = <>
       <MemberPageHeader
         title="Local businesses"
         subtitle={`Browse approved businesses in ${cityLabel(city).replace(', Australia', '')}.`}
@@ -296,20 +296,8 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
         title={categoryId === 'all' ? 'All businesses' : categories.find(category => category.id === categoryId)?.label || 'Businesses'}
         subtitle={`${cityBusinesses.length} result${cityBusinesses.length === 1 ? '' : 's'} in ${cityLabel(city).replace(', Australia', '')}`}
       />
-      {loading ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyIcon}>{'\u231B'}</Text>
-          <Text style={styles.emptyTitle}>Loading businesses</Text>
-          <Text style={styles.emptyText}>Checking approved listings for {cityLabel(city).replace(', Australia', '')}.</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.errorCard}>
-          <Text style={styles.errorTitle}>Directory unavailable</Text>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : cityBusinesses.length ? (
-        <View style={styles.businessList}>
-          {cityBusinesses.map(business => (
+  </>;
+  const renderBusiness = business => (
             <Pressable key={business.id} onPress={() => onOpenBusiness(business)} style={({ pressed }) => [styles.businessRow, pressed && styles.pressed]}>
               <View style={[styles.rowLogo, { backgroundColor: colors.tealSoft }]}>
                 {business.logoUrl ? <Image source={{ uri: business.logoUrl }} resizeMode="cover" style={styles.rowLogoImage} /> : <Text style={styles.rowCategoryIcon}>{categories.find(category => category.id === business.categoryId || category.label === business.category)?.icon || '🏪'}</Text>}
@@ -328,7 +316,17 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
               </View>
               <Text style={styles.chevron}>{'\u203A'}</Text>
             </Pressable>
-          ))}
+  );
+  const empty = loading ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyIcon}>{'\u231B'}</Text>
+          <Text style={styles.emptyTitle}>Loading businesses</Text>
+          <Text style={styles.emptyText}>Checking approved listings for {cityLabel(city).replace(', Australia', '')}.</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorCard}>
+          <Text style={styles.errorTitle}>Directory unavailable</Text>
+          <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : (
         <View style={styles.emptyCard}>
@@ -339,10 +337,22 @@ function DirectoryHome({ businesses, categories, city, savedIds, loading, error,
             <Text style={styles.secondaryButtonText}>Clear filters</Text>
           </Pressable>
         </View>
-      )}
-
-    </ScrollView>
-  );
+      );
+  if (Platform.OS === 'android') return <FlatList
+    data={loading || error ? [] : cityBusinesses}
+    keyExtractor={business => business.id}
+    renderItem={({ item }) => renderBusiness(item)}
+    ListHeaderComponent={header}
+    ListEmptyComponent={empty}
+    ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+    contentContainerStyle={styles.pageContent}
+    keyboardShouldPersistTaps="handled"
+    initialNumToRender={6} maxToRenderPerBatch={6} windowSize={5}
+  />;
+  return <ScrollView contentContainerStyle={styles.pageContent} keyboardShouldPersistTaps="handled">
+    {header}
+    {loading || error || !cityBusinesses.length ? empty : <View style={styles.businessList}>{cityBusinesses.map(renderBusiness)}</View>}
+  </ScrollView>;
 }
 
 function PromotionsScreen({ city, businesses, promotions, ownerPromotions = [], loading, error, onOpenBusiness }) {

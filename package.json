@@ -4,6 +4,7 @@
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
+    "test:android-images": "node scripts/test-android-images.cjs",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
@@ -48,6 +49,7 @@
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.24",
     "expo-font": "~14.0.12",
+    "expo-image": "~3.0.11",
     "expo-image-picker": "~17.0.11",
     "expo-intent-launcher": "~13.0.8",
     "expo-keep-awake": "~15.0.8",

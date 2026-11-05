@@ -1,5 +1,6 @@
+import Image from '../components/OptimizedImage';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import ScrollView from '../components/KeyboardAwareScrollView';
 import * as ImagePicker from 'expo-image-picker';
 import CompactSelect from '../components/CompactSelect';

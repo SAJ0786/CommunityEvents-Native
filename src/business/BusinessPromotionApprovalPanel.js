@@ -1,5 +1,6 @@
+import Image from '../components/OptimizedImage';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import {
   approveBusinessPromotion,
   listenBusinessPromotionsForAdmin,

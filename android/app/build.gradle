@@ -142,6 +142,10 @@ android {
         }
         release {
             signingConfig signingConfigs.release
+            firebaseCrashlytics {
+                // Keep release stack traces readable after R8 obfuscation.
+                mappingFileUploadEnabled true
+            }
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

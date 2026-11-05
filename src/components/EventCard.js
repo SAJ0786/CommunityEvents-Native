@@ -1,5 +1,6 @@
+import Image from './OptimizedImage';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, AppState, Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, AppState, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { auth } from '../firebase/firebase';
 import { registrationStatusLabel } from '../registration/registrationStatus';
@@ -173,7 +174,7 @@ export default function EventCard({ event, onPress, onToggleSaved, isSaved, savi
 
     <Modal transparent visible={posterOpen} animationType="fade" onRequestClose={() => setPosterOpen(false)}>
       <Pressable accessibilityLabel="Close full-screen event poster" onPress={() => setPosterOpen(false)} style={styles.posterModal}>
-        {visiblePoster ? <Image source={{ uri: visiblePoster }} style={styles.posterFullscreen} resizeMode="contain" /> : posterError ? <><Text accessibilityRole="alert" style={{ color: colors.onPrimary }}>{posterError}</Text><Pressable onPress={event => { event.stopPropagation?.(); setPosterRefresh(value => value + 1); }}><Text style={{ color: colors.onPrimary }}>Retry poster</Text></Pressable></> : <ActivityIndicator color={colors.onPrimary} />}
+        {visiblePoster ? <Image fullResolution source={{ uri: visiblePoster }} style={styles.posterFullscreen} resizeMode="contain" /> : posterError ? <><Text accessibilityRole="alert" style={{ color: colors.onPrimary }}>{posterError}</Text><Pressable onPress={event => { event.stopPropagation?.(); setPosterRefresh(value => value + 1); }}><Text style={{ color: colors.onPrimary }}>Retry poster</Text></Pressable></> : <ActivityIndicator color={colors.onPrimary} />}
         <Text maxFontSizeMultiplier={1.1} style={styles.posterCloseHint}>Tap anywhere to close</Text>
       </Pressable>
     </Modal>

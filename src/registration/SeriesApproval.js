@@ -1,5 +1,6 @@
+import Image from '../components/OptimizedImage';
 import React,{useRef,useState,useEffect} from 'react';
-import {Image,Pressable,Text,View} from 'react-native';
+import {Pressable,Text,View} from 'react-native';
 import {Action,RegistrationIdentity,styles} from './RegistrationControls';
 
 export default function SeriesApproval({api,event,onApproved,disabled}){

@@ -1576,6 +1576,7 @@ function MainApp() {
         <FlatList
           data={loading ? [] : displayedEvents}
           keyExtractor={(item, index) => item.id || `${item.eventDate || 'event'}-${index}`}
+          {...(Platform.OS === 'android' ? { initialNumToRender: 4, maxToRenderPerBatch: 4, windowSize: 5 } : {})}
           renderItem={({ item }) => (
             <EventCard
               event={item}

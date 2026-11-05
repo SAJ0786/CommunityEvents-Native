@@ -1,5 +1,6 @@
+import Image from '../components/OptimizedImage';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, shadow, spacing, typography, withAlpha } from '../theme';
 
 const CATEGORY_ART = {
@@ -40,6 +41,7 @@ export default function BusinessCard({ business, saved = false, onPress, onToggl
   const [imageFailed, setImageFailed] = useState(false);
   const promotionPulse = useRef(new Animated.Value(1)).current;
   const imageUrl = business.coverUrl || business.logoUrl;
+  useEffect(() => { setImageFailed(false); }, [imageUrl]);
   useEffect(() => {
     if (!business.hasActivePromotion) return undefined;
     const animation = Animated.loop(Animated.sequence([

@@ -51,11 +51,8 @@ export async function deleteBusinessImage(imagePath) {
 }
 
 const posterUrlCache = new Map();
-
-function cacheKey(event = {}) {
-  if (!event || typeof event !== 'object') return '';
-  return String(event.id || event.imagePath || event.imageUrl || event.posterUrl || '');
-}
+const posterUrlRequests = new Map();
+const MAX_POSTER_URLS = 128;
 
 export function getImmediatePosterSource(event = {}) {
   if (!event || typeof event !== 'object') return '';
@@ -79,10 +76,20 @@ export async function resolvePosterSource(event = {}) {
   const path = String(event.imagePath || event.posterPath || '').trim();
   if (!path) return '';
 
-  const key = cacheKey(event);
-  if (key && posterUrlCache.has(key)) return posterUrlCache.get(key);
-
-  const url = await getDownloadURL(ref(storage, path));
-  if (key) posterUrlCache.set(key, url);
-  return url;
+  // A replacement poster must not reuse the URL of the previous storage path.
+  const key = path;
+  if (posterUrlCache.has(key)) {
+    const url = posterUrlCache.get(key);
+    posterUrlCache.delete(key);
+    posterUrlCache.set(key, url);
+    return url;
+  }
+  if (posterUrlRequests.has(key)) return posterUrlRequests.get(key);
+  const request = getDownloadURL(ref(storage, path)).then(url => {
+    posterUrlCache.set(key, url);
+    while (posterUrlCache.size > MAX_POSTER_URLS) posterUrlCache.delete(posterUrlCache.keys().next().value);
+    return url;
+  }).finally(() => posterUrlRequests.delete(key));
+  posterUrlRequests.set(key, request);
+  return request;
 }

@@ -1,3 +1,4 @@
+import Image from './OptimizedImage';
 import HorizontalStrip from './HorizontalStrip';
 import SegmentedControl from './SegmentedControl';
 import BusinessApprovalPanel from '../business/BusinessApprovalPanel';
@@ -7,15 +8,13 @@ import {
   ActivityIndicator,
   AppState,
   Alert,
-  Image,
   Linking,
   Pressable,
   Share,
   StyleSheet,
   Text,
   TextInput,
-  View,
-} from 'react-native';
+  View} from 'react-native';
 import ScrollView from './KeyboardAwareScrollView';
 import { memberJoinedLabel, memberJoinedMillis, newestMembersFirst } from '../utils/memberProfile';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';

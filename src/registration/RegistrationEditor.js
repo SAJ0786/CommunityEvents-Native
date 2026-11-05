@@ -1,7 +1,8 @@
+import Image from '../components/OptimizedImage';
 import EventPosterPicker from '../components/EventPosterPicker';
 import { registrationPosterAsset } from './posterAsset';
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, Switch, Text, View } from 'react-native';
+import { Switch, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import CreateEventForm from '../components/CreateEventForm';
 import NativeDateTimeField from '../components/NativeDateTimeField';

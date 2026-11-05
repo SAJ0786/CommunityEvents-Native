@@ -178,6 +178,8 @@ function detailsFixture(detail, isGuest = false, options = {}) {
     plugins: [require.resolve('@babel/plugin-transform-react-jsx'), require.resolve('@babel/plugin-transform-modules-commonjs')],
   }).code;
   vm.runInNewContext(code, { exports, require: name => {
+    if (name.endsWith('/OptimizedImage')) return { __esModule:true, default:'Image' };
+    if (name === '../utils/hijriEventDate') return load(path.join(root, 'src/utils/hijriEventDate.js'));
     if (!(name in mocks)) throw new Error(`Unexpected component dependency ${name}`);
     return mocks[name];
   } });
@@ -300,6 +302,8 @@ test('My Events preserves attendee history without exposing host edit/delete con
     plugins: [require.resolve('@babel/plugin-transform-react-jsx'), require.resolve('@babel/plugin-transform-modules-commonjs')],
   }).code;
   vm.runInNewContext(code, { exports, require: name => {
+    if (name.endsWith('/OptimizedImage')) return { __esModule:true, default:'Image' };
+    if (name === '../utils/hijriEventDate') return load(path.join(root, 'src/utils/hijriEventDate.js'));
     if (!(name in mocks)) throw new Error(`Unexpected My Events dependency ${name}`);
     return mocks[name];
   } });
@@ -337,7 +341,7 @@ test('My Events type filter preserves list choice, bookings and history and rese
     '../registration/registrationStatus':{registrationUnavailable:event=>Boolean(event.deletedAt)}, '../theme':require('./theme-fixture.cjs')};
   const exports = {};
   const code = babel.transformSync(fs.readFileSync(path.join(root,'src/components/MyEventsScreen.js'),'utf8'), {configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
-  vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
+  vm.runInNewContext(code,{exports,require:name=>{if(name.endsWith('/OptimizedImage'))return {__esModule:true,default:'Image'};assert.ok(name in mocks,name);return mocks[name];}});
   const events = [{id:'normal'}, {id:'hosted',ownerUid:'a',registrationOnly:true,isRegistered:true}, {id:'booking',ownerUid:'other',registrationOnly:true,isRegistered:true}, {id:'history',ownerUid:'other',registrationOnly:true,isRegistered:true,deletedAt:'2026-10-01'}];
   const render = (uid='a', rows=events) => {index=0;return exports.default({userUid:uid,events:rows});};
   const ids = list => Array.from(list.props.data,event=>event.id);
@@ -358,7 +362,7 @@ test('registered attendees get collapsed poster thumbnails and account changes d
   const react={createElement:(type,props,...children)=>({type,props:{...props,children}}),useState:value=>{const i=index++;if(!(i in slots))slots[i]=typeof value==='function'?value():value;return[slots[i],next=>{slots[i]=typeof next==='function'?next(slots[i]):next;}];},useEffect:(fn,deps)=>{const i=index++;const old=slots[i];if(!old||deps.some((value,j)=>value!==old.deps[j])){old?.cleanup?.();const item={deps};slots[i]=item;effects.push(()=>item.cleanup=fn());}}};
   const mocks={react,'react-native':{ActivityIndicator:'ActivityIndicator',AppState:{currentState:'active',addEventListener:()=>({remove(){}})},Image:'Image',Modal:'Modal',Pressable:'Pressable',Text:'Text',View:'View',useWindowDimensions:()=>({width:393,fontScale:1}),StyleSheet:{create:v=>v}},'@expo/vector-icons/MaterialCommunityIcons':'Icon','../firebase/firebase':{auth},'../registration/registrationStatus':load(path.join(root,'src/registration/registrationStatus.js')),'../theme':require('./theme-fixture.cjs'),'../utils/formatters':load(path.join(root,'src/utils/formatters.js')),'../services/events':{getEventPoster:()=>'',getEventSuburb:()=>''},'../services/images':{getImmediatePosterSource:()=>'',resolvePosterSource:async()=>''},'../registration/firebaseRegistration':{REGISTRATION_ENABLED:true,firebaseRegistration:()=>({poster:async()=>{calls++;return{mime:'image/png',base64:'registered-poster'};}})},'../../assets/logo.png':'fallback-logo'};
   const exports={};const code=babel.transformSync(fs.readFileSync(path.join(root,'src/components/EventCard.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
-  vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
+  vm.runInNewContext(code,{exports,require:name=>{if(name.endsWith('/OptimizedImage'))return {__esModule:true,default:'Image'};assert.ok(name in mocks,name);return mocks[name];}});
   let event={id:'event',eventDate:'2026-12-01',registrationOnly:true,status:'approved',hasPoster:true,isRegistered:true,revision:1};
   const render=()=>{index=0;const tree=exports.default({event});while(effects.length)effects.shift()();return tree;};
   render();await new Promise(setImmediate);let tree=render();assert.equal(calls,1);assert.equal(flatten(tree).find(node=>node.type==='Image').props.source.uri,'data:image/png;base64,registered-poster');
@@ -534,6 +538,8 @@ function componentFixture(file, mocks, props) {
     configFile: false, babelrc: false, plugins: ['@babel/plugin-transform-react-jsx', '@babel/plugin-transform-modules-commonjs'],
   }).code;
   vm.runInNewContext(code, { exports, require: name => {
+    if (name.endsWith('/OptimizedImage')) return { __esModule:true, default:'Image' };
+    if (name === '../utils/hijriEventDate') return load(path.join(root, 'src/utils/hijriEventDate.js'));
     if (name === 'react') return react;
     if (name === './EventDetailsModal') return {__esModule:true,default:'Details'};
     if (name === '../registration/eventFeed') return feed;
@@ -1019,7 +1025,7 @@ test('saved native form preserves participant snapshots and consent while blocki
  const react={createElement:(type,props,...children)=>({type,props:{...props,children}})};
  const mocks={react,'@expo/vector-icons/MaterialCommunityIcons':{default:'Icon'},'react-native':{Pressable:'Pressable',StyleSheet:{create:value=>value},Switch:'Switch',Text:'Text',TextInput:'TextInput',View:'View'},'../theme':require('./theme-fixture.cjs'),'./prototypeModel':load(path.join(root,'src/registration/prototypeModel.js'))};
  const code=babel.transformSync(fs.readFileSync(path.join(root,'src/registration/RegistrationControls.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
- vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
+ vm.runInNewContext(code,{exports,require:name=>{if(name.endsWith('/OptimizedImage'))return {__esModule:true,default:'Image'};assert.ok(name in mocks,name);return mocks[name];}});
  const fields=[{id:'participant:1:name',participantIndex:1,perParticipant:true,originalLabel:'Name',label:'Participant 1 — Name',type:'text'},{id:'participant:2:name',participantIndex:2,perParticipant:true,originalLabel:'Name',label:'Participant 2 — Name',type:'text'},{id:'terms',type:'consent',label:'Agreement',terms:'Original terms'}];
  const nodes=flatten(exports.RegistrationFields({fields,places:2,answers:{'participant:1:name':'First','participant:2:name':'Second',terms:true},readOnly:true}));
  const answers=nodes.filter(node=>node.type===exports.Answer);assert.equal(answers.length,3);assert.equal(answers[2].props.value,true);assert.ok(answers.every(node=>node.props.readOnly));
@@ -1094,7 +1100,7 @@ test('native dashboard opens the transfer selector from the card action and subm
  './TransferMemberPicker':{__esModule:true,default:'TransferMemberPicker'},'./EventCard':{__esModule:true,default:'EventCard'},'./RegistrationEventDetails':{__esModule:true,default:'RegistrationDetails'},'./NativeLiveStreamModal':{__esModule:true,default:'StreamModal'},'./CitySelector':{__esModule:true,default:'CitySelector'},
  '../registration/firebaseRegistration':{REGISTRATION_ENABLED:true,firebaseRegistration:()=>({transfer:async(...args)=>calls.push(args)})},'../registration/eventFeed':{},'../services/events':{},'../utils/adminUserSearch':load(path.join(root,'src/utils/adminUserSearch.js')),'../utils/cities':{DEFAULT_CITY:'sydney'},'../theme':require('./theme-fixture.cjs')};
  const exports={};const code=babel.transformSync(fs.readFileSync(path.join(root,'src/components/RegistrationManagementPanel.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
- vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
+ vm.runInNewContext(code,{exports,require:name=>{if(name.endsWith('/OptimizedImage'))return {__esModule:true,default:'Image'};assert.ok(name in mocks,name);return mocks[name];}});
  const render=(extra={})=>{cursor=0;return exports.default({user:{uid:'super'},profile:{role:'superAdmin'},users:[{id:'new-owner',fullName:'Syed Asim Raza',phone:'+61 496 504 950'}],onLoadUsers:()=>calls.push(['loadUsers']),...extra});};
  let nodes=flatten(render());nodes.find(node=>node.type==='EventCard').props.onPress(event);
  nodes=flatten(render());const details=nodes.find(node=>node.type==='RegistrationDetails');assert.equal(details.props.event.id,'event');
@@ -1116,7 +1122,7 @@ test('shared native transfer picker uses identical filtering and select-then-tra
  const react={createElement:(type,props,...children)=>({type,props:{...props,children}})};
  const mocks={react,'react-native':{ActivityIndicator:'ActivityIndicator',Pressable:'Pressable',StyleSheet:{create:value=>value,hairlineWidth:1},Text:'Text',TextInput:'TextInput',View:'View'},'../theme':require('./theme-fixture.cjs'),'../utils/adminUserSearch':search};
  const code=babel.transformSync(fs.readFileSync(path.join(root,'src/components/TransferMemberPicker.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
- vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
+ vm.runInNewContext(code,{exports,require:name=>{if(name.endsWith('/OptimizedImage'))return {__esModule:true,default:'Image'};assert.ok(name in mocks,name);return mocks[name];}});
  const props={users,ownerUid:'owner',query:'0496 504 950',onQueryChange:value=>calls.push(['query',value]),onSelect:value=>calls.push(['select',value]),onConfirm:value=>calls.push(['confirm',value]),onCancel:()=>{}};
  const render=extra=>flatten(exports.default({...props,...extra}));
  const row=nodes=>nodes.find(node=>node.type==='Pressable'&&flatten(node).some(child=>child.type==='Text'&&child.props.children[0]==='Syed Asim Raza'));
@@ -1155,7 +1161,7 @@ test('native member refresh uses the server and propagates offline failure witho
  const firestore={collection:()=> 'users',getDocs:async()=>{calls.push('default');return snapshot;},getDocsFromServer:async()=>{calls.push('server');if(offline)throw new Error('Offline');return snapshot;}};
  const mocks={'@react-native-firebase/firestore':firestore,'@react-native-firebase/functions':{},'@react-native-firebase/auth':{},'../firebase/firebase':{db:{}}};
  const code=babel.transformSync(fs.readFileSync(path.join(root,'src/services/users.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
- vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
+ vm.runInNewContext(code,{exports,require:name=>{if(name.endsWith('/OptimizedImage'))return {__esModule:true,default:'Image'};assert.ok(name in mocks,name);return mocks[name];}});
  assert.equal((await exports.listUsers({includeHidden:true,serverOnly:true}))[0].fullName,'Syed Asim Raza');
  await exports.listUsers({includeHidden:true});
  offline=true;await assert.rejects(exports.listUsers({includeHidden:true,serverOnly:true}),/Offline/);
@@ -1169,7 +1175,7 @@ test('native admin panel renders hidden non-owned events as delete-only entries'
  './TransferMemberPicker':{__esModule:true,default:'TransferMemberPicker'},'./EventCard':{__esModule:true,default:'EventCard'},'./RegistrationEventDetails':{__esModule:true,default:'RegistrationDetails'},'./NativeLiveStreamModal':{__esModule:true,default:'StreamModal'},'./CitySelector':{__esModule:true,default:'CitySelector'},
  '../registration/firebaseRegistration':{REGISTRATION_ENABLED:true,firebaseRegistration:()=>({deleteEvent:async(...args)=>calls.push(args)})},'../registration/eventFeed':{},'../services/events':{},'../utils/adminUserSearch':load(path.join(root,'src/utils/adminUserSearch.js')),'../utils/cities':{DEFAULT_CITY:'sydney'},'../theme':require('./theme-fixture.cjs')};
  const exports={};const code=babel.transformSync(fs.readFileSync(path.join(root,'src/components/RegistrationManagementPanel.js'),'utf8'),{configFile:false,babelrc:false,plugins:[require.resolve('@babel/plugin-transform-react-jsx'),require.resolve('@babel/plugin-transform-modules-commonjs')]}).code;
- vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in mocks,name);return mocks[name];}});
+ vm.runInNewContext(code,{exports,require:name=>{if(name.endsWith('/OptimizedImage'))return {__esModule:true,default:'Image'};assert.ok(name in mocks,name);return mocks[name];}});
  const tree=exports.default({user:{uid:'admin'},profile:{role:'superAdmin'}}),nodes=flatten(tree);
  assert.equal(nodes.filter(node=>node.type==='EventCard').length,0);
  assert.equal(nodes.find(node=>node.type==='RegistrationDetails').props.event,null);

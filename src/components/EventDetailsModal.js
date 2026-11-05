@@ -1,10 +1,10 @@
+import Image from './OptimizedImage';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Animated,
   BackHandler,
-  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -15,8 +15,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
-} from 'react-native';
+  View} from 'react-native';
 import SafeAreaView from './ModalSafeArea';
 import useMenuDrawerMotion from './useMenuDrawerMotion';
 import DrawerDragZone from './DrawerDragZone';
@@ -613,7 +612,7 @@ export default function EventDetailsModal({
             <View style={styles.posterModalRoot}>
           <Pressable style={styles.posterBackdrop} onPress={() => setPosterOpen(false)} />
           <Pressable style={styles.posterModalContent} onPress={() => setPosterOpen(false)}>
-            {canSharePoster ? <Image source={{ uri: posterUri }} style={styles.posterFullscreen} resizeMode="contain" /> : null}
+            {canSharePoster ? <Image fullResolution source={{ uri: posterUri }} style={styles.posterFullscreen} resizeMode="contain" /> : null}
           </Pressable>
             </View>
           </View> : null}
