@@ -16,6 +16,12 @@ iOS bundle ID: `info.siza.communityevents`
 
 Use [FINAL_LAUNCH_CHECKLIST.md](FINAL_LAUNCH_CHECKLIST.md) for the final Deployers-account build, signing, artifact inspection and store-submission hand-off.
 
+## Next Android release to-do
+
+- [ ] Bundle the validated Android image and R8 mapping improvements with the next planned store release after a few more changes are ready. Release timing is on hold. See the [Android performance review](../ANDROID_PERFORMANCE_REVIEW_2026_11_05.md).
+- [ ] Before submission, check signed-in flows, uploads, push notifications, deep links and crash reporting on the release candidate.
+- [ ] Review Android vitals for a significant crash or freeze spike, a threshold breach or a Play enforcement deadline. Reprioritise the release if any of these appear. After Google evaluates the next production build, recheck the original recommendations.
+
 ## Automated gates now enforced
 
 - Store name is Community Connect Australia; in-app module titles remain Community Events Australia and Community Businesses Australia.
